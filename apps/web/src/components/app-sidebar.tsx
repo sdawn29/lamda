@@ -37,7 +37,7 @@ export function AppSidebar() {
         </SidebarGroup>
         <SidebarGroup>
           <div className="flex items-center justify-between">
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+            <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
             <Button variant="ghost" size="icon">
               <Plus />
             </Button>
