@@ -1,3 +1,4 @@
+import { useMemo, useSyncExternalStore } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { useRouter } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
@@ -8,6 +9,23 @@ const isMac =
 
 export function TitleBar() {
   const router = useRouter()
+
+  const { subscribe, getSnapshot } = useMemo(() => {
+    let count = 0
+    return {
+      subscribe: (notify: () => void) =>
+        router.history.subscribe(({ action }) => {
+          if (action.type === "PUSH" || action.type === "REPLACE") count = 0
+          else if (action.type === "BACK") count++
+          else if (action.type === "FORWARD") count = Math.max(0, count - 1)
+          notify()
+        }),
+      getSnapshot: () => count > 0,
+    }
+  }, [router.history])
+
+  const canGoBack = router.history.canGoBack()
+  const canGoForward = useSyncExternalStore(subscribe, getSnapshot, () => false)
 
   return (
     <div
@@ -23,6 +41,7 @@ export function TitleBar() {
           variant="ghost"
           size="icon-sm"
           onClick={() => router.history.back()}
+          disabled={!canGoBack}
         >
           <ChevronLeft />
           <span className="sr-only">Go back</span>
@@ -31,6 +50,7 @@ export function TitleBar() {
           variant="ghost"
           size="icon-sm"
           onClick={() => router.history.forward()}
+          disabled={!canGoForward}
         >
           <ChevronRight />
           <span className="sr-only">Go forward</span>
