@@ -7,6 +7,7 @@ import { transformSync } from "esbuild";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
+console.log(`Running in ${isDev ? "development" : "production"} mode`);
 
 function buildPreload(): string {
   const src = readFileSync(path.join(__dirname, "preload.ts"), "utf-8");

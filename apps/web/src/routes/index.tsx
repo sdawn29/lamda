@@ -7,7 +7,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   return (
-    <div className="flex items-end justify-center p-6">
+    <div className="flex h-full items-center justify-center p-6">
       <div className="w-full max-w-2xl">
         <ChatTextbox onSend={(msg) => console.log("Sent:", msg)} />
       </div>
