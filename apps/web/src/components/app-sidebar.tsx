@@ -1,4 +1,4 @@
-import { Edit, FolderOpen, Plus } from "lucide-react"
+import { FolderOpen, Plus } from "lucide-react"
 
 import {
   Sidebar,
@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { useWorkspace } from "@/hooks/workspace-context"
 
-const items = [{ title: "New Thread", url: "/", icon: Edit }]
+// const items = [{ title: "New Thread", url: "/", icon: Edit }]
 
 export function AppSidebar() {
   const { workspaces, activeWorkspace, selectWorkspace, createWorkspace } =

@@ -16,15 +16,22 @@ import type { ManagedSessionHandle, SdkConfig } from "./types.js";
 export async function createManagedSession(
   config: SdkConfig,
 ): Promise<ManagedSessionHandle> {
+  const cwd = config.cwd ?? process.cwd();
   const authStorage = buildAuthStorage(config);
   const modelRegistry = ModelRegistry.create(authStorage);
-  const sessionManager = SessionManager.inMemory(config.cwd ?? process.cwd());
+  const sessionManager = SessionManager.inMemory(cwd);
+
+  const model =
+    config.provider && config.model
+      ? modelRegistry.find(config.provider, config.model)
+      : undefined;
 
   const { session } = await createAgentSession({
     authStorage,
     modelRegistry,
     sessionManager,
-    cwd: config.cwd ?? process.cwd(),
+    cwd,
+    model,
   });
 
   return {

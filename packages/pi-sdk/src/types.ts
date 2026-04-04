@@ -5,6 +5,10 @@ export interface SdkConfig {
   anthropicApiKey?: string;
   /** Working directory for the agent. Defaults to process.cwd(). */
   cwd?: string;
+  /** Provider for the model, e.g. "anthropic". */
+  provider?: string;
+  /** Model ID to use, e.g. "claude-opus-4-5". */
+  model?: string;
 }
 
 /**

@@ -3,15 +3,24 @@ import { ArrowUpIcon, SquareIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useModels } from "@/queries/use-models"
 
 interface ChatTextboxProps {
-  onSend?: (message: string) => void
+  onSend?: (message: string, modelId: string, provider: string) => void
   isLoading?: boolean
   onStop?: () => void
   placeholder?: string
@@ -26,13 +35,29 @@ export function ChatTextbox({
   className,
 }: ChatTextboxProps) {
   const [value, setValue] = React.useState("")
+  const [selectedModelId, setSelectedModelId] = React.useState<string | null>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+
+  const { data } = useModels()
+  const models = React.useMemo(() => data?.models ?? [], [data])
+  const selectedModel = models.find((m) => m.id === selectedModelId) ?? models[0] ?? null
+
+  const grouped = React.useMemo(
+    () =>
+      Object.entries(
+        models.reduce<Record<string, typeof models>>((acc, m) => {
+          ;(acc[m.provider] ??= []).push(m)
+          return acc
+        }, {}),
+      ),
+    [models],
+  )
 
   const canSend = value.trim().length > 0 && !isLoading
 
   function handleSend() {
     if (!canSend) return
-    onSend?.(value.trim())
+    onSend?.(value.trim(), selectedModel?.id ?? "", selectedModel?.provider ?? "")
     setValue("")
     textareaRef.current?.focus()
   }
@@ -62,17 +87,27 @@ export function ChatTextbox({
       />
 
       <div className="flex items-center justify-between">
-        <p className="text-[0.625rem] text-muted-foreground">
-          Press{" "}
-          <kbd className="rounded border border-border px-0.5 font-mono">
-            Enter
-          </kbd>{" "}
-          to send,{" "}
-          <kbd className="rounded border border-border px-0.5 font-mono">
-            Shift+Enter
-          </kbd>{" "}
-          for new line
-        </p>
+        <Select
+          value={selectedModel?.id ?? ""}
+          onValueChange={(id) => setSelectedModelId(id)}
+          disabled={models.length === 0}
+        >
+          <SelectTrigger className="h-6 w-auto min-w-40 border-none px-1 py-0 text-xs shadow-none focus:ring-0">
+            {selectedModel?.name ?? "Select model"}
+          </SelectTrigger>
+          <SelectContent className="max-h-64">
+            {grouped.map(([provider, items]) => (
+              <SelectGroup key={provider}>
+                <SelectLabel>{provider}</SelectLabel>
+                {items.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
 
         {isLoading ? (
           <Tooltip>

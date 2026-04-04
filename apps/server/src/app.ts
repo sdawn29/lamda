@@ -1,8 +1,12 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
+import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 import { createManagedSession, type SdkConfig } from "@asphalt/pi-sdk";
 import { store } from "./store.js";
+
+const authStorage = AuthStorage.create();
+const modelRegistry = ModelRegistry.create(authStorage);
 
 const app = new Hono();
 
@@ -12,11 +16,22 @@ app.get("/health", (c) =>
   c.json({ status: "ok", uptime: process.uptime() }),
 );
 
+app.get("/models", (c) => {
+  const models = modelRegistry.getAvailable().map((m) => ({
+    id: m.id,
+    name: m.name,
+    provider: m.provider,
+  }));
+  return c.json({ models });
+});
+
 app.post("/session", async (c) => {
-  const body = await c.req.json<Partial<SdkConfig>>().catch(() => ({}));
+  const body = await c.req.json<Partial<SdkConfig>>().catch((): Partial<SdkConfig> => ({}));
   const config: SdkConfig = {
-    anthropicApiKey: (body as { anthropicApiKey?: string }).anthropicApiKey,
+    anthropicApiKey: body.anthropicApiKey,
     cwd: body.cwd,
+    provider: body.provider,
+    model: body.model,
   };
   const handle = await createManagedSession(config);
   const sessionId = store.create(handle);
@@ -34,7 +49,7 @@ app.post("/session/:id/prompt", async (c) => {
   const entry = store.get(id);
   if (!entry) return c.json({ error: "Not found" }, 404);
 
-  const body = await c.req.json<{ text?: string }>().catch(() => ({}));
+  const body = await c.req.json<{ text?: string }>().catch((): { text?: string } => ({}));
   if (!body.text) return c.json({ error: "text is required" }, 400);
 
   // Fire and forget — events arrive via GET /session/:id/events

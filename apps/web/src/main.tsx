@@ -5,6 +5,7 @@ import {
   createHashHistory,
   createRouter,
 } from "@tanstack/react-router"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 import "./index.css"
 
@@ -13,6 +14,7 @@ import { routeTree } from "./routeTree.gen"
 import { ThemeProvider } from "./components/theme-provider"
 
 const router = createRouter({ routeTree, history: createHashHistory() })
+const queryClient = new QueryClient()
 
 // Register the router instance for type safety
 declare module "@tanstack/react-router" {
@@ -27,9 +29,11 @@ if (!rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement)
   root.render(
     <StrictMode>
-      <ThemeProvider>
-        <RouterProvider router={router} />
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <RouterProvider router={router} />
+        </ThemeProvider>
+      </QueryClientProvider>
     </StrictMode>
   )
 }
