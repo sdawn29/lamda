@@ -108,6 +108,19 @@ function ToolCallBlock({ msg }: { msg: ToolMessage }) {
   const resultText = useMemo(() => {
     if (msg.result === undefined) return null
     if (typeof msg.result === "string") return msg.result
+    // MCP-style tool output: { content: [{ type: "text", text: "..." }] }
+    if (
+      typeof msg.result === "object" &&
+      msg.result !== null &&
+      Array.isArray((msg.result as Record<string, unknown>).content)
+    ) {
+      const parts = (msg.result as { content: { type: string; text?: string }[] }).content
+      const text = parts
+        .filter((p) => p.type === "text" && typeof p.text === "string")
+        .map((p) => p.text)
+        .join("")
+      if (text) return text
+    }
     return JSON.stringify(msg.result, null, 2)
   }, [msg.result])
 
