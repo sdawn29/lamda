@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
-import { CheckIcon, ChevronDownIcon, Loader2Icon, WrenchIcon, XIcon } from "lucide-react"
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  Loader2Icon,
+  WrenchIcon,
+  XIcon,
+} from "lucide-react"
 
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -40,7 +46,7 @@ function LivePre({ text, live }: { text: string; live: boolean }) {
   return (
     <pre
       ref={ref}
-      className="overflow-auto max-h-64 whitespace-pre-wrap break-all text-muted-foreground"
+      className="max-h-64 overflow-auto break-all whitespace-pre-wrap text-muted-foreground"
     >
       {text}
     </pre>
@@ -86,7 +92,7 @@ function ToolCallBlock({ msg }: { msg: ToolMessage }) {
   const summary = argsSummary(msg.args)
 
   return (
-    <div className="self-start w-full max-w-2xl rounded-lg border border-border bg-muted/20 text-xs">
+    <div className="w-full max-w-2xl self-start rounded-lg border border-border bg-muted/20 text-xs">
       <button
         className="flex w-full items-center gap-2 px-3 py-2 text-left"
         onClick={toggle}
@@ -112,8 +118,8 @@ function ToolCallBlock({ msg }: { msg: ToolMessage }) {
       </button>
 
       {expanded && (
-        <div className="border-t border-border px-3 py-2 space-y-2">
-          <pre className="overflow-auto max-h-32 whitespace-pre-wrap break-all text-muted-foreground">
+        <div className="space-y-2 border-t border-border px-3 py-2">
+          <pre className="max-h-32 overflow-auto break-all whitespace-pre-wrap text-muted-foreground">
             {argsText}
           </pre>
           {resultText && (
@@ -173,6 +179,8 @@ export function ChatView({
   const [isLoading, setIsLoading] = useState(false)
   const [branch, setBranch] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const pinnedRef = useRef(true)
   const hasTitledRef = useRef(false)
 
   const { setThreadTitle } = useWorkspace()
@@ -276,8 +284,17 @@ export function ChatView({
   }, [sessionId])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (pinnedRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
   }, [messages, isLoading])
+
+  function handleScroll() {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    pinnedRef.current = distanceFromBottom < 80
+  }
 
   const handleSend = useCallback(
     (text: string) => {
@@ -287,6 +304,7 @@ export function ChatView({
           .then(({ title }) => setThreadTitle(workspaceId, threadId, title))
           .catch(() => {})
       }
+      pinnedRef.current = true
       setMessages((prev) => [...prev, { role: "user", content: text }])
       setIsLoading(true)
       sendPrompt(sessionId, text).catch(() => setIsLoading(false))
@@ -298,7 +316,11 @@ export function ChatView({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-6 pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-6 pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {messages.map((msg, i) => {
           if (msg.role === "tool") {
             return <ToolCallBlock key={i} msg={msg} />

@@ -42,10 +42,8 @@ export function AppSidebar() {
       <SidebarContent className="mt-10">
         <SidebarGroup>
           <div className="flex items-center justify-between">
-            <SidebarGroupLabel>
-              <span>Workspaces</span>
-            </SidebarGroupLabel>
-            <Button variant="ghost" size="icon" onClick={handleCreateWorkspace}>
+            <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
+            <Button variant="ghost" size="icon-sm" onClick={handleCreateWorkspace}>
               <Plus />
             </Button>
           </div>
@@ -80,7 +78,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                       <Button
                         variant="ghost"
-                        size="icon"
+                        size="icon-sm"
                         className="shrink-0 opacity-0 transition-opacity group-hover/ws:opacity-100"
                         onClick={() => createThread(ws.id)}
                         title="New Thread"
@@ -109,8 +107,8 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarFooter />
       </SidebarContent>
+      <SidebarFooter />
     </Sidebar>
   )
 }
