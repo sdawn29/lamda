@@ -35,12 +35,15 @@ export function ChatTextbox({
   className,
 }: ChatTextboxProps) {
   const [value, setValue] = React.useState("")
-  const [selectedModelId, setSelectedModelId] = React.useState<string | null>(null)
+  const [selectedModelId, setSelectedModelId] = React.useState<string | null>(
+    null
+  )
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   const { data } = useModels()
   const models = React.useMemo(() => data?.models ?? [], [data])
-  const selectedModel = models.find((m) => m.id === selectedModelId) ?? models[0] ?? null
+  const selectedModel =
+    models.find((m) => m.id === selectedModelId) ?? models[0] ?? null
 
   const grouped = React.useMemo(
     () =>
@@ -48,16 +51,20 @@ export function ChatTextbox({
         models.reduce<Record<string, typeof models>>((acc, m) => {
           ;(acc[m.provider] ??= []).push(m)
           return acc
-        }, {}),
+        }, {})
       ),
-    [models],
+    [models]
   )
 
   const canSend = value.trim().length > 0 && !isLoading
 
   function handleSend() {
     if (!canSend) return
-    onSend?.(value.trim(), selectedModel?.id ?? "", selectedModel?.provider ?? "")
+    onSend?.(
+      value.trim(),
+      selectedModel?.id ?? "",
+      selectedModel?.provider ?? ""
+    )
     setValue("")
     textareaRef.current?.focus()
   }
@@ -92,7 +99,7 @@ export function ChatTextbox({
           onValueChange={(id) => setSelectedModelId(id)}
           disabled={models.length === 0}
         >
-          <SelectTrigger className="h-6 w-auto min-w-40 border-none px-1 py-0 text-xs shadow-none focus:ring-0">
+          <SelectTrigger className="h-6 w-auto min-w-40 border-none px-2 py-0 text-xs shadow-none focus:ring-0">
             {selectedModel?.name ?? "Select model"}
           </SelectTrigger>
           <SelectContent className="max-h-64">
