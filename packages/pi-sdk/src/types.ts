@@ -1,5 +1,12 @@
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
+/** SDK-agnostic model descriptor. */
+export interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+}
+
 export interface SdkConfig {
   /** Anthropic API key. Falls back to ANTHROPIC_API_KEY env var, then ~/.pi/agent/auth.json. */
   anthropicApiKey?: string;

@@ -13,7 +13,6 @@
   "dependencies": {
     "@asphalt/pi-sdk": "*",
     "@hono/node-server": "^1.13.0",
-    "@mariozechner/pi-coding-agent": "0.64.0",
     "hono": "^4.7.0"
   },
   "devDependencies": {

@@ -1,12 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
-import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
-import { createManagedSession, type SdkConfig } from "@asphalt/pi-sdk";
+import { createManagedSession, getAvailableModels, type SdkConfig } from "@asphalt/pi-sdk";
 import { store } from "./store.js";
-
-const authStorage = AuthStorage.create();
-const modelRegistry = ModelRegistry.create(authStorage);
 
 const app = new Hono();
 
@@ -17,12 +13,7 @@ app.get("/health", (c) =>
 );
 
 app.get("/models", (c) => {
-  const models = modelRegistry.getAvailable().map((m) => ({
-    id: m.id,
-    name: m.name,
-    provider: m.provider,
-  }));
-  return c.json({ models });
+  return c.json({ models: getAvailableModels() });
 });
 
 app.post("/session", async (c) => {

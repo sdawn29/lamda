@@ -1,2 +1,3 @@
 export { createManagedSession } from "./session.js";
-export type { ManagedSessionHandle, SdkConfig, SessionEvent } from "./types.js";
+export { getAvailableModels } from "./models.js";
+export type { ManagedSessionHandle, ModelInfo, SdkConfig, SessionEvent } from "./types.js";

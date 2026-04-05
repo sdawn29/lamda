@@ -84,3 +84,10 @@ __root.tsx (WorkspaceProvider + ThemeProvider)
 ```
 
 The TitleBar uses `-webkit-app-region: drag` for Electron window dragging and adjusts padding for macOS traffic lights based on `window.electronAPI.platform`.
+
+## Pi SDK Reference
+
+When working with the `@mariozechner/pi-coding-agent` SDK, refer to the local installation:
+
+- **Docs:** `/Users/snehasishdawn/.nvm/versions/node/v25.8.2/lib/node_modules/@mariozechner/pi-coding-agent/docs`
+- **Examples:** `/Users/snehasishdawn/.nvm/versions/node/v25.8.2/lib/node_modules/@mariozechner/pi-coding-agent/examples`
