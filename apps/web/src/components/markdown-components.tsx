@@ -1,5 +1,6 @@
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
-import atomDark from "react-syntax-highlighter/dist/esm/styles/prism/atom-dark"
+import vscDarkPlus from "react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus"
+import vs from "react-syntax-highlighter/dist/esm/styles/prism/vs"
 import type { Components } from "react-markdown"
 
 function CodeBlock({
@@ -10,13 +11,14 @@ function CodeBlock({
   children?: React.ReactNode
 }) {
   const match = /language-(\w+)/.exec(className ?? "")
+  const isDark = document.documentElement.classList.contains("dark")
   const code = String(children).replace(/\n$/, "")
 
   if (match) {
     return (
       <SyntaxHighlighter
         language={match[1]}
-        style={atomDark}
+        style={isDark ? vscDarkPlus : vs}
         PreTag="div"
         customStyle={{
           margin: 0,
