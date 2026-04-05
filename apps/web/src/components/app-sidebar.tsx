@@ -1,4 +1,5 @@
-import { FolderOpen, MessageSquare, Plus } from "lucide-react"
+import { useState } from "react"
+import { ChevronRight, FolderOpen, Plus } from "lucide-react"
 
 import {
   Sidebar,
@@ -20,13 +21,13 @@ import { useWorkspace } from "@/hooks/workspace-context"
 export function AppSidebar() {
   const {
     workspaces,
-    activeWorkspace,
     activeThread,
     selectWorkspace,
     createWorkspace,
     createThread,
     selectThread,
   } = useWorkspace()
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   async function handleCreateWorkspace() {
     const folderPath = await window.electronAPI?.selectFolder()
@@ -42,7 +43,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <div className="flex items-center justify-between">
             <SidebarGroupLabel>
-              <span className="font-serif">Workspaces</span>
+              <span>Workspaces</span>
             </SidebarGroupLabel>
             <Button variant="ghost" size="icon" onClick={handleCreateWorkspace}>
               <Plus />
@@ -59,26 +60,36 @@ export function AppSidebar() {
                   <SidebarMenuItem key={ws.id}>
                     <div className="group/ws flex items-center">
                       <SidebarMenuButton
-                        isActive={activeWorkspace?.id === ws.id}
-                        onClick={() => selectWorkspace(ws)}
+                        onClick={() => {
+                          selectWorkspace(ws)
+                          setCollapsed((prev) => ({
+                            ...prev,
+                            [ws.id]: !prev[ws.id],
+                          }))
+                        }}
                         tooltip={ws.name}
                         className="flex-1"
                       >
-                        <FolderOpen />
+                        <span className="relative h-4 w-4 shrink-0">
+                          <FolderOpen className="absolute inset-0 h-4 w-4 transition-opacity group-hover/ws:opacity-0" />
+                          <ChevronRight
+                            className={`absolute inset-0 h-4 w-4 opacity-0 transition-all group-hover/ws:opacity-100 ${collapsed[ws.id] ? "" : "rotate-90"}`}
+                          />
+                        </span>
                         <span>{ws.name}</span>
                       </SidebarMenuButton>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover/ws:opacity-100"
+                        className="shrink-0 opacity-0 transition-opacity group-hover/ws:opacity-100"
                         onClick={() => createThread(ws.id)}
                         title="New Thread"
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus />
                       </Button>
                     </div>
 
-                    {ws.threads.length > 0 && (
+                    {!collapsed[ws.id] && ws.threads.length > 0 && (
                       <SidebarMenuSub>
                         {ws.threads.map((thread) => (
                           <SidebarMenuSubItem key={thread.id}>
@@ -86,7 +97,6 @@ export function AppSidebar() {
                               isActive={activeThread?.id === thread.id}
                               onClick={() => selectThread(ws.id, thread)}
                             >
-                              <MessageSquare className="h-3 w-3 shrink-0" />
                               <span className="truncate">{thread.title}</span>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
