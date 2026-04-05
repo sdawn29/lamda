@@ -39,7 +39,7 @@ This is a monorepo (Turborepo + npm workspaces) building an Electron desktop app
 
 - **`apps/web`** — React 19 + Vite + TanStack Router + Tailwind CSS + shadcn/ui. This is the renderer/UI layer.
 - **`apps/desktop`** — Electron wrapper. Loads the web app in a `BrowserWindow`. Provides native OS capabilities (file picker, platform info) via IPC.
-- **`apps/server`** — Minimal stub, not yet developed.
+- **`apps/server`** — Hono HTTP server managing Pi agent sessions. Runs on port 3001 (configurable via `PORT` env var or `--port` flag). Exposes REST + SSE endpoints for session lifecycle and streaming.
 
 ### Electron IPC Bridge
 
@@ -56,7 +56,7 @@ Uses **TanStack Router** with file-based routing. The route tree at [apps/web/sr
 
 ### State Management
 
-- **WorkspaceContext** ([apps/web/src/hooks/workspace-context.tsx](apps/web/src/hooks/workspace-context.tsx)) — manages the list of workspaces (name + path), active workspace selection, create/delete. Wraps the entire app.
+- **WorkspaceContext** ([apps/web/src/hooks/workspace-context.tsx](apps/web/src/hooks/workspace-context.tsx)) — manages the list of workspaces (name + path + sessionId), active workspace selection, create/delete. `createWorkspace` is async — it calls `POST /session` on the server with the workspace `cwd` and stores the returned `sessionId`. `deleteWorkspace` fire-and-forgets `DELETE /session/:id` for cleanup. Wraps the entire app.
 - **ThemeProvider** ([apps/web/src/components/theme-provider.tsx](apps/web/src/components/theme-provider.tsx)) — dark/light/system theme with localStorage persistence. Press `d` to toggle.
 - No external state library — plain React context.
 
@@ -80,10 +80,38 @@ __root.tsx (WorkspaceProvider + ThemeProvider)
        ├─ AppSidebar       (workspace list + new thread)
        ├─ TitleBar         (back/forward nav, draggable, macOS-aware)
        └─ <Outlet />       (route content)
-            └─ index.tsx → ChatTextbox
+            └─ index.tsx → ChatView (keyed by workspace id)
+                                └─ ChatTextbox
 ```
 
 The TitleBar uses `-webkit-app-region: drag` for Electron window dragging and adjusts padding for macOS traffic lights based on `window.electronAPI.platform`.
+
+### Server API (`apps/server`)
+
+The server wraps the Pi SDK and exposes these endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Uptime check |
+| `GET` | `/models` | List available models from the Pi SDK |
+| `POST` | `/session` | Create a session — body: `{ cwd?, provider?, model?, anthropicApiKey? }` → `{ sessionId }` |
+| `DELETE` | `/session/:id` | Dispose and remove a session |
+| `POST` | `/session/:id/prompt` | Send a prompt (fire-and-forget, 202) — body: `{ text }` |
+| `GET` | `/session/:id/events` | SSE stream of session events (named events matching Pi SDK event types) |
+
+The web app talks to the server via helpers in `apps/web/src/api/`:
+- `client.ts` — `apiFetch()` and `apiUrl()` (base URL from `VITE_SERVER_URL`, defaults to `http://localhost:3001`)
+- `sessions.ts` — `createSession`, `deleteSession`, `sendPrompt`
+- `models.ts` — `fetchModels` (React Query via `queries/use-models.ts`)
+
+### Chat Flow
+
+When a workspace is created, a Pi session is automatically started on that directory. The chat view (`ChatView`) opens an `EventSource` to `GET /session/:id/events` and streams the agent's response in real time. SSE events used:
+- `message_start` — push an empty assistant message
+- `message_update` — append `text_delta` to the current assistant message
+- `agent_end` — clear loading state
+
+Assistant messages are rendered with `react-markdown` + Tailwind Typography (`prose prose-sm dark:prose-invert`).
 
 ## Pi SDK Reference
 

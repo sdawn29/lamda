@@ -6,16 +6,19 @@ import {
   type ReactNode,
 } from "react"
 
+import { createSession, deleteSession } from "@/api/sessions"
+
 export interface Workspace {
   id: string
   name: string
   path: string
+  sessionId: string
 }
 
 interface WorkspaceContextValue {
   workspaces: Workspace[]
   activeWorkspace: Workspace | null
-  createWorkspace: (name: string, path: string) => Workspace
+  createWorkspace: (name: string, path: string) => Promise<Workspace>
   selectWorkspace: (workspace: Workspace) => void
   deleteWorkspace: (workspace: Workspace) => void
 }
@@ -32,8 +35,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null)
 
   const createWorkspace = useCallback(
-    (name: string, path: string): Workspace => {
-      const workspace: Workspace = { id: generateId(), name, path }
+    async (name: string, path: string): Promise<Workspace> => {
+      const { sessionId } = await createSession({ cwd: path })
+      const workspace: Workspace = { id: generateId(), name, path, sessionId }
       setWorkspaces((prev) => [...prev, workspace])
       setActiveWorkspace(workspace)
       return workspace
@@ -46,6 +50,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const deleteWorkspace = useCallback((workspace: Workspace) => {
+    deleteSession(workspace.sessionId).catch(() => {})
     setWorkspaces((prev) => prev.filter((w) => w.id !== workspace.id))
     setActiveWorkspace((prev) => (prev?.id === workspace.id ? null : prev))
   }, [])
