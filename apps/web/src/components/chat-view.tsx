@@ -53,6 +53,9 @@ export function ChatView({
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [branch, setBranch] = useState<string | null>(null)
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(
+    () => localStorage.getItem(`lambda-code:threadModel:${threadId}`)
+  )
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(true)
@@ -189,7 +192,7 @@ export function ChatView({
   }
 
   const handleSend = useCallback(
-    (text: string) => {
+    (text: string, modelId: string, provider: string) => {
       if (!hasTitledRef.current) {
         hasTitledRef.current = true
         generateTitle(text)
@@ -199,7 +202,8 @@ export function ChatView({
       pinnedRef.current = true
       setMessages((prev) => [...prev, { role: "user", content: text }])
       setIsLoading(true)
-      sendPrompt(sessionId, text).catch(() => setIsLoading(false))
+      const model = modelId && provider ? { provider, modelId } : undefined
+      sendPrompt(sessionId, text, model).catch(() => setIsLoading(false))
     },
     [sessionId, workspaceId, threadId, setThreadTitle]
   )
@@ -256,6 +260,11 @@ export function ChatView({
           onSend={handleSend}
           isLoading={isLoading}
           footerLabel={footerLabel}
+          selectedModelId={selectedModelId}
+          onModelChange={(id) => {
+            setSelectedModelId(id)
+            localStorage.setItem(`lambda-code:threadModel:${threadId}`, id)
+          }}
         />
       </div>
     </div>

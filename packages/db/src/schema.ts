@@ -13,6 +13,7 @@ export const threads = sqliteTable("threads", {
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
   title: text("title").notNull().default("New Thread"),
+  sessionFile: text("session_file"),
   createdAt: integer("created_at").notNull(),
 })
 

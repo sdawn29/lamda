@@ -29,6 +29,10 @@ export type SessionEvent =
 export interface ManagedSessionHandle {
   /** Send a prompt to the agent (non-blocking — events stream via events()). */
   prompt(text: string): Promise<void>;
+  /** Switch the model used for subsequent prompts. */
+  setModel(provider: string, modelId: string): Promise<void>;
+  /** Path to the persisted session file, or undefined for in-memory sessions. */
+  readonly sessionFile: string | undefined;
   /** Abort the current agent turn. */
   abort(): Promise<void>;
   /** Dispose the session and free resources. */

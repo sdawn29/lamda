@@ -12,6 +12,7 @@ import {
   getThread,
   deleteThread,
   updateThreadTitle,
+  updateThreadSessionFile,
   listMessages,
   insertMessage,
 } from "@asphalt/db";
@@ -76,6 +77,7 @@ app.post("/workspace", async (c) => {
     model: body.model,
   });
   const sessionId = store.create(handle, body.path, threadId);
+  if (handle.sessionFile) updateThreadSessionFile(threadId, handle.sessionFile);
 
   return c.json({
     workspace: {
@@ -120,6 +122,7 @@ app.post("/workspace/:workspaceId/thread", async (c) => {
     model: body.model,
   });
   const sessionId = store.create(handle, ws.path, threadId);
+  if (handle.sessionFile) updateThreadSessionFile(threadId, handle.sessionFile);
 
   return c.json({
     thread: {
@@ -166,6 +169,7 @@ app.post("/session", async (c) => {
   const workspaceId = insertWorkspace("Untitled", resolvedCwd);
   const threadId = insertThread(workspaceId);
   const sessionId = store.create(handle, resolvedCwd, threadId);
+  if (handle.sessionFile) updateThreadSessionFile(threadId, handle.sessionFile);
   return c.json({ sessionId }, 201);
 });
 
@@ -180,13 +184,19 @@ app.post("/session/:id/prompt", async (c) => {
   const entry = store.get(id);
   if (!entry) return c.json({ error: "Not found" }, 404);
 
-  const body = await c.req.json<{ text?: string }>().catch((): { text?: string } => ({}));
+  const body = await c.req.json<{ text?: string; provider?: string; model?: string }>().catch((): { text?: string; provider?: string; model?: string } => ({}));
   if (!body.text) return c.json({ error: "text is required" }, 400);
 
   insertMessage(entry.threadId, "user", body.text);
 
   // Fire and forget — events arrive via GET /session/:id/events
-  entry.handle.prompt(body.text).catch((err: unknown) => {
+  const run = async () => {
+    if (body.provider && body.model) {
+      await entry.handle.setModel(body.provider, body.model);
+    }
+    await entry.handle.prompt(body.text!);
+  };
+  run().catch((err: unknown) => {
     console.error(`[prompt:${id}]`, err);
   });
 

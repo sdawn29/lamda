@@ -1,9 +1,11 @@
-import { createManagedSession } from "@asphalt/pi-sdk";
+import { createManagedSession, openManagedSession } from "@asphalt/pi-sdk";
 import { listWorkspacesWithThreads } from "@asphalt/db";
 import { store } from "./store.js";
 
 /**
  * Recreate Pi sessions for every persisted thread on server startup.
+ * Threads with a saved session_file are resumed (context restored);
+ * threads without one get a fresh session.
  * Individual failures are logged but non-fatal — other sessions still work.
  */
 export async function bootstrapSessions(): Promise<void> {
@@ -11,7 +13,9 @@ export async function bootstrapSessions(): Promise<void> {
 
   const tasks = workspaceList.flatMap((ws) =>
     ws.threads.map(async (thread) => {
-      const handle = await createManagedSession({ cwd: ws.path });
+      const handle = thread.sessionFile
+        ? await openManagedSession(thread.sessionFile, { cwd: ws.path })
+        : await createManagedSession({ cwd: ws.path });
       store.create(handle, ws.path, thread.id);
     }),
   );

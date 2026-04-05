@@ -26,6 +26,8 @@ interface ChatTextboxProps {
   placeholder?: string
   className?: string
   footerLabel?: string
+  selectedModelId?: string | null
+  onModelChange?: (modelId: string) => void
 }
 
 export function ChatTextbox({
@@ -35,11 +37,13 @@ export function ChatTextbox({
   placeholder = "Ask anything…",
   className,
   footerLabel,
+  selectedModelId: controlledModelId,
+  onModelChange,
 }: ChatTextboxProps) {
   const [value, setValue] = React.useState("")
-  const [selectedModelId, setSelectedModelId] = React.useState<string | null>(
-    null
-  )
+  const [internalModelId, setInternalModelId] = React.useState<string | null>(null)
+  const isControlled = controlledModelId !== undefined
+  const selectedModelId = isControlled ? controlledModelId : internalModelId
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   const { data } = useModels()
@@ -94,7 +98,10 @@ export function ChatTextbox({
         <div className="flex items-center justify-between">
           <Select
             value={selectedModel?.id ?? ""}
-            onValueChange={(id) => setSelectedModelId(id)}
+            onValueChange={(id) => {
+              if (!isControlled) setInternalModelId(id)
+              onModelChange?.(id)
+            }}
             disabled={models.length === 0}
           >
             <SelectTrigger className="h-6 w-auto min-w-40 border-none px-2 py-0 text-xs shadow-none focus:ring-0">

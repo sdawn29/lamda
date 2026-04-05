@@ -31,6 +31,7 @@ function createDb() {
       id           TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
       title        TEXT NOT NULL DEFAULT 'New Thread',
+      session_file TEXT,
       created_at   INTEGER NOT NULL
     );
 
@@ -42,6 +43,13 @@ function createDb() {
       created_at INTEGER NOT NULL
     );
   `)
+
+  // Migrate existing databases that predate the session_file column
+  try {
+    sqlite.exec("ALTER TABLE threads ADD COLUMN session_file TEXT")
+  } catch {
+    // Column already exists — nothing to do
+  }
 
   return db
 }

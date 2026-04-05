@@ -19,6 +19,10 @@ export function updateThreadTitle(id: string, title: string) {
   db.update(threads).set({ title }).where(eq(threads.id, id)).run()
 }
 
+export function updateThreadSessionFile(id: string, sessionFile: string) {
+  db.update(threads).set({ sessionFile }).where(eq(threads.id, id)).run()
+}
+
 export function deleteThread(id: string) {
   db.delete(threads).where(eq(threads.id, id)).run()
 }
