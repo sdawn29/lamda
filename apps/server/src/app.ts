@@ -8,6 +8,7 @@ import {
   getWorkspace,
   insertWorkspace,
   deleteWorkspace,
+  deleteAllWorkspaces,
   insertThread,
   getThread,
   deleteThread,
@@ -93,6 +94,18 @@ app.post("/workspace", async (c) => {
       }],
     },
   }, 201);
+});
+
+app.delete("/reset", (c) => {
+  // Dispose all in-memory sessions
+  for (const ws of listWorkspacesWithThreads()) {
+    for (const thread of ws.threads) {
+      const session = store.getByThreadId(thread.id);
+      if (session) store.delete(session.sessionId);
+    }
+  }
+  deleteAllWorkspaces();
+  return new Response(null, { status: 204 });
 });
 
 app.delete("/workspace/:id", (c) => {
@@ -227,6 +240,7 @@ app.get("/session/:id/events", async (c) => {
 
   return streamSSE(c, async (stream) => {
     const generator = entry.handle.events();
+    const toolMeta = new Map<string, { toolName: string; args: unknown }>();
 
     stream.onAbort(async () => {
       messageBuffer.flush(id);
@@ -242,6 +256,9 @@ app.get("/session/:id/events", async (c) => {
         if (e.assistantMessageEvent?.type === "text_delta") {
           messageBuffer.appendDelta(id, e.assistantMessageEvent.delta);
         }
+      } else if (event.type === "tool_execution_start") {
+        const e = event as { toolCallId: string; toolName: string; args: unknown };
+        toolMeta.set(e.toolCallId, { toolName: e.toolName, args: e.args });
       } else if (event.type === "tool_execution_end") {
         const e = event as {
           toolCallId: string;
@@ -250,13 +267,15 @@ app.get("/session/:id/events", async (c) => {
           result: unknown;
           isError: boolean;
         };
+        const meta = toolMeta.get(e.toolCallId);
+        toolMeta.delete(e.toolCallId);
         insertMessage(
           threadId,
           "tool",
           JSON.stringify({
             toolCallId: e.toolCallId,
-            toolName: e.toolName ?? "",
-            args: e.args ?? {},
+            toolName: meta?.toolName ?? e.toolName ?? "",
+            args: meta?.args ?? e.args ?? {},
             result: e.result,
             status: e.isError ? "error" : "done",
           }),

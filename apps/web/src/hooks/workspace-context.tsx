@@ -13,6 +13,7 @@ import {
   deleteWorkspace as apiDeleteWorkspace,
   createThread as apiCreateThread,
   updateThreadTitle as apiUpdateThreadTitle,
+  resetAllData,
   type WorkspaceDto,
   type ThreadDto,
 } from "@/api/workspaces"
@@ -31,6 +32,7 @@ interface WorkspaceContextValue {
   createThread: (workspaceId: string) => Promise<Thread>
   selectThread: (workspaceId: string, thread: Thread) => void
   setThreadTitle: (workspaceId: string, threadId: string, title: string) => void
+  resetAll: () => Promise<void>
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
@@ -148,6 +150,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
+  const resetAll = useCallback(async (): Promise<void> => {
+    await resetAllData()
+    setWorkspaces([])
+    setActiveWorkspace(null)
+    setActiveThread(null)
+  }, [])
+
   return (
     <WorkspaceContext
       value={{
@@ -161,6 +170,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         createThread,
         selectThread,
         setThreadTitle,
+        resetAll,
       }}
     >
       {children}

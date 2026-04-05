@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { ChevronRight, FolderOpen, Plus } from "lucide-react"
+import { ChevronRight, FolderOpen, Plus, Settings } from "lucide-react"
+import { useNavigate, useLocation } from "@tanstack/react-router"
 
 import {
   Sidebar,
@@ -16,6 +17,7 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { useWorkspace } from "@/hooks/workspace-context"
 
 export function AppSidebar() {
@@ -28,6 +30,9 @@ export function AppSidebar() {
     selectThread,
   } = useWorkspace()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isSettings = location.pathname === "/settings"
 
   async function handleCreateWorkspace() {
     const folderPath = await window.electronAPI?.selectFolder()
@@ -106,7 +111,20 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter />
+      <SidebarFooter className="border-t border-border p-2">
+        <button
+          className={cn(
+            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors",
+            isSettings
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
+          onClick={() => navigate({ to: "/settings" })}
+        >
+          <Settings className="h-3.5 w-3.5 shrink-0" />
+          Settings
+        </button>
+      </SidebarFooter>
     </Sidebar>
   )
 }

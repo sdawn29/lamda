@@ -68,3 +68,7 @@ export interface StoredMessageDto {
 export function listMessages(sessionId: string): Promise<{ messages: StoredMessageDto[] }> {
   return apiFetch<{ messages: StoredMessageDto[] }>(`/session/${sessionId}/messages`)
 }
+
+export function resetAllData(): Promise<void> {
+  return apiFetch<void>("/reset", { method: "DELETE" })
+}

@@ -29,3 +29,7 @@ export function insertWorkspace(name: string, path: string): string {
 export function deleteWorkspace(id: string) {
   db.delete(workspaces).where(eq(workspaces.id, id)).run()
 }
+
+export function deleteAllWorkspaces() {
+  db.delete(workspaces).run()
+}
