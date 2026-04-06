@@ -8,14 +8,18 @@
     "dev": "tsx src/index.ts",
     "build": "node build.mjs",
     "start": "node dist/server.cjs",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "postinstall": "node -e \"const{existsSync,chmodSync}=require('fs'),p=require.resolve('node-pty/prebuilds/darwin-arm64/spawn-helper');if(existsSync(p))chmodSync(p,'755');\""
   },
   "dependencies": {
     "@asphalt/db": "*",
     "@asphalt/git": "*",
     "@asphalt/pi-sdk": "*",
     "@hono/node-server": "^1.13.0",
-    "hono": "^4.7.0"
+    "@types/ws": "^8.18.1",
+    "hono": "^4.7.0",
+    "node-pty": "^1.1.0",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.0",

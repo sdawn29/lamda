@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, TerminalSquare } from "lucide-react"
 import { useRouter, useParams } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { useWorkspace } from "@/hooks/workspace-context"
+import { useTerminal } from "@/hooks/terminal-context"
 
 const isMac =
   typeof window !== "undefined" && window.electronAPI?.platform === "darwin"
@@ -12,6 +13,7 @@ export function TitleBar() {
   const router = useRouter()
   const { open } = useSidebar()
   const { workspaces } = useWorkspace()
+  const { isOpen: terminalOpen, toggle: toggleTerminal } = useTerminal()
   const { threadId } = useParams({ strict: false }) as { threadId?: string }
   const activeThread = threadId
     ? workspaces.flatMap((w) => w.threads).find((t) => t.id === threadId)
@@ -92,6 +94,23 @@ export function TitleBar() {
           </span>
         </div>
       )}
+
+      {/* Right controls */}
+      <div
+        className="absolute inset-y-0 right-0 flex items-center pr-3"
+        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      >
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={toggleTerminal}
+          data-active={terminalOpen}
+          className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+        >
+          <TerminalSquare />
+          <span className="sr-only">Toggle terminal</span>
+        </Button>
+      </div>
     </div>
   )
 }

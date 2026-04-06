@@ -33,13 +33,13 @@ export function ToolCallBlock({ msg }: { msg: ToolMessage }) {
     setManualExpanded((e) => !e)
   }
 
-  const argsText = useMemo(
-    () =>
-      typeof msg.args === "object"
-        ? JSON.stringify(msg.args, null, 2)
-        : String(msg.args),
-    [msg.args]
-  )
+  // const argsText = useMemo(
+  //   () =>
+  //     typeof msg.args === "object"
+  //       ? JSON.stringify(msg.args, null, 2)
+  //       : String(msg.args),
+  //   [msg.args]
+  // )
 
   const resultText = useMemo(() => {
     if (msg.result === undefined) return null

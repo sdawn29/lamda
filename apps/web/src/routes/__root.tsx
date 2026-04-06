@@ -6,6 +6,7 @@ import { TitleBar } from "@/components/title-bar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { WorkspaceProvider, useWorkspace } from "@/hooks/workspace-context"
+import { TerminalProvider } from "@/hooks/terminal-context"
 
 function RootLayoutInner() {
   const { isLoading } = useWorkspace()
@@ -38,7 +39,9 @@ function RootLayoutInner() {
 
 const RootLayout = () => (
   <WorkspaceProvider>
-    <RootLayoutInner />
+    <TerminalProvider>
+      <RootLayoutInner />
+    </TerminalProvider>
   </WorkspaceProvider>
 )
 

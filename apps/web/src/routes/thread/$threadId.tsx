@@ -48,6 +48,7 @@ function ThreadRoute() {
       sessionId={foundThread.sessionId}
       workspaceName={foundWorkspace.name}
       workspaceId={foundWorkspace.id}
+      workspacePath={foundWorkspace.path}
       threadId={foundThread.id}
     />
   )

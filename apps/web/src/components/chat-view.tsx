@@ -4,10 +4,12 @@ import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
 import { ChatTextbox } from "@/components/chat-textbox"
+import { TerminalPanel } from "@/components/terminal-panel"
 import { sendPrompt, getBranch, generateTitle } from "@/api/sessions"
 import { listMessages, type StoredMessageDto } from "@/api/workspaces"
 import { apiUrl } from "@/api/client"
 import { useWorkspace } from "@/hooks/workspace-context"
+import { useTerminal } from "@/hooks/terminal-context"
 import { ToolCallBlock } from "@/components/tool-call-block"
 import { markdownComponents } from "@/components/markdown-components"
 import type { Message, TextMessage, ToolMessage } from "@/components/chat-types"
@@ -41,6 +43,7 @@ interface ChatViewProps {
   sessionId: string
   workspaceName: string
   workspaceId: string
+  workspacePath: string
   threadId: string
 }
 
@@ -48,6 +51,7 @@ export function ChatView({
   sessionId,
   workspaceName,
   workspaceId,
+  workspacePath,
   threadId,
 }: ChatViewProps) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -62,6 +66,7 @@ export function ChatView({
   const hasTitledRef = useRef(false)
 
   const { setThreadTitle } = useWorkspace()
+  const { isOpen: terminalOpen } = useTerminal()
 
   // ── Load message history on mount (component is keyed by threadId) ──────────
   useEffect(() => {
@@ -254,6 +259,8 @@ export function ChatView({
         )}
         <div ref={bottomRef} />
       </div>
+
+      {terminalOpen && <TerminalPanel cwd={workspacePath} />}
 
       <div className="mx-auto w-full max-w-2xl px-6 pb-6">
         <ChatTextbox
