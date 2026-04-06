@@ -41,7 +41,9 @@ export function ChatTextbox({
   onModelChange,
 }: ChatTextboxProps) {
   const [value, setValue] = React.useState("")
-  const [internalModelId, setInternalModelId] = React.useState<string | null>(null)
+  const [internalModelId, setInternalModelId] = React.useState<string | null>(
+    null
+  )
   const isControlled = controlledModelId !== undefined
   const selectedModelId = isControlled ? controlledModelId : internalModelId
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
@@ -100,7 +102,7 @@ export function ChatTextbox({
             value={selectedModel?.id ?? ""}
             onValueChange={(id) => {
               if (!isControlled) setInternalModelId(id)
-              onModelChange?.(id)
+              onModelChange?.(id as string)
             }}
             disabled={models.length === 0}
           >

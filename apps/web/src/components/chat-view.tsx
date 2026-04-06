@@ -240,7 +240,7 @@ export function ChatView({
               className={
                 msg.role === "user"
                   ? "self-end rounded-xl bg-muted px-4 py-2 text-sm"
-                  : "prose prose-sm self-start dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                  : "prose prose-sm w-full max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
               }
             >
               {msg.role === "user" ? (
