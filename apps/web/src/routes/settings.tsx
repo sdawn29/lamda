@@ -13,6 +13,14 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { useWorkspace } from "@/hooks/workspace-context"
+import { useTheme } from "@/components/theme-provider"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -20,6 +28,7 @@ export const Route = createFileRoute("/settings")({
 
 function SettingsPage() {
   const { resetAll } = useWorkspace()
+  const { theme, setTheme } = useTheme()
   const [showConfirm, setShowConfirm] = useState(false)
   const [resetting, setResetting] = useState(false)
 
@@ -36,6 +45,36 @@ function SettingsPage() {
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-8">
       <h1 className="mb-6 text-lg font-semibold">Settings</h1>
+
+      {/* Appearance section */}
+      <section className="mb-4 rounded-lg border border-border">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-medium">Appearance</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Customize the look of the application.
+          </p>
+        </div>
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Theme</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Choose between light, dark, or system theme.
+              </p>
+            </div>
+            <Select value={theme} onValueChange={(v) => setTheme(v as typeof theme)}>
+              <SelectTrigger className="w-28 capitalize">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+                <SelectItem value="system">System</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </section>
 
       {/* Data management section */}
       <section className="rounded-lg border border-border">
