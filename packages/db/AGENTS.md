@@ -10,7 +10,7 @@ Drizzle ORM + SQLite database layer — provides schema definitions, database cl
 
 | Action    | Command                              |
 | --------- | ------------------------------------ |
-| Typecheck | `npm run check-types -w @asphalt/db` |
+| Typecheck | `npm run check-types -w @lambda/db` |
 
 ## Architecture
 

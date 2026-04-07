@@ -4,13 +4,13 @@
 
 ## Purpose
 
-Wrapper around `@mariozechner/pi-coding-agent` that provides managed session lifecycle, model discovery, auth resolution, and SSE-compatible event streaming for the Asphalt server.
+Wrapper around `@mariozechner/pi-coding-agent` that provides managed session lifecycle, model discovery, auth resolution, and SSE-compatible event streaming for the Lambda server.
 
 ## Quick Reference
 
 | Action    | Command                                  |
 | --------- | ---------------------------------------- |
-| Typecheck | `npm run check-types -w @asphalt/pi-sdk` |
+| Typecheck | `npm run check-types -w @lambda/pi-sdk` |
 
 ## Architecture
 

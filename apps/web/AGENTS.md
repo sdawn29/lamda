@@ -4,7 +4,7 @@
 
 ## Purpose
 
-React web UI layer — the primary user interface for the Asphalt desktop app, providing chat interface, workspace management, and session controls.
+React web UI layer — the primary user interface for the Lambda desktop app, providing chat interface, workspace management, and session controls.
 
 ## Quick Reference
 

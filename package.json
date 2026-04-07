@@ -1,5 +1,5 @@
 {
-  "name": "asphalt-code",
+  "name": "lambda",
   "private": true,
   "scripts": {
     "build": "turbo run build",

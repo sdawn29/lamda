@@ -1,5 +1,5 @@
 {
-  "name": "@asphalt/git",
+  "name": "@lambda/git",
   "version": "0.1.0",
   "private": true,
   "type": "module",

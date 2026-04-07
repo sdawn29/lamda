@@ -74,7 +74,7 @@ function buildPreload(): string {
     format: "cjs",
     platform: "node",
   });
-  const out = path.join(tmpdir(), "asphalt-preload.js");
+  const out = path.join(tmpdir(), "lambda-preload.js");
   writeFileSync(out, code);
   return out;
 }
@@ -105,7 +105,7 @@ const LOADING_HTML = `data:text/html,${encodeURIComponent(`<!DOCTYPE html>
 </style>
 </head>
 <body>
-  <span>asphalt code</span>
+  <span>lambda</span>
 </body>
 </html>`)}`;
 

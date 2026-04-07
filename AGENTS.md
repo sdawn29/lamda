@@ -1,4 +1,4 @@
-# AGENTS.md — asphalt-code (root)
+# AGENTS.md — lambda (root)
 
 > Auto-generated context for coding agents. Last updated: 2026-04-07
 
@@ -34,7 +34,7 @@ Monorepo for an Electron desktop app wrapping a React web UI, backed by a Hono s
 ## Architecture
 
 ```
-asphalt-code/
+lambda/
 ├── apps/
 │   ├── web/          — React UI layer (Vite + TanStack Router)
 │   ├── desktop/      — Electron shell wrapping the web app
@@ -52,7 +52,7 @@ asphalt-code/
 - **Turborepo** pipeline defined in `turbo.json` — tasks: `build`, `dev`, `lint`, `check-types`
 - **TypeScript strict mode** across all packages
 - **ESM** (`"type": "module"`) in all packages
-- Internal packages use `@asphalt/*` naming convention
+- Internal packages use `@lambda/*` naming convention
 
 ## Environment Variables
 

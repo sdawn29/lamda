@@ -10,7 +10,7 @@ Git operations utility — provides async functions for detecting git repositori
 
 | Action    | Command                               |
 | --------- | ------------------------------------- |
-| Typecheck | `npm run check-types -w @asphalt/git` |
+| Typecheck | `npm run check-types -w @lambda/git` |
 
 ## Architecture
 

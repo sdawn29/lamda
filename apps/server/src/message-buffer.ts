@@ -1,4 +1,4 @@
-import { insertMessage } from "@asphalt/db";
+import { insertMessage } from "@lambda/db";
 
 interface BufferEntry {
   threadId: string;

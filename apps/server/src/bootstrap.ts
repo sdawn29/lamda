@@ -1,5 +1,5 @@
-import { createManagedSession, openManagedSession } from "@asphalt/pi-sdk";
-import { listWorkspacesWithThreads } from "@asphalt/db";
+import { createManagedSession, openManagedSession } from "@lambda/pi-sdk";
+import { listWorkspacesWithThreads } from "@lambda/db";
 import { store } from "./store.js";
 
 /**

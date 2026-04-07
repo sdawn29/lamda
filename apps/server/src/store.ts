@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ManagedSessionHandle } from "@asphalt/pi-sdk";
+import type { ManagedSessionHandle } from "@lambda/pi-sdk";
 
 interface StoredSession {
   handle: ManagedSessionHandle;

@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { streamSSE } from "hono/streaming";
-import { createManagedSession, getAvailableModels, generateThreadTitle, type SdkConfig } from "@asphalt/pi-sdk";
-import { getCurrentBranch, listBranches, checkoutBranch } from "@asphalt/git";
+import { createManagedSession, getAvailableModels, generateThreadTitle, type SdkConfig } from "@lambda/pi-sdk";
+import { getCurrentBranch, listBranches, checkoutBranch } from "@lambda/git";
 import {
   listWorkspacesWithThreads,
   getWorkspace,
@@ -18,7 +18,7 @@ import {
   updateThreadSessionFile,
   listMessages,
   insertMessage,
-} from "@asphalt/db";
+} from "@lambda/db";
 import { store } from "./store.js";
 import { messageBuffer } from "./message-buffer.js";
 

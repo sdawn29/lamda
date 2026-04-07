@@ -56,14 +56,14 @@ The `electronAPI` is exposed on `window.electronAPI` with methods:
 - `electron` (v41) — Desktop shell
 - `tsx` — TypeScript execution in development
 - `esbuild` — Runtime compilation of preload script
-- `@asphalt/server` — Dependency reference to the Hono server package
+- `@lambda/server` — Dependency reference to the Hono server package
 
 ## Gotchas
 
 - The server is spawned with `PORT=0` (random available port) — the web app must discover the port via `window.electronAPI.getServerPort()` rather than using a hardcoded value
 - `bootstrap.mjs` is the entry point in `package.json` `"main"` — this file uses `tsx/esm/api` to load `src/main.ts`
 - In production, the server is loaded from `process.resourcesPath/server/server.cjs` — this must be bundled during the build/packaging step
-- The preload script is written to a temp file at runtime (`/tmp/asphalt-preload.js`) — this is a deliberate choice to avoid a build step
+- The preload script is written to a temp file at runtime (`/tmp/lambda-preload.js`) — this is a deliberate choice to avoid a build step
 - `titleBarStyle: "hiddenInset"` means the web app must implement its own title bar (see `web/src/components/title-bar.tsx`)
 - Server has a 15-second startup timeout — if it doesn't signal ready, the app fails
 
