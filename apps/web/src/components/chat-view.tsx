@@ -6,6 +6,15 @@ import remarkGfm from "remark-gfm"
 import { ChatTextbox } from "@/components/chat-textbox"
 import { TerminalPanel } from "@/components/terminal-panel"
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog"
+import {
   sendPrompt,
   getBranch,
   listBranches,
@@ -62,6 +71,7 @@ export function ChatView({
 }: ChatViewProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [gitError, setGitError] = useState<string | null>(null)
   const [branch, setBranch] = useState<string | null>(null)
   const [branches, setBranches] = useState<string[]>([])
   const [selectedModelId, setSelectedModelId] = useState<string | null>(() =>
@@ -107,7 +117,17 @@ export function ChatView({
         .then((r) => {
           if (r.branch) setBranch(r.branch)
         })
-        .catch(() => {})
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err)
+          // Strip the "API 500: " prefix and parse JSON error if present
+          const stripped = msg.replace(/^API \d+:\s*/, "")
+          try {
+            const parsed = JSON.parse(stripped) as { error?: string }
+            setGitError(parsed.error ?? stripped)
+          } catch {
+            setGitError(stripped)
+          }
+        })
     },
     [sessionId]
   )
@@ -243,6 +263,18 @@ export function ChatView({
     )
 
   return (
+    <>
+    <AlertDialog open={gitError !== null} onOpenChange={(open) => { if (!open) setGitError(null) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Git Error</AlertDialogTitle>
+          <AlertDialogDescription>{gitError}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={() => setGitError(null)}>OK</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <div className="flex h-full flex-col">
       <div
         ref={scrollContainerRef}
@@ -300,5 +332,6 @@ export function ChatView({
       </div>
       {terminalOpen && <TerminalPanel cwd={workspacePath} />}
     </div>
+    </>
   )
 }

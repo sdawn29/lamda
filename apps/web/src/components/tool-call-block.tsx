@@ -26,7 +26,7 @@ export function ToolCallBlock({ msg }: { msg: ToolMessage }) {
   // Auto-expand while running, collapse when done unless user has toggled it
   const [userToggled, setUserToggled] = useState(false)
   const [manualExpanded, setManualExpanded] = useState(false)
-  const expanded = userToggled ? manualExpanded : msg.status === "running" || msg.status === "error"
+  const expanded = userToggled ? manualExpanded : msg.status === "error"
 
   function toggle() {
     setUserToggled(true)

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { logger } from "hono/logger";
 import { streamSSE } from "hono/streaming";
 import { createManagedSession, getAvailableModels, generateThreadTitle, type SdkConfig } from "@asphalt/pi-sdk";
 import { getCurrentBranch, listBranches, checkoutBranch } from "@asphalt/git";
@@ -24,6 +25,7 @@ import { messageBuffer } from "./message-buffer.js";
 const app = new Hono();
 
 app.use(cors());
+app.use(logger());
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -252,8 +254,12 @@ app.post("/session/:id/checkout", async (c) => {
     await checkoutBranch(cwd, body.branch);
     const branch = await getCurrentBranch(cwd);
     return c.json({ branch });
-  } catch {
-    return c.json({ error: "Checkout failed" }, 500);
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
+    // Extract the human-readable part from the git stderr (after the first line which is the command echo)
+    const lines = raw.split("\n").filter(Boolean);
+    const message = lines.find((l) => l.startsWith("error:") || l.startsWith("fatal:")) ?? lines[0] ?? "Checkout failed";
+    return c.json({ error: message }, 500);
   }
 });
 
