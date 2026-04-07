@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, memo } from "react"
 import {
   ChevronRight,
   GripVertical,
@@ -105,7 +105,7 @@ interface DiffPanelProps {
   cwd: string
 }
 
-export function DiffPanel({ cwd }: DiffPanelProps) {
+export const DiffPanel = memo(function DiffPanel({ cwd }: DiffPanelProps) {
   const { close } = useDiffPanel()
   const [width, setWidth] = useState(DEFAULT_WIDTH)
   const [mode, setMode] = useState<DiffMode>("inline")
@@ -234,4 +234,4 @@ export function DiffPanel({ cwd }: DiffPanelProps) {
       </div>
     </div>
   )
-}
+})

@@ -2,14 +2,15 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react"
 import { useNavigate } from "@tanstack/react-router"
+import { useQueryClient } from "@tanstack/react-query"
 
+import { useWorkspaces, workspacesQueryKey } from "@/queries/use-workspaces"
 import {
-  listWorkspaces,
   createWorkspace as apiCreateWorkspace,
   deleteWorkspace as apiDeleteWorkspace,
   createThread as apiCreateThread,
@@ -35,73 +36,82 @@ interface WorkspaceContextValue {
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: workspacesData, isLoading } = useWorkspaces()
+  const queryClient = useQueryClient()
+  const [workspaces, setWorkspaces] = useState<Workspace[] | null>(null)
 
-  // ── Init: fetch from server ────────────────────────────────────────────────
-  useEffect(() => {
-    listWorkspaces()
-      .then(({ workspaces: ws }) => {
-        setWorkspaces(ws)
-      })
-      .catch((err) => console.error("[workspace-context] init failed:", err))
-      .finally(() => setIsLoading(false))
-  }, [])
-
-  // ── Actions ────────────────────────────────────────────────────────────────
+  const initialWorkspaces = useMemo(
+    () => workspaces ?? workspacesData ?? [],
+    [workspaces, workspacesData]
+  )
 
   const createWorkspace = useCallback(
     async (name: string, path: string): Promise<Workspace> => {
       const { workspace, existing } = await apiCreateWorkspace({ name, path })
-      if (!existing) setWorkspaces((prev) => [...prev, workspace])
+      if (!existing) {
+        setWorkspaces((prev) => [...(prev ?? initialWorkspaces), workspace])
+      }
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
       return workspace
     },
-    [],
+    [initialWorkspaces, queryClient]
   )
 
-  const createThread = useCallback(async (workspaceId: string): Promise<Thread> => {
-    const { thread } = await apiCreateThread(workspaceId)
-    setWorkspaces((prev) =>
-      prev.map((w) =>
-        w.id === workspaceId ? { ...w, threads: [...w.threads, thread] } : w,
-      ),
-    )
-    return thread
-  }, [])
+  const createThread = useCallback(
+    async (workspaceId: string): Promise<Thread> => {
+      const { thread } = await apiCreateThread(workspaceId)
+      setWorkspaces((prev) =>
+        (prev ?? initialWorkspaces).map((w) =>
+          w.id === workspaceId ? { ...w, threads: [...w.threads, thread] } : w
+        )
+      )
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+      return thread
+    },
+    [initialWorkspaces, queryClient]
+  )
 
   const setThreadTitle = useCallback(
     (workspaceId: string, threadId: string, title: string) => {
       setWorkspaces((prev) =>
-        prev.map((w) =>
+        (prev ?? initialWorkspaces).map((w) =>
           w.id !== workspaceId
             ? w
             : {
                 ...w,
                 threads: w.threads.map((t) =>
-                  t.id === threadId ? { ...t, title } : t,
+                  t.id === threadId ? { ...t, title } : t
                 ),
-              },
-        ),
+              }
+        )
       )
       apiUpdateThreadTitle(threadId, title).catch(console.error)
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
-    [],
+    [initialWorkspaces, queryClient]
   )
 
-  const deleteWorkspace = useCallback(async (workspace: Workspace): Promise<void> => {
-    await apiDeleteWorkspace(workspace.id)
-    setWorkspaces((prev) => prev.filter((w) => w.id !== workspace.id))
-  }, [])
+  const deleteWorkspace = useCallback(
+    async (workspace: Workspace): Promise<void> => {
+      await apiDeleteWorkspace(workspace.id)
+      setWorkspaces((prev) =>
+        (prev ?? initialWorkspaces).filter((w) => w.id !== workspace.id)
+      )
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+    [initialWorkspaces, queryClient]
+  )
 
   const resetAll = useCallback(async (): Promise<void> => {
     await resetAllData()
     setWorkspaces([])
-  }, [])
+    queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+  }, [queryClient])
 
   return (
     <WorkspaceContext
       value={{
-        workspaces,
+        workspaces: initialWorkspaces,
         isLoading,
         createWorkspace,
         deleteWorkspace,
@@ -134,7 +144,10 @@ export function useCreateWorkspaceAction() {
     const workspace = await createWorkspace(folderName, folderPath)
     const firstThread = workspace.threads[0]
     if (firstThread) {
-      navigate({ to: "/thread/$threadId", params: { threadId: firstThread.id } })
+      navigate({
+        to: "/thread/$threadId",
+        params: { threadId: firstThread.id },
+      })
     }
   }, [createWorkspace, navigate])
 }

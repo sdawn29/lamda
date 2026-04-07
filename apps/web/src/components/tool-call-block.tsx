@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, memo } from "react"
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -48,9 +48,8 @@ function getResultText(msg: ToolMessage): string | null {
     msg.result !== null &&
     Array.isArray((msg.result as Record<string, unknown>).content)
   ) {
-    const parts = (
-      msg.result as { content: { type: string; text?: string }[] }
-    ).content
+    const parts = (msg.result as { content: { type: string; text?: string }[] })
+      .content
     const text = parts
       .filter((p) => p.type === "text" && typeof p.text === "string")
       .map((p) => p.text)
@@ -85,11 +84,20 @@ function isReadTool(toolName: string, args: unknown): boolean {
   return toolName.toLowerCase() === "read" && getReadFilePath(args) !== null
 }
 
-function ReadView({ text, filePath, live }: { text: string; filePath: string; live: boolean }) {
+function ReadView({
+  text,
+  filePath,
+  live,
+}: {
+  text: string
+  filePath: string
+  live: boolean
+}) {
   const { theme } = useTheme()
   const isDark =
     theme === "dark" ||
-    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches)
   const language = detectLanguage(filePath) ?? "text"
 
   return (
@@ -115,7 +123,11 @@ function ReadView({ text, filePath, live }: { text: string; filePath: string; li
 
 // ── ToolCallBlock ──────────────────────────────────────────────────────────────
 
-export function ToolCallBlock({ msg }: { msg: ToolMessage }) {
+export const ToolCallBlock = memo(function ToolCallBlock({
+  msg,
+}: {
+  msg: ToolMessage
+}) {
   const isEdit = msg.toolName === "edit" && isEditArgs(msg.args)
   const diff = isEdit ? getEditDiff(msg.result) : null
   const isRead = isReadTool(msg.toolName, msg.args)
@@ -141,7 +153,7 @@ export function ToolCallBlock({ msg }: { msg: ToolMessage }) {
         "w-full max-w-2xl self-start rounded-lg border text-xs",
         msg.status === "error"
           ? "border-destructive/50 bg-destructive/5"
-          : "border-border bg-muted/20",
+          : "border-border bg-muted/20"
       )}
     >
       {/* Header */}
@@ -168,7 +180,7 @@ export function ToolCallBlock({ msg }: { msg: ToolMessage }) {
         <ChevronDownIcon
           className={cn(
             "ml-auto h-3 w-3 shrink-0 text-muted-foreground transition-transform",
-            expanded && "rotate-180",
+            expanded && "rotate-180"
           )}
         />
       </button>
@@ -179,13 +191,16 @@ export function ToolCallBlock({ msg }: { msg: ToolMessage }) {
           <div
             className={cn(
               "mb-2 border-t",
-              msg.status === "error" ? "border-destructive/30" : "border-border",
+              msg.status === "error" ? "border-destructive/30" : "border-border"
             )}
           />
 
           {/* Edit: show pre-computed diff from SDK */}
           {isEdit && diff !== null && (
-            <DiffView diff={diff} filePath={(msg.args as { path?: string }).path} />
+            <DiffView
+              diff={diff}
+              filePath={(msg.args as { path?: string }).path}
+            />
           )}
 
           {/* Edit running — no diff yet */}
@@ -198,23 +213,28 @@ export function ToolCallBlock({ msg }: { msg: ToolMessage }) {
 
           {/* Read tool: syntax-highlighted file content */}
           {isRead && readFilePath && resultText && msg.status !== "error" && (
-            <ReadView text={resultText} filePath={readFilePath} live={msg.status === "running"} />
+            <ReadView
+              text={resultText}
+              filePath={readFilePath}
+              live={msg.status === "running"}
+            />
           )}
 
           {/* Non-edit, non-read tools or error fallback */}
-          {!isEdit && !isRead && resultText && (
-            msg.status === "error" ? (
-              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all text-destructive">
+          {!isEdit &&
+            !isRead &&
+            resultText &&
+            (msg.status === "error" ? (
+              <pre className="max-h-48 overflow-auto break-all whitespace-pre-wrap text-destructive">
                 {resultText}
               </pre>
             ) : (
               <LivePre text={resultText} live={msg.status === "running"} />
-            )
-          )}
+            ))}
 
           {/* Edit / read error */}
           {(isEdit || isRead) && msg.status === "error" && resultText && (
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all text-destructive">
+            <pre className="max-h-48 overflow-auto break-all whitespace-pre-wrap text-destructive">
               {resultText}
             </pre>
           )}
@@ -222,4 +242,4 @@ export function ToolCallBlock({ msg }: { msg: ToolMessage }) {
       )}
     </div>
   )
-}
+})

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, memo } from "react"
 
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -22,8 +22,8 @@ import {
   checkoutBranch,
   generateTitle,
 } from "@/api/sessions"
-import { listMessages, type StoredMessageDto } from "@/api/workspaces"
 import { apiUrl } from "@/api/client"
+import type { StoredMessageDto } from "@/api/workspaces"
 import { useWorkspace } from "@/hooks/workspace-context"
 import { useTerminal } from "@/hooks/terminal-context"
 import { useDiffPanel } from "@/hooks/diff-panel-context"
@@ -64,7 +64,7 @@ interface ChatViewProps {
   threadId: string
 }
 
-export function ChatView({
+export const ChatView = memo(function ChatView({
   sessionId,
   workspaceName,
   workspaceId,
@@ -91,10 +91,11 @@ export function ChatView({
   // ── Load message history on mount (component is keyed by threadId) ──────────
   useEffect(() => {
     let cancelled = false
-    listMessages(sessionId)
-      .then(({ messages: stored }) => {
+    fetch(apiUrl(`/session/${sessionId}/messages`))
+      .then((r) => r.json())
+      .then(({ messages }: { messages: StoredMessageDto[] }) => {
         if (cancelled) return
-        const loaded = stored.map(storedToMessage)
+        const loaded = messages.map(storedToMessage)
         setMessages(loaded)
         hasTitledRef.current = loaded.length > 0
       })
@@ -240,6 +241,14 @@ export function ChatView({
     pinnedRef.current = distanceFromBottom < 80
   }, [])
 
+  const handleModelChange = useCallback(
+    (id: string) => {
+      setSelectedModelId(id)
+      localStorage.setItem(`lambda-code:threadModel:${threadId}`, id)
+    },
+    [threadId]
+  )
+
   const handleSend = useCallback(
     (text: string, modelId: string, provider: string) => {
       if (!hasTitledRef.current) {
@@ -294,12 +303,14 @@ export function ChatView({
             className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-6 pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {messages.map((msg, i) => {
+              const key =
+                msg.role === "tool" ? msg.toolCallId : `${msg.role}-${i}`
               if (msg.role === "tool") {
-                return <ToolCallBlock key={i} msg={msg} />
+                return <ToolCallBlock key={key} msg={msg} />
               }
               return (
                 <div
-                  key={i}
+                  key={key}
                   className={
                     msg.role === "user"
                       ? "self-end rounded-xl bg-muted px-4 py-2 text-sm"
@@ -336,10 +347,7 @@ export function ChatView({
               branches={branches}
               onBranchSelect={handleBranchSelect}
               selectedModelId={selectedModelId}
-              onModelChange={(id) => {
-                setSelectedModelId(id)
-                localStorage.setItem(`lambda-code:threadModel:${threadId}`, id)
-              }}
+              onModelChange={handleModelChange}
             />
           </div>
           {terminalOpen && <TerminalPanel cwd={workspacePath} />}
@@ -350,4 +358,4 @@ export function ChatView({
       </div>
     </>
   )
-}
+})

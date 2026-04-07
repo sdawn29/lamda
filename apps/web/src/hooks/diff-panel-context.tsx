@@ -1,4 +1,11 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react"
 
 interface DiffPanelContextValue {
   isOpen: boolean
@@ -16,15 +23,17 @@ export function DiffPanelProvider({ children }: { children: ReactNode }) {
   const open = useCallback(() => setIsOpen(true), [])
   const close = useCallback(() => setIsOpen(false), [])
 
-  return (
-    <DiffPanelContext value={{ isOpen, toggle, open, close }}>
-      {children}
-    </DiffPanelContext>
+  const value = useMemo(
+    () => ({ isOpen, toggle, open, close }),
+    [isOpen, toggle, open, close]
   )
+
+  return <DiffPanelContext value={value}>{children}</DiffPanelContext>
 }
 
 export function useDiffPanel() {
   const ctx = useContext(DiffPanelContext)
-  if (!ctx) throw new Error("useDiffPanel must be used within DiffPanelProvider")
+  if (!ctx)
+    throw new Error("useDiffPanel must be used within DiffPanelProvider")
   return ctx
 }

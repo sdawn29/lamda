@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react"
+import { useEffect, useRef, useCallback, useState, memo } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
 import { X, GripHorizontal } from "lucide-react"
@@ -7,7 +7,8 @@ import { useTerminal } from "@/hooks/terminal-context"
 import "@xterm/xterm/css/xterm.css"
 
 const SERVER_URL =
-  (import.meta.env.VITE_SERVER_URL as string | undefined) ?? "http://localhost:3001"
+  (import.meta.env.VITE_SERVER_URL as string | undefined) ??
+  "http://localhost:3001"
 
 function wsUrl(path: string): string {
   return SERVER_URL.replace(/^http/, "ws") + path
@@ -20,7 +21,9 @@ interface TerminalPanelProps {
   cwd: string
 }
 
-export function TerminalPanel({ cwd }: TerminalPanelProps) {
+export const TerminalPanel = memo(function TerminalPanel({
+  cwd,
+}: TerminalPanelProps) {
   const { close } = useTerminal()
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
@@ -77,7 +80,9 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
     ws.onopen = () => {
       const dims = fitAddon.proposeDimensions()
       if (dims) {
-        ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }))
+        ws.send(
+          JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
+        )
       }
     }
 
@@ -99,7 +104,9 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
       fitAddon.fit()
       const dims = fitAddon.proposeDimensions()
       if (dims && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }))
+        ws.send(
+          JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
+        )
       }
     })
     resizeObserver.observe(container)
@@ -112,7 +119,7 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
       fitAddonRef.current = null
       wsRef.current = null
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cwd])
 
   // Re-fit when height changes
@@ -123,29 +130,34 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
     fitAddon.fit()
     const dims = fitAddon.proposeDimensions()
     if (dims && ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }))
+      ws.send(
+        JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
+      )
     }
   }, [height])
 
-  const onDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    dragStartRef.current = { y: e.clientY, h: height }
+  const onDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      dragStartRef.current = { y: e.clientY, h: height }
 
-    const onMove = (ev: MouseEvent) => {
-      if (!dragStartRef.current) return
-      const delta = dragStartRef.current.y - ev.clientY
-      setHeight(Math.max(MIN_HEIGHT, dragStartRef.current.h + delta))
-    }
+      const onMove = (ev: MouseEvent) => {
+        if (!dragStartRef.current) return
+        const delta = dragStartRef.current.y - ev.clientY
+        setHeight(Math.max(MIN_HEIGHT, dragStartRef.current.h + delta))
+      }
 
-    const onUp = () => {
-      dragStartRef.current = null
-      window.removeEventListener("mousemove", onMove)
-      window.removeEventListener("mouseup", onUp)
-    }
+      const onUp = () => {
+        dragStartRef.current = null
+        window.removeEventListener("mousemove", onMove)
+        window.removeEventListener("mouseup", onUp)
+      }
 
-    window.addEventListener("mousemove", onMove)
-    window.addEventListener("mouseup", onUp)
-  }, [height])
+      window.addEventListener("mousemove", onMove)
+      window.addEventListener("mouseup", onUp)
+    },
+    [height]
+  )
 
   return (
     <div
@@ -180,4 +192,4 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
       />
     </div>
   )
-}
+})

@@ -1,4 +1,11 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react"
 
 interface TerminalContextValue {
   isOpen: boolean
@@ -16,11 +23,12 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const open = useCallback(() => setIsOpen(true), [])
   const close = useCallback(() => setIsOpen(false), [])
 
-  return (
-    <TerminalContext value={{ isOpen, toggle, open, close }}>
-      {children}
-    </TerminalContext>
+  const value = useMemo(
+    () => ({ isOpen, toggle, open, close }),
+    [isOpen, toggle, open, close]
   )
+
+  return <TerminalContext value={value}>{children}</TerminalContext>
 }
 
 export function useTerminal() {

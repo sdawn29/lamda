@@ -1,4 +1,5 @@
 import * as React from "react"
+import { memo } from "react"
 import { ArrowUpIcon, SquareIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -34,7 +35,7 @@ interface ChatTextboxProps {
   onModelChange?: (modelId: string) => void
 }
 
-export function ChatTextbox({
+export const ChatTextbox = memo(function ChatTextbox({
   onSend,
   isLoading = false,
   onStop,
@@ -186,4 +187,4 @@ export function ChatTextbox({
       )}
     </div>
   )
-}
+})
