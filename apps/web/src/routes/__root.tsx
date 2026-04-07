@@ -7,6 +7,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { WorkspaceProvider, useWorkspace } from "@/hooks/workspace-context"
 import { TerminalProvider } from "@/hooks/terminal-context"
+import { DiffPanelProvider } from "@/hooks/diff-panel-context"
 
 function RootLayoutInner() {
   const { isLoading } = useWorkspace()
@@ -40,7 +41,9 @@ function RootLayoutInner() {
 const RootLayout = () => (
   <WorkspaceProvider>
     <TerminalProvider>
-      <RootLayoutInner />
+      <DiffPanelProvider>
+        <RootLayoutInner />
+      </DiffPanelProvider>
     </TerminalProvider>
   </WorkspaceProvider>
 )

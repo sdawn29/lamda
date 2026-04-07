@@ -1,6 +1,8 @@
 import { useMemo } from "react"
 import { cn } from "@/lib/utils"
 
+export type DiffMode = "inline" | "side-by-side"
+
 type DiffLineKind = "added" | "removed" | "context" | "skipped"
 
 interface DiffLine {
@@ -10,7 +12,6 @@ interface DiffLine {
 }
 
 // ── Format detection ───────────────────────────────────────────────────────────
-// SDK lines look like "+3 content" — digit(s) immediately after the sign.
 
 function isSdkFormat(diff: string): boolean {
   const first = diff.split("\n").find(Boolean) ?? ""
@@ -18,7 +19,6 @@ function isSdkFormat(diff: string): boolean {
 }
 
 // ── SDK format parser ──────────────────────────────────────────────────────────
-// Format: "+N content", "-N content", " N content", " N ..."
 
 function parseSdkDiff(diff: string): DiffLine[] {
   return diff
@@ -41,8 +41,6 @@ function parseSdkDiff(diff: string): DiffLine[] {
 }
 
 // ── Unified diff parser ────────────────────────────────────────────────────────
-// Skips meta lines (diff/index/---/+++), parses @@ for line numbers, tracks
-// old/new line counters for every added/removed/context line.
 
 function parseUnifiedDiff(diff: string): DiffLine[] {
   const result: DiffLine[] = []
@@ -50,7 +48,6 @@ function parseUnifiedDiff(diff: string): DiffLine[] {
   let newLine = 0
 
   for (const raw of diff.split("\n")) {
-    // Skip file-level meta entirely
     if (
       raw.startsWith("diff ") ||
       raw.startsWith("index ") ||
@@ -60,7 +57,6 @@ function parseUnifiedDiff(diff: string): DiffLine[] {
       continue
     }
 
-    // Hunk header — extract starting line numbers, emit a separator
     if (raw.startsWith("@@")) {
       const m = raw.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
       if (m) {
@@ -85,7 +81,7 @@ function parseUnifiedDiff(diff: string): DiffLine[] {
   return result
 }
 
-// ── Row ────────────────────────────────────────────────────────────────────────
+// ── Inline row ─────────────────────────────────────────────────────────────────
 
 function DiffRow({ line }: { line: DiffLine }) {
   return (
@@ -96,7 +92,6 @@ function DiffRow({ line }: { line: DiffLine }) {
         line.kind === "removed" && "bg-red-500/8 hover:bg-red-500/12",
       )}
     >
-      {/* Sign */}
       <span
         className={cn(
           "w-4 shrink-0 select-none text-center",
@@ -108,7 +103,6 @@ function DiffRow({ line }: { line: DiffLine }) {
         {line.kind === "added" ? "+" : line.kind === "removed" ? "−" : ""}
       </span>
 
-      {/* Line number */}
       <span
         className={cn(
           "w-8 shrink-0 select-none border-r pr-2 text-right",
@@ -121,7 +115,6 @@ function DiffRow({ line }: { line: DiffLine }) {
         {line.lineNum}
       </span>
 
-      {/* Content */}
       <span
         className={cn(
           "flex-1 whitespace-pre pl-3",
@@ -137,17 +130,123 @@ function DiffRow({ line }: { line: DiffLine }) {
   )
 }
 
+// ── Side-by-side ───────────────────────────────────────────────────────────────
+
+interface SideBySideRow {
+  left: DiffLine | null
+  right: DiffLine | null
+}
+
+function buildSideBySideRows(lines: DiffLine[]): SideBySideRow[] {
+  const rows: SideBySideRow[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    if (line.kind === "context" || line.kind === "skipped") {
+      rows.push({ left: line, right: line })
+      i++
+      continue
+    }
+
+    // Collect a run of removed then added lines
+    const removed: DiffLine[] = []
+    const added: DiffLine[] = []
+
+    while (i < lines.length && lines[i].kind === "removed") {
+      removed.push(lines[i++])
+    }
+    while (i < lines.length && lines[i].kind === "added") {
+      added.push(lines[i++])
+    }
+
+    const maxLen = Math.max(removed.length, added.length)
+    for (let j = 0; j < maxLen; j++) {
+      rows.push({
+        left: removed[j] ?? null,
+        right: added[j] ?? null,
+      })
+    }
+  }
+
+  return rows
+}
+
+function SideBySideCell({
+  line,
+  side,
+}: {
+  line: DiffLine | null
+  side: "left" | "right"
+}) {
+  if (!line) {
+    return <div className="flex flex-1 leading-5 min-w-0" />
+  }
+
+  const isSkipped = line.kind === "skipped"
+  const isAdded = line.kind === "added"
+  const isRemoved = line.kind === "removed"
+
+  return (
+    <div
+      className={cn(
+        "flex flex-1 leading-5 min-w-0",
+        isAdded && "bg-green-500/8",
+        isRemoved && "bg-red-500/8",
+      )}
+    >
+      <span
+        className={cn(
+          "w-8 shrink-0 select-none border-r pr-2 text-right text-xs",
+          isAdded && "border-green-500/20 text-green-400/50",
+          isRemoved && "border-red-500/20 text-red-400/50",
+          (line.kind === "context" || isSkipped) && "border-border/40 text-muted-foreground/40",
+        )}
+      >
+        {isSkipped ? "" : line.lineNum}
+      </span>
+      <span
+        className={cn(
+          "flex-1 whitespace-pre pl-2 truncate",
+          isAdded && "text-green-700 dark:text-green-400",
+          isRemoved && "text-red-700 dark:text-red-400",
+          line.kind === "context" && "text-foreground/60",
+          isSkipped && "italic text-muted-foreground/40",
+        )}
+      >
+        {isSkipped ? "⋯" : line.content || " "}
+      </span>
+    </div>
+  )
+}
+
+function SideBySideRow({ row }: { row: SideBySideRow }) {
+  return (
+    <div className="flex leading-5 divide-x divide-border/30">
+      <SideBySideCell line={row.left} side="left" />
+      <SideBySideCell line={row.right} side="right" />
+    </div>
+  )
+}
+
 // ── Public component ───────────────────────────────────────────────────────────
 
 interface DiffViewProps {
   diff: string
   className?: string
+  mode?: DiffMode
 }
 
-export function DiffView({ diff, className }: DiffViewProps) {
+export function DiffView({ diff, className, mode = "inline" }: DiffViewProps) {
   const lines = useMemo(() => {
     return isSdkFormat(diff) ? parseSdkDiff(diff) : parseUnifiedDiff(diff)
   }, [diff])
+
+  const sideBySideRows = useMemo(() => {
+    if (mode !== "side-by-side") return null
+    return buildSideBySideRows(lines)
+  }, [lines, mode])
 
   const added = lines.filter((l) => l.kind === "added").length
   const removed = lines.filter((l) => l.kind === "removed").length
@@ -160,9 +259,9 @@ export function DiffView({ diff, className }: DiffViewProps) {
       )}
     >
       <div className="max-h-80 overflow-auto">
-        {lines.map((line, i) => (
-          <DiffRow key={i} line={line} />
-        ))}
+        {mode === "inline"
+          ? lines.map((line, i) => <DiffRow key={i} line={line} />)
+          : sideBySideRows?.map((row, i) => <SideBySideRow key={i} row={row} />)}
       </div>
 
       {(added > 0 || removed > 0) && (

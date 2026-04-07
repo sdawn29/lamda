@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
-import { ChevronLeft, ChevronRight, TerminalSquare } from "lucide-react"
+import { ChevronLeft, ChevronRight, TerminalSquare, GitCompare } from "lucide-react"
 import { useRouter, useParams } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { useWorkspace } from "@/hooks/workspace-context"
 import { useTerminal } from "@/hooks/terminal-context"
+import { useDiffPanel } from "@/hooks/diff-panel-context"
 import { CommitDialog } from "@/components/commit-dialog"
 
 const isMac =
@@ -15,6 +16,7 @@ export function TitleBar() {
   const { open } = useSidebar()
   const { workspaces } = useWorkspace()
   const { isOpen: terminalOpen, toggle: toggleTerminal } = useTerminal()
+  const { isOpen: diffOpen, toggle: toggleDiff } = useDiffPanel()
   const { threadId } = useParams({ strict: false }) as { threadId?: string }
   const activeThread = threadId
     ? workspaces.flatMap((w) => w.threads).find((t) => t.id === threadId)
@@ -105,6 +107,17 @@ export function TitleBar() {
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
         <CommitDialog cwd={activeWorkspace?.path} />
+        <Button
+          variant="outline"
+          size="icon-sm"
+          onClick={toggleDiff}
+          data-active={diffOpen}
+          disabled={!activeWorkspace?.path}
+          className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+        >
+          <GitCompare />
+          <span className="sr-only">Toggle diff panel</span>
+        </Button>
         <Button
           variant="outline"
           size="icon-sm"

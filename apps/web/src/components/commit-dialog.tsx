@@ -144,13 +144,13 @@ export function CommitDialog({ cwd }: CommitDialogProps) {
         render={
           <Button
             variant="outline"
-            size="icon-sm"
+            size="sm"
             disabled={!cwd}
-            aria-label="Commit changes"
           />
         }
       >
         <GitCommit />
+        Commit
       </DialogTrigger>
       <DialogContent
         showCloseButton={true}

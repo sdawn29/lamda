@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm"
 
 import { ChatTextbox } from "@/components/chat-textbox"
 import { TerminalPanel } from "@/components/terminal-panel"
+import { DiffPanel } from "@/components/diff-panel"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -25,6 +26,7 @@ import { listMessages, type StoredMessageDto } from "@/api/workspaces"
 import { apiUrl } from "@/api/client"
 import { useWorkspace } from "@/hooks/workspace-context"
 import { useTerminal } from "@/hooks/terminal-context"
+import { useDiffPanel } from "@/hooks/diff-panel-context"
 import { ToolCallBlock } from "@/components/tool-call-block"
 import { markdownComponents } from "@/components/markdown-components"
 import type { Message, TextMessage, ToolMessage } from "@/components/chat-types"
@@ -84,6 +86,7 @@ export function ChatView({
 
   const { setThreadTitle } = useWorkspace()
   const { isOpen: terminalOpen } = useTerminal()
+  const { isOpen: diffOpen } = useDiffPanel()
 
   // ── Load message history on mount (component is keyed by threadId) ──────────
   useEffect(() => {
@@ -275,62 +278,68 @@ export function ChatView({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    <div className="flex h-full flex-col">
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-6 pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {messages.map((msg, i) => {
-          if (msg.role === "tool") {
-            return <ToolCallBlock key={i} msg={msg} />
-          }
-          return (
-            <div
-              key={i}
-              className={
-                msg.role === "user"
-                  ? "self-end rounded-xl bg-muted px-4 py-2 text-sm"
-                  : "prose prose-sm w-full max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
-              }
-            >
-              {msg.role === "user" ? (
-                msg.content
-              ) : (
-                <Markdown
-                  remarkPlugins={[remarkGfm]}
-                  components={markdownComponents}
-                >
-                  {msg.content}
-                </Markdown>
-              )}
-            </div>
-          )
-        })}
-        {showThinking && (
-          <p className="animate-pulse self-start text-sm text-muted-foreground">
-            Thinking…
-          </p>
-        )}
-        <div ref={bottomRef} />
+    <div className="flex h-full min-w-0">
+      {/* Main chat column */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-6 pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {messages.map((msg, i) => {
+            if (msg.role === "tool") {
+              return <ToolCallBlock key={i} msg={msg} />
+            }
+            return (
+              <div
+                key={i}
+                className={
+                  msg.role === "user"
+                    ? "self-end rounded-xl bg-muted px-4 py-2 text-sm"
+                    : "prose prose-sm w-full max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                }
+              >
+                {msg.role === "user" ? (
+                  msg.content
+                ) : (
+                  <Markdown
+                    remarkPlugins={[remarkGfm]}
+                    components={markdownComponents}
+                  >
+                    {msg.content}
+                  </Markdown>
+                )}
+              </div>
+            )
+          })}
+          {showThinking && (
+            <p className="animate-pulse self-start text-sm text-muted-foreground">
+              Thinking…
+            </p>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        <div className="mx-auto w-full max-w-2xl px-6 pb-6">
+          <ChatTextbox
+            onSend={handleSend}
+            isLoading={isLoading}
+            workspaceName={workspaceName}
+            branch={branch}
+            branches={branches}
+            onBranchSelect={handleBranchSelect}
+            selectedModelId={selectedModelId}
+            onModelChange={(id) => {
+              setSelectedModelId(id)
+              localStorage.setItem(`lambda-code:threadModel:${threadId}`, id)
+            }}
+          />
+        </div>
+        {terminalOpen && <TerminalPanel cwd={workspacePath} />}
       </div>
 
-      <div className="mx-auto w-full max-w-2xl px-6 pb-6">
-        <ChatTextbox
-          onSend={handleSend}
-          isLoading={isLoading}
-          workspaceName={workspaceName}
-          branch={branch}
-          branches={branches}
-          onBranchSelect={handleBranchSelect}
-          selectedModelId={selectedModelId}
-          onModelChange={(id) => {
-            setSelectedModelId(id)
-            localStorage.setItem(`lambda-code:threadModel:${threadId}`, id)
-          }}
-        />
-      </div>
-      {terminalOpen && <TerminalPanel cwd={workspacePath} />}
+      {/* Right-side diff panel */}
+      {diffOpen && <DiffPanel cwd={workspacePath} />}
     </div>
     </>
   )
