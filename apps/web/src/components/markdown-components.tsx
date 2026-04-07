@@ -22,7 +22,7 @@ function CopyButton({ code }: { code: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute right-2 top-2 rounded-md border border-border bg-background p-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+      className="absolute top-2 right-2 rounded-md border border-border bg-background p-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
       aria-label="Copy code"
     >
       {copied ? <Check size={13} /> : <Copy size={13} />}
@@ -40,7 +40,8 @@ function CodeBlock({
   const { theme } = useTheme()
   const isDark =
     theme === "dark" ||
-    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches)
   const match = /language-(\w+)/.exec(className ?? "")
   const code = String(children).replace(/\n$/, "")
 
@@ -67,7 +68,12 @@ function CodeBlock({
             lineHeight: "1.6",
             background: "transparent",
           }}
-          codeTagProps={{ style: { fontFamily: "var(--font-mono, ui-monospace, monospace)" } }}
+          codeTagProps={{
+            style: {
+              fontFamily: "var(--font-mono, ui-monospace, monospace)",
+              fontWeight: "normal",
+            },
+          }}
         >
           {code}
         </SyntaxHighlighter>
@@ -97,7 +103,12 @@ function CodeBlock({
           lineHeight: "1.6",
           background: "transparent",
         }}
-        codeTagProps={{ style: { fontFamily: "var(--font-mono, ui-monospace, monospace)" } }}
+        codeTagProps={{
+          style: {
+            fontFamily: "var(--font-mono, ui-monospace, monospace)",
+            fontWeight: "normal",
+          },
+        }}
       >
         {code}
       </SyntaxHighlighterAuto>
@@ -135,7 +146,8 @@ export const markdownComponents: Components = {
     // react-markdown v9+ removed the `inline` prop. The reliable heuristic:
     // remark always appends a trailing "\n" to fenced/indented code block
     // content, but never to inline code spans.
-    const isBlock = String(children).endsWith("\n") || className?.startsWith("language-")
+    const isBlock =
+      String(children).endsWith("\n") || className?.startsWith("language-")
     if (!isBlock) {
       return (
         <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.8125rem]">
