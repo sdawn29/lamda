@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { useWorkspace } from "@/hooks/workspace-context"
 import { useTerminal } from "@/hooks/terminal-context"
+import { CommitDialog } from "@/components/commit-dialog"
 
 const isMac =
   typeof window !== "undefined" && window.electronAPI?.platform === "darwin"
@@ -17,6 +18,9 @@ export function TitleBar() {
   const { threadId } = useParams({ strict: false }) as { threadId?: string }
   const activeThread = threadId
     ? workspaces.flatMap((w) => w.threads).find((t) => t.id === threadId)
+    : undefined
+  const activeWorkspace = activeThread
+    ? workspaces.find((w) => w.threads.some((t) => t.id === activeThread.id))
     : undefined
 
   const { subscribe, getSnapshot } = useMemo(() => {
@@ -97,9 +101,10 @@ export function TitleBar() {
 
       {/* Right controls */}
       <div
-        className="absolute inset-y-0 right-0 flex items-center pr-3"
+        className="absolute inset-y-0 right-0 flex items-center gap-1 pr-3"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
+        <CommitDialog cwd={activeWorkspace?.path} />
         <Button
           variant="ghost"
           size="icon-sm"

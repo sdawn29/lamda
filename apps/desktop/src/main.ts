@@ -4,7 +4,7 @@ import path from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { transformSync } from "esbuild";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, execFile, type ChildProcess } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -167,6 +167,52 @@ app.whenReady().then(async () => {
   ipcMain.handle("open-path", (_event, filePath: string) => {
     shell.showItemInFolder(filePath);
   });
+
+  ipcMain.handle("git-status", (_event, cwd: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      execFile("git", ["status", "--short"], { cwd }, (err, stdout, stderr) => {
+        if (err) reject(new Error(stderr || err.message));
+        else resolve(stdout);
+      });
+    });
+  });
+
+  ipcMain.handle(
+    "git-file-diff",
+    (_event, cwd: string, filePath: string, statusCode: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const isUntracked = statusCode.trim() === "??";
+        const args = isUntracked
+          ? ["diff", "--no-index", "--", "/dev/null", filePath]
+          : ["diff", "HEAD", "--", filePath];
+        execFile("git", args, { cwd }, (err, stdout, stderr) => {
+          // git diff --no-index exits with code 1 when there are differences — not an error
+          if (err && !stdout) reject(new Error(stderr || err.message));
+          else resolve(stdout);
+        });
+      });
+    },
+  );
+
+  ipcMain.handle(
+    "git-commit",
+    (_event, cwd: string, message: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        execFile("git", ["add", "-A"], { cwd }, (err, _stdout, stderr) => {
+          if (err) return reject(new Error(stderr || err.message));
+          execFile(
+            "git",
+            ["commit", "-m", message],
+            { cwd },
+            (err2, stdout2, stderr2) => {
+              if (err2) reject(new Error(stderr2 || err2.message));
+              else resolve(stdout2);
+            },
+          );
+        });
+      });
+    },
+  );
 
   await createWindow();
 
