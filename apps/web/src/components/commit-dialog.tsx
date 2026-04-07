@@ -27,7 +27,7 @@ function statusColor(code: string) {
   if (c === "M" || c === "MM") return "text-yellow-500 dark:text-yellow-400"
   if (c === "A" || c === "AM") return "text-green-600 dark:text-green-400"
   if (c === "D") return "text-red-500 dark:text-red-400"
-  if (c === "??") return "text-blue-500 dark:text-blue-400"
+  if (c === "U") return "text-blue-500 dark:text-blue-400"
   if (c === "R") return "text-purple-500 dark:text-purple-400"
   return "text-muted-foreground"
 }
@@ -112,7 +112,7 @@ export function CommitDialog({ cwd }: CommitDialogProps) {
           .split("\n")
           .map((l) => l.trimEnd())
           .filter(Boolean)
-          .map((l) => ({ statusCode: l.slice(0, 2), filePath: l.slice(3) }))
+          .map((l) => ({ statusCode: l.slice(0, 2) === "??" ? "U" : l.slice(0, 2), filePath: l.slice(3) }))
         setFiles(parsed)
       })
       .catch((err: Error) => setError(err.message))

@@ -181,7 +181,7 @@ app.whenReady().then(async () => {
     "git-file-diff",
     (_event, cwd: string, filePath: string, statusCode: string): Promise<string> => {
       return new Promise((resolve, reject) => {
-        const isUntracked = statusCode.trim() === "??";
+        const isUntracked = statusCode.trim() === "??" || statusCode.trim() === "U";
         const args = isUntracked
           ? ["diff", "--no-index", "--", "/dev/null", filePath]
           : ["diff", "HEAD", "--", filePath];
