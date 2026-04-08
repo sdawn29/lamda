@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, TerminalSquare, GitCompare } from "lucide-re
 import { useRouter, useParams } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useWorkspace } from "@/hooks/workspace-context"
 import { useTerminal } from "@/hooks/terminal-context"
 import { useDiffPanel } from "@/hooks/diff-panel-context"
@@ -62,25 +63,42 @@ export function TitleBar() {
         className={`absolute inset-y-0 left-0 flex items-center gap-1 ${isMac ? "pl-20" : "pl-2"}`}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-        <SidebarTrigger />
-        <Button
-          variant="outline"
-          size="icon-sm"
-          onClick={() => router.history.back()}
-          disabled={!canGoBack}
-        >
-          <ChevronLeft />
-          <span className="sr-only">Go back</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="icon-sm"
-          onClick={() => router.history.forward()}
-          disabled={!canGoForward}
-        >
-          <ChevronRight />
-          <span className="sr-only">Go forward</span>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger render={<SidebarTrigger />} />
+          <TooltipContent>Toggle sidebar</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => router.history.back()}
+                disabled={!canGoBack}
+              >
+                <ChevronLeft />
+                <span className="sr-only">Go back</span>
+              </Button>
+            }
+          />
+          <TooltipContent>Go back</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => router.history.forward()}
+                disabled={!canGoForward}
+              >
+                <ChevronRight />
+                <span className="sr-only">Go forward</span>
+              </Button>
+            }
+          />
+          <TooltipContent>Go forward</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Animated spacer — tracks sidebar width; never collapses past nav controls */}
@@ -110,33 +128,47 @@ export function TitleBar() {
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
         <CommitDialog sessionId={activeThread?.sessionId ?? undefined} />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={toggleDiff}
-          data-active={diffOpen}
-          disabled={!activeWorkspace?.path}
-          className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground h-6 gap-1 px-1.5"
-        >
-          <GitCompare className="size-3 shrink-0" />
-          {diffStat && (diffStat.additions > 0 || diffStat.deletions > 0) && (
-            <span className="flex items-center gap-0.5 font-mono leading-none">
-              <span className="text-green-500">+{diffStat.additions}</span>
-              <span className="text-red-500">-{diffStat.deletions}</span>
-            </span>
-          )}
-          <span className="sr-only">Toggle diff panel</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="icon-sm"
-          onClick={toggleTerminal}
-          data-active={terminalOpen}
-          className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-        >
-          <TerminalSquare />
-          <span className="sr-only">Toggle terminal</span>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleDiff}
+                data-active={diffOpen}
+                disabled={!activeWorkspace?.path}
+                className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground h-6 gap-1 px-1.5"
+              >
+                <GitCompare className="size-3 shrink-0" />
+                {diffStat && (diffStat.additions > 0 || diffStat.deletions > 0) && (
+                  <span className="flex items-center gap-0.5 font-mono leading-none">
+                    <span className="text-green-500">+{diffStat.additions}</span>
+                    <span className="text-red-500">-{diffStat.deletions}</span>
+                  </span>
+                )}
+                <span className="sr-only">Toggle diff panel</span>
+              </Button>
+            }
+          />
+          <TooltipContent>Toggle diff panel</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={toggleTerminal}
+                data-active={terminalOpen}
+                className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+              >
+                <TerminalSquare />
+                <span className="sr-only">Toggle terminal</span>
+              </Button>
+            }
+          />
+          <TooltipContent>Toggle terminal</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   )

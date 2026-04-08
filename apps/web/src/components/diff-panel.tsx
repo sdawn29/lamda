@@ -218,8 +218,8 @@ function FileAccordionItem({
   const dirPath = pathParts.length > 1 ? pathParts.slice(0, -1).join("/") : null
 
   return (
-    <div className="group/file relative border-b border-border/40 last:border-0">
-      <div className="flex w-full items-center">
+    <div className="group/file border-b border-border/40 last:border-0">
+      <div className="relative flex w-full items-center">
         <button
           onClick={() => setExpanded((v) => !v)}
           className="flex min-w-0 flex-1 items-center gap-1.5 py-2 pl-2 pr-8 text-left transition-colors hover:bg-muted/40"
