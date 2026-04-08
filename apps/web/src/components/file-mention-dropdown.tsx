@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react"
 import { FileIcon, FolderIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -15,10 +16,19 @@ export function FileMentionDropdown({
   selectedIndex: number
   onSelect: (entry: WorkspaceEntry) => void
 }) {
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const list = listRef.current
+    if (!list) return
+    const item = list.children[selectedIndex] as HTMLElement | undefined
+    item?.scrollIntoView({ block: "nearest" })
+  }, [selectedIndex])
+
   if (!open || entries.length === 0) return null
 
   return (
-    <div className="absolute bottom-full left-0 z-50 mb-1 max-h-60 w-full overflow-y-auto rounded-lg border bg-popover p-1 shadow-md">
+    <div ref={listRef} className="absolute bottom-full left-0 z-50 mb-1 max-h-60 w-full overflow-y-auto rounded-lg border bg-popover p-1 shadow-md">
       {entries.map((entry, i) => (
         <button
           key={entry.path}
