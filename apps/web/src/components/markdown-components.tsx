@@ -1,10 +1,12 @@
 import { useState } from "react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import SyntaxHighlighterAuto from "react-syntax-highlighter"
-import vscDarkPlus from "react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus"
-import vs from "react-syntax-highlighter/dist/esm/styles/prism/vs"
-import hljsDark from "react-syntax-highlighter/dist/esm/styles/hljs/vs2015"
-import hljsLight from "react-syntax-highlighter/dist/esm/styles/hljs/vs"
+import {
+  jellybeansdark,
+  jellybeanslight,
+  jellybeanshljsdark,
+  jellybeanshljslight,
+} from "@/lib/syntax-theme"
 import type { Components } from "react-markdown"
 import { useTheme } from "@/components/theme-provider"
 import { Check, Copy } from "lucide-react"
@@ -51,7 +53,7 @@ function CodeBlock({
         <CopyButton code={code} />
         <SyntaxHighlighter
           language={match[1]}
-          style={isDark ? vscDarkPlus : vs}
+          style={isDark ? jellybeansdark : jellybeanslight}
           PreTag="div"
           showLineNumbers
           lineNumberStyle={{
@@ -72,6 +74,8 @@ function CodeBlock({
             style: {
               fontFamily: "var(--font-mono, ui-monospace, monospace)",
               fontWeight: "normal",
+              fontSize: "0.75rem",
+              fontSize: "0.75rem",
             },
           }}
         >
@@ -86,7 +90,7 @@ function CodeBlock({
     <div className="group relative my-4 overflow-hidden rounded-lg border border-border">
       <CopyButton code={code} />
       <SyntaxHighlighterAuto
-        style={isDark ? hljsDark : hljsLight}
+        style={isDark ? jellybeanshljsdark : jellybeanshljslight}
         PreTag="div"
         showLineNumbers
         lineNumberStyle={{

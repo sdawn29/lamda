@@ -8,8 +8,7 @@ import {
   XIcon,
 } from "lucide-react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
-import vscDarkPlus from "react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus"
-import vs from "react-syntax-highlighter/dist/esm/styles/prism/vs"
+import { jellybeansdark, jellybeanslight } from "@/lib/syntax-theme"
 
 import { cn } from "@/lib/utils"
 import { LivePre } from "@/components/live-pre"
@@ -104,7 +103,7 @@ function ReadView({
     <div className="max-h-64 overflow-auto rounded-md border border-border/60 text-xs">
       <SyntaxHighlighter
         language={language}
-        style={isDark ? vscDarkPlus : vs}
+        style={isDark ? jellybeansdark : jellybeanslight}
         customStyle={{
           margin: 0,
           padding: "0.5rem 0.75rem",
@@ -150,7 +149,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   return (
     <div
       className={cn(
-        "animate-in fade-in-0 slide-in-from-bottom-1 duration-150 w-full max-w-2xl self-start rounded-lg border text-xs",
+        "w-full max-w-2xl animate-in self-start rounded-lg border text-xs duration-150 fade-in-0 slide-in-from-bottom-1",
         msg.status === "error"
           ? "border-destructive/50 bg-destructive/5"
           : "border-border bg-muted/20"
@@ -158,7 +157,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     >
       {/* Header */}
       <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/30 rounded-lg"
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/30"
         onClick={toggle}
       >
         {msg.status === "running" ? (
@@ -187,7 +186,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
       {/* Body */}
       {expanded && (
-        <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150 px-3 pb-3">
+        <div className="animate-in px-3 pb-3 duration-150 fade-in-0 slide-in-from-top-1">
           <div
             className={cn(
               "mb-2 border-t",

@@ -1,8 +1,7 @@
 import { useMemo } from "react"
 import { refractor } from "refractor"
-import vscDarkPlus from "react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus"
-import vs from "react-syntax-highlighter/dist/esm/styles/prism/vs"
 import { cn } from "@/lib/utils"
+import { jellybeansdark, jellybeanslight } from "@/lib/syntax-theme"
 import { useTheme } from "@/components/theme-provider"
 
 export type DiffMode = "inline" | "side-by-side"
@@ -18,17 +17,32 @@ interface DiffLine {
 // ── Syntax highlighting ────────────────────────────────────────────────────────
 
 const EXT_TO_LANG: Record<string, string> = {
-  ts: "typescript", tsx: "typescript",
-  js: "javascript", jsx: "javascript",
-  mjs: "javascript", cjs: "javascript",
-  py: "python", rs: "rust", go: "go",
-  css: "css", html: "html", json: "json",
-  sh: "bash", bash: "bash",
-  yaml: "yaml", yml: "yaml",
-  md: "markdown", mdx: "markdown",
-  sql: "sql", java: "java",
-  c: "c", cpp: "cpp", cs: "csharp",
-  rb: "ruby", php: "php", kt: "kotlin",
+  ts: "typescript",
+  tsx: "typescript",
+  js: "javascript",
+  jsx: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  py: "python",
+  rs: "rust",
+  go: "go",
+  css: "css",
+  html: "html",
+  json: "json",
+  sh: "bash",
+  bash: "bash",
+  yaml: "yaml",
+  yml: "yaml",
+  md: "markdown",
+  mdx: "markdown",
+  sql: "sql",
+  java: "java",
+  c: "c",
+  cpp: "cpp",
+  cs: "csharp",
+  rb: "ruby",
+  php: "php",
+  kt: "kotlin",
 }
 
 export function detectLanguage(filePath: string): string | null {
@@ -49,14 +63,19 @@ type HastNode = HastText | HastElement
 
 type FlatToken = { classNames: string[]; text: string }
 
-function flattenHast(nodes: HastNode[], classNames: string[] = []): FlatToken[] {
+function flattenHast(
+  nodes: HastNode[],
+  classNames: string[] = []
+): FlatToken[] {
   const tokens: FlatToken[] = []
   for (const node of nodes) {
     if (node.type === "text") {
       tokens.push({ classNames, text: node.value })
     } else if (node.type === "element") {
       const cls = node.properties?.className ?? []
-      tokens.push(...flattenHast(node.children as HastNode[], [...classNames, ...cls]))
+      tokens.push(
+        ...flattenHast(node.children as HastNode[], [...classNames, ...cls])
+      )
     }
   }
   return tokens
@@ -69,7 +88,10 @@ function splitTokensByLine(tokens: FlatToken[]): FlatToken[][] {
     for (let i = 0; i < parts.length; i++) {
       if (i > 0) lines.push([])
       if (parts[i] !== "") {
-        lines[lines.length - 1].push({ classNames: token.classNames, text: parts[i] })
+        lines[lines.length - 1].push({
+          classNames: token.classNames,
+          text: parts[i],
+        })
       }
     }
   }
@@ -88,18 +110,27 @@ function highlightSource(source: string, language: string): FlatToken[][] {
 
 type ThemeStyle = Record<string, React.CSSProperties>
 
-function tokenStyle(classNames: string[], themeStyle: ThemeStyle): React.CSSProperties {
+function tokenStyle(
+  classNames: string[],
+  themeStyle: ThemeStyle
+): React.CSSProperties {
   let result: React.CSSProperties = {}
   for (const cls of classNames) {
     if (cls === "token") continue
     if ((themeStyle as Record<string, React.CSSProperties>)[cls]) {
-      result = { ...result, ...(themeStyle as Record<string, React.CSSProperties>)[cls] }
+      result = {
+        ...result,
+        ...(themeStyle as Record<string, React.CSSProperties>)[cls],
+      }
     }
   }
   return result
 }
 
-function renderTokens(tokens: FlatToken[], themeStyle: ThemeStyle): React.ReactNode {
+function renderTokens(
+  tokens: FlatToken[],
+  themeStyle: ThemeStyle
+): React.ReactNode {
   if (tokens.length === 0) return " "
   return tokens.map((token, i) => {
     const style = tokenStyle(token.classNames, themeStyle)
@@ -119,7 +150,10 @@ interface HighlightMap {
   oldLineIndex: number[]
 }
 
-function buildHighlightMap(lines: DiffLine[], language: string | null): HighlightMap {
+function buildHighlightMap(
+  lines: DiffLine[],
+  language: string | null
+): HighlightMap {
   const newFileLines: { diffIndex: number; content: string }[] = []
   const oldFileLines: { diffIndex: number; content: string }[] = []
 
@@ -134,13 +168,19 @@ function buildHighlightMap(lines: DiffLine[], language: string | null): Highligh
   }
 
   const newLineIndex = new Array<number>(lines.length).fill(-1)
-  newFileLines.forEach((l, idx) => { newLineIndex[l.diffIndex] = idx })
+  newFileLines.forEach((l, idx) => {
+    newLineIndex[l.diffIndex] = idx
+  })
 
   const oldLineIndex = new Array<number>(lines.length).fill(-1)
-  oldFileLines.forEach((l, idx) => { oldLineIndex[l.diffIndex] = idx })
+  oldFileLines.forEach((l, idx) => {
+    oldLineIndex[l.diffIndex] = idx
+  })
 
   if (!language) {
-    const plain = (content: string): FlatToken[] => [{ classNames: [], text: content }]
+    const plain = (content: string): FlatToken[] => [
+      { classNames: [], text: content },
+    ]
     return {
       newLines: newFileLines.map((l) => plain(l.content)),
       oldLines: oldFileLines.map((l) => plain(l.content)),
@@ -149,25 +189,40 @@ function buildHighlightMap(lines: DiffLine[], language: string | null): Highligh
     }
   }
 
-  const newHighlighted = highlightSource(newFileLines.map((l) => l.content).join("\n"), language)
-  const oldHighlighted = highlightSource(oldFileLines.map((l) => l.content).join("\n"), language)
+  const newHighlighted = highlightSource(
+    newFileLines.map((l) => l.content).join("\n"),
+    language
+  )
+  const oldHighlighted = highlightSource(
+    oldFileLines.map((l) => l.content).join("\n"),
+    language
+  )
 
-  return { newLines: newHighlighted, oldLines: oldHighlighted, newLineIndex, oldLineIndex }
+  return {
+    newLines: newHighlighted,
+    oldLines: oldHighlighted,
+    newLineIndex,
+    oldLineIndex,
+  }
 }
 
 function getLineTokens(
   line: DiffLine,
   diffIndex: number,
-  map: HighlightMap,
+  map: HighlightMap
 ): FlatToken[] {
   const fallback: FlatToken[] = [{ classNames: [], text: line.content }]
   if (line.kind === "removed") {
     const idx = map.oldLineIndex[diffIndex]
-    return idx >= 0 && idx < map.oldLines.length ? (map.oldLines[idx] ?? fallback) : fallback
+    return idx >= 0 && idx < map.oldLines.length
+      ? (map.oldLines[idx] ?? fallback)
+      : fallback
   }
   if (line.kind === "added" || line.kind === "context") {
     const idx = map.newLineIndex[diffIndex]
-    return idx >= 0 && idx < map.newLines.length ? (map.newLines[idx] ?? fallback) : fallback
+    return idx >= 0 && idx < map.newLines.length
+      ? (map.newLines[idx] ?? fallback)
+      : fallback
   }
   return fallback
 }
@@ -193,10 +248,13 @@ function parseSdkDiff(diff: string): DiffLine[] {
       const content = spaceIdx === -1 ? "" : rest.slice(spaceIdx + 1)
       const isSkipped = prefix === " " && content === "..."
       const kind: DiffLineKind =
-        prefix === "+" ? "added"
-        : prefix === "-" ? "removed"
-        : isSkipped ? "skipped"
-        : "context"
+        prefix === "+"
+          ? "added"
+          : prefix === "-"
+            ? "removed"
+            : isSkipped
+              ? "skipped"
+              : "context"
       return { kind, lineNum, content }
     })
 }
@@ -229,11 +287,23 @@ function parseUnifiedDiff(diff: string): DiffLine[] {
     }
 
     if (raw.startsWith("+")) {
-      result.push({ kind: "added", lineNum: String(newLine++), content: raw.slice(1) })
+      result.push({
+        kind: "added",
+        lineNum: String(newLine++),
+        content: raw.slice(1),
+      })
     } else if (raw.startsWith("-")) {
-      result.push({ kind: "removed", lineNum: String(oldLine++), content: raw.slice(1) })
+      result.push({
+        kind: "removed",
+        lineNum: String(oldLine++),
+        content: raw.slice(1),
+      })
     } else if (raw.startsWith(" ") || raw === "") {
-      result.push({ kind: "context", lineNum: String(oldLine), content: raw.slice(1) })
+      result.push({
+        kind: "context",
+        lineNum: String(oldLine),
+        content: raw.slice(1),
+      })
       oldLine++
       newLine++
     }
@@ -262,15 +332,16 @@ function DiffRow({
       className={cn(
         "flex leading-5",
         line.kind === "added" && "bg-green-500/8 hover:bg-green-500/12",
-        line.kind === "removed" && "bg-red-500/8 hover:bg-red-500/12",
+        line.kind === "removed" && "bg-red-500/8 hover:bg-red-500/12"
       )}
     >
       <span
         className={cn(
-          "w-4 shrink-0 select-none text-center",
+          "w-4 shrink-0 text-center select-none",
           line.kind === "added" && "text-green-500",
           line.kind === "removed" && "text-red-500",
-          (line.kind === "context" || line.kind === "skipped") && "text-muted-foreground/30",
+          (line.kind === "context" || line.kind === "skipped") &&
+            "text-muted-foreground/30"
         )}
       >
         {line.kind === "added" ? "+" : line.kind === "removed" ? "−" : ""}
@@ -278,11 +349,11 @@ function DiffRow({
 
       <span
         className={cn(
-          "w-8 shrink-0 select-none border-r pr-2 text-right",
+          "w-8 shrink-0 border-r pr-2 text-right select-none",
           line.kind === "added" && "border-green-500/20 text-green-400/50",
           line.kind === "removed" && "border-red-500/20 text-red-400/50",
           (line.kind === "context" || line.kind === "skipped") &&
-            "border-border/40 text-muted-foreground/40",
+            "border-border/40 text-muted-foreground/40"
         )}
       >
         {line.lineNum}
@@ -290,8 +361,8 @@ function DiffRow({
 
       <span
         className={cn(
-          "flex-1 whitespace-pre pl-3",
-          line.kind === "skipped" && "italic text-muted-foreground/40",
+          "flex-1 pl-3 whitespace-pre",
+          line.kind === "skipped" && "text-muted-foreground/40 italic"
         )}
       >
         {line.kind === "skipped" ? "⋯" : renderTokens(tokens, themeStyle)}
@@ -354,7 +425,7 @@ function SideBySideCell({
   themeStyle: ThemeStyle
 }) {
   if (!entry) {
-    return <div className="flex flex-1 leading-5 min-w-0" />
+    return <div className="flex min-w-0 flex-1 leading-5" />
   }
 
   const { line, diffIndex } = entry
@@ -366,25 +437,26 @@ function SideBySideCell({
   return (
     <div
       className={cn(
-        "flex flex-1 leading-5 min-w-0",
+        "flex min-w-0 flex-1 leading-5",
         isAdded && "bg-green-500/8",
-        isRemoved && "bg-red-500/8",
+        isRemoved && "bg-red-500/8"
       )}
     >
       <span
         className={cn(
-          "w-8 shrink-0 select-none border-r pr-2 text-right text-xs",
+          "w-8 shrink-0 border-r pr-2 text-right text-xs select-none",
           isAdded && "border-green-500/20 text-green-400/50",
           isRemoved && "border-red-500/20 text-red-400/50",
-          (line.kind === "context" || isSkipped) && "border-border/40 text-muted-foreground/40",
+          (line.kind === "context" || isSkipped) &&
+            "border-border/40 text-muted-foreground/40"
         )}
       >
         {isSkipped ? "" : line.lineNum}
       </span>
       <span
         className={cn(
-          "flex-1 whitespace-pre pl-2 truncate",
-          isSkipped && "italic text-muted-foreground/40",
+          "flex-1 truncate pl-2 whitespace-pre",
+          isSkipped && "text-muted-foreground/40 italic"
         )}
       >
         {isSkipped ? "⋯" : renderTokens(tokens, themeStyle)}
@@ -403,7 +475,7 @@ function SideBySideRowView({
   themeStyle: ThemeStyle
 }) {
   return (
-    <div className="flex leading-5 divide-x divide-border/30">
+    <div className="flex divide-x divide-border/30 leading-5">
       <SideBySideCell entry={row.left} map={map} themeStyle={themeStyle} />
       <SideBySideCell entry={row.right} map={map} themeStyle={themeStyle} />
     </div>
@@ -419,20 +491,32 @@ interface DiffViewProps {
   mode?: DiffMode
 }
 
-export function DiffView({ diff, filePath, className, mode = "inline" }: DiffViewProps) {
+export function DiffView({
+  diff,
+  filePath,
+  className,
+  mode = "inline",
+}: DiffViewProps) {
   const { theme } = useTheme()
   const isDark =
     theme === "dark" ||
-    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
-  const themeStyle = (isDark ? vscDarkPlus : vs) as ThemeStyle
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches)
+  const themeStyle = (isDark ? jellybeansdark : jellybeanslight) as ThemeStyle
 
   const lines = useMemo(() => {
     return isSdkFormat(diff) ? parseSdkDiff(diff) : parseUnifiedDiff(diff)
   }, [diff])
 
-  const language = useMemo(() => (filePath ? detectLanguage(filePath) : null), [filePath])
+  const language = useMemo(
+    () => (filePath ? detectLanguage(filePath) : null),
+    [filePath]
+  )
 
-  const highlightMap = useMemo(() => buildHighlightMap(lines, language), [lines, language])
+  const highlightMap = useMemo(
+    () => buildHighlightMap(lines, language),
+    [lines, language]
+  )
 
   const sideBySideRows = useMemo(() => {
     if (mode !== "side-by-side") return null
@@ -446,23 +530,40 @@ export function DiffView({ diff, filePath, className, mode = "inline" }: DiffVie
     <div
       className={cn(
         "overflow-hidden rounded-lg border border-border/60 font-mono text-xs",
-        className,
+        className
       )}
     >
       <div className="max-h-80 overflow-auto">
         {mode === "inline"
           ? lines.map((line, i) => (
-              <DiffRow key={i} line={line} diffIndex={i} map={highlightMap} themeStyle={themeStyle} />
+              <DiffRow
+                key={i}
+                line={line}
+                diffIndex={i}
+                map={highlightMap}
+                themeStyle={themeStyle}
+              />
             ))
           : sideBySideRows?.map((row, i) => (
-              <SideBySideRowView key={i} row={row} map={highlightMap} themeStyle={themeStyle} />
+              <SideBySideRowView
+                key={i}
+                row={row}
+                map={highlightMap}
+                themeStyle={themeStyle}
+              />
             ))}
       </div>
 
       {(added > 0 || removed > 0) && (
         <div className="flex items-center gap-3 border-t border-border/60 bg-muted/20 px-3 py-1.5 font-sans text-xs text-muted-foreground">
-          {removed > 0 && <span className="text-red-500">−{removed} removed</span>}
-          {added > 0 && <span className="text-green-600 dark:text-green-400">+{added} added</span>}
+          {removed > 0 && (
+            <span className="text-red-500">−{removed} removed</span>
+          )}
+          {added > 0 && (
+            <span className="text-green-600 dark:text-green-400">
+              +{added} added
+            </span>
+          )}
         </div>
       )}
     </div>

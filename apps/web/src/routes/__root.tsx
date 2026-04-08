@@ -13,13 +13,7 @@ function RootLayoutInner() {
   const { isLoading } = useWorkspace()
 
   if (isLoading) {
-    return (
-      <TooltipProvider>
-        <div className="flex h-svh items-center justify-center">
-          <p className="text-muted-foreground text-sm">Loading…</p>
-        </div>
-      </TooltipProvider>
-    )
+    return
   }
 
   return (
