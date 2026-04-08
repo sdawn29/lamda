@@ -429,6 +429,67 @@ function StashSection({ sessionId }: { sessionId: string }) {
   )
 }
 
+// ── Files section ───────────────────────────────────────────────────────────
+
+function FilesSection({
+  label,
+  files,
+  sessionId,
+  mode,
+  onStageToggle,
+  emptyText,
+}: {
+  label: string
+  files: ChangedFile[]
+  sessionId: string
+  mode: DiffMode
+  onStageToggle: (file: ChangedFile) => Promise<void>
+  emptyText?: string
+}) {
+  const [collapsed, setCollapsed] = useState(false)
+
+  return (
+    <div className="border-b border-border/40 last:border-0">
+      <button
+        onClick={() => setCollapsed((v) => !v)}
+        className="flex w-full items-center gap-1.5 bg-muted/30 px-2 py-1.5 text-left"
+      >
+        <ChevronRight
+          className={cn(
+            "h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-150",
+            !collapsed && "rotate-90"
+          )}
+        />
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
+        {files.length > 0 && (
+          <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            {files.length}
+          </span>
+        )}
+      </button>
+
+      {!collapsed && (
+        <>
+          {files.length === 0 && emptyText && (
+            <p className="px-3 py-2 text-xs text-muted-foreground/50">{emptyText}</p>
+          )}
+          {files.map((file, i) => (
+            <FileAccordionItem
+              key={i}
+              file={file}
+              sessionId={sessionId}
+              mode={mode}
+              onStageToggle={onStageToggle}
+            />
+          ))}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── DiffPanel ───────────────────────────────────────────────────────────────
 
 interface DiffPanelProps {
@@ -443,15 +504,18 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
   const dragStartRef = useRef<{ x: number; w: number } | null>(null)
 
   const { data: statusRaw, isLoading: loading, error: statusError, refetch } = useGitStatus(sessionId)
-  const files = useMemo(
-    () =>
-      (statusRaw ?? "")
-        .split("\n")
-        .map((l) => l.trimEnd())
-        .filter(Boolean)
-        .map(parseStatusLine),
-    [statusRaw]
-  )
+  const { staged, unstaged } = useMemo(() => {
+    const all = (statusRaw ?? "")
+      .split("\n")
+      .map((l) => l.trimEnd())
+      .filter(Boolean)
+      .map(parseStatusLine)
+    return {
+      staged: all.filter((f) => f.isStaged),
+      unstaged: all.filter((f) => !f.isStaged),
+    }
+  }, [statusRaw])
+  const files = useMemo(() => [...staged, ...unstaged], [staged, unstaged])
   const error = statusError instanceof Error ? statusError.message : null
 
   const { stage, unstage } = useGitStage(sessionId)
@@ -510,9 +574,9 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
     [width]
   )
 
-  const stagedCount = files.filter((f) => f.isStaged).length
+  const stagedCount = staged.length
   const hasStaged = stagedCount > 0
-  const hasUnstaged = files.some((f) => !f.isStaged)
+  const hasUnstaged = unstaged.length > 0
   const hasChanges = files.length > 0
 
   return (
@@ -689,15 +753,29 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
         {!loading && !error && files.length === 0 && (
           <p className="px-3 py-3 text-xs text-muted-foreground">No changes</p>
         )}
-        {files.map((file, i) => (
-          <FileAccordionItem
-            key={i}
-            file={file}
+
+        {/* Staged section */}
+        {!loading && !error && (staged.length > 0 || unstaged.length > 0) && (
+          <FilesSection
+            label="Staged"
+            files={staged}
+            sessionId={sessionId}
+            mode={mode}
+            onStageToggle={handleStageToggle}
+            emptyText="No staged changes"
+          />
+        )}
+
+        {/* Unstaged section */}
+        {!loading && !error && unstaged.length > 0 && (
+          <FilesSection
+            label="Changes"
+            files={unstaged}
             sessionId={sessionId}
             mode={mode}
             onStageToggle={handleStageToggle}
           />
-        ))}
+        )}
       </div>
 
       {/* Stash section */}
