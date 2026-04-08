@@ -29,18 +29,31 @@ export function ModelCombobox({
   disabled,
 }: {
   groups: ModelGroup
-  selected: { id: string; name: string } | null
-  onSelect: (id: string) => void
+  selected: { id: string; name: string; provider: string } | null
+  onSelect: (compositeKey: string) => void
   disabled?: boolean
 }) {
   const [open, setOpen] = React.useState(false)
 
-  const selectedProvider = groups.find(([, items]) =>
-    items.some((m) => m.id === selected?.id)
-  )?.[0]
-  const selectedMeta = selectedProvider
-    ? getProviderMeta(selectedProvider)
+  const selectedMeta = selected?.provider
+    ? getProviderMeta(selected.provider)
     : null
+
+  const nameByKey = React.useMemo(() => {
+    const map = new Map<string, string>()
+    for (const [provider, items] of groups) {
+      for (const m of items) map.set(`${provider}::${m.id}`, m.name)
+    }
+    return map
+  }, [groups])
+
+  const filter = React.useCallback(
+    (key: string, search: string) => {
+      const name = nameByKey.get(key) ?? key
+      return name.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+    },
+    [nameByKey]
+  )
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -51,20 +64,21 @@ export function ModelCombobox({
             size="sm"
             disabled={disabled}
             aria-expanded={open}
+            className="w-auto"
           >
             {selectedMeta?.icon}
-            <span>{selected?.name ?? "Select model"}</span>
+            <span className="whitespace-nowrap">{selected?.name ?? "Select model"}</span>
             <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
           </Button>
         }
       />
       <PopoverContent
-        className="w-48 p-0"
+        className="w-auto min-w-40 p-0"
         side="top"
         align="start"
         sideOffset={6}
       >
-        <Command>
+        <Command filter={filter}>
           <CommandInput placeholder="Search models…" />
           <CommandList>
             <CommandEmpty>No models found</CommandEmpty>
@@ -74,11 +88,12 @@ export function ModelCombobox({
                 <CommandGroup key={provider} heading={meta.label}>
                   {items.map((m) => (
                     <CommandItem
-                      key={m.id}
-                      value={`${provider} ${m.name}`}
-                      data-checked={m.id === selected?.id}
+                      key={`${provider}::${m.id}`}
+                      value={`${provider}::${m.id}`}
+                      data-checked={m.id === selected?.id && provider === selected?.provider}
+                      className="whitespace-nowrap"
                       onSelect={() => {
-                        onSelect(m.id)
+                        onSelect(`${provider}::${m.id}`)
                         setOpen(false)
                       }}
                     >

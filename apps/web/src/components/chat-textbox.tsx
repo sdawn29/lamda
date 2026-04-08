@@ -77,7 +77,9 @@ export const ChatTextbox = memo(function ChatTextbox({
   const { data } = useModels()
   const models = React.useMemo(() => data?.models ?? [], [data])
   const selectedModel =
-    models.find((m) => m.id === selectedModelId) ?? models[0] ?? null
+    models.find((m) => `${m.provider}::${m.id}` === selectedModelId) ??
+    models[0] ??
+    null
 
   const grouped = React.useMemo(
     () =>
@@ -220,9 +222,9 @@ export const ChatTextbox = memo(function ChatTextbox({
             <ModelCombobox
               groups={grouped}
               selected={selectedModel}
-              onSelect={(id) => {
-                if (!isControlled) setInternalModelId(id)
-                onModelChange?.(id)
+              onSelect={(compositeKey) => {
+                if (!isControlled) setInternalModelId(compositeKey)
+                onModelChange?.(compositeKey)
               }}
               disabled={models.length === 0}
             />
