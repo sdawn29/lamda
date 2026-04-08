@@ -276,6 +276,14 @@ app.delete("/session/:id", (c) => {
   return new Response(null, { status: 204 });
 });
 
+app.post("/session/:id/abort", async (c) => {
+  const id = c.req.param("id");
+  const entry = store.get(id);
+  if (!entry) return c.json({ error: "Not found" }, 404);
+  await entry.handle.abort();
+  return c.json({ aborted: true });
+});
+
 app.post("/session/:id/prompt", async (c) => {
   const id = c.req.param("id");
   const entry = store.get(id);

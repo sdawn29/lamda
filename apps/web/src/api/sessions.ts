@@ -29,6 +29,10 @@ export function deleteSession(id: string): Promise<void> {
   return apiFetch<void>(`/session/${id}`, { method: "DELETE" })
 }
 
+export function abortSession(id: string): Promise<void> {
+  return apiFetch<void>(`/session/${id}/abort`, { method: "POST" })
+}
+
 export function sendPrompt(
   id: string,
   text: string,

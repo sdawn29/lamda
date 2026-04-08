@@ -1,6 +1,6 @@
 import * as React from "react"
 import { memo } from "react"
-import { ArrowUpIcon, SquareIcon } from "lucide-react"
+import { ArrowUpIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -241,13 +241,12 @@ export const ChatTextbox = memo(function ChatTextbox({
                 <TooltipTrigger
                   render={
                     <Button
-                      variant="outline"
                       size="icon-sm"
                       onClick={onStop}
                       aria-label="Stop generation"
-                      className="animate-in duration-150 fade-in-0 zoom-in-90"
+                      className="animate-in duration-150 fade-in-0 zoom-in-90 bg-destructive hover:bg-destructive/90"
                     >
-                      <SquareIcon className="animate-pulse" />
+                      <div className="h-2.5 w-2.5 rounded-sm bg-white" />
                     </Button>
                   }
                 />

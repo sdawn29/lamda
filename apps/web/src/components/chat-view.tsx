@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, memo } from "react"
+import { StopCircleIcon } from "lucide-react"
 
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -21,6 +22,7 @@ import { useBranches } from "@/queries/use-branches"
 import { useCheckoutBranch } from "@/mutations/use-checkout-branch"
 import { useGenerateTitle } from "@/mutations/use-generate-title"
 import { useSendPrompt } from "@/mutations/use-send-prompt"
+import { abortSession } from "@/api/sessions"
 import { ToolCallBlock } from "@/components/tool-call-block"
 import { markdownComponents } from "@/components/markdown-components"
 import { CopyButton } from "@/components/copy-button"
@@ -37,12 +39,15 @@ interface ChatViewProps {
 
 export const ChatView = memo(function ChatView({
   sessionId,
-  workspaceName,
   workspaceId,
   threadId,
 }: ChatViewProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const stoppedKey = `lambda-code:stopped:${threadId}`
+  const [isStopped, setIsStopped] = useState(
+    () => localStorage.getItem(stoppedKey) === "1"
+  )
   const [gitError, setGitError] = useState<string | null>(null)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(() =>
     localStorage.getItem(`lambda-code:threadModel:${threadId}`)
@@ -210,6 +215,15 @@ export const ChatView = memo(function ChatView({
     [checkoutBranchMutation]
   )
 
+  const handleStop = useCallback(() => {
+    abortSession(sessionId).catch((err: unknown) => {
+      console.error("[abort]", err)
+    })
+    setIsLoading(false)
+    setIsStopped(true)
+    localStorage.setItem(stoppedKey, "1")
+  }, [sessionId, stoppedKey])
+
   const handleSend = useCallback(
     (
       text: string,
@@ -225,6 +239,8 @@ export const ChatView = memo(function ChatView({
         })
       }
       pinnedRef.current = true
+      setIsStopped(false)
+      localStorage.removeItem(stoppedKey)
       setMessages((prev) => [...prev, { role: "user", content: text }])
       setIsLoading(true)
       const model = modelId && provider ? { provider, modelId } : undefined
@@ -239,6 +255,7 @@ export const ChatView = memo(function ChatView({
       workspaceId,
       threadId,
       setThreadTitle,
+      stoppedKey,
     ]
   )
 
@@ -317,14 +334,20 @@ export const ChatView = memo(function ChatView({
             )
           })}
           {showThinking && <ThinkingIndicator />}
+          {isStopped && !isLoading && (
+            <div className="flex animate-in items-center gap-1.5 self-start duration-200 fade-in-0 text-muted-foreground/60">
+              <StopCircleIcon className="h-3.5 w-3.5 shrink-0 text-destructive" />
+              <span className="text-xs">Interrupted</span>
+            </div>
+          )}
           <div ref={bottomRef} />
         </div>
 
         <div className="mx-auto w-full max-w-2xl px-6 pb-6">
           <ChatTextbox
             onSend={handleSend}
+            onStop={handleStop}
             isLoading={isLoading}
-            workspaceName={workspaceName}
             branch={branch}
             branches={branches}
             onBranchSelect={handleBranchSelect}
