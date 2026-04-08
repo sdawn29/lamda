@@ -120,3 +120,18 @@ export function gitRevertFile(
 export function gitPush(sessionId: string): Promise<void> {
   return apiFetch<void>(`${base(sessionId)}/push`, { method: "POST" })
 }
+
+export async function gitGenerateCommitMessage(
+  sessionId: string,
+  promptTemplate?: string
+): Promise<string> {
+  const { message } = await apiFetch<{ message: string }>(
+    `${base(sessionId)}/generate-commit-message`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ promptTemplate }),
+    }
+  )
+  return message
+}

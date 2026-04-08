@@ -5,7 +5,10 @@ import {
   ChevronRight,
   GitBranch,
   CloudUpload,
+  Sparkles,
+  Settings2,
 } from "lucide-react"
+import { useNavigate } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { DiffView } from "@/components/diff-view"
@@ -15,6 +18,9 @@ import { useGitFileDiff } from "@/queries/use-git-file-diff"
 import { useGitCommit } from "@/mutations/use-git-commit"
 import { useGitPush } from "@/mutations/use-git-push"
 import { useBranch } from "@/queries/use-branch"
+import { gitGenerateCommitMessage } from "@/api/git"
+
+export const COMMIT_PROMPT_STORAGE_KEY = "lambda:commit-message-prompt"
 
 interface CommitDialogProps {
   sessionId: string | undefined
@@ -171,6 +177,8 @@ function AutoTextarea({
 export function CommitDialog({ sessionId }: CommitDialogProps) {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState("")
+  const [generating, setGenerating] = useState(false)
+  const navigate = useNavigate()
 
   const { data: statusRaw, isLoading: loading } = useGitStatus(sessionId ?? "")
   const { data: branchData } = useBranch(sessionId ?? "")
@@ -238,10 +246,29 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
     }
   }
 
+  async function handleGenerate() {
+    if (!sessionId || generating) return
+    setGenerating(true)
+    try {
+      const promptTemplate = localStorage.getItem(COMMIT_PROMPT_STORAGE_KEY) ?? undefined
+      const generated = await gitGenerateCommitMessage(sessionId, promptTemplate)
+      setMessage(generated)
+    } catch {
+      // silently ignore — user still has the text field
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  function handleConfigure() {
+    setOpen(false)
+    navigate({ to: "/settings" })
+  }
+
   const committing = commitMutation.isPending
   const pushing = pushMutation.isPending
   const canCommit =
-    !committing && !pushing && !!message.trim() && staged.length > 0 && !loading
+    !committing && !pushing && !generating && !!message.trim() && staged.length > 0 && !loading
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -338,7 +365,7 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
 
         {/* Message */}
         <div className="flex flex-col border-t border-border/60">
-          <div className="px-4 pt-3 pb-2">
+          <div className="relative px-4 pt-3 pb-2">
             <AutoTextarea
               value={message}
               onChange={setMessage}
@@ -348,6 +375,31 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
                   handleCommit()
               }}
             />
+            <div className="mt-1 flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={handleConfigure}
+              >
+                <Settings2 className="size-3" />
+                Configure
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                disabled={generating || staged.length === 0}
+                onClick={handleGenerate}
+              >
+                {generating ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3" />
+                )}
+                {generating ? "Generating…" : "Generate message"}
+              </Button>
+            </div>
           </div>
 
           {error && (

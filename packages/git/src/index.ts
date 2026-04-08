@@ -241,3 +241,17 @@ export async function gitDiffStat(
 export async function gitPush(cwd: string): Promise<void> {
   await execFileAsync("git", ["push"], { cwd, timeout: 30000 });
 }
+
+/** Returns the full staged diff (`git diff --cached`). */
+export async function gitStagedDiff(cwd: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["diff", "--cached"],
+      { cwd, timeout: 10000 },
+    );
+    return stdout;
+  } catch {
+    return "";
+  }
+}

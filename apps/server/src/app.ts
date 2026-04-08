@@ -12,6 +12,7 @@ import {
   createManagedSession,
   getAvailableModels,
   generateThreadTitle,
+  generateCommitMessage,
   type SdkConfig,
 } from "@lambda/pi-sdk";
 import {
@@ -34,6 +35,7 @@ import {
   gitStashDrop,
   gitDiffStat,
   gitRevertFile,
+  gitStagedDiff,
 } from "@lambda/git";
 import {
   listWorkspacesWithThreads,
@@ -556,6 +558,19 @@ app.post("/session/:id/git/commit", async (c) => {
       500,
     );
   }
+});
+
+app.post("/session/:id/git/generate-commit-message", async (c) => {
+  const id = c.req.param("id");
+  const cwd = gitCwd(id);
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const body = await c.req
+    .json<{ promptTemplate?: string }>()
+    .catch((): { promptTemplate?: string } => ({}));
+  const diff = await gitStagedDiff(cwd);
+  if (!diff.trim()) return c.json({ error: "No staged changes to generate a message for" }, 400);
+  const message = await generateCommitMessage(diff, { cwd }, body.promptTemplate);
+  return c.json({ message });
 });
 
 app.post("/session/:id/git/push", async (c) => {

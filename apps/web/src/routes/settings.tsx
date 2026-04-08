@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import {
   Sun, Moon, Monitor, Trash2, AlertTriangle, Eye, EyeOff, Check, Save,
-  LogIn, LogOut, Loader2, ExternalLink,
+  LogIn, LogOut, Loader2, ExternalLink, RotateCcw,
 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { useWorkspace } from "@/hooks/workspace-context"
+import { COMMIT_PROMPT_STORAGE_KEY } from "@/components/commit-dialog"
 import { useTheme } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
 import { useProviders } from "@/queries/use-providers"
@@ -147,6 +148,15 @@ function SettingsPage() {
               description="Configure API keys for each provider. Stored in ~/.pi/agent/auth.json."
             />
             <ApiKeysCard />
+          </section>
+
+          {/* AI Commit Messages */}
+          <section className="space-y-3" id="commit-prompt">
+            <SectionHeader
+              title="AI Commit Messages"
+              description="Customize the prompt used to generate commit messages. Use {diff} where the staged diff should be inserted."
+            />
+            <CommitPromptCard />
           </section>
 
           {/* Data */}
@@ -602,6 +612,80 @@ function ApiKeysCard() {
             })}
           </div>
         )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── Commit prompt card ─────────────────────────────────────────────────────────
+
+const DEFAULT_COMMIT_PROMPT =
+  `Generate a git commit message for the following staged diff. Follow the conventional commits format (e.g. "feat: ...", "fix: ...", "refactor: ..."). Use an imperative verb. Be concise — the subject line should be under 72 characters. If needed, add a blank line followed by a short body. Reply with ONLY the commit message, no extra explanation.\n\n{diff}`
+
+function CommitPromptCard() {
+  const [value, setValue] = useState(
+    () => localStorage.getItem(COMMIT_PROMPT_STORAGE_KEY) ?? DEFAULT_COMMIT_PROMPT
+  )
+  const [saved, setSaved] = useState(false)
+
+  function handleSave() {
+    const trimmed = value.trim()
+    if (trimmed === DEFAULT_COMMIT_PROMPT) {
+      localStorage.removeItem(COMMIT_PROMPT_STORAGE_KEY)
+    } else {
+      localStorage.setItem(COMMIT_PROMPT_STORAGE_KEY, trimmed)
+    }
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1500)
+  }
+
+  function handleReset() {
+    setValue(DEFAULT_COMMIT_PROMPT)
+    localStorage.removeItem(COMMIT_PROMPT_STORAGE_KEY)
+  }
+
+  const isDefault = value.trim() === DEFAULT_COMMIT_PROMPT
+  const hasDiffPlaceholder = value.includes("{diff}")
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <textarea
+          value={value}
+          onChange={(e) => { setValue(e.target.value); setSaved(false) }}
+          rows={6}
+          className="w-full resize-y rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs text-foreground outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/40"
+          spellCheck={false}
+        />
+        {!hasDiffPlaceholder && (
+          <p className="text-xs text-destructive">
+            Prompt must contain <code className="rounded bg-muted px-1 py-0.5">{"{diff}"}</code> — it will be replaced with the staged diff.
+          </p>
+        )}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+            disabled={isDefault}
+            onClick={handleReset}
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset to default
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 px-3 text-xs"
+            disabled={!hasDiffPlaceholder || saved}
+            onClick={handleSave}
+          >
+            {saved ? (
+              <><Check className="mr-1.5 h-3 w-3" />Saved</>
+            ) : (
+              <><Save className="mr-1.5 h-3 w-3" />Save</>
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
