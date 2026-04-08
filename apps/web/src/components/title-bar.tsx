@@ -106,7 +106,7 @@ export function TitleBar() {
         className="absolute inset-y-0 right-0 flex items-center gap-1 pr-3"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-        <CommitDialog cwd={activeWorkspace?.path} />
+        <CommitDialog sessionId={activeThread?.sessionId ?? undefined} />
         <Button
           variant="outline"
           size="icon-sm"

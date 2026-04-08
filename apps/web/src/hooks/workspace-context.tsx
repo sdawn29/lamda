@@ -7,18 +7,16 @@ import {
   type ReactNode,
 } from "react"
 import { useNavigate } from "@tanstack/react-router"
-import { useQueryClient } from "@tanstack/react-query"
 
-import { useWorkspaces, workspacesQueryKey } from "@/queries/use-workspaces"
+import { useWorkspaces } from "@/queries/use-workspaces"
 import {
-  createWorkspace as apiCreateWorkspace,
-  deleteWorkspace as apiDeleteWorkspace,
-  createThread as apiCreateThread,
-  updateThreadTitle as apiUpdateThreadTitle,
-  resetAllData,
-  type WorkspaceDto,
-  type ThreadDto,
-} from "@/api/workspaces"
+  useCreateWorkspace as useCreateWorkspaceMutation,
+  useDeleteWorkspace as useDeleteWorkspaceMutation,
+  useCreateThread as useCreateThreadMutation,
+  useUpdateThreadTitle,
+  useResetAll as useResetAllMutation,
+} from "@/mutations/use-workspace-mutations"
+import type { WorkspaceDto, ThreadDto } from "@/api/workspaces"
 
 export type Workspace = WorkspaceDto
 export type Thread = ThreadDto
@@ -37,44 +35,57 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { data: workspacesData, isLoading } = useWorkspaces()
-  const queryClient = useQueryClient()
-  const [workspaces, setWorkspaces] = useState<Workspace[] | null>(null)
+  const [optimisticWorkspaces, setOptimisticWorkspaces] = useState<Workspace[] | null>(null)
 
-  const initialWorkspaces = useMemo(
-    () => workspaces ?? workspacesData ?? [],
-    [workspaces, workspacesData]
+  const workspaces = useMemo(
+    () => optimisticWorkspaces ?? workspacesData ?? [],
+    [optimisticWorkspaces, workspacesData]
   )
+
+  const createWorkspaceMutation = useCreateWorkspaceMutation()
+  const deleteWorkspaceMutation = useDeleteWorkspaceMutation()
+  const createThreadMutation = useCreateThreadMutation()
+  const updateTitleMutation = useUpdateThreadTitle()
+  const resetAllMutation = useResetAllMutation()
 
   const createWorkspace = useCallback(
     async (name: string, path: string): Promise<Workspace> => {
-      const { workspace, existing } = await apiCreateWorkspace({ name, path })
+      const { workspace, existing } = await createWorkspaceMutation.mutateAsync({ name, path })
       if (!existing) {
-        setWorkspaces((prev) => [...(prev ?? initialWorkspaces), workspace])
+        setOptimisticWorkspaces((prev) => [...(prev ?? workspaces), workspace])
       }
-      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
       return workspace
     },
-    [initialWorkspaces, queryClient]
+    [createWorkspaceMutation, workspaces]
+  )
+
+  const deleteWorkspace = useCallback(
+    async (workspace: Workspace): Promise<void> => {
+      await deleteWorkspaceMutation.mutateAsync(workspace.id)
+      setOptimisticWorkspaces((prev) =>
+        (prev ?? workspaces).filter((w) => w.id !== workspace.id)
+      )
+    },
+    [deleteWorkspaceMutation, workspaces]
   )
 
   const createThread = useCallback(
     async (workspaceId: string): Promise<Thread> => {
-      const { thread } = await apiCreateThread(workspaceId)
-      setWorkspaces((prev) =>
-        (prev ?? initialWorkspaces).map((w) =>
+      const { thread } = await createThreadMutation.mutateAsync(workspaceId)
+      setOptimisticWorkspaces((prev) =>
+        (prev ?? workspaces).map((w) =>
           w.id === workspaceId ? { ...w, threads: [...w.threads, thread] } : w
         )
       )
-      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
       return thread
     },
-    [initialWorkspaces, queryClient]
+    [createThreadMutation, workspaces]
   )
 
   const setThreadTitle = useCallback(
     (workspaceId: string, threadId: string, title: string) => {
-      setWorkspaces((prev) =>
-        (prev ?? initialWorkspaces).map((w) =>
+      setOptimisticWorkspaces((prev) =>
+        (prev ?? workspaces).map((w) =>
           w.id !== workspaceId
             ? w
             : {
@@ -85,33 +96,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               }
         )
       )
-      apiUpdateThreadTitle(threadId, title).catch(console.error)
-      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+      updateTitleMutation.mutate({ threadId, title })
     },
-    [initialWorkspaces, queryClient]
-  )
-
-  const deleteWorkspace = useCallback(
-    async (workspace: Workspace): Promise<void> => {
-      await apiDeleteWorkspace(workspace.id)
-      setWorkspaces((prev) =>
-        (prev ?? initialWorkspaces).filter((w) => w.id !== workspace.id)
-      )
-      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
-    },
-    [initialWorkspaces, queryClient]
+    [updateTitleMutation, workspaces]
   )
 
   const resetAll = useCallback(async (): Promise<void> => {
-    await resetAllData()
-    setWorkspaces([])
-    queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
-  }, [queryClient])
+    await resetAllMutation.mutateAsync()
+    setOptimisticWorkspaces([])
+  }, [resetAllMutation])
 
   return (
     <WorkspaceContext
       value={{
-        workspaces: initialWorkspaces,
+        workspaces,
         isLoading,
         createWorkspace,
         deleteWorkspace,
@@ -133,7 +131,6 @@ export function useWorkspace() {
   return context
 }
 
-/** Returns a stable callback that opens the native folder picker, creates a workspace, and navigates to its first thread. */
 export function useCreateWorkspaceAction() {
   const { createWorkspace } = useWorkspace()
   const navigate = useNavigate()

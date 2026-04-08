@@ -13,44 +13,17 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog"
-import {
-  sendPrompt,
-  getBranch,
-  listBranches,
-  checkoutBranch,
-  generateTitle,
-} from "@/api/sessions"
 import { apiUrl } from "@/api/client"
-import type { StoredMessageDto } from "@/api/workspaces"
 import { useWorkspace } from "@/hooks/workspace-context"
+import { useMessages } from "@/queries/use-messages"
+import { useBranch } from "@/queries/use-branch"
+import { useBranches } from "@/queries/use-branches"
+import { useCheckoutBranch } from "@/mutations/use-checkout-branch"
+import { useGenerateTitle } from "@/mutations/use-generate-title"
+import { useSendPrompt } from "@/mutations/use-send-prompt"
 import { ToolCallBlock } from "@/components/tool-call-block"
 import { markdownComponents } from "@/components/markdown-components"
 import type { Message, TextMessage, ToolMessage } from "@/components/chat-types"
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function storedToMessage(m: StoredMessageDto): Message {
-  if (m.role === "tool") {
-    const data = JSON.parse(m.content) as {
-      toolCallId: string
-      toolName: string
-      args: unknown
-      result: unknown
-      status: "running" | "done" | "error"
-    }
-    return {
-      role: "tool",
-      toolCallId: data.toolCallId,
-      toolName: data.toolName,
-      args: data.args,
-      result: data.result,
-      status: data.status,
-    }
-  }
-  return { role: m.role as "user" | "assistant", content: m.content }
-}
-
-// ── ChatView ──────────────────────────────────────────────────────────────────
 
 interface ChatViewProps {
   sessionId: string
@@ -68,8 +41,6 @@ export const ChatView = memo(function ChatView({
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [gitError, setGitError] = useState<string | null>(null)
-  const [branch, setBranch] = useState<string | null>(null)
-  const [branches, setBranches] = useState<string[]>([])
   const [selectedModelId, setSelectedModelId] = useState<string | null>(() =>
     localStorage.getItem(`lambda-code:threadModel:${threadId}`)
   )
@@ -77,57 +48,33 @@ export const ChatView = memo(function ChatView({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(true)
   const hasTitledRef = useRef(false)
+  const seededRef = useRef(false)
 
   const { setThreadTitle } = useWorkspace()
 
-  // ── Load message history on mount (component is keyed by threadId) ──────────
+  // ── Queries ───────────────────────────────────────────────────────────────────
+  const { data: messagesData } = useMessages(sessionId)
+  const { data: branchData } = useBranch(sessionId)
+  const { data: branchesData } = useBranches(sessionId)
+
+  const branch = branchData?.branch ?? null
+  const branches = branchesData?.branches ?? []
+
+  // ── Mutations ─────────────────────────────────────────────────────────────────
+  const checkoutBranchMutation = useCheckoutBranch(sessionId)
+  const generateTitleMutation = useGenerateTitle()
+  const sendPromptMutation = useSendPrompt(sessionId)
+
+  // ── Seed messages from query (once, on first load) ────────────────────────────
   useEffect(() => {
-    let cancelled = false
-    fetch(apiUrl(`/session/${sessionId}/messages`))
-      .then((r) => r.json())
-      .then(({ messages }: { messages: StoredMessageDto[] }) => {
-        if (cancelled) return
-        const loaded = messages.map(storedToMessage)
-        setMessages(loaded)
-        hasTitledRef.current = loaded.length > 0
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
+    if (messagesData && !seededRef.current) {
+      seededRef.current = true
+      setMessages(messagesData)
+      hasTitledRef.current = messagesData.length > 0
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [messagesData])
 
-  useEffect(() => {
-    getBranch(sessionId)
-      .then((r) => setBranch(r.branch))
-      .catch(() => {})
-    listBranches(sessionId)
-      .then((r) => setBranches(r.branches))
-      .catch(() => {})
-  }, [sessionId])
-
-  const handleBranchSelect = useCallback(
-    (selectedBranch: string) => {
-      checkoutBranch(sessionId, selectedBranch)
-        .then((r) => {
-          if (r.branch) setBranch(r.branch)
-        })
-        .catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : String(err)
-          // Strip the "API 500: " prefix and parse JSON error if present
-          const stripped = msg.replace(/^API \d+:\s*/, "")
-          try {
-            const parsed = JSON.parse(stripped) as { error?: string }
-            setGitError(parsed.error ?? stripped)
-          } catch {
-            setGitError(stripped)
-          }
-        })
-    },
-    [sessionId]
-  )
-
+  // ── SSE event stream ──────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true
     const es = new EventSource(apiUrl(`/session/${sessionId}/events`))
@@ -220,6 +167,7 @@ export const ChatView = memo(function ChatView({
     }
   }, [sessionId])
 
+  // ── Auto-scroll ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (pinnedRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -241,30 +189,48 @@ export const ChatView = memo(function ChatView({
     [threadId]
   )
 
+  const handleBranchSelect = useCallback(
+    (selectedBranch: string) => {
+      checkoutBranchMutation.mutate(selectedBranch, {
+        onError: (err) => {
+          const msg = err instanceof Error ? err.message : String(err)
+          const stripped = msg.replace(/^API \d+:\s*/, "")
+          try {
+            const parsed = JSON.parse(stripped) as { error?: string }
+            setGitError(parsed.error ?? stripped)
+          } catch {
+            setGitError(stripped)
+          }
+        },
+      })
+    },
+    [checkoutBranchMutation]
+  )
+
   const handleSend = useCallback(
     (text: string, modelId: string, provider: string) => {
       if (!hasTitledRef.current) {
         hasTitledRef.current = true
-        generateTitle(text)
-          .then(({ title }) => setThreadTitle(workspaceId, threadId, title))
-          .catch(() => {})
+        generateTitleMutation.mutate(text, {
+          onSuccess: ({ title }) => setThreadTitle(workspaceId, threadId, title),
+        })
       }
       pinnedRef.current = true
       setMessages((prev) => [...prev, { role: "user", content: text }])
       setIsLoading(true)
       const model = modelId && provider ? { provider, modelId } : undefined
-      sendPrompt(sessionId, text, model).catch(() => setIsLoading(false))
+      sendPromptMutation.mutate(
+        { text, model },
+        { onError: () => setIsLoading(false) }
+      )
     },
-    [sessionId, workspaceId, threadId, setThreadTitle]
+    [sendPromptMutation, generateTitleMutation, workspaceId, threadId, setThreadTitle]
   )
 
   const lastMsg = messages[messages.length - 1]
   const showThinking =
     isLoading &&
-    !(
-      lastMsg?.role === "assistant" &&
-      (lastMsg as TextMessage).content.length > 0
-    )
+    !(lastMsg?.role === "assistant" && (lastMsg as TextMessage).content.length > 0)
 
   return (
     <>
@@ -287,7 +253,6 @@ export const ChatView = memo(function ChatView({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Chat column — fills remaining space alongside sibling panels */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div
           ref={scrollContainerRef}
@@ -295,8 +260,7 @@ export const ChatView = memo(function ChatView({
           className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-6 pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {messages.map((msg, i) => {
-            const key =
-              msg.role === "tool" ? msg.toolCallId : `${msg.role}-${i}`
+            const key = msg.role === "tool" ? msg.toolCallId : `${msg.role}-${i}`
             if (msg.role === "tool") {
               return <ToolCallBlock key={key} msg={msg} />
             }
@@ -312,10 +276,7 @@ export const ChatView = memo(function ChatView({
                 {msg.role === "user" ? (
                   msg.content
                 ) : (
-                  <Markdown
-                    remarkPlugins={[remarkGfm]}
-                    components={markdownComponents}
-                  >
+                  <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {msg.content}
                   </Markdown>
                 )}

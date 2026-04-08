@@ -3,7 +3,23 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { streamSSE } from "hono/streaming";
 import { createManagedSession, getAvailableModels, generateThreadTitle, type SdkConfig } from "@lambda/pi-sdk";
-import { getCurrentBranch, listBranches, checkoutBranch } from "@lambda/git";
+import {
+  getCurrentBranch,
+  listBranches,
+  checkoutBranch,
+  gitStatus,
+  gitFileDiff,
+  gitCommit,
+  gitStage,
+  gitUnstage,
+  gitStageAll,
+  gitUnstageAll,
+  gitStash,
+  gitStashList,
+  gitStashPop,
+  gitStashApply,
+  gitStashDrop,
+} from "@lambda/git";
 import {
   listWorkspacesWithThreads,
   getWorkspace,
@@ -334,6 +350,132 @@ app.get("/session/:id/events", async (c) => {
       await stream.writeSSE({ event: event.type, data });
     }
   });
+});
+
+// ── Git endpoints ──────────────────────────────────────────────────────────────
+
+function gitCwd(id: string): string | null {
+  return store.getCwd(id) ?? null;
+}
+
+app.get("/session/:id/git/status", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const raw = await gitStatus(cwd);
+  return c.json({ raw });
+});
+
+app.get("/session/:id/git/diff", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const file = c.req.query("file");
+  const status = c.req.query("status") ?? "";
+  if (!file) return c.json({ error: "file query param is required" }, 400);
+  try {
+    const diff = await gitFileDiff(cwd, file, status);
+    return c.json({ diff });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
+});
+
+app.post("/session/:id/git/commit", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const body = await c.req.json<{ message?: string }>();
+  if (!body.message) return c.json({ error: "message is required" }, 400);
+  try {
+    const output = await gitCommit(cwd, body.message);
+    return c.json({ output });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
+});
+
+app.post("/session/:id/git/stage", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const body = await c.req.json<{ filePath?: string }>();
+  if (!body.filePath) return c.json({ error: "filePath is required" }, 400);
+  await gitStage(cwd, body.filePath);
+  return new Response(null, { status: 204 });
+});
+
+app.post("/session/:id/git/unstage", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const body = await c.req.json<{ filePath?: string }>();
+  if (!body.filePath) return c.json({ error: "filePath is required" }, 400);
+  await gitUnstage(cwd, body.filePath);
+  return new Response(null, { status: 204 });
+});
+
+app.post("/session/:id/git/stage-all", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  await gitStageAll(cwd);
+  return new Response(null, { status: 204 });
+});
+
+app.post("/session/:id/git/unstage-all", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  await gitUnstageAll(cwd);
+  return new Response(null, { status: 204 });
+});
+
+app.post("/session/:id/git/stash", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const body = await c.req.json<{ message?: string }>().catch((): { message?: string } => ({}));
+  await gitStash(cwd, body.message);
+  return new Response(null, { status: 204 });
+});
+
+app.get("/session/:id/git/stash-list", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const raw = await gitStashList(cwd);
+  return c.json({ raw });
+});
+
+app.post("/session/:id/git/stash-pop", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const body = await c.req.json<{ ref?: string }>();
+  if (!body.ref) return c.json({ error: "ref is required" }, 400);
+  try {
+    await gitStashPop(cwd, body.ref);
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
+});
+
+app.post("/session/:id/git/stash-apply", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const body = await c.req.json<{ ref?: string }>();
+  if (!body.ref) return c.json({ error: "ref is required" }, 400);
+  try {
+    await gitStashApply(cwd, body.ref);
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
+});
+
+app.post("/session/:id/git/stash-drop", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const body = await c.req.json<{ ref?: string }>();
+  if (!body.ref) return c.json({ error: "ref is required" }, 400);
+  try {
+    await gitStashDrop(cwd, body.ref);
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
 });
 
 export default app;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState, useMemo } from "react"
 import { GitCommit, Loader2, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,16 +11,18 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { DiffView } from "@/components/diff-view"
 import { cn } from "@/lib/utils"
+import { useGitStatus } from "@/queries/use-git-status"
+import { useGitFileDiff } from "@/queries/use-git-file-diff"
+import { useGitCommit } from "@/mutations/use-git-commit"
 
 interface CommitDialogProps {
-  cwd: string | undefined
+  sessionId: string | undefined
 }
 
 interface ChangedFile {
   statusCode: string
   filePath: string
 }
-
 
 function statusColor(code: string) {
   const c = code.trim()
@@ -34,32 +36,25 @@ function statusColor(code: string) {
 
 function FileAccordionItem({
   file,
-  cwd,
+  sessionId,
 }: {
   file: ChangedFile
-  cwd: string
+  sessionId: string
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [diff, setDiff] = useState<string | null>(null)
-  const [diffLoading, setDiffLoading] = useState(false)
 
-  function toggle() {
-    if (!expanded && diff === null) {
-      setDiffLoading(true)
-      window.electronAPI
-        ?.gitFileDiff(cwd, file.filePath, file.statusCode)
-        .then((out) => setDiff(out))
-        .catch((err: Error) => setDiff(`Error: ${err.message}`))
-        .finally(() => setDiffLoading(false))
-    }
-    setExpanded((v) => !v)
-  }
+  const { data: diff, isLoading: diffLoading } = useGitFileDiff(
+    sessionId,
+    file.filePath,
+    file.statusCode,
+    expanded,
+  )
 
   return (
     <div className="border-b border-border/50 last:border-0">
       <button
-        onClick={toggle}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/50"
       >
         <ChevronRight
           className={cn(
@@ -82,7 +77,7 @@ function FileAccordionItem({
               <Loader2 className="size-3 animate-spin" />
               Loading diff…
             </div>
-          ) : diff !== null ? (
+          ) : diff != null ? (
             <DiffView diff={diff} filePath={file.filePath} className="rounded-none border-x-0 border-b-0" />
           ) : null}
         </div>
@@ -91,77 +86,73 @@ function FileAccordionItem({
   )
 }
 
-export function CommitDialog({ cwd }: CommitDialogProps) {
+export function CommitDialog({ sessionId }: CommitDialogProps) {
   const [open, setOpen] = useState(false)
-  const [files, setFiles] = useState<ChangedFile[]>([])
   const [message, setMessage] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [committing, setCommitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!open || !cwd) return
-    setLoading(true)
-    setError(null)
-    setSuccess(null)
-    window.electronAPI
-      ?.gitStatus(cwd)
-      .then((out) => {
-        const parsed = out
-          .split("\n")
-          .map((l) => l.trimEnd())
-          .filter(Boolean)
-          .map((l) => ({ statusCode: l.slice(0, 2) === "??" ? "U" : l.slice(0, 2), filePath: l.slice(3) }))
-        setFiles(parsed)
-      })
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [open, cwd])
+  const { data: statusRaw, isLoading: loading, error: statusError } = useGitStatus(
+    sessionId ?? "",
+    // enabled only when dialog is open and sessionId is set
+  )
+  const commitMutation = useGitCommit(sessionId ?? "")
+
+  const files = useMemo<ChangedFile[]>(() => {
+    if (!open || !statusRaw) return []
+    return statusRaw
+      .split("\n")
+      .map((l) => l.trimEnd())
+      .filter(Boolean)
+      .map((l) => ({
+        statusCode: l.slice(0, 2) === "??" ? "U" : l.slice(0, 2),
+        filePath: l.slice(3),
+      }))
+  }, [open, statusRaw])
+
+  const error =
+    statusError instanceof Error
+      ? statusError.message
+      : commitMutation.error instanceof Error
+        ? commitMutation.error.message
+        : null
 
   async function handleCommit() {
-    if (!cwd || !message.trim()) return
-    setCommitting(true)
-    setError(null)
+    if (!sessionId || !message.trim()) return
     setSuccess(null)
     try {
-      const out = await window.electronAPI?.gitCommit(cwd, message.trim())
-      setSuccess(out ?? "Committed.")
+      const out = await commitMutation.mutateAsync(message.trim())
+      setSuccess(out || "Committed.")
       setMessage("")
-      setFiles([])
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setCommitting(false)
+    } catch {
+      // error shown via commitMutation.error
+    }
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen)
+    if (!nextOpen) {
+      setSuccess(null)
+      commitMutation.reset()
     }
   }
 
   const hasChanges = files.length > 0
+  const committing = commitMutation.isPending
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
-        render={
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!cwd}
-          />
-        }
+        render={<Button variant="outline" size="sm" disabled={!sessionId} />}
       >
         <GitCommit />
         Commit
       </DialogTrigger>
-      <DialogContent
-        showCloseButton={true}
-        className="flex flex-col gap-3 sm:max-w-xl"
-      >
+      <DialogContent showCloseButton={true} className="flex flex-col gap-3 sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Commit changes</DialogTitle>
         </DialogHeader>
 
-        {/* File accordion */}
-        <div className="rounded-md border border-border/50 overflow-hidden">
+        <div className="overflow-hidden rounded-md border border-border/50">
           <div className="border-b border-border/50 bg-muted/30 px-3 py-1.5">
             <p className="text-xs text-muted-foreground">Changed files</p>
           </div>
@@ -175,13 +166,12 @@ export function CommitDialog({ cwd }: CommitDialogProps) {
             {!loading && !hasChanges && !error && (
               <p className="px-3 py-3 text-xs text-muted-foreground">No changes</p>
             )}
-            {!loading && cwd && files.map((file, i) => (
-              <FileAccordionItem key={i} file={file} cwd={cwd} />
+            {!loading && sessionId && files.map((file, i) => (
+              <FileAccordionItem key={i} file={file} sessionId={sessionId} />
             ))}
           </div>
         </div>
 
-        {/* Commit message */}
         <div className="flex flex-col gap-1">
           <p className="text-xs text-muted-foreground">Commit message</p>
           <Textarea

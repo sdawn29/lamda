@@ -62,7 +62,7 @@ function WorkspaceThreadRoute() {
           threadId={foundThread.id}
         />
 
-        {diffOpen && <DiffPanel cwd={cwd} />}
+        {diffOpen && <DiffPanel sessionId={foundThread.sessionId} />}
       </div>
 
       {/* Terminal panel anchored to bottom */}
