@@ -62,7 +62,8 @@ async function spawnServer(): Promise<number> {
     });
 
     setTimeout(() => {
-      if (!resolved) reject(new Error("Server did not become ready within 15s"));
+      if (!resolved)
+        reject(new Error("Server did not become ready within 15s"));
     }, 15_000);
   });
 }
@@ -91,7 +92,7 @@ const LOADING_HTML = `data:text/html,${encodeURIComponent(`<!DOCTYPE html>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{
-    background:#09090b;
+    background:#27272a;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -173,7 +174,6 @@ app.whenReady().then(async () => {
   ipcMain.handle("open-external", (_event, url: string) => {
     shell.openExternal(url);
   });
-
 
   await createWindow();
 

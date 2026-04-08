@@ -42,7 +42,7 @@ export const TerminalPanel = memo(function TerminalPanel({
       fontSize: 13,
       fontFamily: '"Menlo", "Monaco", "Courier New", monospace',
       theme: {
-        background: "#09090b",
+        background: "#27272a",
         foreground: "#e4e4e7",
         cursor: "#a1a1aa",
         selectionBackground: "#3f3f46",
@@ -161,7 +161,7 @@ export const TerminalPanel = memo(function TerminalPanel({
 
   return (
     <div
-      className="flex shrink-0 flex-col border-t bg-[#09090b]"
+      className="flex shrink-0 flex-col border-t bg-[#27272a]"
       style={{ height }}
     >
       {/* Drag handle / header */}
