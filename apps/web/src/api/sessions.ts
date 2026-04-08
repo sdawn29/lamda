@@ -16,7 +16,7 @@ export interface SendPromptResponse {
 }
 
 export function createSession(
-  body: CreateSessionBody = {},
+  body: CreateSessionBody = {}
 ): Promise<CreateSessionResponse> {
   return apiFetch<CreateSessionResponse>("/session", {
     method: "POST",
@@ -33,12 +33,17 @@ export function sendPrompt(
   id: string,
   text: string,
   model?: { provider: string; modelId: string },
-  thinkingLevel?: string,
+  thinkingLevel?: string
 ): Promise<SendPromptResponse> {
   return apiFetch<SendPromptResponse>(`/session/${id}/prompt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, provider: model?.provider, model: model?.modelId, thinkingLevel }),
+    body: JSON.stringify({
+      text,
+      provider: model?.provider,
+      model: model?.modelId,
+      thinkingLevel,
+    }),
   })
 }
 
@@ -63,6 +68,17 @@ export function checkoutBranch(
   branch: string
 ): Promise<BranchResponse> {
   return apiFetch<BranchResponse>(`/session/${sessionId}/checkout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ branch }),
+  })
+}
+
+export function createBranch(
+  sessionId: string,
+  branch: string
+): Promise<BranchResponse> {
+  return apiFetch<BranchResponse>(`/session/${sessionId}/branch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ branch }),

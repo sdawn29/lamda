@@ -363,6 +363,7 @@ export const ChatView = memo(function ChatView({
             branch={branch}
             branches={branches}
             onBranchSelect={handleBranchSelect}
+            sessionId={sessionId}
             selectedModelId={selectedModelId}
             onModelChange={handleModelChange}
           />

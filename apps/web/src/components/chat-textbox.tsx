@@ -9,6 +9,19 @@ import {
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Tooltip,
@@ -259,55 +272,47 @@ function ThinkingCombobox({
   onSelect: (level: ThinkingLevel) => void
 }) {
   const [open, setOpen] = React.useState(false)
-  const ref = React.useRef<HTMLDivElement>(null)
-
-  React.useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [open])
-
   const selectedLevel = THINKING_LEVELS.find((l) => l.value === selected)
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex h-6 items-center gap-1.5 rounded px-1.5 text-xs text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button variant="ghost" size="sm" aria-expanded={open}>
+            {selectedLevel?.icon}
+            <span>{selectedLevel?.label ?? selected}</span>
+            <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
+          </Button>
+        }
+      />
+      <PopoverContent
+        className="w-28 p-0"
+        side="top"
+        align="start"
+        sideOffset={6}
       >
-        {selectedLevel?.icon}
-        <span>{selectedLevel?.label ?? selected}</span>
-        <ChevronsUpDownIcon className="size-3 shrink-0 opacity-50" />
-      </button>
-
-      {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-1 overflow-hidden rounded-lg bg-popover shadow-md ring-1 ring-foreground/10">
-          <div className="p-1">
-            {THINKING_LEVELS.map((level) => (
-              <button
-                key={level.value}
-                type="button"
-                onClick={() => {
-                  onSelect(level.value)
-                  setOpen(false)
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs transition-colors hover:bg-foreground/8",
-                  selected === level.value && "font-medium text-foreground"
-                )}
-              >
-                {level.icon}
-                {level.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {THINKING_LEVELS.map((level) => (
+                <CommandItem
+                  key={level.value}
+                  value={level.value}
+                  data-checked={level.value === selected}
+                  onSelect={() => {
+                    onSelect(level.value)
+                    setOpen(false)
+                  }}
+                >
+                  {level.icon}
+                  {level.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -323,42 +328,7 @@ function ModelCombobox({
   disabled?: boolean
 }) {
   const [open, setOpen] = React.useState(false)
-  const [query, setQuery] = React.useState("")
-  const ref = React.useRef<HTMLDivElement>(null)
-  const inputRef = React.useRef<HTMLInputElement>(null)
 
-  React.useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-        setQuery("")
-      }
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [open])
-
-  React.useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 0)
-  }, [open])
-
-  const filtered: ModelGroup = groups
-    .map(
-      ([provider, items]) =>
-        [
-          provider,
-          items.filter(
-            (m) =>
-              !query ||
-              m.name.toLowerCase().includes(query.toLowerCase()) ||
-              provider.toLowerCase().includes(query.toLowerCase())
-          ),
-        ] as [string, typeof items]
-    )
-    .filter(([, items]) => items.length > 0)
-
-  // Find the provider of the selected model for the trigger icon
   const selectedProvider = groups.find(([, items]) =>
     items.some((m) => m.id === selected?.id)
   )?.[0]
@@ -367,70 +337,56 @@ function ModelCombobox({
     : null
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
-        className="flex h-6 items-center gap-1.5 rounded px-1.5 text-xs text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            aria-expanded={open}
+          >
+            {selectedMeta?.icon}
+            <span>{selected?.name ?? "Select model"}</span>
+            <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
+          </Button>
+        }
+      />
+      <PopoverContent
+        className="w-48 p-0"
+        side="top"
+        align="start"
+        sideOffset={6}
       >
-        {selectedMeta && selectedMeta.icon}
-        <span>{selected?.name ?? "Select model"}</span>
-        <ChevronsUpDownIcon className="size-3 shrink-0 opacity-50" />
-      </button>
-
-      {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-1 w-max overflow-hidden rounded-lg bg-popover shadow-md ring-1 ring-foreground/10">
-          <div className="border-b border-foreground/10 px-2 py-1.5">
-            <input
-              ref={inputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search models…"
-              className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-          <div className="max-h-52 overflow-y-auto p-1">
-            {filtered.length === 0 ? (
-              <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                No models found
-              </p>
-            ) : (
-              filtered.map(([provider, items]) => {
-                const meta = getProviderMeta(provider)
-                return (
-                  <div key={provider}>
-                    <div className="flex items-center px-2 py-1">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {meta.label}
-                      </p>
-                    </div>
-                    {items.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          onSelect(m.id)
-                          setOpen(false)
-                          setQuery("")
-                        }}
-                        className={cn(
-                          "flex w-full items-center gap-2 rounded-md py-1 pl-2 text-left text-xs transition-colors hover:bg-foreground/8",
-                          selected?.id === m.id && "font-medium text-foreground"
-                        )}
-                      >
-                        {meta.icon}
-                        {m.name}
-                      </button>
-                    ))}
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+        <Command>
+          <CommandInput placeholder="Search models…" />
+          <CommandList>
+            <CommandEmpty>No models found</CommandEmpty>
+            {groups.map(([provider, items]) => {
+              const meta = getProviderMeta(provider)
+              return (
+                <CommandGroup key={provider} heading={meta.label}>
+                  {items.map((m) => (
+                    <CommandItem
+                      key={m.id}
+                      value={`${provider} ${m.name}`}
+                      data-checked={m.id === selected?.id}
+                      onSelect={() => {
+                        onSelect(m.id)
+                        setOpen(false)
+                      }}
+                    >
+                      {meta.icon}
+                      {m.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )
+            })}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -449,6 +405,7 @@ interface ChatTextboxProps {
   branch?: string | null
   branches?: string[]
   onBranchSelect?: (branch: string) => void
+  sessionId?: string
   selectedModelId?: string | null
   onModelChange?: (modelId: string) => void
 }
@@ -463,6 +420,7 @@ export const ChatTextbox = memo(function ChatTextbox({
   branch,
   branches = [],
   onBranchSelect,
+  sessionId,
   selectedModelId: controlledModelId,
   onModelChange,
 }: ChatTextboxProps) {
@@ -603,6 +561,7 @@ export const ChatTextbox = memo(function ChatTextbox({
               branch={branch ?? null}
               branches={branches}
               onBranchSelect={onBranchSelect}
+              sessionId={sessionId}
             />
           )}
         </div>

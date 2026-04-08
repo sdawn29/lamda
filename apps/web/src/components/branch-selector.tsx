@@ -1,107 +1,154 @@
 import * as React from "react"
-import { Popover } from "@base-ui/react/popover"
-import { GitBranchIcon, CheckIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { GitBranchIcon, ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { useCreateBranch } from "@/mutations/use-create-branch"
 
 interface BranchSelectorProps {
   branch: string | null
   branches: string[]
   onBranchSelect?: (branch: string) => void
+  sessionId?: string
 }
 
 export function BranchSelector({
   branch,
   branches,
   onBranchSelect,
+  sessionId,
 }: BranchSelectorProps) {
-  const [query, setQuery] = React.useState("")
-  const inputRef = React.useRef<HTMLInputElement>(null)
+  const [open, setOpen] = React.useState(false)
+  const [dialogOpen, setDialogOpen] = React.useState(false)
+  const [newBranch, setNewBranch] = React.useState("")
 
-  const filtered = React.useMemo(
-    () =>
-      query.trim()
-        ? branches.filter((b) =>
-            b.toLowerCase().includes(query.toLowerCase())
-          )
-        : branches,
-    [branches, query]
-  )
+  const createBranch = useCreateBranch(sessionId ?? "")
 
-  function handleSelect(b: string) {
-    onBranchSelect?.(b)
+  function handleCreate() {
+    if (!newBranch.trim() || !sessionId) return
+    createBranch.mutate(newBranch.trim(), {
+      onSuccess: (data) => {
+        onBranchSelect?.(data.branch ?? newBranch.trim())
+        setDialogOpen(false)
+        setNewBranch("")
+      },
+    })
   }
 
   return (
-    <Popover.Root
-      onOpenChange={(open) => {
-        if (open) {
-          setQuery("")
-          setTimeout(() => inputRef.current?.focus(), 0)
-        }
-      }}
-    >
-      <Popover.Trigger
-        className={cn(
-          "flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors",
-          "hover:bg-muted hover:text-foreground",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-        )}
-      >
-        <GitBranchIcon className="size-3 shrink-0" />
-        <span className="max-w-32 truncate">{branch ?? "no branch"}</span>
-      </Popover.Trigger>
-
-      <Popover.Portal>
-        <Popover.Positioner side="top" align="start" sideOffset={6}>
-          <Popover.Popup
-            className={cn(
-              "z-50 w-56 overflow-hidden rounded-lg border border-border/50 bg-popover/80 shadow-md",
-              "backdrop-blur-2xl backdrop-saturate-150",
-              "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
-              "data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-              "origin-(--transform-origin)"
-            )}
-          >
-            <div className="border-b border-border/30 px-2 py-1.5">
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search branch…"
-                className="w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <Button variant="ghost" size="sm" aria-expanded={open}>
+              <GitBranchIcon data-icon="inline-start" />
+              <span className="max-w-32 truncate">{branch ?? "no branch"}</span>
+              <ChevronsUpDownIcon
+                data-icon="inline-end"
+                className="opacity-50"
               />
-            </div>
-
-            <div className="max-h-48 overflow-y-auto py-1">
-              {filtered.length === 0 ? (
-                <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                  No branches found
-                </p>
-              ) : (
-                filtered.map((b) => (
-                  <Popover.Close
+            </Button>
+          }
+        />
+        <PopoverContent
+          className="w-48 p-0"
+          side="top"
+          align="start"
+          sideOffset={6}
+        >
+          <Command>
+            <CommandInput placeholder="Search branch…" />
+            <CommandList>
+              <CommandEmpty>No branches found</CommandEmpty>
+              <CommandGroup>
+                {branches.map((b) => (
+                  <CommandItem
                     key={b}
-                    onClick={() => handleSelect(b)}
-                    className={cn(
-                      "flex w-full cursor-default items-center gap-2 px-2 py-1.5 text-xs",
-                      "rounded-sm hover:bg-foreground/10 focus-visible:bg-foreground/10 focus-visible:outline-none",
-                      b === branch && "font-medium text-foreground"
-                    )}
+                    value={b}
+                    data-checked={b === branch}
+                    onSelect={() => {
+                      onBranchSelect?.(b)
+                      setOpen(false)
+                    }}
                   >
-                    <CheckIcon
-                      className={cn(
-                        "size-3 shrink-0",
-                        b === branch ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <span className="truncate">{b}</span>
-                  </Popover.Close>
-                ))
+                    {b}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+              {sessionId && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup>
+                    <CommandItem
+                      onSelect={() => {
+                        setOpen(false)
+                        setDialogOpen(true)
+                      }}
+                    >
+                      <PlusIcon />
+                      Create new branch
+                    </CommandItem>
+                  </CommandGroup>
+                </>
               )}
-            </div>
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create new branch</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="Branch name"
+            value={newBranch}
+            onChange={(e) => setNewBranch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleCreate()
+            }}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false)
+                setNewBranch("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreate}
+              disabled={!newBranch.trim() || createBranch.isPending}
+            >
+              {createBranch.isPending ? "Creating…" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

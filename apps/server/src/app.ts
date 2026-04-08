@@ -18,6 +18,7 @@ import {
   getCurrentBranch,
   listBranches,
   checkoutBranch,
+  createBranch,
   gitStatus,
   gitFileDiff,
   gitCommit,
@@ -355,6 +356,26 @@ app.post("/session/:id/checkout", async (c) => {
       lines.find((l) => l.startsWith("error:") || l.startsWith("fatal:")) ??
       lines[0] ??
       "Checkout failed";
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.post("/session/:id/branch", async (c) => {
+  const cwd = store.getCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const body = await c.req.json<{ branch: string }>();
+  if (!body.branch) return c.json({ error: "branch is required" }, 400);
+  try {
+    await createBranch(cwd, body.branch);
+    const branch = await getCurrentBranch(cwd);
+    return c.json({ branch });
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
+    const lines = raw.split("\n").filter(Boolean);
+    const message =
+      lines.find((l) => l.startsWith("error:") || l.startsWith("fatal:")) ??
+      lines[0] ??
+      "Branch creation failed";
     return c.json({ error: message }, 500);
   }
 });

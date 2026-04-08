@@ -57,6 +57,13 @@ export async function checkoutBranch(
   await execFileAsync("git", ["checkout", branch], { cwd, timeout: 10000 });
 }
 
+export async function createBranch(cwd: string, branch: string): Promise<void> {
+  await execFileAsync("git", ["checkout", "-b", branch], {
+    cwd,
+    timeout: 10000,
+  });
+}
+
 /** Returns raw `git status --short` output. */
 export async function gitStatus(cwd: string): Promise<string> {
   const { stdout } = await execFileAsync("git", ["status", "--short"], {
