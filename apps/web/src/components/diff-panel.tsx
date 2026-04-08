@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useMemo,
-  memo,
-} from "react"
+import { useCallback, useEffect, useRef, useState, useMemo, memo } from "react"
 import {
   ChevronRight,
   GripVertical,
@@ -18,7 +11,6 @@ import {
   RefreshCw,
   Plus,
   Minus,
-  MoreHorizontal,
   Archive,
   Trash2,
   GitBranch,
@@ -27,6 +19,7 @@ import {
   ArrowUpDown,
   Check,
   Undo2,
+  GitCompare,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -39,7 +32,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { DiffView, type DiffMode } from "@/components/diff-view"
 import { useDiffPanel } from "@/hooks/diff-panel-context"
@@ -84,7 +76,8 @@ function statusLabel(file: ChangedFile): string {
 
 function statusColor(file: ChangedFile) {
   const label = statusLabel(file)
-  if (label === "M" || label === "M*") return "text-yellow-500 dark:text-yellow-400"
+  if (label === "M" || label === "M*")
+    return "text-yellow-500 dark:text-yellow-400"
   if (label === "A") return "text-green-600 dark:text-green-400"
   if (label === "D") return "text-red-500 dark:text-red-400"
   if (label === "U") return "text-blue-500 dark:text-blue-400"
@@ -203,7 +196,7 @@ function FileAccordionItem({
     sessionId,
     file.filePath,
     file.raw,
-    expanded,
+    expanded
   )
 
   async function handleToggle(e: React.MouseEvent) {
@@ -238,7 +231,7 @@ function FileAccordionItem({
       <div className="relative flex w-full items-center">
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-1.5 py-2 pl-2 pr-8 text-left transition-colors hover:bg-muted/40"
+          className="flex min-w-0 flex-1 items-center gap-1.5 py-2 pr-8 pl-2 text-left transition-colors hover:bg-muted/40"
         >
           <ChevronRight
             className={cn(
@@ -246,7 +239,9 @@ function FileAccordionItem({
               expanded && "rotate-90"
             )}
           />
-          <span className={cn("w-6 shrink-0 font-mono text-xs", statusColor(file))}>
+          <span
+            className={cn("w-6 shrink-0 font-mono text-xs", statusColor(file))}
+          >
             {label}
           </span>
           <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
@@ -261,7 +256,7 @@ function FileAccordionItem({
           </span>
         </button>
 
-        <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/file:opacity-100">
+        <div className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/file:opacity-100">
           {!file.isUntracked && (
             <Tooltip>
               <TooltipTrigger
@@ -302,17 +297,21 @@ function FileAccordionItem({
                   ) : (
                     <Plus className="h-3 w-3" />
                   )}
-                  <span className="sr-only">{file.isStaged ? "Unstage" : "Stage"}</span>
+                  <span className="sr-only">
+                    {file.isStaged ? "Unstage" : "Stage"}
+                  </span>
                 </Button>
               }
             />
-            <TooltipContent>{file.isStaged ? "Unstage file" : "Stage file"}</TooltipContent>
+            <TooltipContent>
+              {file.isStaged ? "Unstage file" : "Stage file"}
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>
 
       {expanded && (
-        <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150 border-t border-border/40 px-3 pb-3">
+        <div className="animate-in border-t border-border/40 px-3 pb-3 duration-150 fade-in-0 slide-in-from-top-1">
           {diffLoading ? (
             <div className="flex items-center gap-1.5 py-2 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
@@ -364,16 +363,14 @@ function StashEntryRow({
       {/* Index badge + icon */}
       <div className="relative mt-0.5 shrink-0">
         <Archive className="h-3.5 w-3.5 text-muted-foreground/50" />
-        <span className="absolute -right-1.5 -top-1.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-muted px-0.5 text-[8px] font-semibold text-muted-foreground">
+        <span className="absolute -top-1.5 -right-1.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-muted px-0.5 text-[8px] font-semibold text-muted-foreground">
           {entry.index}
         </span>
       </div>
 
       {/* Label + branch */}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs text-foreground/85">
-          {entry.message}
-        </p>
+        <p className="truncate text-xs text-foreground/85">{entry.message}</p>
         {entry.branch && (
           <div className="mt-0.5 flex items-center gap-1">
             <GitBranch className="h-2.5 w-2.5 shrink-0 text-muted-foreground/40" />
@@ -455,7 +452,10 @@ function StashSection({ sessionId }: { sessionId: string }) {
 
   const stashes = useMemo(() => parseStashList(stashRaw ?? ""), [stashRaw])
 
-  const handleApply = useCallback((ref: string) => apply.mutateAsync(ref), [apply])
+  const handleApply = useCallback(
+    (ref: string) => apply.mutateAsync(ref),
+    [apply]
+  )
   const handlePop = useCallback((ref: string) => pop.mutateAsync(ref), [pop])
   const handleDrop = useCallback((ref: string) => drop.mutateAsync(ref), [drop])
 
@@ -472,7 +472,7 @@ function StashSection({ sessionId }: { sessionId: string }) {
           )}
         />
         <Archive className="h-3 w-3 shrink-0 text-muted-foreground/60" />
-        <span className="flex-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <span className="flex-1 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
           Stashes
         </span>
         {isLoading && (
@@ -486,9 +486,11 @@ function StashSection({ sessionId }: { sessionId: string }) {
       </button>
 
       {!collapsed && (
-        <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150">
+        <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
           {!isLoading && stashes.length === 0 && (
-            <p className="px-4 py-2.5 text-xs text-muted-foreground/40">No stashes</p>
+            <p className="px-4 py-2.5 text-xs text-muted-foreground/40">
+              No stashes
+            </p>
           )}
           {stashes.map((s) => (
             <StashEntryRow
@@ -538,7 +540,7 @@ function FilesSection({
             !collapsed && "rotate-90"
           )}
         />
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
           {label}
         </span>
         {files.length > 0 && (
@@ -549,9 +551,11 @@ function FilesSection({
       </button>
 
       {!collapsed && (
-        <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150">
+        <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
           {files.length === 0 && emptyText && (
-            <p className="px-3 py-2 text-xs text-muted-foreground/50">{emptyText}</p>
+            <p className="px-3 py-2 text-xs text-muted-foreground/50">
+              {emptyText}
+            </p>
           )}
           {files.map((file, i) => (
             <FileAccordionItem
@@ -601,7 +605,10 @@ function applySortMode(files: ChangedFile[], sort: SortMode): ChangedFile[] {
       return sorted.sort((a, b) => {
         const la = statusLabel(a)
         const lb = statusLabel(b)
-        return (STATUS_ORDER[la] ?? 5) - (STATUS_ORDER[lb] ?? 5) || a.filePath.localeCompare(b.filePath)
+        return (
+          (STATUS_ORDER[la] ?? 5) - (STATUS_ORDER[lb] ?? 5) ||
+          a.filePath.localeCompare(b.filePath)
+        )
       })
     case "path":
       return sorted.sort((a, b) => a.filePath.localeCompare(b.filePath))
@@ -614,7 +621,9 @@ interface DiffPanelProps {
   sessionId: string
 }
 
-export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) {
+export const DiffPanel = memo(function DiffPanel({
+  sessionId,
+}: DiffPanelProps) {
   const { close } = useDiffPanel()
   const [width, setWidth] = useState(DEFAULT_WIDTH)
   const [mode, setMode] = useState<DiffMode>("inline")
@@ -622,7 +631,12 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
   const [stashInputOpen, setStashInputOpen] = useState(false)
   const dragStartRef = useRef<{ x: number; w: number } | null>(null)
 
-  const { data: statusRaw, isLoading: loading, error: statusError, refetch } = useGitStatus(sessionId)
+  const {
+    data: statusRaw,
+    isLoading: loading,
+    error: statusError,
+    refetch,
+  } = useGitStatus(sessionId)
   const { staged, unstaged } = useMemo(() => {
     const all = (statusRaw ?? "")
       .split("\n")
@@ -630,8 +644,14 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
       .filter(Boolean)
       .map(parseStatusLine)
     return {
-      staged: applySortMode(all.filter((f) => f.isStaged), sortMode),
-      unstaged: applySortMode(all.filter((f) => !f.isStaged), sortMode),
+      staged: applySortMode(
+        all.filter((f) => f.isStaged),
+        sortMode
+      ),
+      unstaged: applySortMode(
+        all.filter((f) => !f.isStaged),
+        sortMode
+      ),
     }
   }, [statusRaw, sortMode])
   const files = useMemo(() => [...staged, ...unstaged], [staged, unstaged])
@@ -719,177 +739,196 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
         <GripVertical className="h-4 w-3 text-muted-foreground/20 transition-[color,opacity] duration-150 group-hover:text-muted-foreground/70" />
       </div>
 
-      {/* Header */}
-      <div className="flex h-9 min-w-0 shrink-0 items-center justify-between border-t border-b border-border/60 px-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-xs font-medium text-muted-foreground">
-            Changes
-          </span>
-          {files.length > 0 && (
-            <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-              {stagedCount}/{files.length}
+      {/* Header – Row 1: title + status badges + refresh + close */}
+      <div className="flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-border/60 pr-2 pl-4">
+        <GitCompare className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+        <span className="text-xs font-semibold tracking-wide">
+          Source Control
+        </span>
+        <div className="flex flex-1 items-center justify-end gap-1">
+          {hasStaged && (
+            <span className="rounded-full bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
+              {stagedCount} staged
+            </span>
+          )}
+          {unstaged.length > 0 && (
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              {unstaged.length} changed
             </span>
           )}
         </div>
-
-        <div className="flex items-center gap-1">
-          {/* Stage all */}
+        <div className="flex shrink-0 items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger
               render={
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  onClick={handleStageAll}
-                  disabled={bulkWorking || !hasUnstaged}
+                  onClick={() => refetch()}
+                  className="h-6 w-6 text-muted-foreground"
                 >
-                  {bulkWorking ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <PackagePlus className="h-3 w-3" />
-                  )}
-                  <span className="sr-only">Stage all</span>
+                  <RefreshCw className="h-3 w-3" />
+                  <span className="sr-only">Refresh</span>
                 </Button>
               }
             />
-            <TooltipContent>Stage all changes</TooltipContent>
+            <TooltipContent>Refresh</TooltipContent>
           </Tooltip>
-
-          {/* Unstage all */}
           <Tooltip>
             <TooltipTrigger
               render={
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  onClick={handleUnstageAll}
-                  disabled={bulkWorking || !hasStaged}
+                  onClick={close}
+                  className="h-6 w-6"
                 >
-                  <PackageMinus className="h-3 w-3" />
-                  <span className="sr-only">Unstage all</span>
-                </Button>
-              }
-            />
-            <TooltipContent>Unstage all changes</TooltipContent>
-          </Tooltip>
-
-          <div className="mx-0.5 h-4 w-px bg-border/60" />
-
-          {/* View mode */}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setMode("inline")}
-                  data-active={mode === "inline"}
-                  className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-                >
-                  <AlignLeft className="h-3 w-3" />
-                  <span className="sr-only">Inline view</span>
-                </Button>
-              }
-            />
-            <TooltipContent>Inline view</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setMode("side-by-side")}
-                  data-active={mode === "side-by-side"}
-                  className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-                >
-                  <Columns2 className="h-3 w-3" />
-                  <span className="sr-only">Side-by-side</span>
-                </Button>
-              }
-            />
-            <TooltipContent>Side-by-side view</TooltipContent>
-          </Tooltip>
-
-          <div className="mx-0.5 h-4 w-px bg-border/60" />
-
-          {/* Sort */}
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <DropdownMenuTrigger
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-                    data-active={sortMode !== "name"}
-                  >
-                    <ArrowUpDown className="h-3 w-3" />
-                    <span className="sr-only">Sort</span>
-                  </DropdownMenuTrigger>
-                }
-              />
-              <TooltipContent>Sort files</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end" className="w-44">
-              {SORT_OPTIONS.map((opt) => (
-                <DropdownMenuItem
-                  key={opt.value}
-                  onClick={() => setSortMode(opt.value)}
-                  className="flex items-center justify-between"
-                >
-                  {opt.label}
-                  {sortMode === opt.value && (
-                    <Check className="ml-2 h-3 w-3 text-muted-foreground" />
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <div className="mx-0.5 h-4 w-px bg-border/60" />
-
-          {/* More actions (stash + refresh) */}
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-md border border-input bg-background text-muted-foreground shadow-xs hover:bg-accent hover:text-accent-foreground">
-                    <MoreHorizontal className="h-3 w-3" />
-                    <span className="sr-only">More actions</span>
-                  </DropdownMenuTrigger>
-                }
-              />
-              <TooltipContent>More actions</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem
-                disabled={!hasChanges}
-                onClick={() => setStashInputOpen(true)}
-              >
-                <Archive className="mr-2 h-3.5 w-3.5" />
-                Stash all changes…
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => refetch()}>
-                <RefreshCw className="mr-2 h-3.5 w-3.5" />
-                Refresh
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Close */}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button variant="ghost" size="icon-sm" onClick={close}>
                   <X className="h-3 w-3" />
-                  <span className="sr-only">Close</span>
+                  <span className="sr-only">Close panel</span>
                 </Button>
               }
             />
-            <TooltipContent>Close</TooltipContent>
+            <TooltipContent>Close panel</TooltipContent>
           </Tooltip>
         </div>
+      </div>
+
+      {/* Header – Row 2: action toolbar */}
+      <div className="flex h-8 min-w-0 shrink-0 items-center gap-0.5 border-b border-border/60 bg-muted/20 px-2">
+        {/* Stage / unstage all */}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleStageAll}
+                disabled={bulkWorking || !hasUnstaged}
+                className="h-6 w-6"
+              >
+                {bulkWorking ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <PackagePlus className="h-3 w-3" />
+                )}
+                <span className="sr-only">Stage all</span>
+              </Button>
+            }
+          />
+          <TooltipContent>Stage all changes</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleUnstageAll}
+                disabled={bulkWorking || !hasStaged}
+                className="h-6 w-6"
+              >
+                <PackageMinus className="h-3 w-3" />
+                <span className="sr-only">Unstage all</span>
+              </Button>
+            }
+          />
+          <TooltipContent>Unstage all changes</TooltipContent>
+        </Tooltip>
+
+        <div className="mx-1 h-4 w-px bg-border/60" />
+
+        {/* View mode */}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setMode("inline")}
+                data-active={mode === "inline"}
+                className="h-6 w-6 data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+              >
+                <AlignLeft className="h-3 w-3" />
+                <span className="sr-only">Inline view</span>
+              </Button>
+            }
+          />
+          <TooltipContent>Inline view</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setMode("side-by-side")}
+                data-active={mode === "side-by-side"}
+                className="h-6 w-6 data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+              >
+                <Columns2 className="h-3 w-3" />
+                <span className="sr-only">Side-by-side</span>
+              </Button>
+            }
+          />
+          <TooltipContent>Side-by-side view</TooltipContent>
+        </Tooltip>
+
+        <div className="mx-1 h-4 w-px bg-border/60" />
+
+        {/* Sort */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+                  data-active={sortMode !== "name"}
+                >
+                  <ArrowUpDown className="h-3 w-3" />
+                  <span className="sr-only">Sort files</span>
+                </DropdownMenuTrigger>
+              }
+            />
+            <TooltipContent>Sort files</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end" className="w-44">
+            {SORT_OPTIONS.map((opt) => (
+              <DropdownMenuItem
+                key={opt.value}
+                onClick={() => setSortMode(opt.value)}
+                className="flex items-center justify-between"
+              >
+                {opt.label}
+                {sortMode === opt.value && (
+                  <Check className="ml-2 h-3 w-3 text-muted-foreground" />
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="mx-1 h-4 w-px bg-border/60" />
+
+        {/* Stash */}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setStashInputOpen(true)}
+                disabled={!hasChanges}
+                className="h-6 w-6"
+              >
+                <Archive className="h-3 w-3" />
+                <span className="sr-only">Stash changes</span>
+              </Button>
+            }
+          />
+          <TooltipContent>Stash all changes</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* File list + stash input */}
