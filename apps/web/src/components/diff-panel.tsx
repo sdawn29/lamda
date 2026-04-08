@@ -273,7 +273,7 @@ function FileAccordionItem({
       </div>
 
       {expanded && (
-        <div className="border-t border-border/40 px-3 pb-3">
+        <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150 border-t border-border/40 px-3 pb-3">
           {diffLoading ? (
             <div className="flex items-center gap-1.5 py-2 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
@@ -424,7 +424,7 @@ function StashSection({ sessionId }: { sessionId: string }) {
     <div className="shrink-0 border-t border-border/60">
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className="flex w-full items-center gap-1.5 bg-muted/30 px-2 py-1.5 text-left"
+        className="flex w-full items-center gap-1.5 bg-muted/30 px-2 py-1.5 text-left transition-colors duration-150 hover:bg-muted/60"
       >
         <ChevronRight
           className={cn(
@@ -447,7 +447,7 @@ function StashSection({ sessionId }: { sessionId: string }) {
       </button>
 
       {!collapsed && (
-        <div>
+        <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150">
           {!isLoading && stashes.length === 0 && (
             <p className="px-4 py-2.5 text-xs text-muted-foreground/40">No stashes</p>
           )}
@@ -489,7 +489,7 @@ function FilesSection({
     <div className="border-b border-border/40 last:border-0">
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className="flex w-full items-center gap-1.5 bg-muted/30 px-2 py-1.5 text-left"
+        className="flex w-full items-center gap-1.5 bg-muted/30 px-2 py-1.5 text-left transition-colors duration-150 hover:bg-muted/60"
       >
         <ChevronRight
           className={cn(
@@ -508,7 +508,7 @@ function FilesSection({
       </button>
 
       {!collapsed && (
-        <>
+        <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150">
           {files.length === 0 && emptyText && (
             <p className="px-3 py-2 text-xs text-muted-foreground/50">{emptyText}</p>
           )}
@@ -521,7 +521,7 @@ function FilesSection({
               onStageToggle={onStageToggle}
             />
           ))}
-        </>
+        </div>
       )}
     </div>
   )
@@ -663,10 +663,10 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
     >
       {/* Left-edge drag handle */}
       <div
-        className="group absolute inset-y-0 left-0 flex w-1 cursor-col-resize items-center justify-center transition-colors hover:bg-border/60"
+        className="group absolute inset-y-0 left-0 flex w-2 cursor-col-resize items-center justify-center transition-[background-color,width] duration-150 hover:w-2 hover:bg-border/40"
         onMouseDown={onDragStart}
       >
-        <GripVertical className="h-4 w-3 text-muted-foreground/30 group-hover:text-muted-foreground/60" />
+        <GripVertical className="h-4 w-3 text-muted-foreground/20 transition-[color,opacity] duration-150 group-hover:text-muted-foreground/70" />
       </div>
 
       {/* Header */}

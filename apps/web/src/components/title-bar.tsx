@@ -137,11 +137,11 @@ export function TitleBar() {
                 onClick={toggleDiff}
                 data-active={diffOpen}
                 disabled={!activeWorkspace?.path}
-                className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground h-6 gap-1 px-1.5"
+                className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground h-6 gap-1 px-1.5 transition-[background-color,color] duration-150"
               >
                 <GitCompare className="size-3 shrink-0" />
                 {diffStat && (diffStat.additions > 0 || diffStat.deletions > 0) && (
-                  <span className="flex items-center gap-0.5 font-mono leading-none">
+                  <span className="animate-in fade-in-0 zoom-in-90 duration-200 flex items-center gap-0.5 font-mono leading-none">
                     <span className="text-green-500">+{diffStat.additions}</span>
                     <span className="text-red-500">-{diffStat.deletions}</span>
                   </span>
@@ -160,7 +160,7 @@ export function TitleBar() {
                 size="icon-sm"
                 onClick={toggleTerminal}
                 data-active={terminalOpen}
-                className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+                className="data-[active=true]:bg-accent data-[active=true]:text-accent-foreground transition-[background-color,color] duration-150"
               >
                 <TerminalSquare />
                 <span className="sr-only">Toggle terminal</span>

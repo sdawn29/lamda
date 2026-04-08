@@ -68,9 +68,9 @@ export function AppSidebar() {
                         className="flex-1"
                       >
                         <span className="relative h-4 w-4 shrink-0">
-                          <FolderOpen className="absolute inset-0 h-4 w-4 transition-opacity group-hover/ws:opacity-0" />
+                          <FolderOpen className="absolute inset-0 h-4 w-4 transition-[opacity,transform] duration-150 group-hover/ws:opacity-0 group-hover/ws:scale-75" />
                           <ChevronRight
-                            className={`absolute inset-0 h-4 w-4 opacity-0 transition-[opacity,transform] group-hover/ws:opacity-100 ${collapsed[ws.id] ? "" : "rotate-90"}`}
+                            className={`absolute inset-0 h-4 w-4 opacity-0 transition-[opacity,transform] duration-150 group-hover/ws:opacity-100 ${collapsed[ws.id] ? "" : "rotate-90"}`}
                           />
                         </span>
                         <span>{ws.name}</span>
@@ -119,7 +119,7 @@ export function AppSidebar() {
                     </div>
 
                     {!collapsed[ws.id] && ws.threads.length > 0 && (
-                      <SidebarMenuSub>
+                      <SidebarMenuSub className="animate-in fade-in-0 slide-in-from-top-1 duration-150">
                         {ws.threads.map((thread) => (
                           <SidebarMenuSubItem key={thread.id}>
                             <SidebarMenuSubButton
@@ -154,7 +154,7 @@ export function AppSidebar() {
           )}
           onClick={() => navigate({ to: "/settings" })}
         >
-          <Settings className="h-3.5 w-3.5 shrink-0" />
+          <Settings className="h-3.5 w-3.5 shrink-0 transition-transform duration-300 hover:rotate-45" />
           Settings
         </button>
       </SidebarFooter>

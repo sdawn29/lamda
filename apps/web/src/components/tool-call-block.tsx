@@ -150,7 +150,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   return (
     <div
       className={cn(
-        "w-full max-w-2xl self-start rounded-lg border text-xs",
+        "animate-in fade-in-0 slide-in-from-bottom-1 duration-150 w-full max-w-2xl self-start rounded-lg border text-xs",
         msg.status === "error"
           ? "border-destructive/50 bg-destructive/5"
           : "border-border bg-muted/20"
@@ -158,7 +158,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     >
       {/* Header */}
       <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/30 rounded-lg"
         onClick={toggle}
       >
         {msg.status === "running" ? (
@@ -187,7 +187,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
       {/* Body */}
       {expanded && (
-        <div className="px-3 pb-3">
+        <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150 px-3 pb-3">
           <div
             className={cn(
               "mb-2 border-t",

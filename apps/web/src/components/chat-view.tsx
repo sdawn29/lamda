@@ -269,8 +269,8 @@ export const ChatView = memo(function ChatView({
                 key={key}
                 className={
                   msg.role === "user"
-                    ? "self-end rounded-xl bg-muted px-4 py-2 text-sm"
-                    : "prose prose-sm w-full max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                    ? "animate-in fade-in-0 slide-in-from-bottom-2 duration-200 self-end rounded-xl bg-muted px-4 py-2 text-sm"
+                    : "animate-in fade-in-0 slide-in-from-bottom-1 duration-200 prose prose-sm w-full max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
                 }
               >
                 {msg.role === "user" ? (
@@ -284,9 +284,11 @@ export const ChatView = memo(function ChatView({
             )
           })}
           {showThinking && (
-            <p className="animate-pulse self-start text-sm text-muted-foreground">
-              Thinking…
-            </p>
+            <div className="animate-in fade-in-0 duration-200 flex self-start items-center gap-1 py-1">
+              <span className="size-1.5 rounded-full bg-muted-foreground/60 animate-thinking-dot" style={{ animationDelay: "0ms" }} />
+              <span className="size-1.5 rounded-full bg-muted-foreground/60 animate-thinking-dot" style={{ animationDelay: "200ms" }} />
+              <span className="size-1.5 rounded-full bg-muted-foreground/60 animate-thinking-dot" style={{ animationDelay: "400ms" }} />
+            </div>
           )}
           <div ref={bottomRef} />
         </div>

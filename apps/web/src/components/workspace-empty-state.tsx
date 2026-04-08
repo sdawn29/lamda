@@ -15,7 +15,7 @@ export function WorkspaceEmptyState() {
 
   return (
     <div className="flex h-full items-center justify-center">
-      <Card className="w-full max-w-md">
+      <Card className="animate-in fade-in-0 zoom-in-95 duration-300 w-full max-w-md">
         <CardHeader className="items-center text-center">
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-muted">
             <FolderOpen className="size-6 text-muted-foreground" />
