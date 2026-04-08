@@ -99,31 +99,6 @@ async function getPreloadPath(): Promise<string> {
   return preloadPathPromise;
 }
 
-const LOADING_HTML = `data:text/html,${encodeURIComponent(`<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{
-    background:#27272a;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    height:100vh;
-    font-family:system-ui,sans-serif;
-    color:#fafafa;
-    font-size:18px;
-    font-weight:500;
-    letter-spacing:.08em;
-  }
-</style>
-</head>
-<body>
-  <span>lambda</span>
-</body>
-</html>`)}`;
-
 async function waitForDevServer(url: string, timeout = 30_000): Promise<void> {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -161,7 +136,6 @@ async function createWindow() {
   win.once("ready-to-show", () => win.show());
 
   if (isDev) {
-    win.loadURL(LOADING_HTML);
     await waitForDevServer(DEV_SERVER_URL);
     win.loadURL(DEV_SERVER_URL);
   } else {

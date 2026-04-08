@@ -2,10 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Inline theme bootstrap — runs synchronously before any stylesheet or
+      React bundle loads so the correct dark/light class is already on <html>
+      and the background colour is set instantly, preventing any flash of
+      unstyled / wrong-theme content.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("theme");
+          var dark =
+            stored === "dark" ||
+            (stored !== "light" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.add(dark ? "dark" : "light");
+          // Apply the exact background values defined in index.css so the
+          // window background matches from the very first paint.
+          document.documentElement.style.background = dark
+            ? "#101010"
+            : "#f5f5f0";
+        } catch (e) {}
+      })();
+    </script>
     <style>
       html,
       body {
-        background: var(--background);
+        /* Fallback for the brief moment before index.css is parsed. The
+           inline script above will have already set the correct colour on
+           <html> via style attribute, so this just acts as a safety net. */
+        background: var(--background, #101010);
       }
     </style>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
