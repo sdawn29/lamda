@@ -141,7 +141,7 @@ app.post("/workspace", async (c) => {
   }, 201);
 });
 
-app.delete("/reset", (c) => {
+app.delete("/reset", (_c) => {
   // Dispose all in-memory sessions
   for (const ws of listWorkspacesWithThreads()) {
     for (const thread of ws.threads) {
@@ -509,6 +509,7 @@ interface ActiveLogin {
   sseFlush: (() => void) | null;
   promptResolvers: Map<string, (value: string) => void>;
   abortController: AbortController;
+  rejectManualInput: ((err: Error) => void) | null;
 }
 
 const activeLogins = new Map<string, ActiveLogin>();
@@ -537,6 +538,7 @@ app.post("/auth/oauth/:providerId/login", async (c) => {
     sseFlush: null,
     promptResolvers: new Map(),
     abortController: new AbortController(),
+    rejectManualInput: null,
   };
   activeLogins.set(loginId, login);
 
@@ -544,6 +546,13 @@ app.post("/auth/oauth/:providerId/login", async (c) => {
     login.sseQueue.push(event);
     login.sseFlush?.();
   }
+
+  // onManualCodeInput keeps the local OAuth callback server alive until resolved or rejected.
+  // Rejecting it (on abort) triggers server.cancelWait() inside the SDK, which causes the
+  // finally block to run server.close() — freeing port 1455 for the next login attempt.
+  const manualInputPromise = new Promise<string>((_resolve, reject) => {
+    login.rejectManualInput = reject;
+  });
 
   // Run login in background — SSE stream will pick up events
   sharedAuthStorage.login(providerId, {
@@ -561,6 +570,7 @@ app.post("/auth/oauth/:providerId/login", async (c) => {
         login.promptResolvers.set(promptId, resolve);
       });
     },
+    onManualCodeInput: () => manualInputPromise,
   })
     .then(() => {
       emit({ type: "done" });
@@ -635,6 +645,9 @@ app.post("/auth/oauth/:loginId/abort", (c) => {
   const login = activeLogins.get(loginId);
   if (!login) return c.json({ error: "Login session not found" }, 404);
   login.abortController.abort();
+  // Rejecting manualInputPromise triggers server.cancelWait() inside the SDK,
+  // which causes the local HTTP server on port 1455 to close (via finally block).
+  login.rejectManualInput?.(new Error("Login aborted"));
   activeLogins.delete(loginId);
   return c.json({ ok: true });
 });

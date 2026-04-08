@@ -286,18 +286,20 @@ function SubscriptionsCard() {
       setTimeout(() => setLoginState({ status: "idle" }), 2000)
     })
 
-    es.addEventListener("error_event", (e) => {
-      const event = JSON.parse((e as MessageEvent).data) as OAuthSseEvent & { type: "error" }
-      closeEventSource()
-      setLoginState({ status: "error", providerId, message: event.message })
-    })
-
-    es.onerror = () => {
-      closeEventSource()
-      if (loginState.status !== "done") {
-        setLoginState({ status: "error", providerId, message: "Connection lost" })
+    es.addEventListener("error", (e) => {
+      if (e instanceof MessageEvent) {
+        // SSE message with event: error — auth flow error from server
+        const event = JSON.parse(e.data) as OAuthSseEvent & { type: "error" }
+        closeEventSource()
+        setLoginState({ status: "error", providerId, message: event.message })
+      } else {
+        // EventSource connection error
+        closeEventSource()
+        if (loginState.status !== "done") {
+          setLoginState({ status: "error", providerId, message: "Connection lost" })
+        }
       }
-    }
+    })
   }
 
   async function handlePromptSubmit() {

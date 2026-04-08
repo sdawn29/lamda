@@ -1,4 +1,4 @@
-import { apiFetch, apiUrl } from "./client"
+import { apiFetch } from "./client"
 
 const base = (sessionId: string) => `/session/${sessionId}/git`
 
