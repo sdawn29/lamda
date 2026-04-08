@@ -42,26 +42,26 @@ export const TerminalPanel = memo(function TerminalPanel({
       fontSize: 13,
       fontFamily: '"Menlo", "Monaco", "Courier New", monospace',
       theme: {
-        background: "#27272a",
-        foreground: "#e4e4e7",
-        cursor: "#a1a1aa",
-        selectionBackground: "#3f3f46",
-        black: "#18181b",
-        red: "#f87171",
-        green: "#4ade80",
-        yellow: "#facc15",
-        blue: "#60a5fa",
-        magenta: "#c084fc",
-        cyan: "#22d3ee",
-        white: "#e4e4e7",
-        brightBlack: "#71717a",
-        brightRed: "#fca5a5",
-        brightGreen: "#86efac",
-        brightYellow: "#fde047",
-        brightBlue: "#93c5fd",
-        brightMagenta: "#d8b4fe",
-        brightCyan: "#67e8f9",
-        brightWhite: "#fafafa",
+        background: "#101010",
+        foreground: "#c8c8c8",
+        cursor: "#7898b0",
+        selectionBackground: "#7898b028",
+        black: "#171717",
+        red: "#c86858",
+        green: "#7a9a5a",
+        yellow: "#c8a848",
+        blue: "#7898b8",
+        magenta: "#a898c8",
+        cyan: "#7898b0",
+        white: "#c8c8c8",
+        brightBlack: "#686868",
+        brightRed: "#d87868",
+        brightGreen: "#90b070",
+        brightYellow: "#d8b858",
+        brightBlue: "#98b0d0",
+        brightMagenta: "#c0b0d8",
+        brightCyan: "#98b0c8",
+        brightWhite: "#d8d8d8",
       },
     })
 
@@ -161,7 +161,7 @@ export const TerminalPanel = memo(function TerminalPanel({
 
   return (
     <div
-      className="flex shrink-0 flex-col border-t bg-[#27272a]"
+      className="flex shrink-0 flex-col border-t bg-background"
       style={{ height }}
     >
       {/* Drag handle / header */}
