@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createFileRoute } from "@tanstack/react-router"
-import { Sun, Moon, Monitor, Trash2, AlertTriangle } from "lucide-react"
+import { Sun, Moon, Monitor, Trash2, AlertTriangle, Eye, EyeOff, Check, Save } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Card,
   CardHeader,
@@ -23,6 +24,8 @@ import { Separator } from "@/components/ui/separator"
 import { useWorkspace } from "@/hooks/workspace-context"
 import { useTheme } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
+import { useProviders } from "@/queries/use-providers"
+import { useUpdateProviders } from "@/mutations/use-update-providers"
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -34,6 +37,26 @@ const THEMES: { value: Theme; label: string; icon: React.ElementType }[] = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
   { value: "system", label: "System", icon: Monitor },
+]
+
+const PROVIDERS: { id: string; label: string; placeholder: string }[] = [
+  { id: "anthropic", label: "Anthropic", placeholder: "sk-ant-..." },
+  { id: "openai", label: "OpenAI", placeholder: "sk-..." },
+  { id: "google", label: "Google Gemini", placeholder: "AIza..." },
+  { id: "mistral", label: "Mistral", placeholder: "..." },
+  { id: "groq", label: "Groq", placeholder: "gsk_..." },
+  { id: "cerebras", label: "Cerebras", placeholder: "..." },
+  { id: "xai", label: "xAI", placeholder: "xai-..." },
+  { id: "openrouter", label: "OpenRouter", placeholder: "sk-or-..." },
+  { id: "vercel-ai-gateway", label: "Vercel AI Gateway", placeholder: "..." },
+  { id: "huggingface", label: "Hugging Face", placeholder: "hf_..." },
+  { id: "kimi-coding", label: "Kimi For Coding", placeholder: "..." },
+  { id: "minimax", label: "MiniMax", placeholder: "..." },
+  { id: "minimax-cn", label: "MiniMax (China)", placeholder: "..." },
+  { id: "zai", label: "ZAI", placeholder: "..." },
+  { id: "opencode", label: "OpenCode Zen", placeholder: "..." },
+  { id: "opencode-go", label: "OpenCode Go", placeholder: "..." },
+  { id: "azure-openai-responses", label: "Azure OpenAI", placeholder: "..." },
 ]
 
 function SettingsPage() {
@@ -104,6 +127,9 @@ function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Providers */}
+          <ProvidersCard />
 
           {/* Data */}
           <Card>
@@ -187,6 +213,106 @@ function SettingsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function ProvidersCard() {
+  const { data: savedKeys, isLoading } = useProviders()
+  const { mutate: saveProviders, isPending, isSuccess } = useUpdateProviders()
+
+  const [keys, setKeys] = useState<Record<string, string>>({})
+  const [visible, setVisible] = useState<Record<string, boolean>>({})
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (savedKeys) setKeys(savedKeys)
+  }, [savedKeys])
+
+  useEffect(() => {
+    if (isSuccess) {
+      setSaved(true)
+      const t = setTimeout(() => setSaved(false), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [isSuccess])
+
+  function handleSave() {
+    saveProviders(keys)
+  }
+
+  function toggleVisible(id: string) {
+    setVisible((v) => ({ ...v, [id]: !v[id] }))
+  }
+
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle>Providers</CardTitle>
+        <CardDescription>
+          API keys stored in{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            ~/.pi/agent/auth.json
+          </code>
+          . Leave blank to remove a key.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-4">
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">Loading…</p>
+        ) : (
+          <div className="space-y-3">
+            {PROVIDERS.map(({ id, label, placeholder }, i) => (
+              <div key={id}>
+                {i > 0 && <Separator className="mb-3" />}
+                <div className="flex items-center gap-3">
+                  <div className="w-36 shrink-0">
+                    <p className="text-xs font-medium">{label}</p>
+                  </div>
+                  <div className="relative flex-1">
+                    <Input
+                      type={visible[id] ? "text" : "password"}
+                      value={keys[id] ?? ""}
+                      onChange={(e) =>
+                        setKeys((k) => ({ ...k, [id]: e.target.value }))
+                      }
+                      placeholder={placeholder}
+                      className="h-7 pr-8 font-mono text-xs"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleVisible(id)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      tabIndex={-1}
+                    >
+                      {visible[id] ? (
+                        <EyeOff className="h-3.5 w-3.5" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                  {(savedKeys?.[id] ?? "") !== "" && (keys[id] ?? "") === (savedKeys?.[id] ?? "") && (
+                    <Check className="h-3.5 w-3.5 shrink-0 text-green-500" />
+                  )}
+                </div>
+              </div>
+            ))}
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              {saved && (
+                <span className="text-xs text-green-500">Saved</span>
+              )}
+              <Button size="sm" onClick={handleSave} disabled={isPending}>
+                <Save className="mr-1.5 h-3.5 w-3.5" />
+                {isPending ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

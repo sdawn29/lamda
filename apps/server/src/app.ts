@@ -2,6 +2,10 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { streamSSE } from "hono/streaming";
+import { readFile, writeFile, mkdir } from "fs/promises";
+import { existsSync } from "fs";
+import { homedir } from "os";
+import { join, dirname } from "path";
 import { createManagedSession, getAvailableModels, generateThreadTitle, type SdkConfig } from "@lambda/pi-sdk";
 import {
   getCurrentBranch,
@@ -476,6 +480,63 @@ app.post("/session/:id/git/stash-drop", async (c) => {
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
+});
+
+// ── Provider auth endpoints ────────────────────────────────────────────────────
+
+const AUTH_FILE = join(homedir(), ".pi", "agent", "auth.json");
+
+type AuthEntry = { type: string; key?: string; [k: string]: unknown };
+type AuthJson = Record<string, AuthEntry>;
+
+async function readAuthJson(): Promise<AuthJson> {
+  if (!existsSync(AUTH_FILE)) return {};
+  try {
+    const raw = await readFile(AUTH_FILE, "utf-8");
+    return JSON.parse(raw) as AuthJson;
+  } catch {
+    return {};
+  }
+}
+
+async function writeAuthJson(data: AuthJson): Promise<void> {
+  await mkdir(dirname(AUTH_FILE), { recursive: true });
+  await writeFile(AUTH_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
+}
+
+// Returns flat map of providerId -> key string (only api_key entries)
+app.get("/providers", async (c) => {
+  const auth = await readAuthJson();
+  const providers: Record<string, string> = {};
+  for (const [id, entry] of Object.entries(auth)) {
+    if (entry.type === "api_key" && typeof entry.key === "string") {
+      providers[id] = entry.key;
+    }
+  }
+  return c.json({ providers });
+});
+
+// Accepts flat map of providerId -> key string (empty string = remove)
+app.put("/providers", async (c) => {
+  const body = await c.req.json<{ providers?: Record<string, string> }>().catch((): { providers?: Record<string, string> } => ({}));
+  if (!body.providers) return c.json({ error: "providers is required" }, 400);
+
+  const auth = await readAuthJson();
+
+  for (const [id, key] of Object.entries(body.providers)) {
+    if (key.trim() === "") {
+      // Remove api_key entries; keep OAuth and other types untouched
+      if (auth[id]?.type === "api_key") {
+        delete auth[id];
+      }
+    } else {
+      // Preserve non-api_key entries (e.g., OAuth tokens) unless explicitly overwriting
+      auth[id] = { type: "api_key", key: key.trim() };
+    }
+  }
+
+  await writeAuthJson(auth);
+  return c.json({ ok: true });
 });
 
 export default app;
