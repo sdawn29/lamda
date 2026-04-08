@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, memo } from "react"
 
+import { CheckIcon, CopyIcon } from "lucide-react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -24,6 +25,28 @@ import { useSendPrompt } from "@/mutations/use-send-prompt"
 import { ToolCallBlock } from "@/components/tool-call-block"
 import { markdownComponents } from "@/components/markdown-components"
 import type { Message, TextMessage, ToolMessage } from "@/components/chat-types"
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      type="button"
+      aria-label="Copy message"
+      onClick={() => {
+        navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      }}
+      className="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover:opacity-100"
+    >
+      {copied ? (
+        <CheckIcon className="size-3.5 text-green-500" />
+      ) : (
+        <CopyIcon className="size-3.5" />
+      )}
+    </button>
+  )
+}
 
 interface ChatViewProps {
   sessionId: string
@@ -264,22 +287,26 @@ export const ChatView = memo(function ChatView({
             if (msg.role === "tool") {
               return <ToolCallBlock key={key} msg={msg} />
             }
+            if (msg.role === "user") {
+              return (
+                <div key={key} className="group animate-in fade-in-0 slide-in-from-bottom-2 duration-200 flex flex-col items-end gap-1.5 self-end">
+                  <div className="rounded-xl bg-muted px-4 py-2 text-sm">
+                    {msg.content}
+                  </div>
+                  <CopyButton text={msg.content} />
+                </div>
+              )
+            }
             return (
-              <div
-                key={key}
-                className={
-                  msg.role === "user"
-                    ? "animate-in fade-in-0 slide-in-from-bottom-2 duration-200 self-end rounded-xl bg-muted px-4 py-2 text-sm"
-                    : "animate-in fade-in-0 slide-in-from-bottom-1 duration-200 prose prose-sm w-full max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
-                }
-              >
-                {msg.role === "user" ? (
-                  msg.content
-                ) : (
+              <div key={key} className="group animate-in fade-in-0 slide-in-from-bottom-1 duration-200 flex flex-col gap-1.5">
+                <div className="prose prose-sm max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                   <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {msg.content}
                   </Markdown>
-                )}
+                </div>
+                <div>
+                  <CopyButton text={msg.content} />
+                </div>
               </div>
             )
           })}
