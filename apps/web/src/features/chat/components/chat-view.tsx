@@ -353,7 +353,7 @@ export const ChatView = memo(function ChatView({
                   key={key}
                   className="group flex animate-in flex-col items-end gap-1.5 self-end duration-200 fade-in-0 slide-in-from-bottom-2"
                 >
-                  <div className="rounded-xl bg-muted px-4 py-2 text-sm">
+                  <div className="rounded-xl bg-muted px-4 py-2 text-sm" data-selectable>
                     <UserMessageContent content={msg.content} />
                   </div>
                   <CopyButton text={msg.content} />

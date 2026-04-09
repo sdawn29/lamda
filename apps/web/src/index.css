@@ -147,7 +147,20 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    user-select: none;
   }
+
+  /* Re-enable selection where it makes sense */
+  input, textarea, [contenteditable] {
+    user-select: text;
+  }
+
+  /* Chat messages, markdown content, code blocks */
+  .prose, .prose *, pre, code,
+  [data-selectable], [data-selectable] * {
+    user-select: text;
+  }
+
   body {
     @apply bg-background text-foreground;
   }
