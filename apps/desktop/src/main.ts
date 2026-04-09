@@ -135,6 +135,13 @@ async function createWindow() {
 
   win.once("ready-to-show", () => win.show());
 
+  win.on("enter-full-screen", () => {
+    win.webContents.send("fullscreen-changed", true);
+  });
+  win.on("leave-full-screen", () => {
+    win.webContents.send("fullscreen-changed", false);
+  });
+
   if (isDev) {
     await waitForDevServer(DEV_SERVER_URL);
     win.loadURL(DEV_SERVER_URL);
@@ -150,6 +157,11 @@ app.whenReady().then(async () => {
     console.error("Server failed to start:", err);
     // Still open the window — it will show a connection error rather than nothing
   }
+
+  ipcMain.handle("get-fullscreen", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return win?.isFullScreen() ?? false;
+  });
 
   ipcMain.handle("select-folder", async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);

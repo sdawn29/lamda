@@ -16,6 +16,7 @@ function wsUrl(path: string): string {
 
 const MIN_HEIGHT = 120
 const DEFAULT_HEIGHT = 260
+const MIN_CONTENT_HEIGHT = 200
 
 interface TerminalPanelProps {
   cwd: string
@@ -29,6 +30,7 @@ export const TerminalPanel = memo(function TerminalPanel({
   const termRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState(DEFAULT_HEIGHT)
   const dragStartRef = useRef<{ y: number; h: number } | null>(null)
 
@@ -140,15 +142,27 @@ export const TerminalPanel = memo(function TerminalPanel({
     (e: React.MouseEvent) => {
       e.preventDefault()
       dragStartRef.current = { y: e.clientY, h: height }
+      document.body.style.userSelect = "none"
+      document.body.style.cursor = "row-resize"
 
       const onMove = (ev: MouseEvent) => {
         if (!dragStartRef.current) return
         const delta = dragStartRef.current.y - ev.clientY
-        setHeight(Math.max(MIN_HEIGHT, dragStartRef.current.h + delta))
+        const parentHeight =
+          panelRef.current?.parentElement?.clientHeight ?? window.innerHeight
+        const maxHeight = parentHeight - MIN_CONTENT_HEIGHT
+        setHeight(
+          Math.max(
+            MIN_HEIGHT,
+            Math.min(maxHeight, dragStartRef.current.h + delta)
+          )
+        )
       }
 
       const onUp = () => {
         dragStartRef.current = null
+        document.body.style.userSelect = ""
+        document.body.style.cursor = ""
         window.removeEventListener("mousemove", onMove)
         window.removeEventListener("mouseup", onUp)
       }
@@ -161,8 +175,9 @@ export const TerminalPanel = memo(function TerminalPanel({
 
   return (
     <div
+      ref={panelRef}
       className="flex shrink-0 flex-col border-t bg-background"
-      style={{ height }}
+      style={{ height, maxHeight: "80%" }}
     >
       {/* Drag handle / header */}
       <div

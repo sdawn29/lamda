@@ -43,6 +43,19 @@ import { useGitDiffStat } from "@/queries/use-git-diff-stat"
 const isMac =
   typeof window !== "undefined" && window.electronAPI?.platform === "darwin"
 
+function useIsFullscreen() {
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  useEffect(() => {
+    if (!window.electronAPI) return
+    window.electronAPI.getFullscreen().then(setIsFullscreen)
+    const unsub = window.electronAPI.onFullscreenChange(setIsFullscreen)
+    return unsub
+  }, [])
+
+  return isFullscreen
+}
+
 export function TitleBar() {
   const router = useRouter()
   const navigate = useNavigate()
@@ -115,10 +128,21 @@ export function TitleBar() {
   const canGoBack = router.history.canGoBack()
   const canGoForward = useSyncExternalStore(subscribe, getSnapshot, () => false)
 
+  const isFullscreen = useIsFullscreen()
+
   const navRef = useRef<HTMLDivElement>(null)
   const [navWidth, setNavWidth] = useState(0)
   useEffect(() => {
-    if (navRef.current) setNavWidth(navRef.current.offsetWidth)
+    if (!navRef.current) return
+    // Seed with current value immediately
+    setNavWidth(navRef.current.offsetWidth)
+    // Live-track during CSS transitions (borderBoxSize includes padding)
+    const observer = new ResizeObserver((entries) => {
+      const size = entries[0]?.borderBoxSize?.[0]
+      if (size) setNavWidth(size.inlineSize)
+    })
+    observer.observe(navRef.current)
+    return () => observer.disconnect()
   }, [])
 
   return (
@@ -129,7 +153,9 @@ export function TitleBar() {
       {/* Nav controls — absolutely positioned so they never move */}
       <div
         ref={navRef}
-        className={`absolute inset-y-0 left-0 flex items-center gap-1 ${isMac ? "pl-20" : "pl-2"}`}
+        className={`absolute inset-y-0 left-0 flex items-center gap-1 transition-[padding-left] duration-500 ease-in-out ${
+          isMac && !isFullscreen ? "pl-20" : "pl-2"
+        }`}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
         <Tooltip>
@@ -179,10 +205,10 @@ export function TitleBar() {
         }}
       />
 
-      {/* Thread title — left edge follows the sidebar */}
+      {/* Thread title — left edge follows the sidebar (or nav controls in fullscreen) */}
       {activeThread && (
         <div
-          className="group/title flex min-w-0 flex-1 items-center gap-1 px-6"
+          className="group/title flex min-w-0 flex-1 items-center gap-1 pr-6 pl-2"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
           <>

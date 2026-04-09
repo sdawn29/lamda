@@ -46,6 +46,7 @@ import { useGitRevertFile } from "@/mutations/use-git-revert-file"
 
 const MIN_WIDTH = 300
 const DEFAULT_WIDTH = 440
+const MIN_CHAT_WIDTH = 200
 
 // ── Status helpers ──────────────────────────────────────────────────────────
 
@@ -629,6 +630,7 @@ export const DiffPanel = memo(function DiffPanel({
   const [mode, setMode] = useState<DiffMode>("inline")
   const [sortMode, setSortMode] = useState<SortMode>("name")
   const [stashInputOpen, setStashInputOpen] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
   const dragStartRef = useRef<{ x: number; w: number } | null>(null)
 
   const {
@@ -702,15 +704,27 @@ export const DiffPanel = memo(function DiffPanel({
     (e: React.MouseEvent) => {
       e.preventDefault()
       dragStartRef.current = { x: e.clientX, w: width }
+      document.body.style.userSelect = "none"
+      document.body.style.cursor = "col-resize"
 
       const onMove = (ev: MouseEvent) => {
         if (!dragStartRef.current) return
         const delta = dragStartRef.current.x - ev.clientX
-        setWidth(Math.max(MIN_WIDTH, dragStartRef.current.w + delta))
+        const parentWidth =
+          panelRef.current?.parentElement?.clientWidth ?? window.innerWidth
+        const maxWidth = parentWidth - MIN_CHAT_WIDTH
+        setWidth(
+          Math.max(
+            MIN_WIDTH,
+            Math.min(maxWidth, dragStartRef.current.w + delta)
+          )
+        )
       }
 
       const onUp = () => {
         dragStartRef.current = null
+        document.body.style.userSelect = ""
+        document.body.style.cursor = ""
         window.removeEventListener("mousemove", onMove)
         window.removeEventListener("mouseup", onUp)
       }
@@ -728,8 +742,9 @@ export const DiffPanel = memo(function DiffPanel({
 
   return (
     <div
+      ref={panelRef}
       className="relative flex h-full shrink-0 flex-col border-l bg-background"
-      style={{ width }}
+      style={{ width, maxWidth: "80%" }}
     >
       {/* Left-edge drag handle */}
       <div

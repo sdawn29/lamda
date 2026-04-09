@@ -22,7 +22,7 @@ function RootLayoutInner() {
         <TitleBar />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <AppSidebar />
-          <SidebarInset>
+          <SidebarInset className="min-w-0 overflow-hidden">
             <Outlet />
           </SidebarInset>
         </div>
