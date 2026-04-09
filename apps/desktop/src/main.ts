@@ -144,7 +144,12 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  serverPort = await spawnServer();
+  try {
+    serverPort = await spawnServer();
+  } catch (err) {
+    console.error("Server failed to start:", err);
+    // Still open the window — it will show a connection error rather than nothing
+  }
 
   ipcMain.handle("select-folder", async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);

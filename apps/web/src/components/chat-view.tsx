@@ -14,7 +14,7 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog"
-import { apiUrl } from "@/api/client"
+import { getServerUrl } from "@/api/client"
 import { useWorkspace } from "@/hooks/workspace-context"
 import { useMessages } from "@/queries/use-messages"
 import { useBranch } from "@/queries/use-branch"
@@ -86,93 +86,98 @@ export const ChatView = memo(function ChatView({
   // ── SSE event stream ──────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true
-    const es = new EventSource(apiUrl(`/session/${sessionId}/events`))
+    let es: EventSource | null = null
 
-    es.addEventListener("message_start", () => {
+    getServerUrl().then((base) => {
       if (!active) return
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }])
-    })
+      es = new EventSource(`${base}/session/${sessionId}/events`)
 
-    es.addEventListener("message_update", (e: MessageEvent) => {
-      if (!active) return
-      const data = JSON.parse(e.data) as {
-        assistantMessageEvent?: { type: string; delta: string }
-      }
-      if (data.assistantMessageEvent?.type === "text_delta") {
-        const delta = data.assistantMessageEvent.delta
-        setMessages((prev) => {
-          const next = [...prev]
-          const last = next[next.length - 1]
-          if (last?.role === "assistant") {
-            next[next.length - 1] = { ...last, content: last.content + delta }
-          }
-          return next
-        })
-      }
-    })
+      es.addEventListener("message_start", () => {
+        if (!active) return
+        setMessages((prev) => [...prev, { role: "assistant", content: "" }])
+      })
 
-    es.addEventListener("tool_execution_start", (e: MessageEvent) => {
-      if (!active) return
-      const data = JSON.parse(e.data) as {
-        toolCallId: string
-        toolName: string
-        args: unknown
-      }
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "tool",
-          toolCallId: data.toolCallId,
-          toolName: data.toolName,
-          args: data.args,
-          status: "running",
-        } satisfies ToolMessage,
-      ])
-    })
+      es.addEventListener("message_update", (e: MessageEvent) => {
+        if (!active) return
+        const data = JSON.parse(e.data) as {
+          assistantMessageEvent?: { type: string; delta: string }
+        }
+        if (data.assistantMessageEvent?.type === "text_delta") {
+          const delta = data.assistantMessageEvent.delta
+          setMessages((prev) => {
+            const next = [...prev]
+            const last = next[next.length - 1]
+            if (last?.role === "assistant") {
+              next[next.length - 1] = { ...last, content: last.content + delta }
+            }
+            return next
+          })
+        }
+      })
 
-    es.addEventListener("tool_execution_update", (e: MessageEvent) => {
-      if (!active) return
-      const data = JSON.parse(e.data) as {
-        toolCallId: string
-        partialResult: unknown
-      }
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.role === "tool" && msg.toolCallId === data.toolCallId
-            ? { ...msg, result: data.partialResult }
-            : msg
+      es.addEventListener("tool_execution_start", (e: MessageEvent) => {
+        if (!active) return
+        const data = JSON.parse(e.data) as {
+          toolCallId: string
+          toolName: string
+          args: unknown
+        }
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "tool",
+            toolCallId: data.toolCallId,
+            toolName: data.toolName,
+            args: data.args,
+            status: "running",
+          } satisfies ToolMessage,
+        ])
+      })
+
+      es.addEventListener("tool_execution_update", (e: MessageEvent) => {
+        if (!active) return
+        const data = JSON.parse(e.data) as {
+          toolCallId: string
+          partialResult: unknown
+        }
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.role === "tool" && msg.toolCallId === data.toolCallId
+              ? { ...msg, result: data.partialResult }
+              : msg
+          )
         )
-      )
-    })
+      })
 
-    es.addEventListener("tool_execution_end", (e: MessageEvent) => {
-      if (!active) return
-      const data = JSON.parse(e.data) as {
-        toolCallId: string
-        result: unknown
-        isError: boolean
-      }
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.role === "tool" && msg.toolCallId === data.toolCallId
-            ? {
-                ...msg,
-                status: data.isError ? "error" : "done",
-                result: data.result,
-              }
-            : msg
+      es.addEventListener("tool_execution_end", (e: MessageEvent) => {
+        if (!active) return
+        const data = JSON.parse(e.data) as {
+          toolCallId: string
+          result: unknown
+          isError: boolean
+        }
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.role === "tool" && msg.toolCallId === data.toolCallId
+              ? {
+                  ...msg,
+                  status: data.isError ? "error" : "done",
+                  result: data.result,
+                }
+              : msg
+          )
         )
-      )
-    })
+      })
 
-    es.addEventListener("agent_end", () => {
-      if (!active) return
-      setIsLoading(false)
+      es.addEventListener("agent_end", () => {
+        if (!active) return
+        setIsLoading(false)
+      })
     })
 
     return () => {
       active = false
-      es.close()
+      es?.close()
     }
   }, [sessionId])
 

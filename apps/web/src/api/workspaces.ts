@@ -1,4 +1,4 @@
-import { apiFetch, apiUrl } from "./client"
+import { apiFetch, getServerUrl } from "./client"
 
 export interface ThreadDto {
   id: string
@@ -26,7 +26,8 @@ export async function createWorkspace(body: {
   provider?: string
   model?: string
 }): Promise<{ workspace: WorkspaceDto; existing?: true }> {
-  const res = await fetch(apiUrl("/workspace"), {
+  const base = await getServerUrl()
+  const res = await fetch(`${base}/workspace`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

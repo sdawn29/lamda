@@ -272,7 +272,7 @@ function SubscriptionsCard() {
       return
     }
 
-    const es = openOAuthEventSource(loginId)
+    const es = await openOAuthEventSource(loginId)
     esRef.current = es
 
     es.addEventListener("auth_url", (e) => {

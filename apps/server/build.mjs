@@ -17,7 +17,7 @@ await build({
   format: "cjs",
   outfile: "dist/server.cjs",
   // Cannot bundle native .node addons — externalize and copy alongside bundle
-  external: ["@silvia-odwyer/photon-node", "better-sqlite3"],
+  external: ["@silvia-odwyer/photon-node", "better-sqlite3", "node-pty"],
   minify: false,
   sourcemap: true,
 });
@@ -32,5 +32,9 @@ cpSync(addonSrc, addonDest, { recursive: true });
 const bsq3Src = resolvePackageDir("better-sqlite3");
 const bsq3Dest = resolve("dist/node_modules/better-sqlite3");
 cpSync(bsq3Src, bsq3Dest, { recursive: true });
+
+const nodePtySrc = resolvePackageDir("node-pty");
+const nodePtyDest = resolve("dist/node_modules/node-pty");
+cpSync(nodePtySrc, nodePtyDest, { recursive: true });
 
 console.log("Build complete → dist/server.cjs");

@@ -1,4 +1,4 @@
-import { apiFetch, apiUrl } from "./client"
+import { apiFetch, getServerUrl } from "./client"
 
 export interface OAuthProvider {
   id: string
@@ -25,8 +25,9 @@ export async function startOAuthLogin(providerId: string): Promise<string> {
   return res.loginId
 }
 
-export function openOAuthEventSource(loginId: string): EventSource {
-  return new EventSource(apiUrl(`/auth/oauth/${loginId}/events`))
+export async function openOAuthEventSource(loginId: string): Promise<EventSource> {
+  const base = await getServerUrl()
+  return new EventSource(`${base}/auth/oauth/${loginId}/events`)
 }
 
 export async function respondToOAuthPrompt(
