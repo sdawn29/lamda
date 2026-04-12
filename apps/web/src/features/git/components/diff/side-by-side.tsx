@@ -51,7 +51,7 @@ function SideBySideCell({
   themeStyle: ThemeStyle
 }) {
   if (!entry) {
-    return <div className="flex min-w-0 flex-1 leading-5" />
+    return <div className="h-5 min-w-full" />
   }
 
   const { line, diffIndex } = entry
@@ -63,7 +63,7 @@ function SideBySideCell({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-1 leading-5",
+        "flex w-max min-w-full leading-5",
         isAdded && "bg-green-500/8",
         isRemoved && "bg-red-500/8"
       )}
@@ -73,14 +73,15 @@ function SideBySideCell({
           "w-8 shrink-0 border-r pr-2 text-right text-xs select-none",
           isAdded && "border-green-500/20 text-green-400/50",
           isRemoved && "border-red-500/20 text-red-400/50",
-          (line.kind === "context" || isSkipped) && "border-border/40 text-muted-foreground/40"
+          (line.kind === "context" || isSkipped) &&
+            "border-border/40 text-muted-foreground/40"
         )}
       >
         {isSkipped ? "" : line.lineNum}
       </span>
       <span
         className={cn(
-          "flex-1 truncate pl-2 whitespace-pre",
+          "pl-2 whitespace-pre",
           isSkipped && "text-muted-foreground/40 italic"
         )}
       >
@@ -90,19 +91,50 @@ function SideBySideCell({
   )
 }
 
-export function SideBySideRowView({
-  row,
+function SideBySideColumn({
+  entries,
   map,
   themeStyle,
 }: {
-  row: SideBySideRow
+  entries: Array<{ line: DiffLine; diffIndex: number } | null>
   map: HighlightMap
   themeStyle: ThemeStyle
 }) {
   return (
-    <div className="flex divide-x divide-border/30 leading-5">
-      <SideBySideCell entry={row.left} map={map} themeStyle={themeStyle} />
-      <SideBySideCell entry={row.right} map={map} themeStyle={themeStyle} />
+    <div className="min-w-0 overflow-x-auto">
+      {entries.map((entry, index) => (
+        <SideBySideCell
+          key={index}
+          entry={entry}
+          map={map}
+          themeStyle={themeStyle}
+        />
+      ))}
+    </div>
+  )
+}
+
+export function SideBySideView({
+  rows,
+  map,
+  themeStyle,
+}: {
+  rows: SideBySideRow[]
+  map: HighlightMap
+  themeStyle: ThemeStyle
+}) {
+  return (
+    <div className="grid min-w-0 grid-cols-2 divide-x divide-border/30">
+      <SideBySideColumn
+        entries={rows.map((row) => row.left)}
+        map={map}
+        themeStyle={themeStyle}
+      />
+      <SideBySideColumn
+        entries={rows.map((row) => row.right)}
+        map={map}
+        themeStyle={themeStyle}
+      />
     </div>
   )
 }

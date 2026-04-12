@@ -6,7 +6,7 @@ import type { DiffMode, ThemeStyle } from "./types"
 import { buildHighlightMap, detectLanguage } from "./highlight"
 import { parseDiff } from "./parser"
 import { DiffRow } from "./diff-row"
-import { buildSideBySideRows, SideBySideRowView } from "./side-by-side"
+import { buildSideBySideRows, SideBySideView } from "./side-by-side"
 
 export type { DiffMode }
 export { detectLanguage }
@@ -18,18 +18,30 @@ interface DiffViewProps {
   mode?: DiffMode
 }
 
-export function DiffView({ diff, filePath, className, mode = "inline" }: DiffViewProps) {
+export function DiffView({
+  diff,
+  filePath,
+  className,
+  mode = "inline",
+}: DiffViewProps) {
   const { theme } = useTheme()
   const isDark =
     theme === "dark" ||
-    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches)
   const themeStyle = (isDark ? jellybeansdark : jellybeanslight) as ThemeStyle
 
   const lines = useMemo(() => parseDiff(diff), [diff])
 
-  const language = useMemo(() => (filePath ? detectLanguage(filePath) : null), [filePath])
+  const language = useMemo(
+    () => (filePath ? detectLanguage(filePath) : null),
+    [filePath]
+  )
 
-  const highlightMap = useMemo(() => buildHighlightMap(lines, language), [lines, language])
+  const highlightMap = useMemo(
+    () => buildHighlightMap(lines, language),
+    [lines, language]
+  )
 
   const sideBySideRows = useMemo(() => {
     if (mode !== "side-by-side") return null
@@ -46,21 +58,42 @@ export function DiffView({ diff, filePath, className, mode = "inline" }: DiffVie
         className
       )}
     >
-      <div className="max-h-80 overflow-auto">
+      <div
+        className={cn(
+          "max-h-80",
+          mode === "side-by-side"
+            ? "overflow-x-hidden overflow-y-auto"
+            : "overflow-auto"
+        )}
+      >
         {mode === "inline"
           ? lines.map((line, i) => (
-              <DiffRow key={i} line={line} diffIndex={i} map={highlightMap} themeStyle={themeStyle} />
+              <DiffRow
+                key={i}
+                line={line}
+                diffIndex={i}
+                map={highlightMap}
+                themeStyle={themeStyle}
+              />
             ))
-          : sideBySideRows?.map((row, i) => (
-              <SideBySideRowView key={i} row={row} map={highlightMap} themeStyle={themeStyle} />
-            ))}
+          : sideBySideRows && (
+              <SideBySideView
+                rows={sideBySideRows}
+                map={highlightMap}
+                themeStyle={themeStyle}
+              />
+            )}
       </div>
 
       {(added > 0 || removed > 0) && (
         <div className="flex items-center gap-3 border-t border-border/60 bg-muted/20 px-3 py-1.5 font-sans text-xs text-muted-foreground">
-          {removed > 0 && <span className="text-red-500">−{removed} removed</span>}
+          {removed > 0 && (
+            <span className="text-red-500">−{removed} removed</span>
+          )}
           {added > 0 && (
-            <span className="text-green-600 dark:text-green-400">+{added} added</span>
+            <span className="text-green-600 dark:text-green-400">
+              +{added} added
+            </span>
           )}
         </div>
       )}

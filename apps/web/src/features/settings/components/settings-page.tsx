@@ -720,7 +720,7 @@ function ApiKeysCard() {
 
   function handleSave(id: string, key: string) {
     saveProviders(
-      { ...(savedKeys ?? {}), [id]: key },
+      { ...savedKeys, [id]: key },
       { onSuccess: () => setOpenFor(null) }
     )
   }
