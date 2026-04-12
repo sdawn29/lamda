@@ -30,6 +30,101 @@ import { UserMessageContent } from "./user-message"
 import { ThinkingIndicator } from "./thinking-indicator"
 import type { Message, TextMessage, ToolMessage } from "../types"
 
+type AgentEndMessage =
+  | {
+      role: "assistant"
+      stopReason?: "stop" | "length" | "toolUse" | "error" | "aborted"
+      errorMessage?: string
+    }
+  | {
+      role: "toolResult"
+      toolCallId: string
+      toolName: string
+      content: {
+        type: string
+        text?: string
+        data?: string
+        mimeType?: string
+      }[]
+      details?: unknown
+      isError: boolean
+    }
+  | {
+      role: string
+      [key: string]: unknown
+    }
+
+function upsertToolMessage(
+  prev: Message[],
+  toolCallId: string,
+  updater: (existing?: ToolMessage) => ToolMessage
+): Message[] {
+  const index = prev.findIndex(
+    (msg) => msg.role === "tool" && msg.toolCallId === toolCallId
+  )
+
+  if (index === -1) return [...prev, updater()]
+
+  const next = [...prev]
+  next[index] = updater(prev[index] as ToolMessage)
+  return next
+}
+
+function finalizeRunningTools(
+  prev: Message[],
+  runMessages: AgentEndMessage[]
+): Message[] {
+  const toolResults = new Map(
+    runMessages
+      .filter(
+        (
+          message
+        ): message is Extract<AgentEndMessage, { role: "toolResult" }> =>
+          message.role === "toolResult"
+      )
+      .map((message) => [message.toolCallId, message] as const)
+  )
+
+  const assistantFailure = [...runMessages]
+    .reverse()
+    .find(
+      (message): message is Extract<AgentEndMessage, { role: "assistant" }> =>
+        message.role === "assistant" &&
+        (message.stopReason === "aborted" || message.stopReason === "error")
+    )
+
+  const fallbackError = assistantFailure?.errorMessage
+    ? assistantFailure.errorMessage
+    : assistantFailure?.stopReason === "aborted"
+      ? "Operation aborted"
+      : "Tool execution ended without a final result."
+
+  return prev.map((msg) => {
+    if (msg.role !== "tool" || msg.status !== "running") return msg
+
+    const toolResult = toolResults.get(msg.toolCallId)
+    if (toolResult) {
+      return {
+        ...msg,
+        toolName: toolResult.toolName || msg.toolName,
+        status: toolResult.isError ? "error" : "done",
+        result: {
+          content: toolResult.content,
+          details: toolResult.details,
+        },
+      }
+    }
+
+    return {
+      ...msg,
+      status: "error",
+      result: msg.result ?? {
+        content: [{ type: "text", text: fallbackError }],
+      },
+    }
+  })
+}
+
 interface ChatViewProps {
   sessionId: string
   workspaceName: string
@@ -122,30 +217,35 @@ export const ChatView = memo(function ChatView({
           toolName: string
           args: unknown
         }
-        setMessages((prev) => [
-          ...prev,
-          {
+        setMessages((prev) =>
+          upsertToolMessage(prev, data.toolCallId, (existing) => ({
             role: "tool",
             toolCallId: data.toolCallId,
             toolName: data.toolName,
             args: data.args,
             status: "running",
-          } satisfies ToolMessage,
-        ])
+            result: existing?.result,
+          }))
+        )
       })
 
       es.addEventListener("tool_execution_update", (e: MessageEvent) => {
         if (!active) return
         const data = JSON.parse(e.data) as {
           toolCallId: string
+          toolName: string
+          args: unknown
           partialResult: unknown
         }
         setMessages((prev) =>
-          prev.map((msg) =>
-            msg.role === "tool" && msg.toolCallId === data.toolCallId
-              ? { ...msg, result: data.partialResult }
-              : msg
-          )
+          upsertToolMessage(prev, data.toolCallId, (existing) => ({
+            role: "tool",
+            toolCallId: data.toolCallId,
+            toolName: data.toolName || existing?.toolName || "tool",
+            args: data.args ?? existing?.args ?? {},
+            status: "running",
+            result: data.partialResult,
+          }))
         )
       })
 
@@ -153,24 +253,26 @@ export const ChatView = memo(function ChatView({
         if (!active) return
         const data = JSON.parse(e.data) as {
           toolCallId: string
+          toolName: string
           result: unknown
           isError: boolean
         }
         setMessages((prev) =>
-          prev.map((msg) =>
-            msg.role === "tool" && msg.toolCallId === data.toolCallId
-              ? {
-                  ...msg,
-                  status: data.isError ? "error" : "done",
-                  result: data.result,
-                }
-              : msg
-          )
+          upsertToolMessage(prev, data.toolCallId, (existing) => ({
+            role: "tool",
+            toolCallId: data.toolCallId,
+            toolName: data.toolName || existing?.toolName || "tool",
+            args: existing?.args ?? {},
+            status: data.isError ? "error" : "done",
+            result: data.result,
+          }))
         )
       })
 
-      es.addEventListener("agent_end", () => {
+      es.addEventListener("agent_end", (e: MessageEvent) => {
         if (!active) return
+        const data = JSON.parse(e.data) as { messages?: AgentEndMessage[] }
+        setMessages((prev) => finalizeRunningTools(prev, data.messages ?? []))
         setIsLoading(false)
       })
     })

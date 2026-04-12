@@ -1,6 +1,8 @@
 import * as React from "react"
 import { getFileTypeColor } from "@/shared/lib/file-type-color"
 
+const ZERO_WIDTH_SPACE_RE = /\u200B/g
+
 export interface RichInputHandle {
   getValue: () => string
   setValue: (text: string) => void
@@ -12,6 +14,33 @@ export interface AtMention {
   filter: string
   textNode: Text
   startOffset: number
+}
+
+function readRichInputValue(root: Node): string {
+  let text = ""
+  const walk = (nodes: NodeListOf<ChildNode>) => {
+    for (const node of nodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent ?? ""
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement
+        if (el.tagName === "BR") {
+          text += "\n"
+        } else if (el.dataset.filePath) {
+          text += `@${el.dataset.filePath}`
+        } else {
+          walk(el.childNodes)
+        }
+      }
+    }
+  }
+
+  walk(root.childNodes)
+  return text.replace(ZERO_WIDTH_SPACE_RE, "")
+}
+
+function isRichInputEmpty(root: Node): boolean {
+  return readRichInputValue(root).trim().length === 0
 }
 
 function hasFileExtension(p: string): boolean {
@@ -94,48 +123,65 @@ export const RichInput = React.forwardRef<
 ) {
   const divRef = React.useRef<HTMLDivElement>(null)
 
-  React.useImperativeHandle(ref, () => ({
-    getValue() {
-      if (!divRef.current) return ""
-      let text = ""
-      const walk = (nodes: NodeListOf<ChildNode>) => {
-        for (const node of nodes) {
-          if (node.nodeType === Node.TEXT_NODE) {
-            text += node.textContent ?? ""
-          } else if (node.nodeType === Node.ELEMENT_NODE) {
-            const el = node as HTMLElement
-            if (el.tagName === "BR") {
-              text += "\n"
-            } else if (el.dataset.filePath) {
-              text += `@${el.dataset.filePath}`
-            } else {
-              walk(el.childNodes)
-            }
-          }
+  const syncEmptyState = React.useCallback(() => {
+    const div = divRef.current
+    if (!div) return
+    div.dataset.empty = String(isRichInputEmpty(div))
+  }, [])
+
+  React.useEffect(() => {
+    const div = divRef.current
+    if (!div) return
+
+    syncEmptyState()
+
+    const observer = new MutationObserver(() => {
+      syncEmptyState()
+    })
+
+    observer.observe(div, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    })
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [syncEmptyState])
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      getValue() {
+        if (!divRef.current) return ""
+        return readRichInputValue(divRef.current)
+      },
+      setValue(text: string) {
+        if (divRef.current) {
+          divRef.current.textContent = text
+          syncEmptyState()
+          onInput?.()
+          divRef.current.focus()
+          const range = document.createRange()
+          range.selectNodeContents(divRef.current)
+          range.collapse(false)
+          window.getSelection()?.removeAllRanges()
+          window.getSelection()?.addRange(range)
         }
-      }
-      walk(divRef.current.childNodes)
-      return text
-    },
-    setValue(text: string) {
-      if (divRef.current) {
-        divRef.current.textContent = text
-        onInput?.()
-        divRef.current.focus()
-        const range = document.createRange()
-        range.selectNodeContents(divRef.current)
-        range.collapse(false)
-        window.getSelection()?.removeAllRanges()
-        window.getSelection()?.addRange(range)
-      }
-    },
-    clear() {
-      if (divRef.current) divRef.current.innerHTML = ""
-    },
-    focus() {
-      divRef.current?.focus()
-    },
-  }))
+      },
+      clear() {
+        if (divRef.current) {
+          divRef.current.innerHTML = ""
+          syncEmptyState()
+        }
+      },
+      focus() {
+        divRef.current?.focus()
+      },
+    }),
+    [onInput, syncEmptyState]
+  )
 
   function detectAtMention() {
     const div = divRef.current
@@ -248,6 +294,7 @@ export const RichInput = React.forwardRef<
 
   function handleInput() {
     detectAtMention()
+    syncEmptyState()
     onInput()
   }
 
@@ -285,12 +332,13 @@ export const RichInput = React.forwardRef<
       role="textbox"
       aria-multiline="true"
       aria-label={placeholder}
+      data-empty="true"
       data-placeholder={placeholder}
       suppressContentEditableWarning
       onKeyDown={handleKeyDown}
       onInput={handleInput}
       onPaste={handlePaste}
-      className="rich-input min-h-20 max-h-48 overflow-y-auto w-full cursor-text bg-transparent text-sm leading-relaxed outline-none"
+      className="rich-input max-h-48 min-h-20 w-full cursor-text overflow-y-auto bg-transparent text-sm leading-relaxed outline-none"
     />
   )
 })

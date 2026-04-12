@@ -1,8 +1,14 @@
 import { lazy, memo, Suspense, useMemo, useState } from "react"
 import {
+  BookOpenTextIcon,
   ChevronDownIcon,
   FileEditIcon,
+  FilePlusIcon,
+  FolderSearchIcon,
+  ListTreeIcon,
   Loader2Icon,
+  SearchIcon,
+  TerminalSquareIcon,
   WrenchIcon,
   XIcon,
 } from "lucide-react"
@@ -15,6 +21,42 @@ import { useTheme } from "@/shared/components/theme-provider"
 import type { ToolMessage } from "../types"
 
 const PrismCode = lazy(() => import("./prism-code"))
+
+function ToolGlyph({ toolName }: { toolName: string }) {
+  switch (toolName.toLowerCase()) {
+    case "bash":
+      return (
+        <TerminalSquareIcon className="h-3.5 w-3.5 text-muted-foreground" />
+      )
+    case "edit":
+      return <FileEditIcon className="h-3.5 w-3.5 text-muted-foreground" />
+    case "find":
+      return <FolderSearchIcon className="h-3.5 w-3.5 text-muted-foreground" />
+    case "grep":
+      return <SearchIcon className="h-3.5 w-3.5 text-muted-foreground" />
+    case "ls":
+      return <ListTreeIcon className="h-3.5 w-3.5 text-muted-foreground" />
+    case "read":
+      return <BookOpenTextIcon className="h-3.5 w-3.5 text-muted-foreground" />
+    case "write":
+      return <FilePlusIcon className="h-3.5 w-3.5 text-muted-foreground" />
+    default:
+      return <WrenchIcon className="h-3.5 w-3.5 text-muted-foreground" />
+  }
+}
+
+function getStatusLabel(status: ToolMessage["status"]): string {
+  switch (status) {
+    case "done":
+      return "Done"
+    case "error":
+      return "Failed"
+    default:
+      return "Running"
+  }
+}
+
+
 
 // ── Edit tool detection ────────────────────────────────────────────────────────
 
@@ -127,13 +169,17 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 }: {
   msg: ToolMessage
 }) {
-  const isEdit = msg.toolName === "edit" && isEditArgs(msg.args)
+  const normalizedToolName = msg.toolName.toLowerCase()
+  const isEdit = normalizedToolName === "edit" && isEditArgs(msg.args)
   const diff = isEdit ? getEditDiff(msg.result) : null
-  const isRead = isReadTool(msg.toolName, msg.args)
+  const isRead = isReadTool(normalizedToolName, msg.args)
   const readFilePath = isRead ? getReadFilePath(msg.args) : null
 
   // Edit blocks with a diff start expanded; others start collapsed (unless error)
-  const defaultExpanded = (isEdit && diff !== null) || msg.status === "error"
+  const defaultExpanded =
+    msg.status === "running" ||
+    (isEdit && diff !== null) ||
+    msg.status === "error"
   const [userToggled, setUserToggled] = useState(false)
   const [manualExpanded, setManualExpanded] = useState(false)
   const expanded = userToggled ? manualExpanded : defaultExpanded
@@ -145,11 +191,15 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
   const resultText = useMemo(() => getResultText(msg), [msg])
   const summary = argsSummary(msg.args)
+  const statusLabel = getStatusLabel(msg.status)
 
   return (
     <div
       className={cn(
         "w-full max-w-2xl animate-in self-start rounded-lg border text-xs duration-150 fade-in-0 slide-in-from-bottom-1",
+        msg.status === "running"
+          ? "border-amber-500/30 bg-amber-500/5"
+          : undefined,
         msg.status === "error"
           ? "border-destructive/50 bg-destructive/5"
           : "border-border bg-muted/20"
@@ -160,20 +210,28 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/30"
         onClick={toggle}
       >
-        {msg.status === "running" && (
-          <Loader2Icon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
-        )}
-        {msg.status === "error" && (
-          <XIcon className="h-3.5 w-3.5 shrink-0 text-destructive" />
-        )}
-        {isEdit ? (
-          <FileEditIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
-        ) : (
-          <WrenchIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
-        )}
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background/70">
+          <ToolGlyph toolName={msg.toolName} />
+        </span>
         <span className="font-medium text-foreground">{msg.toolName}</span>
         {summary && (
-          <span className="truncate text-muted-foreground">{summary}</span>
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            {summary}
+          </span>
+        )}
+        {msg.status !== "done" && (
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 font-medium",
+              getStatusClasses(msg.status)
+            )}
+          >
+            {msg.status === "running" && (
+              <Loader2Icon className="h-3 w-3 animate-spin" />
+            )}
+            {msg.status === "error" && <XIcon className="h-3 w-3" />}
+            {statusLabel}
+          </span>
         )}
         <ChevronDownIcon
           className={cn(
@@ -218,6 +276,13 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             />
           )}
 
+          {isRead && !resultText && msg.status === "running" && (
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Loader2Icon className="size-3 animate-spin" />
+              Reading…
+            </div>
+          )}
+
           {/* Non-edit, non-read tools or error fallback */}
           {!isEdit &&
             !isRead &&
@@ -229,6 +294,13 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             ) : (
               <LivePre text={resultText} live={msg.status === "running"} />
             ))}
+
+          {!isEdit && !isRead && !resultText && msg.status === "running" && (
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Loader2Icon className="size-3 animate-spin" />
+              Waiting for tool output…
+            </div>
+          )}
 
           {/* Edit / read error */}
           {(isEdit || isRead) && msg.status === "error" && resultText && (

@@ -200,9 +200,10 @@
   }
 
   /* Placeholder for contenteditable rich input */
-  .rich-input:empty::before {
+  .rich-input[data-empty="true"]::before {
     content: attr(data-placeholder);
     color: var(--muted-foreground);
+    display: block;
     pointer-events: none;
   }
 }
