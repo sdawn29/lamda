@@ -58,12 +58,10 @@ function getStatusLabel(status: ToolMessage["status"]): string {
 
 function getStatusClasses(status: ToolMessage["status"]): string {
   switch (status) {
-    case "done":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
     case "error":
-      return "border-destructive/30 bg-destructive/10 text-destructive"
+      return "text-destructive"
     default:
-      return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+      return "text-muted-foreground"
   }
 }
 
@@ -205,24 +203,21 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   return (
     <div
       className={cn(
-        "w-full max-w-2xl animate-in self-start rounded-lg border text-xs duration-150 fade-in-0 slide-in-from-bottom-1",
-        msg.status === "running"
-          ? "border-amber-500/30 bg-amber-500/5"
-          : undefined,
-        msg.status === "error"
-          ? "border-destructive/50 bg-destructive/5"
-          : "border-border bg-muted/20"
+        "w-full max-w-2xl animate-in self-start text-xs duration-150 fade-in-0 slide-in-from-bottom-1",
+        msg.status === "error" && "text-destructive"
       )}
     >
       {/* Header */}
       <button
-        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/30"
+        className="flex w-full items-center gap-1.5 py-0.5 text-left transition-colors hover:text-foreground"
         onClick={toggle}
       >
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background/70">
+        <span className="flex size-4 shrink-0 items-center justify-center">
           <ToolGlyph toolName={msg.toolName} />
         </span>
-        <span className="font-medium text-foreground">{msg.toolName}</span>
+        <span className="shrink-0 font-medium text-foreground">
+          {msg.toolName}
+        </span>
         {summary && (
           <span className="min-w-0 flex-1 truncate text-muted-foreground">
             {summary}
@@ -231,7 +226,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         {msg.status !== "done" && (
           <span
             className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 font-medium",
+              "inline-flex shrink-0 items-center gap-1 font-medium",
               getStatusClasses(msg.status)
             )}
           >
@@ -244,7 +239,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         )}
         <ChevronDownIcon
           className={cn(
-            "ml-auto h-3 w-3 shrink-0 text-muted-foreground transition-transform",
+            "h-3 w-3 shrink-0 text-muted-foreground transition-transform",
             expanded && "rotate-180"
           )}
         />
@@ -252,14 +247,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
       {/* Body */}
       {expanded && (
-        <div className="animate-in px-3 pb-3 duration-150 fade-in-0 slide-in-from-top-1">
-          <div
-            className={cn(
-              "mb-2 border-t",
-              msg.status === "error" ? "border-destructive/30" : "border-border"
-            )}
-          />
-
+        <div className="mt-1 ml-5 animate-in duration-150 fade-in-0 slide-in-from-top-1">
           {/* Edit: show pre-computed diff from SDK */}
           {isEdit && diff !== null && (
             <DiffView
