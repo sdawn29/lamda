@@ -2,6 +2,11 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
+import {
+  getOpenWithAppIcon,
+  listOpenWithApps,
+  openWorkspaceWithApp,
+} from "./open-with.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -189,6 +194,38 @@ app.whenReady().then(async () => {
   ipcMain.handle("open-path", (_event, filePath: string) => {
     shell.showItemInFolder(filePath);
   });
+
+  ipcMain.handle("list-open-with-apps", async () => {
+    return listOpenWithApps();
+  });
+
+  ipcMain.handle("get-open-with-app-icon", async (_event, appId: string) => {
+    if (!appId) {
+      return null;
+    }
+
+    return getOpenWithAppIcon(appId);
+  });
+
+  ipcMain.handle(
+    "open-workspace-with-app",
+    async (
+      _event,
+      payload: { workspacePath?: string; appId?: string } | undefined,
+    ) => {
+      const workspacePath = payload?.workspacePath?.trim();
+      if (!workspacePath) {
+        throw new Error("A workspace path is required.");
+      }
+
+      if (process.platform !== "darwin") {
+        await shell.openPath(workspacePath);
+        return;
+      }
+
+      await openWorkspaceWithApp(workspacePath, payload?.appId);
+    },
+  );
 
   ipcMain.handle("open-external", (_event, url: string) => {
     shell.openExternal(url);

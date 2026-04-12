@@ -35,6 +35,7 @@ import { useTerminal } from "@/features/terminal"
 import { useDiffPanel } from "@/features/git"
 import { CommitDialog } from "@/features/git"
 import { useGitDiffStat } from "@/features/git/queries"
+import { OpenWithButton } from "./open-with-button"
 
 const isMac =
   typeof window !== "undefined" && window.electronAPI?.platform === "darwin"
@@ -268,6 +269,7 @@ export function TitleBar() {
         className="absolute inset-y-0 right-0 flex items-center gap-1 pr-3"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
+        <OpenWithButton workspacePath={activeWorkspace?.path} />
         {!isSettings && (
           <CommitDialog sessionId={activeThread?.sessionId ?? undefined} />
         )}
