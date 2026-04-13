@@ -1,11 +1,16 @@
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react"
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+  type ReactNode,
+} from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { SparklesIcon, StopCircleIcon } from "lucide-react"
 
-import Markdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-
 import { ChatTextbox, type ChatTextboxHandle } from "./chat-textbox"
+import { MessageRow, estimateMessageSize, getMessageKey } from "./message-row"
 import { openSessionEventSource } from "../api"
 import {
   AlertDialog,
@@ -27,22 +32,54 @@ import {
   subscribeToSessionEvents,
   type AgentEndMessage,
 } from "../session-events"
-import { ToolCallBlock } from "./tool-call-block"
-import { markdownComponents } from "./markdown-components"
-import { CopyButton } from "@/shared/components/copy-button"
-import { UserMessageContent } from "./user-message"
 import { ThinkingIndicator } from "./thinking-indicator"
-import { ThinkingBlock } from "./thinking-block"
 import { useShowThinkingSetting } from "@/shared/lib/thinking-visibility"
 import {
   createAssistantMessage,
-  type AssistantMessage,
   type Message,
   type ToolMessage,
 } from "../types"
 
 // Persists scroll positions across thread switches (survives remounts, cleared on page reload)
 const threadScrollPositions = new Map<string, number>()
+const VIRTUAL_OVERSCAN_PX = 600
+
+function MeasuredMessageRow({
+  messageKey,
+  onHeightChange,
+  children,
+}: {
+  messageKey: string
+  onHeightChange: (messageKey: string, height: number) => void
+  children: ReactNode
+}) {
+  const rowRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const row = rowRef.current
+    if (!row) return
+
+    const measure = () => {
+      onHeightChange(messageKey, Math.ceil(row.getBoundingClientRect().height))
+    }
+
+    measure()
+
+    const observer = new ResizeObserver(() => {
+      measure()
+    })
+
+    observer.observe(row)
+
+    return () => observer.disconnect()
+  }, [messageKey, onHeightChange])
+
+  return (
+    <div ref={rowRef} className="pb-3">
+      {children}
+    </div>
+  )
+}
 
 function upsertToolMessage(
   prev: Message[],
@@ -122,58 +159,6 @@ function resolveMessages(
   return prev ?? initialMessages
 }
 
-function assistantCopyText(
-  message: AssistantMessage,
-  includeThinking: boolean
-): string {
-  const sections: string[] = []
-
-  if (includeThinking && message.thinking.trim()) {
-    sections.push(
-      message.content.trim()
-        ? `Thinking\n${message.thinking.trim()}`
-        : message.thinking.trim()
-    )
-  }
-
-  if (message.content.trim()) {
-    sections.push(message.content.trim())
-  }
-
-  return sections.join("\n\n")
-}
-
-function AssistantMessageBlock({
-  message,
-  showThinking,
-}: {
-  message: AssistantMessage
-  showThinking: boolean
-}) {
-  const hasThinking = showThinking && message.thinking.trim().length > 0
-  const hasContent = message.content.length > 0
-
-  if (!hasThinking && !hasContent) return null
-
-  return (
-    <div className="group flex animate-in flex-col gap-2 duration-300 fade-in-0 slide-in-from-bottom-1">
-      {hasThinking && <ThinkingBlock thinking={message.thinking} />}
-
-      {hasContent && (
-        <div className="prose prose-sm max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {message.content}
-          </Markdown>
-        </div>
-      )}
-
-      <div>
-        <CopyButton text={assistantCopyText(message, showThinking)} />
-      </div>
-    </div>
-  )
-}
-
 interface ChatViewProps {
   sessionId: string
   workspaceName: string
@@ -181,11 +166,7 @@ interface ChatViewProps {
   threadId: string
 }
 
-export const ChatView = memo(function ChatView({
-  sessionId,
-  workspaceId,
-  threadId,
-}: ChatViewProps) {
+export function ChatView({ sessionId, workspaceId, threadId }: ChatViewProps) {
   const queryClient = useQueryClient()
   const showThinkingSetting = useShowThinkingSetting()
   const [messages, setMessages] = useState<Message[] | null>(null)
@@ -199,6 +180,13 @@ export const ChatView = memo(function ChatView({
   const [selectedModelId, setSelectedModelId] = useState<string | null>(() =>
     localStorage.getItem(`lambda-code:threadModel:${threadId}`)
   )
+  const [scrollTop, setScrollTop] = useState(
+    () => threadScrollPositions.get(threadId) ?? 0
+  )
+  const [viewportHeight, setViewportHeight] = useState(0)
+  const [measuredRowHeights, setMeasuredRowHeights] = useState<
+    Record<string, number>
+  >({})
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(false)
@@ -247,6 +235,25 @@ export const ChatView = memo(function ChatView({
     if (messages !== null) return
     latestVisibleMessagesRef.current = messagesData ?? []
   }, [messages, messagesData])
+
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+
+    const updateViewportHeight = () => {
+      setViewportHeight(el.clientHeight)
+    }
+
+    updateViewportHeight()
+
+    const observer = new ResizeObserver(() => {
+      updateViewportHeight()
+    })
+
+    observer.observe(el)
+
+    return () => observer.disconnect()
+  }, [])
 
   // ── SSE event stream ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -414,28 +421,6 @@ export const ChatView = memo(function ChatView({
     }
   }, [applyLocalMessages, queryClient, sessionId])
 
-  // ── Restore scroll position on mount ─────────────────────────────────────────
-  // Wait for messages to be available before restoring so scroll heights are correct.
-  useEffect(() => {
-    if (initialScrollDoneRef.current) return
-    if (!messagesData) return
-
-    initialScrollDoneRef.current = true
-    const saved = threadScrollPositions.get(threadId)
-
-    requestAnimationFrame(() => {
-      const el = scrollContainerRef.current
-      if (!el) return
-      if (saved !== undefined) {
-        el.scrollTop = saved
-      } else {
-        // First visit to this thread — start pinned at the bottom
-        el.scrollTop = el.scrollHeight
-        pinnedRef.current = true
-      }
-    })
-  }, [messagesData, threadId])
-
   // ── Auto-scroll ───────────────────────────────────────────────────────────────
   // During streaming, smooth scrolling is called on every delta and the browser
   // interrupts each animation before it finishes, causing the view to lag behind
@@ -447,6 +432,78 @@ export const ChatView = memo(function ChatView({
     () => messages ?? messagesData ?? [],
     [messages, messagesData]
   )
+  const messageKeys = useMemo(
+    () => visibleMessages.map(getMessageKey),
+    [visibleMessages]
+  )
+  const {
+    startIndex: visibleStartIndex,
+    endIndex: visibleEndIndex,
+    topSpacerHeight,
+    bottomSpacerHeight,
+  } = useMemo(() => {
+    const count = visibleMessages.length
+    if (count === 0) {
+      return {
+        startIndex: 0,
+        endIndex: 0,
+        topSpacerHeight: 0,
+        bottomSpacerHeight: 0,
+      }
+    }
+
+    const rowHeights = visibleMessages.map((message, index) => {
+      const messageKey = messageKeys[index]
+      return messageKey
+        ? (measuredRowHeights[messageKey] ?? estimateMessageSize(message))
+        : estimateMessageSize(message)
+    })
+
+    const rowOffsets: number[] = []
+    let totalHeight = 0
+    for (const rowHeight of rowHeights) {
+      rowOffsets.push(totalHeight)
+      totalHeight += rowHeight
+    }
+
+    const minVisibleY = Math.max(scrollTop - VIRTUAL_OVERSCAN_PX, 0)
+    const maxVisibleY =
+      scrollTop + Math.max(viewportHeight, 1) + VIRTUAL_OVERSCAN_PX
+
+    let startIndex = 0
+    while (
+      startIndex < count &&
+      rowOffsets[startIndex] + rowHeights[startIndex] < minVisibleY
+    ) {
+      startIndex += 1
+    }
+
+    let endIndex = startIndex
+    while (endIndex < count && rowOffsets[endIndex] < maxVisibleY) {
+      endIndex += 1
+    }
+
+    if (endIndex === startIndex) {
+      endIndex = Math.min(count, startIndex + 1)
+    }
+
+    const topSpacerHeight = startIndex > 0 ? rowOffsets[startIndex] : 0
+    const bottomSpacerHeight =
+      endIndex < count ? Math.max(totalHeight - rowOffsets[endIndex], 0) : 0
+
+    return {
+      startIndex,
+      endIndex,
+      topSpacerHeight,
+      bottomSpacerHeight,
+    }
+  }, [
+    messageKeys,
+    measuredRowHeights,
+    scrollTop,
+    viewportHeight,
+    visibleMessages,
+  ])
 
   const commandsByName = useMemo(
     () =>
@@ -454,16 +511,61 @@ export const ChatView = memo(function ChatView({
     [commandsData]
   )
 
+  // ── Restore scroll position on mount ─────────────────────────────────────────
+  // Wait for messages to be available before restoring so scroll heights are correct.
+  useEffect(() => {
+    if (initialScrollDoneRef.current) return
+    if (!messagesData) return
+
+    initialScrollDoneRef.current = true
+    const saved = threadScrollPositions.get(threadId)
+
+    const frame = requestAnimationFrame(() => {
+      const el = scrollContainerRef.current
+      if (!el) return
+      if (saved !== undefined) {
+        el.scrollTop = saved
+        setScrollTop(saved)
+      } else {
+        // First visit to this thread — start pinned at the bottom
+        el.scrollTop = el.scrollHeight
+        setScrollTop(el.scrollTop)
+        pinnedRef.current = true
+      }
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [messagesData, threadId])
+
   useEffect(() => {
     if (!pinnedRef.current) return
     const el = scrollContainerRef.current
     if (!el) return
-    if (isLoading) {
-      el.scrollTop = el.scrollHeight
-    } else {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-    }
-  }, [visibleMessages, isLoading])
+    const frame = requestAnimationFrame(() => {
+      if (isLoading) {
+        el.scrollTop = el.scrollHeight
+        setScrollTop(el.scrollTop)
+      } else {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+      }
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [isLoading, visibleMessages])
+
+  const handleMeasuredRow = useCallback(
+    (messageKey: string, height: number) => {
+      setMeasuredRowHeights((current) => {
+        if (current[messageKey] === height) return current
+
+        return {
+          ...current,
+          [messageKey]: height,
+        }
+      })
+    },
+    []
+  )
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current
@@ -471,6 +573,9 @@ export const ChatView = memo(function ChatView({
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     pinnedRef.current = distanceFromBottom < 80
     threadScrollPositions.set(threadId, el.scrollTop)
+    setScrollTop((current) =>
+      current === el.scrollTop ? current : el.scrollTop
+    )
   }, [threadId])
 
   const handleModelChange = useCallback(
@@ -575,7 +680,7 @@ export const ChatView = memo(function ChatView({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-6 pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="mx-auto flex w-full max-w-2xl flex-1 flex-col overflow-y-auto px-6 pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {visibleMessages.length === 0 && !isLoading && (
             <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center select-none">
@@ -610,39 +715,39 @@ export const ChatView = memo(function ChatView({
               </div>
             </div>
           )}
-          {visibleMessages.map((msg, i) => {
-            const key =
-              msg.role === "tool" ? msg.toolCallId : `${msg.role}-${i}`
-            if (msg.role === "tool") {
-              return <ToolCallBlock key={key} msg={msg} />
-            }
-            if (msg.role === "user") {
-              return (
-                <div
-                  key={key}
-                  className="group flex animate-in flex-col items-end gap-1.5 self-end duration-200 fade-in-0 slide-in-from-bottom-2"
-                >
-                  <div
-                    className="rounded-xl bg-muted px-4 py-2 text-sm"
-                    data-selectable
-                  >
-                    <UserMessageContent
-                      content={msg.content}
-                      commandsByName={commandsByName}
-                    />
-                  </div>
-                  <CopyButton text={msg.content} />
-                </div>
-              )
-            }
-            return (
-              <AssistantMessageBlock
-                key={key}
-                message={msg}
-                showThinking={showThinkingSetting}
-              />
-            )
-          })}
+          {visibleMessages.length > 0 && (
+            <div className="w-full">
+              {topSpacerHeight > 0 && (
+                <div style={{ height: `${topSpacerHeight}px` }} />
+              )}
+
+              {visibleMessages
+                .slice(visibleStartIndex, visibleEndIndex)
+                .map((message, offsetIndex) => {
+                  const index = visibleStartIndex + offsetIndex
+                  const messageKey = messageKeys[index]
+                  if (!messageKey) return null
+
+                  return (
+                    <MeasuredMessageRow
+                      key={messageKey}
+                      messageKey={messageKey}
+                      onHeightChange={handleMeasuredRow}
+                    >
+                      <MessageRow
+                        message={message}
+                        commandsByName={commandsByName}
+                        showThinking={showThinkingSetting}
+                      />
+                    </MeasuredMessageRow>
+                  )
+                })}
+
+              {bottomSpacerHeight > 0 && (
+                <div style={{ height: `${bottomSpacerHeight}px` }} />
+              )}
+            </div>
+          )}
           {isLoading && <ThinkingIndicator className="py-0.5" />}
           {isCompacting && (
             <div className="flex animate-in items-center gap-1.5 self-start text-muted-foreground/60 duration-200 fade-in-0">
@@ -677,4 +782,4 @@ export const ChatView = memo(function ChatView({
       </div>
     </>
   )
-})
+}

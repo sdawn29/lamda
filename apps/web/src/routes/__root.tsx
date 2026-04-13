@@ -1,5 +1,4 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router"
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools"
 
 import { AppSidebar } from "@/features/workspace"
 import { TitleBar } from "@/features/layout"
