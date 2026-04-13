@@ -68,8 +68,13 @@ export function useGitDiffStat(sessionId: string) {
     queryKey: gitDiffStatKey(sessionId),
     queryFn: () => gitDiffStat(sessionId),
     enabled: !!sessionId,
+    gcTime: 30 * 1000,
     staleTime: 0,
-    refetchInterval: 5000,
+    refetchInterval: () =>
+      typeof document === "undefined" || document.visibilityState !== "visible"
+        ? false
+        : 5000,
+    refetchIntervalInBackground: false,
   })
 }
 

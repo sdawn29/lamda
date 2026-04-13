@@ -20,8 +20,13 @@ import sql from "refractor/sql"
 import tsx from "refractor/tsx"
 import typescript from "refractor/typescript"
 import yaml from "refractor/yaml"
-import type { DiffLine, FlatToken, HastNode, HighlightMap, ThemeStyle } from "./types"
-
+import type {
+  DiffLine,
+  FlatToken,
+  HastNode,
+  HighlightMap,
+  ThemeStyle,
+} from "./types"
 ;[
   bash,
   c,
@@ -83,14 +88,19 @@ export function detectLanguage(filePath: string): string | null {
   return null
 }
 
-function flattenHast(nodes: HastNode[], classNames: string[] = []): FlatToken[] {
+function flattenHast(
+  nodes: HastNode[],
+  classNames: string[] = []
+): FlatToken[] {
   const tokens: FlatToken[] = []
   for (const node of nodes) {
     if (node.type === "text") {
       tokens.push({ classNames, text: node.value })
     } else if (node.type === "element") {
       const cls = node.properties?.className ?? []
-      tokens.push(...flattenHast(node.children as HastNode[], [...classNames, ...cls]))
+      tokens.push(
+        ...flattenHast(node.children as HastNode[], [...classNames, ...cls])
+      )
     }
   }
   return tokens
@@ -103,7 +113,10 @@ function splitTokensByLine(tokens: FlatToken[]): FlatToken[][] {
     for (let i = 0; i < parts.length; i++) {
       if (i > 0) lines.push([])
       if (parts[i] !== "") {
-        lines[lines.length - 1].push({ classNames: token.classNames, text: parts[i] })
+        lines[lines.length - 1].push({
+          classNames: token.classNames,
+          text: parts[i],
+        })
       }
     }
   }
@@ -120,18 +133,27 @@ function highlightSource(source: string, language: string): FlatToken[][] {
   }
 }
 
-function tokenStyle(classNames: string[], themeStyle: ThemeStyle): React.CSSProperties {
+function tokenStyle(
+  classNames: string[],
+  themeStyle: ThemeStyle
+): React.CSSProperties {
   let result: React.CSSProperties = {}
   for (const cls of classNames) {
     if (cls === "token") continue
     if ((themeStyle as Record<string, React.CSSProperties>)[cls]) {
-      result = { ...result, ...(themeStyle as Record<string, React.CSSProperties>)[cls] }
+      result = {
+        ...result,
+        ...(themeStyle as Record<string, React.CSSProperties>)[cls],
+      }
     }
   }
   return result
 }
 
-export function renderTokens(tokens: FlatToken[], themeStyle: ThemeStyle): ReactNode {
+export function renderTokens(
+  tokens: FlatToken[],
+  themeStyle: ThemeStyle
+): ReactNode {
   if (tokens.length === 0) return " "
   return tokens.map((token, i) => {
     const style = tokenStyle(token.classNames, themeStyle)
@@ -144,7 +166,10 @@ export function renderTokens(tokens: FlatToken[], themeStyle: ThemeStyle): React
   })
 }
 
-export function buildHighlightMap(lines: DiffLine[], language: string | null): HighlightMap {
+export function buildHighlightMap(
+  lines: DiffLine[],
+  language: string | null
+): HighlightMap {
   const newFileLines: { diffIndex: number; content: string }[] = []
   const oldFileLines: { diffIndex: number; content: string }[] = []
 
@@ -169,30 +194,48 @@ export function buildHighlightMap(lines: DiffLine[], language: string | null): H
   })
 
   if (!language) {
-    const plain = (content: string): FlatToken[] => [{ classNames: [], text: content }]
     return {
-      newLines: newFileLines.map((l) => plain(l.content)),
-      oldLines: oldFileLines.map((l) => plain(l.content)),
+      newLines: [],
+      oldLines: [],
       newLineIndex,
       oldLineIndex,
     }
   }
 
-  const newHighlighted = highlightSource(newFileLines.map((l) => l.content).join("\n"), language)
-  const oldHighlighted = highlightSource(oldFileLines.map((l) => l.content).join("\n"), language)
+  const newHighlighted = highlightSource(
+    newFileLines.map((l) => l.content).join("\n"),
+    language
+  )
+  const oldHighlighted = highlightSource(
+    oldFileLines.map((l) => l.content).join("\n"),
+    language
+  )
 
-  return { newLines: newHighlighted, oldLines: oldHighlighted, newLineIndex, oldLineIndex }
+  return {
+    newLines: newHighlighted,
+    oldLines: oldHighlighted,
+    newLineIndex,
+    oldLineIndex,
+  }
 }
 
-export function getLineTokens(line: DiffLine, diffIndex: number, map: HighlightMap): FlatToken[] {
+export function getLineTokens(
+  line: DiffLine,
+  diffIndex: number,
+  map: HighlightMap
+): FlatToken[] {
   const fallback: FlatToken[] = [{ classNames: [], text: line.content }]
   if (line.kind === "removed") {
     const idx = map.oldLineIndex[diffIndex]
-    return idx >= 0 && idx < map.oldLines.length ? (map.oldLines[idx] ?? fallback) : fallback
+    return idx >= 0 && idx < map.oldLines.length
+      ? (map.oldLines[idx] ?? fallback)
+      : fallback
   }
   if (line.kind === "added" || line.kind === "context") {
     const idx = map.newLineIndex[diffIndex]
-    return idx >= 0 && idx < map.newLines.length ? (map.newLines[idx] ?? fallback) : fallback
+    return idx >= 0 && idx < map.newLines.length
+      ? (map.newLines[idx] ?? fallback)
+      : fallback
   }
   return fallback
 }

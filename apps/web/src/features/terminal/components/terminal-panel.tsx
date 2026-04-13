@@ -18,6 +18,8 @@ function wsUrl(path: string): string {
 const MIN_HEIGHT = 120
 const DEFAULT_HEIGHT = 260
 const MIN_CONTENT_HEIGHT = 200
+const TERMINAL_OUTPUT_FLUSH_MS = 16
+const TERMINAL_IMMEDIATE_FLUSH_THRESHOLD = 8_192
 
 const DARK_TERMINAL_THEME = {
   background: "#101010",
@@ -113,6 +115,26 @@ export const TerminalPanel = memo(function TerminalPanel({
     const url = wsUrl(`/terminal?cwd=${encodeURIComponent(cwd)}`)
     const ws = new WebSocket(url)
     wsRef.current = ws
+    let pendingOutput = ""
+    let flushTimeout: number | null = null
+
+    const flushOutput = () => {
+      flushTimeout = null
+      if (!pendingOutput) return
+      term.write(pendingOutput)
+      pendingOutput = ""
+    }
+
+    const scheduleFlush = (delay = TERMINAL_OUTPUT_FLUSH_MS) => {
+      if (flushTimeout !== null) {
+        if (delay !== 0) return
+        window.clearTimeout(flushTimeout)
+      }
+
+      flushTimeout = window.setTimeout(() => {
+        flushOutput()
+      }, delay)
+    }
 
     ws.onopen = () => {
       const dims = fitAddon.proposeDimensions()
@@ -124,10 +146,20 @@ export const TerminalPanel = memo(function TerminalPanel({
     }
 
     ws.onmessage = (e) => {
-      term.write(e.data as string)
+      if (typeof e.data !== "string") return
+
+      pendingOutput += e.data
+      scheduleFlush(
+        pendingOutput.length >= TERMINAL_IMMEDIATE_FLUSH_THRESHOLD
+          ? 0
+          : undefined
+      )
     }
 
     ws.onclose = () => {
+      if (pendingOutput) {
+        flushOutput()
+      }
       term.write("\r\n\x1b[31m[disconnected]\x1b[0m\r\n")
     }
 
@@ -149,6 +181,10 @@ export const TerminalPanel = memo(function TerminalPanel({
     resizeObserver.observe(container)
 
     return () => {
+      if (flushTimeout !== null) {
+        window.clearTimeout(flushTimeout)
+      }
+      pendingOutput = ""
       resizeObserver.disconnect()
       ws.close()
       term.dispose()
