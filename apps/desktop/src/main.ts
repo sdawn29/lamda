@@ -1,4 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeImage,
+  shell,
+} from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -12,10 +19,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
 const DEV_MONOREPO_ROOT = path.join(__dirname, "../../..");
 const DEV_SERVER_URL = "http://localhost:5173";
+const APP_NAME = "lamda";
+const DEV_ICON_PATH = path.join(
+  DEV_MONOREPO_ROOT,
+  "apps",
+  "desktop",
+  "assets",
+  "icon.png",
+);
 const PROD_INDEX = isDev
   ? ""
   : path.join(process.resourcesPath, "web", "index.html");
 const EXTERNAL_URL_PROTOCOL_RE = /^(https?:|mailto:)/i;
+
+app.setName(APP_NAME);
+
 console.log(`Running in ${isDev ? "development" : "production"} mode`);
 
 let serverProcess: ChildProcess | null = null;
@@ -170,6 +188,13 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  if (isDev && process.platform === "darwin") {
+    const dockIcon = nativeImage.createFromPath(DEV_ICON_PATH);
+    if (!dockIcon.isEmpty()) {
+      app.dock?.setIcon(dockIcon);
+    }
+  }
+
   try {
     serverPort = await spawnServer();
   } catch (err) {
