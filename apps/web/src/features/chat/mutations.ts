@@ -1,10 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  abortSession,
-  generateTitle,
-  openSessionEventSource,
-  sendPrompt,
-} from "./api"
+import { abortSession, generateTitle, sendPrompt } from "./api"
 import { messagesQueryKey } from "./queries"
 
 // ── Send prompt ───────────────────────────────────────────────────────────────
@@ -33,12 +28,6 @@ export function useAbortSession(sessionId: string) {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
     },
-  })
-}
-
-export function useOpenSessionEventSource() {
-  return useMutation({
-    mutationFn: (sessionId: string) => openSessionEventSource(sessionId),
   })
 }
 

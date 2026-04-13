@@ -54,7 +54,7 @@ import {
   insertMessage,
 } from "@lambda/db";
 import { store } from "./store.js";
-import { messageBuffer } from "./message-buffer.js";
+import { SESSION_SSE_RETRY_MS, sessionEvents } from "./session-events.js";
 
 const app = new Hono();
 
@@ -72,6 +72,13 @@ async function createSessionForThread(
   const sessionId = store.create(handle, cwd, threadId);
   if (handle.sessionFile) updateThreadSessionFile(threadId, handle.sessionFile);
   return sessionId;
+}
+
+function ensureSessionEventHub(
+  sessionId: string,
+  entry: NonNullable<ReturnType<typeof store.get>>,
+) {
+  return sessionEvents.ensure(sessionId, entry.threadId, entry.handle);
 }
 
 app.get("/health", (c) => c.json({ status: "ok", uptime: process.uptime() }));
@@ -186,25 +193,29 @@ app.post("/workspace", async (c) => {
   );
 });
 
-app.delete("/reset", (_c) => {
+app.delete("/reset", async (_c) => {
   // Dispose all in-memory sessions
   for (const ws of listWorkspacesWithThreads()) {
     for (const thread of ws.threads) {
       const session = store.getByThreadId(thread.id);
-      if (session) store.delete(session.sessionId);
+      if (!session) continue;
+      await sessionEvents.dispose(session.sessionId);
+      store.delete(session.sessionId);
     }
   }
   deleteAllWorkspaces();
   return new Response(null, { status: 204 });
 });
 
-app.delete("/workspace/:id", (c) => {
+app.delete("/workspace/:id", async (c) => {
   const workspaceId = c.req.param("id");
   const ws = listWorkspacesWithThreads().find((w) => w.id === workspaceId);
   if (ws) {
     for (const thread of ws.threads) {
       const session = store.getByThreadId(thread.id);
-      if (session) store.delete(session.sessionId);
+      if (!session) continue;
+      await sessionEvents.dispose(session.sessionId);
+      store.delete(session.sessionId);
     }
   }
   deleteWorkspace(workspaceId);
@@ -240,10 +251,13 @@ app.post("/workspace/:workspaceId/thread", async (c) => {
   );
 });
 
-app.delete("/thread/:id", (c) => {
+app.delete("/thread/:id", async (c) => {
   const threadId = c.req.param("id");
   const session = store.getByThreadId(threadId);
-  if (session) store.delete(session.sessionId);
+  if (session) {
+    await sessionEvents.dispose(session.sessionId);
+    store.delete(session.sessionId);
+  }
   deleteThread(threadId);
   return new Response(null, { status: 204 });
 });
@@ -278,8 +292,9 @@ app.post("/session", async (c) => {
   return c.json({ sessionId }, 201);
 });
 
-app.delete("/session/:id", (c) => {
+app.delete("/session/:id", async (c) => {
   const id = c.req.param("id");
+  await sessionEvents.dispose(id);
   if (!store.delete(id)) return c.json({ error: "Not found" }, 404);
   return new Response(null, { status: 204 });
 });
@@ -313,6 +328,8 @@ app.post("/session/:id/prompt", async (c) => {
       } => ({}),
     );
   if (!body.text) return c.json({ error: "text is required" }, 400);
+
+  ensureSessionEventHub(id, entry);
 
   insertMessage(entry.threadId, "user", body.text);
 
@@ -360,6 +377,7 @@ app.post("/session/:id/compact", async (c) => {
   const id = c.req.param("id");
   const entry = store.get(id);
   if (!entry) return c.json({ error: "Session not found" }, 404);
+  ensureSessionEventHub(id, entry);
   try {
     await entry.handle.compact();
     return c.json({ ok: true });
@@ -494,90 +512,46 @@ app.get("/session/:id/events", async (c) => {
   const entry = store.get(id);
   if (!entry) return c.json({ error: "Not found" }, 404);
 
-  const threadId = entry.threadId;
+  const hub = ensureSessionEventHub(id, entry);
+  const lastEventId = c.req.header("last-event-id");
 
-  return streamSSE(c, async (stream) => {
-    const generator = entry.handle.events();
-    const toolMeta = new Map<string, { toolName: string; args: unknown }>();
-
-    type MessageStartEvent = {
-      message?: { role?: string };
+  const response = streamSSE(c, async (stream) => {
+    let writeQueue = Promise.resolve();
+    const queueWrite = (record: {
+      id: number;
+      event: { type: string };
+      data: string;
+    }) => {
+      writeQueue = writeQueue.then(() =>
+        stream.writeSSE({
+          event: record.event.type,
+          id: String(record.id),
+          retry: SESSION_SSE_RETRY_MS,
+          data: record.data,
+        }),
+      );
     };
 
-    type AssistantMessageDeltaEvent = {
-      assistantMessageEvent?:
-        | { type: "text_delta"; delta: string }
-        | { type: "thinking_delta"; delta: string }
-        | { type: string; delta?: string };
-    };
-
-    stream.onAbort(async () => {
-      messageBuffer.flush(id);
-      await generator.return(undefined);
+    const subscription = hub.subscribe({
+      lastEventId,
+      onEvent: queueWrite,
     });
 
-    for await (const event of generator) {
-      // ── Persistence side-effects ───────────────────────────────────────────
-      if (event.type === "message_start") {
-        const e = event as MessageStartEvent;
-        if (e.message?.role === "assistant") {
-          messageBuffer.startAssistant(id, threadId);
-        }
-      } else if (event.type === "message_update") {
-        const e = event as AssistantMessageDeltaEvent;
-        if (
-          e.assistantMessageEvent?.type === "text_delta" &&
-          typeof e.assistantMessageEvent.delta === "string"
-        ) {
-          messageBuffer.appendTextDelta(id, e.assistantMessageEvent.delta);
-        } else if (
-          e.assistantMessageEvent?.type === "thinking_delta" &&
-          typeof e.assistantMessageEvent.delta === "string"
-        ) {
-          messageBuffer.appendThinkingDelta(id, e.assistantMessageEvent.delta);
-        }
-      } else if (event.type === "tool_execution_start") {
-        const e = event as {
-          toolCallId: string;
-          toolName: string;
-          args: unknown;
-        };
-        toolMeta.set(e.toolCallId, { toolName: e.toolName, args: e.args });
-      } else if (event.type === "tool_execution_end") {
-        const e = event as {
-          toolCallId: string;
-          toolName?: string;
-          args?: unknown;
-          result: unknown;
-          isError: boolean;
-        };
-        const meta = toolMeta.get(e.toolCallId);
-        toolMeta.delete(e.toolCallId);
-        insertMessage(
-          threadId,
-          "tool",
-          JSON.stringify({
-            toolCallId: e.toolCallId,
-            toolName: meta?.toolName ?? e.toolName ?? "",
-            args: meta?.args ?? e.args ?? {},
-            result: e.result,
-            status: e.isError ? "error" : "done",
-          }),
-        );
-      } else if (event.type === "agent_end") {
-        messageBuffer.flush(id);
-      }
+    stream.onAbort(() => {
+      subscription.unsubscribe();
+    });
 
-      // ── SSE passthrough ────────────────────────────────────────────────────
-      let data: string;
-      try {
-        data = JSON.stringify(event);
-      } catch {
-        data = JSON.stringify({ serializeError: true, type: event.type });
-      }
-      await stream.writeSSE({ event: event.type, data });
+    for (const record of subscription.initialEvents) {
+      queueWrite(record);
     }
+
+    await subscription.closed;
+    await writeQueue;
   });
+
+  response.headers.set("Cache-Control", "no-cache, no-transform");
+  response.headers.set("X-Accel-Buffering", "no");
+  return response;
 });
 
 // ── Git endpoints ──────────────────────────────────────────────────────────────

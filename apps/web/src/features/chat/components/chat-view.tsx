@@ -6,6 +6,7 @@ import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
 import { ChatTextbox, type ChatTextboxHandle } from "./chat-textbox"
+import { openSessionEventSource } from "../api"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -21,12 +22,11 @@ import { messagesQueryKey, useMessages, useSlashCommands } from "../queries"
 import { useBranch } from "@/features/git/queries"
 import { useBranches } from "@/features/git/queries"
 import { useCheckoutBranch } from "@/features/git/mutations"
+import { useAbortSession, useGenerateTitle, useSendPrompt } from "../mutations"
 import {
-  useAbortSession,
-  useGenerateTitle,
-  useOpenSessionEventSource,
-  useSendPrompt,
-} from "../mutations"
+  subscribeToSessionEvents,
+  type AgentEndMessage,
+} from "../session-events"
 import { ToolCallBlock } from "./tool-call-block"
 import { markdownComponents } from "./markdown-components"
 import { CopyButton } from "@/shared/components/copy-button"
@@ -43,30 +43,6 @@ import {
 
 // Persists scroll positions across thread switches (survives remounts, cleared on page reload)
 const threadScrollPositions = new Map<string, number>()
-
-type AgentEndMessage =
-  | {
-      role: "assistant"
-      stopReason?: "stop" | "length" | "toolUse" | "error" | "aborted"
-      errorMessage?: string
-    }
-  | {
-      role: "toolResult"
-      toolCallId: string
-      toolName: string
-      content: {
-        type: string
-        text?: string
-        data?: string
-        mimeType?: string
-      }[]
-      details?: unknown
-      isError: boolean
-    }
-  | {
-      role: string
-      [key: string]: unknown
-    }
 
 function upsertToolMessage(
   prev: Message[],
@@ -246,7 +222,6 @@ export const ChatView = memo(function ChatView({
   const checkoutBranchMutation = useCheckoutBranch(sessionId)
   const abortSessionMutation = useAbortSession(sessionId)
   const generateTitleMutation = useGenerateTitle()
-  const { mutateAsync: openSessionEventSource } = useOpenSessionEventSource()
   const sendPromptMutation = useSendPrompt(sessionId)
 
   // ── Track the latest persisted messages for local optimistic updates ──────────
@@ -260,6 +235,7 @@ export const ChatView = memo(function ChatView({
   useEffect(() => {
     let active = true
     let es: EventSource | null = null
+    let cleanupListeners: (() => void) | null = null
 
     openSessionEventSource(sessionId)
       .then((nextEventSource) => {
@@ -268,154 +244,159 @@ export const ChatView = memo(function ChatView({
           return
         }
         es = nextEventSource
-
-        es.addEventListener("message_start", (e: MessageEvent) => {
-          if (!active) return
-          const data = JSON.parse(e.data) as { message?: { role?: string } }
-          if (data.message?.role !== "assistant") return
-          setMessages((prev) => [
-            ...resolveMessages(prev, initialMessagesRef.current),
-            createAssistantMessage(),
-          ])
-        })
-
-        es.addEventListener("message_update", (e: MessageEvent) => {
-          if (!active) return
-          const data = JSON.parse(e.data) as {
-            assistantMessageEvent?: { type: string; delta?: string }
-          }
-          const assistantEvent = data.assistantMessageEvent
-          if (
-            !assistantEvent ||
-            typeof assistantEvent.delta !== "string" ||
-            (assistantEvent.type !== "text_delta" &&
-              assistantEvent.type !== "thinking_delta")
-          ) {
-            return
-          }
-
-          setMessages((prev) => {
-            const next = [...resolveMessages(prev, initialMessagesRef.current)]
-            const last = next[next.length - 1]
-
-            if (last?.role !== "assistant") {
-              next.push(
-                assistantEvent.type === "thinking_delta"
-                  ? createAssistantMessage({ thinking: assistantEvent.delta })
-                  : createAssistantMessage({ content: assistantEvent.delta })
-              )
-              return next
+        cleanupListeners = subscribeToSessionEvents(nextEventSource, {
+          onMessageStart: (data) => {
+            if (!active || data.message?.role !== "assistant") return
+            setMessages((prev) => [
+              ...resolveMessages(prev, initialMessagesRef.current),
+              createAssistantMessage(),
+            ])
+          },
+          onMessageUpdate: (data) => {
+            if (!active) return
+            const assistantEvent = data.assistantMessageEvent
+            if (
+              !assistantEvent ||
+              typeof assistantEvent.delta !== "string" ||
+              (assistantEvent.type !== "text_delta" &&
+                assistantEvent.type !== "thinking_delta")
+            ) {
+              return
             }
 
-            next[next.length - 1] =
-              assistantEvent.type === "thinking_delta"
-                ? {
-                    ...last,
-                    thinking: last.thinking + assistantEvent.delta,
-                  }
-                : {
-                    ...last,
-                    content: last.content + assistantEvent.delta,
-                  }
+            setMessages((prev) => {
+              const next = [
+                ...resolveMessages(prev, initialMessagesRef.current),
+              ]
+              const last = next[next.length - 1]
 
-            return next
-          })
-        })
+              if (last?.role !== "assistant") {
+                next.push(
+                  assistantEvent.type === "thinking_delta"
+                    ? createAssistantMessage({ thinking: assistantEvent.delta })
+                    : createAssistantMessage({ content: assistantEvent.delta })
+                )
+                return next
+              }
 
-        es.addEventListener("tool_execution_start", (e: MessageEvent) => {
-          if (!active) return
-          const data = JSON.parse(e.data) as {
-            toolCallId: string
-            toolName: string
-            args: unknown
-          }
-          setMessages((prev) =>
-            upsertToolMessage(
-              resolveMessages(prev, initialMessagesRef.current),
-              data.toolCallId,
-              (existing) => ({
-                role: "tool",
-                toolCallId: data.toolCallId,
-                toolName: data.toolName,
-                args: data.args,
-                status: "running",
-                result: existing?.result,
-              })
+              next[next.length - 1] =
+                assistantEvent.type === "thinking_delta"
+                  ? {
+                      ...last,
+                      thinking: last.thinking + assistantEvent.delta,
+                    }
+                  : {
+                      ...last,
+                      content: last.content + assistantEvent.delta,
+                    }
+
+              return next
+            })
+          },
+          onToolExecutionStart: (data) => {
+            if (!active) return
+            setMessages((prev) =>
+              upsertToolMessage(
+                resolveMessages(prev, initialMessagesRef.current),
+                data.toolCallId,
+                (existing) => ({
+                  role: "tool",
+                  toolCallId: data.toolCallId,
+                  toolName: data.toolName,
+                  args: data.args,
+                  status: "running",
+                  result: existing?.result,
+                })
+              )
             )
-          )
-        })
-
-        es.addEventListener("tool_execution_update", (e: MessageEvent) => {
-          if (!active) return
-          const data = JSON.parse(e.data) as {
-            toolCallId: string
-            toolName: string
-            args: unknown
-            partialResult: unknown
-          }
-          setMessages((prev) =>
-            upsertToolMessage(
-              resolveMessages(prev, initialMessagesRef.current),
-              data.toolCallId,
-              (existing) => ({
-                role: "tool",
-                toolCallId: data.toolCallId,
-                toolName: data.toolName || existing?.toolName || "tool",
-                args: data.args ?? existing?.args ?? {},
-                status: "running",
-                result: data.partialResult,
-              })
+          },
+          onToolExecutionUpdate: (data) => {
+            if (!active) return
+            setMessages((prev) =>
+              upsertToolMessage(
+                resolveMessages(prev, initialMessagesRef.current),
+                data.toolCallId,
+                (existing) => ({
+                  role: "tool",
+                  toolCallId: data.toolCallId,
+                  toolName: data.toolName || existing?.toolName || "tool",
+                  args: data.args ?? existing?.args ?? {},
+                  status: "running",
+                  result: data.partialResult,
+                })
+              )
             )
-          )
-        })
-
-        es.addEventListener("tool_execution_end", (e: MessageEvent) => {
-          if (!active) return
-          const data = JSON.parse(e.data) as {
-            toolCallId: string
-            toolName: string
-            result: unknown
-            isError: boolean
-          }
-          setMessages((prev) =>
-            upsertToolMessage(
-              resolveMessages(prev, initialMessagesRef.current),
-              data.toolCallId,
-              (existing) => ({
-                role: "tool",
-                toolCallId: data.toolCallId,
-                toolName: data.toolName || existing?.toolName || "tool",
-                args: existing?.args ?? {},
-                status: data.isError ? "error" : "done",
-                result: data.result,
-              })
+          },
+          onToolExecutionEnd: (data) => {
+            if (!active) return
+            setMessages((prev) =>
+              upsertToolMessage(
+                resolveMessages(prev, initialMessagesRef.current),
+                data.toolCallId,
+                (existing) => ({
+                  role: "tool",
+                  toolCallId: data.toolCallId,
+                  toolName: data.toolName || existing?.toolName || "tool",
+                  args: existing?.args ?? {},
+                  status: data.isError ? "error" : "done",
+                  result: data.result,
+                })
+              )
             )
-          )
-        })
-
-        es.addEventListener("agent_end", (e: MessageEvent) => {
-          if (!active) return
-          const data = JSON.parse(e.data) as { messages?: AgentEndMessage[] }
-          setMessages((prev) =>
-            finalizeRunningTools(
-              resolveMessages(prev, initialMessagesRef.current),
-              data.messages ?? []
+          },
+          onAgentEnd: (data) => {
+            if (!active) return
+            setMessages((prev) =>
+              finalizeRunningTools(
+                resolveMessages(prev, initialMessagesRef.current),
+                data.messages ?? []
+              )
             )
-          )
-          setIsLoading(false)
-          void queryClient.invalidateQueries({
-            queryKey: messagesQueryKey(sessionId),
-          })
-        })
-
-        es.addEventListener("compaction_start", () => {
-          if (!active) return
-          setIsCompacting(true)
-        })
-
-        es.addEventListener("compaction_end", () => {
-          if (!active) return
-          setIsCompacting(false)
+            setIsLoading(false)
+            void queryClient.invalidateQueries({
+              queryKey: messagesQueryKey(sessionId),
+            })
+          },
+          onCompactionStart: () => {
+            if (!active) return
+            setIsCompacting(true)
+          },
+          onCompactionEnd: () => {
+            if (!active) return
+            setIsCompacting(false)
+          },
+          onSdkError: ({ message }) => {
+            if (!active) return
+            console.error("[session-events]", message)
+            setMessages((prev) =>
+              finalizeRunningTools(
+                resolveMessages(prev, initialMessagesRef.current),
+                [
+                  {
+                    role: "assistant",
+                    stopReason: "error",
+                    errorMessage: message,
+                  },
+                ]
+              )
+            )
+            setIsLoading(false)
+            setIsCompacting(false)
+            void queryClient.invalidateQueries({
+              queryKey: messagesQueryKey(sessionId),
+            })
+          },
+          onTransportError: () => {
+            if (!active || nextEventSource.readyState !== EventSource.CLOSED) {
+              return
+            }
+            console.error("[session-events] connection closed")
+            setIsLoading(false)
+            setIsCompacting(false)
+            void queryClient.invalidateQueries({
+              queryKey: messagesQueryKey(sessionId),
+            })
+          },
         })
       })
       .catch((err: unknown) => {
@@ -426,9 +407,10 @@ export const ChatView = memo(function ChatView({
 
     return () => {
       active = false
+      cleanupListeners?.()
       es?.close()
     }
-  }, [openSessionEventSource, queryClient, sessionId])
+  }, [queryClient, sessionId])
 
   // ── Restore scroll position on mount ─────────────────────────────────────────
   // Wait for messages to be available before restoring so scroll heights are correct.
