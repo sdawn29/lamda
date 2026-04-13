@@ -213,13 +213,10 @@ export function TitleBar() {
       {/* Thread title — left edge follows the sidebar (or nav controls in fullscreen) */}
       {activeThread && (
         <div
-          className="group/title flex min-w-0 flex-1 items-center gap-1 px-2"
+          className="flex min-w-0 flex-1 items-center gap-1 px-2"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
-          <div
-            className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden"
-            style={{ minWidth: "min(12rem, 100%)" }}
-          >
+          <div className="flex min-w-0 shrink items-center gap-1">
             {activeWorkspace && (
               <>
                 <span className="max-w-40 min-w-0 shrink truncate text-sm text-muted-foreground/60">
@@ -241,34 +238,34 @@ export function TitleBar() {
                   if (e.key === "Enter") commitRename()
                   if (e.key === "Escape") setIsRenaming(false)
                 }}
-                className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none"
+                className="min-w-0 w-48 bg-transparent text-sm font-medium outline-none"
               />
             ) : (
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              <span className="min-w-0 max-w-xs truncate text-sm font-medium">
                 {activeThread.title}
               </span>
             )}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus:ring-0 focus-visible:outline-none">
+                <MoreHorizontal className="size-3.5" />
+                <span className="sr-only">Thread options</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={startRename}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={handleDeleteThread}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Thread
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover/title:opacity-100 hover:bg-accent hover:text-foreground focus:opacity-100 data-popup-open:opacity-100">
-              <MoreHorizontal className="size-3.5" />
-              <span className="sr-only">Thread options</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={startRename}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={handleDeleteThread}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Thread
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       )}
 
