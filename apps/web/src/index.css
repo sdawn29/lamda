@@ -203,7 +203,7 @@
   .rich-input[data-empty="true"]::before {
     content: attr(data-placeholder);
     color: var(--muted-foreground);
-    display: block;
+    position: absolute;
     pointer-events: none;
   }
 }
