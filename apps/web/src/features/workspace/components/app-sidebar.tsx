@@ -1,6 +1,7 @@
 import { useState } from "react"
 import {
   ChevronRight,
+  ExternalLink,
   FolderOpen,
   MoreHorizontal,
   Plus,
@@ -29,7 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
-import { useOpenPath } from "@/features/electron"
+import { useOpenPath, useOpenWorkspaceWithApp } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
 import { useWorkspace, useCreateWorkspaceAction } from "../context"
 
@@ -37,6 +38,7 @@ export function AppSidebar() {
   const { workspaces, createThread, deleteWorkspace } = useWorkspace()
   const handleCreateWorkspace = useCreateWorkspaceAction()
   const openPathMutation = useOpenPath()
+  const openWithAppMutation = useOpenWorkspaceWithApp()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const navigate = useNavigate()
   const location = useLocation()
@@ -113,12 +115,20 @@ export function AppSidebar() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onClick={() => {
-                              openPathMutation.mutate(ws.path)
-                            }}
+                            onClick={() => openPathMutation.mutate(ws.path)}
                           >
                             <FolderOpen className="mr-2 h-4 w-4" />
                             Find in Finder
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              openWithAppMutation.mutate({
+                                workspacePath: ws.path,
+                              })
+                            }
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Open in Editor
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
