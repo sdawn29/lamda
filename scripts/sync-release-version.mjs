@@ -94,7 +94,9 @@ function syncLockfile(version, workspacePackagePaths) {
   }
 
   for (const packagePath of workspacePackagePaths) {
-    const relativePath = toPosixPath(path.relative(repoRoot, path.dirname(packagePath)));
+    const relativePath = toPosixPath(
+      path.relative(repoRoot, path.dirname(packagePath)),
+    );
     const lockfileEntry = lockfile.packages[relativePath];
 
     if (!lockfileEntry || lockfileEntry.version === version) {
@@ -109,7 +111,14 @@ function syncLockfile(version, workspacePackagePaths) {
     return false;
   }
 
-  const { name, version: nextVersion, lockfileVersion, requires, packages, ...rest } = lockfile;
+  const {
+    name,
+    version: nextVersion,
+    lockfileVersion,
+    requires,
+    packages,
+    ...rest
+  } = lockfile;
 
   writeJson(lockfilePath, {
     name,
@@ -130,7 +139,9 @@ if (!semverPattern.test(requestedVersion)) {
 }
 
 const rootPackage = readJson(rootPackagePath);
-const workspacePackagePaths = expandWorkspacePatterns(rootPackage.workspaces ?? []);
+const workspacePackagePaths = expandWorkspacePatterns(
+  rootPackage.workspaces ?? [],
+);
 const packagePaths = [rootPackagePath, ...workspacePackagePaths];
 let updatedPackageCount = 0;
 
