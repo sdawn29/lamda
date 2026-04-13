@@ -205,9 +205,21 @@ export const ChatView = memo(function ChatView({
   const initialScrollDoneRef = useRef(false)
   const hasTitledRef = useRef(false)
   const initialMessagesRef = useRef<Message[]>([])
+  const latestVisibleMessagesRef = useRef<Message[]>([])
   const chatTextboxRef = useRef<ChatTextboxHandle>(null)
 
   const { setThreadTitle } = useWorkspace()
+
+  const applyLocalMessages = useCallback(
+    (updater: (currentMessages: Message[]) => Message[]) => {
+      setMessages((prev) => {
+        const next = updater(resolveMessages(prev, initialMessagesRef.current))
+        latestVisibleMessagesRef.current = next
+        return next
+      })
+    },
+    []
+  )
 
   // ── Queries ───────────────────────────────────────────────────────────────────
   const { data: messagesData } = useMessages(sessionId)
@@ -231,6 +243,11 @@ export const ChatView = memo(function ChatView({
     hasTitledRef.current = messagesData.length > 0
   }, [messagesData])
 
+  useEffect(() => {
+    if (messages !== null) return
+    latestVisibleMessagesRef.current = messagesData ?? []
+  }, [messages, messagesData])
+
   // ── SSE event stream ──────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true
@@ -247,10 +264,7 @@ export const ChatView = memo(function ChatView({
         cleanupListeners = subscribeToSessionEvents(nextEventSource, {
           onMessageStart: (data) => {
             if (!active || data.message?.role !== "assistant") return
-            setMessages((prev) => [
-              ...resolveMessages(prev, initialMessagesRef.current),
-              createAssistantMessage(),
-            ])
+            applyLocalMessages((prev) => [...prev, createAssistantMessage()])
           },
           onMessageUpdate: (data) => {
             if (!active) return
@@ -264,10 +278,8 @@ export const ChatView = memo(function ChatView({
               return
             }
 
-            setMessages((prev) => {
-              const next = [
-                ...resolveMessages(prev, initialMessagesRef.current),
-              ]
+            applyLocalMessages((prev) => {
+              const next = [...prev]
               const last = next[next.length - 1]
 
               if (last?.role !== "assistant") {
@@ -295,63 +307,52 @@ export const ChatView = memo(function ChatView({
           },
           onToolExecutionStart: (data) => {
             if (!active) return
-            setMessages((prev) =>
-              upsertToolMessage(
-                resolveMessages(prev, initialMessagesRef.current),
-                data.toolCallId,
-                (existing) => ({
-                  role: "tool",
-                  toolCallId: data.toolCallId,
-                  toolName: data.toolName,
-                  args: data.args,
-                  status: "running",
-                  result: existing?.result,
-                })
-              )
+            applyLocalMessages((prev) =>
+              upsertToolMessage(prev, data.toolCallId, (existing) => ({
+                role: "tool",
+                toolCallId: data.toolCallId,
+                toolName: data.toolName,
+                args: data.args,
+                status: "running",
+                result: existing?.result,
+              }))
             )
           },
           onToolExecutionUpdate: (data) => {
             if (!active) return
-            setMessages((prev) =>
-              upsertToolMessage(
-                resolveMessages(prev, initialMessagesRef.current),
-                data.toolCallId,
-                (existing) => ({
-                  role: "tool",
-                  toolCallId: data.toolCallId,
-                  toolName: data.toolName || existing?.toolName || "tool",
-                  args: data.args ?? existing?.args ?? {},
-                  status: "running",
-                  result: data.partialResult,
-                })
-              )
+            applyLocalMessages((prev) =>
+              upsertToolMessage(prev, data.toolCallId, (existing) => ({
+                role: "tool",
+                toolCallId: data.toolCallId,
+                toolName: data.toolName || existing?.toolName || "tool",
+                args: data.args ?? existing?.args ?? {},
+                status: "running",
+                result: data.partialResult,
+              }))
             )
           },
           onToolExecutionEnd: (data) => {
             if (!active) return
-            setMessages((prev) =>
-              upsertToolMessage(
-                resolveMessages(prev, initialMessagesRef.current),
-                data.toolCallId,
-                (existing) => ({
-                  role: "tool",
-                  toolCallId: data.toolCallId,
-                  toolName: data.toolName || existing?.toolName || "tool",
-                  args: existing?.args ?? {},
-                  status: data.isError ? "error" : "done",
-                  result: data.result,
-                })
-              )
+            applyLocalMessages((prev) =>
+              upsertToolMessage(prev, data.toolCallId, (existing) => ({
+                role: "tool",
+                toolCallId: data.toolCallId,
+                toolName: data.toolName || existing?.toolName || "tool",
+                args: existing?.args ?? {},
+                status: data.isError ? "error" : "done",
+                result: data.result,
+              }))
             )
           },
           onAgentEnd: (data) => {
             if (!active) return
-            setMessages((prev) =>
-              finalizeRunningTools(
-                resolveMessages(prev, initialMessagesRef.current),
-                data.messages ?? []
-              )
+            const finalMessages = finalizeRunningTools(
+              latestVisibleMessagesRef.current,
+              data.messages ?? []
             )
+            initialMessagesRef.current = finalMessages
+            queryClient.setQueryData(messagesQueryKey(sessionId), finalMessages)
+            setMessages(null)
             setIsLoading(false)
             void queryClient.invalidateQueries({
               queryKey: messagesQueryKey(sessionId),
@@ -368,18 +369,19 @@ export const ChatView = memo(function ChatView({
           onSdkError: ({ message }) => {
             if (!active) return
             console.error("[session-events]", message)
-            setMessages((prev) =>
-              finalizeRunningTools(
-                resolveMessages(prev, initialMessagesRef.current),
-                [
-                  {
-                    role: "assistant",
-                    stopReason: "error",
-                    errorMessage: message,
-                  },
-                ]
-              )
+            const finalMessages = finalizeRunningTools(
+              latestVisibleMessagesRef.current,
+              [
+                {
+                  role: "assistant",
+                  stopReason: "error",
+                  errorMessage: message,
+                },
+              ]
             )
+            initialMessagesRef.current = finalMessages
+            queryClient.setQueryData(messagesQueryKey(sessionId), finalMessages)
+            setMessages(null)
             setIsLoading(false)
             setIsCompacting(false)
             void queryClient.invalidateQueries({
@@ -410,7 +412,7 @@ export const ChatView = memo(function ChatView({
       cleanupListeners?.()
       es?.close()
     }
-  }, [queryClient, sessionId])
+  }, [applyLocalMessages, queryClient, sessionId])
 
   // ── Restore scroll position on mount ─────────────────────────────────────────
   // Wait for messages to be available before restoring so scroll heights are correct.
@@ -445,6 +447,7 @@ export const ChatView = memo(function ChatView({
     () => messages ?? messagesData ?? [],
     [messages, messagesData]
   )
+
   const commandsByName = useMemo(
     () =>
       new Map((commandsData ?? []).map((command) => [command.name, command])),
@@ -528,10 +531,7 @@ export const ChatView = memo(function ChatView({
       pinnedRef.current = true
       setIsStopped(false)
       localStorage.removeItem(stoppedKey)
-      setMessages((prev) => [
-        ...resolveMessages(prev, initialMessagesRef.current),
-        { role: "user", content: text },
-      ])
+      applyLocalMessages((prev) => [...prev, { role: "user", content: text }])
       setIsLoading(true)
       const model = modelId && provider ? { provider, modelId } : undefined
       sendPromptMutation.mutate(
@@ -544,6 +544,7 @@ export const ChatView = memo(function ChatView({
       generateTitleMutation,
       workspaceId,
       threadId,
+      applyLocalMessages,
       setThreadTitle,
       stoppedKey,
     ]

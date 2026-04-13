@@ -113,9 +113,17 @@ export const ChatTextbox = memo(
       [models]
     )
 
-    const { data: fileData } = useWorkspaceFiles(sessionId)
-    const { data: commandsData, isLoading: commandsLoading } =
-      useSlashCommands(sessionId)
+    const fileMentionOpen = atMention !== null
+    const slashCommandOpen = slashMention !== null
+
+    const { data: fileData, isLoading: filesLoading } = useWorkspaceFiles(
+      sessionId,
+      fileMentionOpen
+    )
+    const { data: commandsData, isLoading: commandsLoading } = useSlashCommands(
+      sessionId,
+      slashCommandOpen
+    )
     const { data: contextUsage } = useContextUsage(sessionId)
 
     const mentionEntries2 = React.useMemo(() => {
@@ -251,7 +259,7 @@ export const ChatTextbox = memo(
           <SlashCommandDropdown
             commands={filteredCommands}
             open={
-              slashMention !== null &&
+              slashCommandOpen &&
               (filteredCommands.length > 0 || commandsLoading)
             }
             isLoading={commandsLoading}
@@ -261,7 +269,10 @@ export const ChatTextbox = memo(
 
           <FileMentionDropdown
             entries={mentionEntries2}
-            open={atMention !== null && mentionEntries2.length > 0}
+            open={
+              fileMentionOpen && (mentionEntries2.length > 0 || filesLoading)
+            }
+            isLoading={filesLoading}
             selectedIndex={atMention?.selectedIndex ?? 0}
             onSelect={handleSelectFile}
           />

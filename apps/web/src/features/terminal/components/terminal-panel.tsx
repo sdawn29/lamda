@@ -96,6 +96,7 @@ export const TerminalPanel = memo(function TerminalPanel({
       fontSize: 13,
       fontFamily:
         '"JetBrains Mono", "Menlo", "Monaco", "Courier New", monospace',
+      scrollback: 500,
       theme: document.documentElement.classList.contains("dark")
         ? DARK_TERMINAL_THEME
         : LIGHT_TERMINAL_THEME,

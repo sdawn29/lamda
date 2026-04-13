@@ -15,6 +15,7 @@ const DEV_SERVER_URL = "http://localhost:5173";
 const PROD_INDEX = isDev
   ? ""
   : path.join(process.resourcesPath, "web", "index.html");
+const EXTERNAL_URL_PROTOCOL_RE = /^(https?:|mailto:)/i;
 console.log(`Running in ${isDev ? "development" : "production"} mode`);
 
 let serverProcess: ChildProcess | null = null;
@@ -137,12 +138,21 @@ async function createWindow() {
     trafficLightPosition: { x: 12, y: 16 },
     webPreferences: {
       contextIsolation: true,
+      devTools: isDev,
       nodeIntegration: false,
       preload: preloadPath,
+      spellcheck: false,
     },
   });
 
   win.once("ready-to-show", () => win.show());
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (EXTERNAL_URL_PROTOCOL_RE.test(url)) {
+      void shell.openExternal(url);
+    }
+
+    return { action: "deny" };
+  });
 
   win.on("enter-full-screen", () => {
     win.webContents.send("fullscreen-changed", true);

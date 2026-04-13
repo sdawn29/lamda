@@ -54,6 +54,7 @@ export function useGitFileDiff(
     queryKey: gitFileDiffKey(sessionId, filePath, statusCode),
     queryFn: () => gitFileDiff(sessionId, filePath, statusCode),
     enabled: enabled && !!sessionId && !!filePath,
+    gcTime: 60 * 1000,
     staleTime: 30_000,
   })
 }

@@ -1,5 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
-import { listMessages, fetchModels, listWorkspaceFiles, fetchSlashCommands, fetchContextUsage } from "./api"
+import {
+  listMessages,
+  fetchModels,
+  listWorkspaceFiles,
+  fetchSlashCommands,
+  fetchContextUsage,
+} from "./api"
 import {
   createAssistantMessage,
   parseAssistantMessageContent,
@@ -63,6 +69,7 @@ export function useMessages(sessionId: string) {
       const { messages: stored } = await listMessages(sessionId)
       return stored.map(storedToMessage)
     },
+    gcTime: 60 * 1000,
     staleTime: 5 * 60 * 1000,
     enabled: !!sessionId,
   })
@@ -86,11 +93,15 @@ export function useModels() {
 export const workspaceFilesQueryKey = (sessionId: string) =>
   chatKeys.workspaceFiles(sessionId)
 
-export function useWorkspaceFiles(sessionId: string | undefined) {
+export function useWorkspaceFiles(
+  sessionId: string | undefined,
+  enabled = true
+) {
   return useQuery({
     queryKey: sessionId ? workspaceFilesQueryKey(sessionId) : chatKeys.all,
     queryFn: () => listWorkspaceFiles(sessionId!),
-    enabled: !!sessionId,
+    enabled: enabled && !!sessionId,
+    gcTime: 60 * 1000,
     staleTime: 30_000,
     select: (data) => data,
   })
@@ -98,12 +109,16 @@ export function useWorkspaceFiles(sessionId: string | undefined) {
 
 // ── Slash commands ────────────────────────────────────────────────────────────
 
-export function useSlashCommands(sessionId: string | undefined) {
+export function useSlashCommands(
+  sessionId: string | undefined,
+  enabled = true
+) {
   return useQuery({
     queryKey: sessionId ? chatKeys.commands(sessionId) : chatKeys.all,
     queryFn: () => fetchSlashCommands(sessionId!),
-    enabled: !!sessionId,
-    staleTime: 30_000,
+    enabled: enabled && !!sessionId,
+    gcTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -114,7 +129,12 @@ export function useContextUsage(sessionId: string | undefined) {
     queryKey: sessionId ? chatKeys.contextUsage(sessionId) : chatKeys.all,
     queryFn: () => fetchContextUsage(sessionId!),
     enabled: !!sessionId,
-    refetchInterval: 1_000,
+    gcTime: 30 * 1000,
+    refetchInterval: () =>
+      typeof document === "undefined" || document.visibilityState !== "visible"
+        ? false
+        : 3_000,
+    refetchIntervalInBackground: false,
     staleTime: 0,
     select: (data) => data.contextUsage,
   })
