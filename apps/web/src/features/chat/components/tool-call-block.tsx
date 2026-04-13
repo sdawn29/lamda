@@ -1,7 +1,7 @@
 import { lazy, memo, Suspense, useMemo, useState } from "react"
 import {
   BookOpenTextIcon,
-  ChevronDownIcon,
+  ChevronRightIcon,
   FileEditIcon,
   FilePlusIcon,
   FolderSearchIcon,
@@ -10,7 +10,6 @@ import {
   SearchIcon,
   TerminalSquareIcon,
   WrenchIcon,
-  XIcon,
 } from "lucide-react"
 import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 
@@ -23,45 +22,24 @@ import type { ToolMessage } from "../types"
 const PrismCode = lazy(() => import("./prism-code"))
 
 function ToolGlyph({ toolName }: { toolName: string }) {
+  const cls = "h-3 w-3 text-muted-foreground/40"
   switch (toolName.toLowerCase()) {
     case "bash":
-      return (
-        <TerminalSquareIcon className="h-3.5 w-3.5 text-muted-foreground" />
-      )
+      return <TerminalSquareIcon className={cls} />
     case "edit":
-      return <FileEditIcon className="h-3.5 w-3.5 text-muted-foreground" />
+      return <FileEditIcon className={cls} />
     case "find":
-      return <FolderSearchIcon className="h-3.5 w-3.5 text-muted-foreground" />
+      return <FolderSearchIcon className={cls} />
     case "grep":
-      return <SearchIcon className="h-3.5 w-3.5 text-muted-foreground" />
+      return <SearchIcon className={cls} />
     case "ls":
-      return <ListTreeIcon className="h-3.5 w-3.5 text-muted-foreground" />
+      return <ListTreeIcon className={cls} />
     case "read":
-      return <BookOpenTextIcon className="h-3.5 w-3.5 text-muted-foreground" />
+      return <BookOpenTextIcon className={cls} />
     case "write":
-      return <FilePlusIcon className="h-3.5 w-3.5 text-muted-foreground" />
+      return <FilePlusIcon className={cls} />
     default:
-      return <WrenchIcon className="h-3.5 w-3.5 text-muted-foreground" />
-  }
-}
-
-function getStatusLabel(status: ToolMessage["status"]): string {
-  switch (status) {
-    case "done":
-      return "Done"
-    case "error":
-      return "Failed"
-    default:
-      return "Running"
-  }
-}
-
-function getStatusClasses(status: ToolMessage["status"]): string {
-  switch (status) {
-    case "error":
-      return "text-destructive/80"
-    default:
-      return "text-muted-foreground/70"
+      return <WrenchIcon className={cls} />
   }
 }
 
@@ -149,10 +127,10 @@ function ReadView({
   const language = detectLanguage(filePath) ?? "text"
 
   return (
-    <div className="max-h-64 overflow-auto rounded-md border border-border/60 text-xs text-muted-foreground/75">
+    <div className="max-h-64 overflow-auto rounded border border-border/30 text-xs text-muted-foreground/60">
       <Suspense
         fallback={
-          <pre className="overflow-auto px-3 py-2 text-xs text-muted-foreground/75">
+          <pre className="overflow-auto px-3 py-2 text-xs text-muted-foreground/60">
             {text}
           </pre>
         }
@@ -162,7 +140,7 @@ function ReadView({
           language={language}
           style={isDark ? jellybeansdark : jellybeanslight}
           fontSize="0.75rem"
-          opacity={live ? 0.6 : 0.82}
+          opacity={live ? 0.5 : 0.72}
         />
       </Suspense>
     </div>
@@ -182,7 +160,6 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const isRead = isReadTool(normalizedToolName, msg.args)
   const readFilePath = isRead ? getReadFilePath(msg.args) : null
 
-  // Edit blocks with a diff start expanded; others start collapsed (unless error)
   const defaultExpanded =
     msg.status === "running" ||
     (isEdit && diff !== null) ||
@@ -198,56 +175,45 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
   const resultText = useMemo(() => getResultText(msg), [msg])
   const summary = argsSummary(msg.args)
-  const statusLabel = getStatusLabel(msg.status)
 
   return (
-    <div
-      className={cn(
-        "self-start2 ml w-full max-w-2xl animate-in text-xs duration-150 fade-in-0 slide-in-from-bottom-1",
-        msg.status === "error" && "text-destructive"
-      )}
-    >
+    <div className="w-full max-w-2xl animate-in text-xs duration-150 fade-in-0 slide-in-from-bottom-1">
       {/* Header */}
       <button
-        className="flex w-full items-center gap-1.5 py-0.5 text-left text-muted-foreground/70 transition-colors hover:text-foreground/80"
+        className="group flex w-full items-center gap-1.5 py-0.5 text-left transition-colors"
         onClick={toggle}
       >
-        <span className="flex size-4 shrink-0 items-center justify-center">
-          <ToolGlyph toolName={msg.toolName} />
-        </span>
-        <span className="shrink-0 font-medium text-foreground/80">
+        <ChevronRightIcon
+          className={cn(
+            "h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform group-hover:text-muted-foreground/50",
+            expanded && "rotate-90"
+          )}
+        />
+        <ToolGlyph toolName={msg.toolName} />
+        <span
+          className={cn(
+            "shrink-0 leading-none text-muted-foreground/60 group-hover:text-muted-foreground/80",
+            msg.status === "error" && "text-destructive/60"
+          )}
+        >
           {msg.toolName}
         </span>
         {summary && (
-          <span className="min-w-0 flex-1 truncate text-muted-foreground/70">
+          <span className="min-w-0 flex-1 truncate leading-none text-muted-foreground/35 group-hover:text-muted-foreground/55">
             {summary}
           </span>
         )}
-        {msg.status !== "done" && (
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1 font-medium",
-              getStatusClasses(msg.status)
-            )}
-          >
-            {msg.status === "running" && (
-              <Loader2Icon className="h-3 w-3 animate-spin" />
-            )}
-            {msg.status === "error" && <XIcon className="h-3 w-3" />}
-            {statusLabel}
-          </span>
+        {msg.status === "running" && (
+          <Loader2Icon className="h-3 w-3 shrink-0 animate-spin text-muted-foreground/40" />
         )}
-        <ChevronDownIcon
-          className={cn(
-            "h-3 w-3 shrink-0 text-muted-foreground transition-transform",
-            expanded && "rotate-180"
-          )}
-        />
+        {msg.status === "error" && (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive/60" />
+        )}
       </button>
 
       {/* Body */}
       {expanded && (
-        <div className="mt-1 ml-2 animate-in border-l border-border/60 pl-5 text-muted-foreground/75 duration-300 fade-in-0 slide-in-from-top-1">
+        <div className="mt-0.5 ml-1.5 animate-in border-l border-border/30 pl-4 duration-200 fade-in-0">
           {/* Edit: show pre-computed diff from SDK */}
           {isEdit && diff !== null && (
             <DiffView
@@ -258,10 +224,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
           {/* Edit running — no diff yet */}
           {isEdit && diff === null && msg.status === "running" && (
-            <div className="flex items-center gap-1.5 text-muted-foreground/70">
-              <Loader2Icon className="size-3 animate-spin" />
-              Editing…
-            </div>
+            <span className="text-muted-foreground/40">Editing…</span>
           )}
 
           {/* Read tool: syntax-highlighted file content */}
@@ -274,10 +237,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
           )}
 
           {isRead && !resultText && msg.status === "running" && (
-            <div className="flex items-center gap-1.5 text-muted-foreground/70">
-              <Loader2Icon className="size-3 animate-spin" />
-              Reading…
-            </div>
+            <span className="text-muted-foreground/40">Reading…</span>
           )}
 
           {/* Non-edit, non-read tools or error fallback */}
@@ -285,7 +245,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             !isRead &&
             resultText &&
             (msg.status === "error" ? (
-              <pre className="max-h-48 overflow-auto break-all whitespace-pre-wrap text-destructive/80">
+              <pre className="max-h-48 overflow-auto break-all whitespace-pre-wrap text-destructive/70">
                 {resultText}
               </pre>
             ) : (
@@ -293,15 +253,12 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             ))}
 
           {!isEdit && !isRead && !resultText && msg.status === "running" && (
-            <div className="flex items-center gap-1.5 text-muted-foreground/70">
-              <Loader2Icon className="size-3 animate-spin" />
-              Waiting for tool output…
-            </div>
+            <span className="text-muted-foreground/40">Running…</span>
           )}
 
           {/* Edit / read error */}
           {(isEdit || isRead) && msg.status === "error" && resultText && (
-            <pre className="max-h-48 overflow-auto break-all whitespace-pre-wrap text-destructive/80">
+            <pre className="max-h-48 overflow-auto break-all whitespace-pre-wrap text-destructive/70">
               {resultText}
             </pre>
           )}
