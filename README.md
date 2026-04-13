@@ -87,6 +87,26 @@ npm run build -w desktop
 
 This builds the web app, bundles the server, rebuilds Electron native dependencies, and writes macOS `arm64` artifacts to `apps/desktop/release/`.
 
+## Automated releases
+
+GitHub Releases are cut automatically from `main` with `release-please`.
+
+- Push conventional commits to `main`
+- `release-please` opens or updates a release PR with the next version and changelog
+- Merging that PR creates the GitHub Release and uploads the packaged desktop binaries
+
+The current release scope is intentionally narrow:
+
+- Single repo-wide version shared by the root package and all workspaces
+- macOS `arm64` artifacts only
+- Unsigned `.dmg` and `.zip` uploads only
+
+While the project stays below `1.0.0`, release versioning is configured so `feat` commits bump the patch version and breaking changes bump the minor version. That keeps the initial automated release on the requested `0.0.1` track from the current `0.0.0` baseline.
+
+The workflow lives in `.github/workflows/release-please.yml` and uses `release-please-config.json` plus `.release-please-manifest.json`.
+
+The workflow uses the default `GITHUB_TOKEN`. If you later need release-generated events to trigger additional workflows, switch the action and upload steps to a dedicated repository secret before adding those downstream automations.
+
 ## Useful commands
 
 ### Root commands
