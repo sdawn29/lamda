@@ -1,4 +1,3 @@
-import { rebuild } from "@electron/rebuild";
 import { build } from "esbuild";
 import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
@@ -7,7 +6,6 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = path.resolve(__dirname, "../..");
-const serverDir = path.resolve(__dirname, "../server");
 const desktopPackageJson = JSON.parse(
   readFileSync(path.join(__dirname, "package.json"), "utf8"),
 );
@@ -40,13 +38,21 @@ function run(command, args, cwd = monorepoRoot) {
 
 await run("npm", ["run", "build", "-w", "web"]);
 
-await rebuild({
-  buildPath: serverDir,
-  electronVersion,
-  arch: "arm64",
-  platform: "darwin",
-  onlyModules: ["better-sqlite3", "node-pty", "@silvia-odwyer/photon-node"],
-});
+// Rebuild native modules for the packaged Electron runtime.
+// Native modules (better-sqlite3, node-pty, photon) are hoisted to the
+// monorepo root node_modules/ — run the CLI from there so it locates them.
+// Note: the @electron/rebuild JS API silently skips rebuilds in this monorepo
+// layout; the CLI is the reliable alternative.
+await run(
+  path.join(monorepoRoot, "node_modules", ".bin", "electron-rebuild"),
+  [
+    "--version", electronVersion,
+    "--arch", "arm64",
+    "--force",
+    "--only", "better-sqlite3,node-pty,@silvia-odwyer/photon-node",
+  ],
+  monorepoRoot,
+);
 
 await run("npm", ["run", "build", "-w", "@lamda/server"]);
 

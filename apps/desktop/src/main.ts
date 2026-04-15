@@ -2,6 +2,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  globalShortcut,
   ipcMain,
   nativeImage,
   shell,
@@ -60,7 +61,16 @@ async function spawnServer(): Promise<number> {
       env: {
         ...process.env,
         PORT: "0",
-        ...(isDev ? {} : { ELECTRON_RUN_AS_NODE: "1" }),
+        ...(isDev
+          ? {}
+          : {
+              ELECTRON_RUN_AS_NODE: "1",
+              // Native addons (better-sqlite3, node-pty, photon) live in
+              // resources/server/addons/ rather than node_modules/ because
+              // electron-builder unconditionally strips root-level node_modules
+              // from extraResources. NODE_PATH makes require('<pkg>') find them.
+              NODE_PATH: path.join(process.resourcesPath, "server", "addons"),
+            }),
       },
       // pipe stdout to read the ready JSON line; inherit stderr for logs
       stdio: ["ignore", "pipe", "inherit"],
@@ -156,14 +166,20 @@ async function createWindow() {
     trafficLightPosition: { x: 12, y: 16 },
     webPreferences: {
       contextIsolation: true,
-      devTools: isDev,
+      devTools: true,
       nodeIntegration: false,
       preload: preloadPath,
       spellcheck: false,
     },
   });
 
-  win.once("ready-to-show", () => win.show());
+  win.once("ready-to-show", () => {
+    win.show();
+    globalShortcut.register("CommandOrControl+Alt+I", () => {
+      const focused = BrowserWindow.getFocusedWindow();
+      if (focused) focused.webContents.toggleDevTools();
+    });
+  });
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (EXTERNAL_URL_PROTOCOL_RE.test(url)) {
       void shell.openExternal(url);
@@ -276,6 +292,7 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", () => {
+  globalShortcut.unregisterAll();
   serverProcess?.kill("SIGTERM");
   serverProcess = null;
 });
