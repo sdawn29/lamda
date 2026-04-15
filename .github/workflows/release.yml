@@ -67,7 +67,9 @@ jobs:
         env:
           # Disable macOS code-signing on CI — remove if you configure signing secrets.
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run build -w desktop
+        # --zip-only skips DMG: GitHub Actions macOS runners don't expose /dev/disk
+        # devices so hdiutil (used by dmgbuild) fails with "Device not configured".
+        run: node apps/desktop/build.mjs --zip-only
 
       - name: Create GitHub Release
         env:
@@ -85,6 +87,5 @@ jobs:
           TAG_NAME: v${{ github.event.inputs.version }}
         run: |
           gh release upload "$TAG_NAME" \
-            "apps/desktop/release/lamda-${{ github.event.inputs.version }}-mac-arm64.dmg" \
             "apps/desktop/release/lamda-${{ github.event.inputs.version }}-mac-arm64.zip" \
             --clobber
