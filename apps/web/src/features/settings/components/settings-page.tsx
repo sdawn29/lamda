@@ -877,7 +877,8 @@ const DEFAULT_COMMIT_PROMPT = `Generate a git commit message for the following s
 function CommitPromptCard() {
   const { data: settings } = useAppSettings()
   const updateSetting = useUpdateAppSetting()
-  const persistedValue = settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? DEFAULT_COMMIT_PROMPT
+  const persistedValue =
+    settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? DEFAULT_COMMIT_PROMPT
   const [value, setValue] = useState(persistedValue)
   const [saved, setSaved] = useState(false)
 
@@ -895,14 +896,20 @@ function CommitPromptCard() {
 
   function handleSave() {
     const trimmed = value.trim()
-    updateSetting.mutate({ key: APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT, value: trimmed })
+    updateSetting.mutate({
+      key: APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT,
+      value: trimmed,
+    })
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
   }
 
   function handleReset() {
     setValue(DEFAULT_COMMIT_PROMPT)
-    updateSetting.mutate({ key: APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT, value: DEFAULT_COMMIT_PROMPT })
+    updateSetting.mutate({
+      key: APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT,
+      value: DEFAULT_COMMIT_PROMPT,
+    })
   }
 
   const isDefault = value.trim() === DEFAULT_COMMIT_PROMPT

@@ -1,10 +1,4 @@
-import {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  useMemo,
-} from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { SparklesIcon, StopCircleIcon } from "lucide-react"
 
@@ -131,19 +125,16 @@ function areMessagesEqual(left: Message, right: Message): boolean {
   }
 
   if (left.role === "assistant" && right.role === "assistant") {
-    return (
-      left.content === right.content &&
-      left.thinking === right.thinking
-    )
+    return left.content === right.content && left.thinking === right.thinking
   }
 
   if (left.role === "tool" && right.role === "tool") {
     return (
-    left.toolCallId === right.toolCallId &&
-    left.toolName === right.toolName &&
-    left.status === right.status &&
-    JSON.stringify(left.args) === JSON.stringify(right.args) &&
-    JSON.stringify(left.result) === JSON.stringify(right.result)
+      left.toolCallId === right.toolCallId &&
+      left.toolName === right.toolName &&
+      left.status === right.status &&
+      JSON.stringify(left.args) === JSON.stringify(right.args) &&
+      JSON.stringify(left.result) === JSON.stringify(right.result)
     )
   }
 
@@ -153,19 +144,14 @@ function areMessagesEqual(left: Message, right: Message): boolean {
 function haveSameMessages(left: Message[], right: Message[]): boolean {
   if (left.length !== right.length) return false
 
-  return left.every((message, index) =>
-    areMessagesEqual(message, right[index])
-  )
+  return left.every((message, index) => areMessagesEqual(message, right[index]))
 }
 
 function getMessageOverlapLength(
   persistedMessages: Message[],
   currentMessages: Message[]
 ): number {
-  const maxOverlap = Math.min(
-    persistedMessages.length,
-    currentMessages.length
-  )
+  const maxOverlap = Math.min(persistedMessages.length, currentMessages.length)
 
   for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
     let matches = true
@@ -196,15 +182,9 @@ function mergePersistedMessages(
   if (persistedMessages.length === 0) return currentMessages
   if (currentMessages.length === 0) return persistedMessages
 
-  const overlap = getMessageOverlapLength(
-    persistedMessages,
-    currentMessages
-  )
+  const overlap = getMessageOverlapLength(persistedMessages, currentMessages)
 
-  return [
-    ...persistedMessages,
-    ...currentMessages.slice(overlap),
-  ]
+  return [...persistedMessages, ...currentMessages.slice(overlap)]
 }
 
 interface ChatViewProps {
@@ -216,7 +196,13 @@ interface ChatViewProps {
   initialIsStopped: boolean
 }
 
-export function ChatView({ sessionId, workspaceId, threadId, initialModelId, initialIsStopped }: ChatViewProps) {
+export function ChatView({
+  sessionId,
+  workspaceId,
+  threadId,
+  initialModelId,
+  initialIsStopped,
+}: ChatViewProps) {
   const queryClient = useQueryClient()
   const showThinkingSetting = useShowThinkingSetting()
   const setThreadStatus = useSetThreadStatus()
@@ -224,11 +210,15 @@ export function ChatView({ sessionId, workspaceId, threadId, initialModelId, ini
   const cachedMessages =
     queryClient.getQueryData<Message[]>(messagesQueryKey(sessionId)) ?? []
   const [messages, setMessages] = useState<Message[] | null>(null)
-  const [isLoading, setIsLoading] = useState(persistedThreadStatus === "running")
+  const [isLoading, setIsLoading] = useState(
+    persistedThreadStatus === "running"
+  )
   const [isStopped, setIsStopped] = useState(initialIsStopped)
   const [isCompacting, setIsCompacting] = useState(false)
   const [gitError, setGitError] = useState<string | null>(null)
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(initialModelId)
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(
+    initialModelId
+  )
   const updateThreadModel = useUpdateThreadModel()
   const updateThreadStopped = useUpdateThreadStopped()
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -285,9 +275,7 @@ export function ChatView({ sessionId, workspaceId, threadId, initialModelId, ini
       const mergedMessages = mergePersistedMessages(messagesData, prev)
       latestVisibleMessagesRef.current = mergedMessages
 
-      return haveSameMessages(prev, mergedMessages)
-        ? prev
-        : mergedMessages
+      return haveSameMessages(prev, mergedMessages) ? prev : mergedMessages
     })
   }, [messagesData])
 
