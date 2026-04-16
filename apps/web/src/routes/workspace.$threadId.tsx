@@ -35,9 +35,12 @@ function WorkspaceThreadRoute() {
   const updateLastAccessed = useUpdateThreadLastAccessed()
 
   useEffect(() => {
-    updateSetting.mutate({ key: APP_SETTINGS_KEYS.ACTIVE_THREAD_ID, value: threadId })
+    updateSetting.mutate({
+      key: APP_SETTINGS_KEYS.ACTIVE_THREAD_ID,
+      value: threadId,
+    })
     updateLastAccessed.mutate(threadId)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId])
 
   let foundWorkspace = null
@@ -69,7 +72,6 @@ function WorkspaceThreadRoute() {
         <ChatView
           key={foundThread.id}
           sessionId={foundThread.sessionId}
-          workspaceName={foundWorkspace.name}
           workspaceId={foundWorkspace.id}
           threadId={foundThread.id}
           initialModelId={foundThread.modelId}
@@ -89,9 +91,7 @@ function WorkspaceThreadRoute() {
 
       {terminalOpen && (
         <Suspense
-          fallback={
-            <div className="h-65 shrink-0 border-t bg-background" />
-          }
+          fallback={<div className="h-65 shrink-0 border-t bg-background" />}
         >
           <TerminalPanel cwd={cwd} />
         </Suspense>

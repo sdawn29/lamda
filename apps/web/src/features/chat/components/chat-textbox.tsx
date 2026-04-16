@@ -58,7 +58,7 @@ export const ChatTextbox = memo(
       onSend,
       isLoading = false,
       onStop,
-      placeholder = "Ask me to write, fix, or explain code… Use @ to mention files",
+      placeholder = "Ask me to write, fix, refactor, review, test, or explain code… Use @ for files and / for commands",
       className,
       branch,
       branches = [],
@@ -277,7 +277,7 @@ export const ChatTextbox = memo(
             onSelect={handleSelectFile}
           />
 
-          <div className="px-3 pt-3 pb-2">
+          <div className="px-3 pt-2 pb-1">
             <RichInput
               ref={richInputRef}
               placeholder={placeholder}
