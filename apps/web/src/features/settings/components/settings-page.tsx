@@ -881,12 +881,17 @@ function CommitPromptCard() {
   const [value, setValue] = useState(persistedValue)
   const [saved, setSaved] = useState(false)
 
-  // Sync local state when persisted value loads
+  // Sync local state when persisted value loads without clobbering unsaved edits.
   const prevPersistedRef = React.useRef(persistedValue)
-  if (prevPersistedRef.current !== persistedValue && value === prevPersistedRef.current) {
-    prevPersistedRef.current = persistedValue
-    setValue(persistedValue)
-  }
+  React.useEffect(() => {
+    if (
+      prevPersistedRef.current !== persistedValue &&
+      value === prevPersistedRef.current
+    ) {
+      prevPersistedRef.current = persistedValue
+      setValue(persistedValue)
+    }
+  }, [persistedValue, value])
 
   function handleSave() {
     const trimmed = value.trim()

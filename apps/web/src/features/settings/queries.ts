@@ -15,7 +15,7 @@ export const appSettingsQueryKey = settingsKeys.app
 export function useAppSettings() {
   return useQuery({
     queryKey: appSettingsQueryKey,
-    queryFn: ({ signal: _ }) => fetchAppSettings(),
+    queryFn: () => fetchAppSettings(),
     staleTime: Infinity,
   })
 }

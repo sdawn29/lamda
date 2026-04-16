@@ -24,7 +24,9 @@ export function useGlobalThreadStatusWatcher() {
             status: "running" | "idle"
           }
           setStatus(threadId, status)
-        } catch {}
+        } catch (error) {
+          console.error("[thread-status]", error)
+        }
       })
     })
 

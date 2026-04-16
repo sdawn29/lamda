@@ -42,7 +42,7 @@ import {
   type Message,
   type ToolMessage,
 } from "../types"
-import { useSetThreadStatus } from "../thread-status-context"
+import { useSetThreadStatus, useThreadStatus } from "../thread-status-context"
 
 // Persists scroll positions across thread switches (survives remounts, cleared on page reload)
 const threadScrollPositions = new Map<string, number>()
@@ -125,6 +125,88 @@ function resolveMessages(
   return prev ?? initialMessages
 }
 
+function areMessagesEqual(left: Message, right: Message): boolean {
+  if (left.role === "user" && right.role === "user") {
+    return left.content === right.content
+  }
+
+  if (left.role === "assistant" && right.role === "assistant") {
+    return (
+      left.content === right.content &&
+      left.thinking === right.thinking
+    )
+  }
+
+  if (left.role === "tool" && right.role === "tool") {
+    return (
+    left.toolCallId === right.toolCallId &&
+    left.toolName === right.toolName &&
+    left.status === right.status &&
+    JSON.stringify(left.args) === JSON.stringify(right.args) &&
+    JSON.stringify(left.result) === JSON.stringify(right.result)
+    )
+  }
+
+  return false
+}
+
+function haveSameMessages(left: Message[], right: Message[]): boolean {
+  if (left.length !== right.length) return false
+
+  return left.every((message, index) =>
+    areMessagesEqual(message, right[index])
+  )
+}
+
+function getMessageOverlapLength(
+  persistedMessages: Message[],
+  currentMessages: Message[]
+): number {
+  const maxOverlap = Math.min(
+    persistedMessages.length,
+    currentMessages.length
+  )
+
+  for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
+    let matches = true
+
+    for (let index = 0; index < overlap; index += 1) {
+      const persistedMessage =
+        persistedMessages[persistedMessages.length - overlap + index]
+      const currentMessage = currentMessages[index]
+
+      if (!areMessagesEqual(persistedMessage, currentMessage)) {
+        matches = false
+        break
+      }
+    }
+
+    if (matches) {
+      return overlap
+    }
+  }
+
+  return 0
+}
+
+function mergePersistedMessages(
+  persistedMessages: Message[],
+  currentMessages: Message[]
+): Message[] {
+  if (persistedMessages.length === 0) return currentMessages
+  if (currentMessages.length === 0) return persistedMessages
+
+  const overlap = getMessageOverlapLength(
+    persistedMessages,
+    currentMessages
+  )
+
+  return [
+    ...persistedMessages,
+    ...currentMessages.slice(overlap),
+  ]
+}
+
 interface ChatViewProps {
   sessionId: string
   workspaceName: string
@@ -138,8 +220,11 @@ export function ChatView({ sessionId, workspaceId, threadId, initialModelId, ini
   const queryClient = useQueryClient()
   const showThinkingSetting = useShowThinkingSetting()
   const setThreadStatus = useSetThreadStatus()
+  const persistedThreadStatus = useThreadStatus(threadId)
+  const cachedMessages =
+    queryClient.getQueryData<Message[]>(messagesQueryKey(sessionId)) ?? []
   const [messages, setMessages] = useState<Message[] | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(persistedThreadStatus === "running")
   const [isStopped, setIsStopped] = useState(initialIsStopped)
   const [isCompacting, setIsCompacting] = useState(false)
   const [gitError, setGitError] = useState<string | null>(null)
@@ -150,9 +235,9 @@ export function ChatView({ sessionId, workspaceId, threadId, initialModelId, ini
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(false)
   const initialScrollDoneRef = useRef(false)
-  const hasTitledRef = useRef(false)
-  const initialMessagesRef = useRef<Message[]>([])
-  const latestVisibleMessagesRef = useRef<Message[]>([])
+  const hasTitledRef = useRef(cachedMessages.length > 0)
+  const initialMessagesRef = useRef<Message[]>(cachedMessages)
+  const latestVisibleMessagesRef = useRef<Message[]>(cachedMessages)
   const chatTextboxRef = useRef<ChatTextboxHandle>(null)
 
   useEffect(() => {
@@ -190,8 +275,20 @@ export function ChatView({ sessionId, workspaceId, threadId, initialModelId, ini
   // ── Track the latest persisted messages for local optimistic updates ──────────
   useEffect(() => {
     if (!messagesData) return
+
     initialMessagesRef.current = messagesData
     hasTitledRef.current = messagesData.length > 0
+
+    setMessages((prev) => {
+      if (prev === null) return prev
+
+      const mergedMessages = mergePersistedMessages(messagesData, prev)
+      latestVisibleMessagesRef.current = mergedMessages
+
+      return haveSameMessages(prev, mergedMessages)
+        ? prev
+        : mergedMessages
+    })
   }, [messagesData])
 
   useEffect(() => {
@@ -215,6 +312,7 @@ export function ChatView({ sessionId, workspaceId, threadId, initialModelId, ini
         cleanupListeners = subscribeToSessionEvents(nextEventSource, {
           onMessageStart: (data) => {
             if (!active || data.message?.role !== "assistant") return
+            setIsLoading(true)
             applyLocalMessages((prev) => [...prev, createAssistantMessage()])
           },
           onMessageUpdate: (data) => {
