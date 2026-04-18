@@ -71,6 +71,7 @@ export function useMessages(sessionId: string) {
     },
     gcTime: 60 * 1000,
     staleTime: 5 * 60 * 1000,
+    refetchOnMount: "always",
     enabled: !!sessionId,
   })
 }
