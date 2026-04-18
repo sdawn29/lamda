@@ -251,28 +251,31 @@ export function SettingsPage() {
     [search]
   )
 
-  // Track active section via IntersectionObserver
+  // Track active section by finding the last section whose top is above 40% of the container height
   useEffect(() => {
     const container = contentRef.current
     if (!container) return
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (isScrollingTo.current) return
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id)
-          }
+    function updateActive() {
+      if (isScrollingTo.current) return
+      const containerRect = container!.getBoundingClientRect()
+      const threshold = containerRect.top + containerRect.height * 0.4
+
+      let active: string | null = null
+      for (const section of SECTIONS) {
+        const el = sectionRefs.current[section.id]
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.top <= threshold) {
+          active = section.id
         }
-      },
-      { root: container, threshold: 0.3, rootMargin: "-10% 0px -60% 0px" }
-    )
+      }
+      if (active) setActiveSection(active)
+    }
 
-    Object.values(sectionRefs.current).forEach((el) => {
-      if (el) observer.observe(el)
-    })
-
-    return () => observer.disconnect()
+    container.addEventListener("scroll", updateActive, { passive: true })
+    updateActive()
+    return () => container.removeEventListener("scroll", updateActive)
   }, [visibleSections])
 
   const scrollToSection = useCallback((id: string) => {
