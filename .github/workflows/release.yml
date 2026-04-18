@@ -14,11 +14,36 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      previous_tag: ${{ steps.tag.outputs.previous_tag }}
     steps:
+      - name: Validate version format
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version '$VERSION'. Expected semver like 0.0.2."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Ensure tag does not already exist
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if git rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::Tag v$VERSION already exists locally."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists on origin."
+            exit 1
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -29,14 +54,26 @@ jobs:
         run: |
           node scripts/sync-release-version.mjs --version ${{ github.event.inputs.version }}
 
-      - name: Commit and tag
+      - name: Commit, tag, and push
+        id: tag
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Capture the previous release tag before creating the new one.
+          # Used by the build job to compute a commit range for release notes.
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+
           git add package.json package-lock.json apps/*/package.json packages/*/package.json
-          git commit -m "release: v${{ github.event.inputs.version }}"
-          git tag "v${{ github.event.inputs.version }}"
-          git push origin main --tags
+          git commit -m "release: v$VERSION"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin main
+          git push origin "v$VERSION"
+
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
 
   build:
     needs: release
@@ -45,11 +82,11 @@ jobs:
     # macos-13 is Intel and cross-compiling native addons to arm64 is unreliable.
     runs-on: macos-14
     steps:
-      - name: Checkout code
+      - name: Checkout tagged commit
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: v${{ github.event.inputs.version }}
+          ref: ${{ needs.release.outputs.tag }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -71,21 +108,113 @@ jobs:
         # devices so hdiutil (used by dmgbuild) fails with "Device not configured".
         run: node apps/desktop/build.mjs --zip-only
 
+      - name: Verify artifact exists
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        working-directory: apps/desktop/release
+        run: |
+          ls -la
+          test -f "lamda-$VERSION-mac-arm64.zip" || {
+            echo "::error::Expected artifact lamda-$VERSION-mac-arm64.zip not found"
+            exit 1
+          }
+
+      - name: Generate release notes
+        env:
+          TAG: ${{ needs.release.outputs.tag }}
+          PREVIOUS_TAG: ${{ needs.release.outputs.previous_tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            RANGE="$PREVIOUS_TAG..$TAG"
+          else
+            RANGE="$TAG"
+          fi
+
+          # Commits are grouped by Conventional Commits prefix so the release
+          # page shows categorized changes even without PR-based workflows.
+          format='%s|%h|%an'
+          all_commits=$(git log --no-merges --pretty=format:"$format" "$RANGE" || true)
+
+          # $1=title, $2=grep pattern, $3=invert flag ("1" means use -v)
+          print_section() {
+            local title="$1"
+            local pattern="$2"
+            local invert="${3:-0}"
+            local flags="-E"
+            if [ "$invert" = "1" ]; then
+              flags="-vE"
+            fi
+            local matches
+            matches=$(printf '%s\n' "$all_commits" | grep $flags "$pattern" || true)
+            # Always skip the release commit itself.
+            matches=$(printf '%s\n' "$matches" | grep -vE '^release(\(|:)' || true)
+            if [ -n "$matches" ]; then
+              echo "### $title"
+              echo ""
+              printf '%s\n' "$matches" | awk -F'|' -v repo="$REPO" '{
+                sub(/^[a-zA-Z]+(\([^)]+\))?:[ ]*/, "", $1);
+                printf "- %s by @%s in [`%s`](https://github.com/%s/commit/%s)\n", $1, $3, $2, repo, $2
+              }'
+              echo ""
+            fi
+          }
+
+          known='^(feat|fix|perf|refactor|docs|build|ci|chore|test|style|release)(\(|:)'
+
+          {
+            echo "## What's Changed"
+            echo ""
+            print_section "✨ Features" "^feat(\\(|:)"
+            print_section "🐛 Bug Fixes" "^fix(\\(|:)"
+            print_section "⚡ Performance" "^perf(\\(|:)"
+            print_section "♻️ Refactors" "^refactor(\\(|:)"
+            print_section "📝 Documentation" "^docs(\\(|:)"
+            print_section "🏗️ Build & CI" "^(build|ci|chore)(\\(|:)"
+            print_section "🧪 Tests" "^test(\\(|:)"
+            print_section "🎨 Styles" "^style(\\(|:)"
+            print_section "📦 Other Changes" "$known" 1
+
+            echo "## 📥 Installation (macOS Apple Silicon)"
+            echo ""
+            echo "1. Download \`lamda-${TAG#v}-mac-arm64.zip\` from the assets below."
+            echo "2. Unzip and move \`lamda.app\` to your Applications folder."
+            echo "3. The app is not code-signed, so on first launch right-click → **Open**, then confirm."
+            echo ""
+
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "**Full Changelog**: https://github.com/$REPO/compare/$PREVIOUS_TAG...$TAG"
+            else
+              echo "**Full Changelog**: https://github.com/$REPO/commits/$TAG"
+            fi
+          } > release-notes.md
+
+          echo "--- release-notes.md ---"
+          cat release-notes.md
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ github.event.inputs.version }}
+          TAG: ${{ needs.release.outputs.tag }}
         run: |
-          gh release create "v$VERSION" \
-            --title "Release v$VERSION" \
-            --generate-notes \
-            || echo "Release may already exist"
+          gh release create "$TAG" \
+            --title "Release $TAG" \
+            --notes-file release-notes.md \
+            --latest \
+            --verify-tag
 
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG_NAME: v${{ github.event.inputs.version }}
+          TAG: ${{ needs.release.outputs.tag }}
+        working-directory: apps/desktop/release
         run: |
-          gh release upload "$TAG_NAME" \
-            "apps/desktop/release/lamda-${{ github.event.inputs.version }}-mac-arm64.zip" \
-            --clobber
+          shopt -s nullglob
+          assets=(lamda-*-mac-arm64.zip lamda-*-mac-arm64.zip.blockmap latest-mac.yml)
+          if [ ${#assets[@]} -eq 0 ]; then
+            echo "::error::No release assets found to upload"
+            exit 1
+          fi
+          gh release upload "$TAG" "${assets[@]}" --clobber
