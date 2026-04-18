@@ -75,10 +75,8 @@ jobs:
 
       - name: Build desktop app
         env:
-          # No signing secrets on CI; build.mjs passes --zip-only because
-          # GitHub's macOS runners can't run hdiutil for DMG creation.
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: node apps/desktop/build.mjs --zip-only
+        run: node apps/desktop/build.mjs
 
       - name: Publish GitHub Release
         env:
@@ -86,9 +84,7 @@ jobs:
           TAG: ${{ needs.tag.outputs.tag }}
         working-directory: apps/desktop/release
         run: |
-          shopt -s nullglob
-          assets=(lamda-*-mac-arm64.zip lamda-*-mac-arm64.zip.blockmap latest-mac.yml)
-          gh release create "$TAG" "${assets[@]}" \
+          gh release create "$TAG" * \
             --title "$TAG" \
             --generate-notes \
             --latest \

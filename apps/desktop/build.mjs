@@ -13,7 +13,6 @@ const electronVersion = String(
   desktopPackageJson.devDependencies.electron,
 ).replace(/^[^\d]*/, "");
 const bundleOnly = process.argv.includes("--bundle-only");
-const zipOnly = process.argv.includes("--zip-only");
 
 function run(command, args, cwd = monorepoRoot) {
   return new Promise((resolve, reject) => {
@@ -121,13 +120,9 @@ await build({
 });
 
 if (!bundleOnly) {
-  // GitHub Actions macOS runners don't expose /dev/disk devices, so hdiutil
-  // (used internally by dmgbuild) fails with "Device not configured".
-  // Pass --zip-only on CI to skip DMG and only produce the ZIP artifact.
-  const targets = zipOnly ? ["zip"] : ["dmg", "zip"];
   await run(
     path.join(monorepoRoot, "node_modules", ".bin", "electron-builder"),
-    ["--mac", ...targets, "--arm64", "--publish", "never"],
+    ["--mac", "dmg", "zip", "--arm64", "--publish", "never"],
     __dirname,
   );
 }
