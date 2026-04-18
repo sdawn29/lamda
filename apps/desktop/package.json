@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "lamda Electron desktop app",
   "main": "dist/main.js",
   "scripts": {
