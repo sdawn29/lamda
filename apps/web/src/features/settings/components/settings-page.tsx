@@ -22,7 +22,6 @@ import {
   GitBranch,
   Keyboard,
   Database,
-  ChevronRight,
 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -68,7 +67,6 @@ import { Separator } from "@/shared/ui/separator"
 import { Textarea } from "@/shared/ui/textarea"
 import {
   useShowThinkingSetting,
-  useThinkingPhrases,
   DEFAULT_THINKING_PHRASES,
 } from "@/shared/lib/thinking-visibility"
 import { useWorkspace } from "@/features/workspace"
@@ -172,7 +170,14 @@ const SECTIONS: SettingsSection[] = [
     label: "Subscriptions",
     icon: Key,
     description: "OAuth sign-in for Claude Pro, GitHub Copilot, etc.",
-    keywords: ["oauth", "subscription", "sign in", "claude pro", "copilot", "login"],
+    keywords: [
+      "oauth",
+      "subscription",
+      "sign in",
+      "claude pro",
+      "copilot",
+      "login",
+    ],
   },
   {
     id: "api-keys",
@@ -218,7 +223,15 @@ const SECTIONS: SettingsSection[] = [
     label: "Data",
     icon: Database,
     description: "Manage and delete application data",
-    keywords: ["delete", "reset", "workspace", "thread", "message", "data", "wipe"],
+    keywords: [
+      "delete",
+      "reset",
+      "workspace",
+      "thread",
+      "message",
+      "data",
+      "wipe",
+    ],
   },
 ]
 
@@ -313,7 +326,7 @@ export function SettingsPage() {
         {/* Search */}
         <div className="p-3 pb-2">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search settings…"
               value={search}
@@ -324,7 +337,7 @@ export function SettingsPage() {
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -335,7 +348,9 @@ export function SettingsPage() {
         {/* Nav */}
         <nav className="flex flex-col gap-0.5 overflow-y-auto px-2 pb-4">
           {visibleSections.length === 0 ? (
-            <p className="px-2 py-3 text-xs text-muted-foreground">No results</p>
+            <p className="px-2 py-3 text-xs text-muted-foreground">
+              No results
+            </p>
           ) : (
             visibleSections.map((section) => {
               const Icon = section.icon
@@ -348,7 +363,7 @@ export function SettingsPage() {
                   className={cn(
                     "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
                     isActive
-                      ? "bg-accent text-accent-foreground font-medium"
+                      ? "bg-accent font-medium text-accent-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
@@ -364,7 +379,15 @@ export function SettingsPage() {
         <div className="mt-auto border-t px-3 py-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             λ<span className="font-mono">Code</span>
-            <Badge variant="outline" className="ml-auto">Alpha</Badge>
+            {import.meta.env.DEV ? (
+              <Badge variant="outline" className="ml-auto">
+                dev
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="ml-auto font-mono">
+                v{__APP_VERSION__}
+              </Badge>
+            )}
           </div>
         </div>
       </aside>
@@ -387,7 +410,9 @@ export function SettingsPage() {
             {visibleSections.some((s) => s.id === "appearance") && (
               <section
                 id="appearance"
-                ref={(el) => { sectionRefs.current["appearance"] = el }}
+                ref={(el) => {
+                  sectionRefs.current["appearance"] = el
+                }}
                 className="scroll-mt-8"
               >
                 <SectionHeader
@@ -403,7 +428,9 @@ export function SettingsPage() {
             {visibleSections.some((s) => s.id === "chat") && (
               <section
                 id="chat"
-                ref={(el) => { sectionRefs.current["chat"] = el }}
+                ref={(el) => {
+                  sectionRefs.current["chat"] = el
+                }}
                 className="scroll-mt-8"
               >
                 <SectionHeader
@@ -419,7 +446,9 @@ export function SettingsPage() {
             {visibleSections.some((s) => s.id === "subscriptions") && (
               <section
                 id="subscriptions"
-                ref={(el) => { sectionRefs.current["subscriptions"] = el }}
+                ref={(el) => {
+                  sectionRefs.current["subscriptions"] = el
+                }}
                 className="scroll-mt-8"
               >
                 <SectionHeader
@@ -435,7 +464,9 @@ export function SettingsPage() {
             {visibleSections.some((s) => s.id === "api-keys") && (
               <section
                 id="api-keys"
-                ref={(el) => { sectionRefs.current["api-keys"] = el }}
+                ref={(el) => {
+                  sectionRefs.current["api-keys"] = el
+                }}
                 className="scroll-mt-8"
               >
                 <SectionHeader
@@ -451,7 +482,9 @@ export function SettingsPage() {
             {visibleSections.some((s) => s.id === "git") && (
               <section
                 id="git"
-                ref={(el) => { sectionRefs.current["git"] = el }}
+                ref={(el) => {
+                  sectionRefs.current["git"] = el
+                }}
                 className="scroll-mt-8"
               >
                 <SectionHeader
@@ -467,7 +500,9 @@ export function SettingsPage() {
             {visibleSections.some((s) => s.id === "shortcuts") && (
               <section
                 id="shortcuts"
-                ref={(el) => { sectionRefs.current["shortcuts"] = el }}
+                ref={(el) => {
+                  sectionRefs.current["shortcuts"] = el
+                }}
                 className="scroll-mt-8"
               >
                 <SectionHeader
@@ -483,7 +518,9 @@ export function SettingsPage() {
             {visibleSections.some((s) => s.id === "data") && (
               <section
                 id="data"
-                ref={(el) => { sectionRefs.current["data"] = el }}
+                ref={(el) => {
+                  sectionRefs.current["data"] = el
+                }}
                 className="scroll-mt-8"
               >
                 <SectionHeader
@@ -498,9 +535,12 @@ export function SettingsPage() {
                         <div className="flex min-w-0 items-start gap-3">
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                           <div>
-                            <p className="text-sm font-medium">Delete all data</p>
+                            <p className="text-sm font-medium">
+                              Delete all data
+                            </p>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                              Permanently removes all workspaces, threads, and messages. This cannot be undone.
+                              Permanently removes all workspaces, threads, and
+                              messages. This cannot be undone.
                             </p>
                           </div>
                         </div>
@@ -528,14 +568,22 @@ export function SettingsPage() {
           <DialogHeader>
             <DialogTitle>Delete all data?</DialogTitle>
             <DialogDescription>
-              This will permanently delete all workspaces, threads, and messages. This action cannot be undone.
+              This will permanently delete all workspaces, threads, and
+              messages. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />} disabled={resetting}>
+            <DialogClose
+              render={<Button variant="outline" />}
+              disabled={resetting}
+            >
               Cancel
             </DialogClose>
-            <Button variant="destructive" onClick={handleReset} disabled={resetting}>
+            <Button
+              variant="destructive"
+              onClick={handleReset}
+              disabled={resetting}
+            >
               {resetting ? "Deleting…" : "Delete all"}
             </Button>
           </DialogFooter>
@@ -586,7 +634,11 @@ function AppearanceCard() {
             <FieldDescription>
               {shortcuts[SHORTCUT_ACTIONS.TOGGLE_THEME] && (
                 <>
-                  Press <ShortcutKbd binding={shortcuts[SHORTCUT_ACTIONS.TOGGLE_THEME]} /> to toggle quickly.
+                  Press{" "}
+                  <ShortcutKbd
+                    binding={shortcuts[SHORTCUT_ACTIONS.TOGGLE_THEME]}
+                  />{" "}
+                  to toggle quickly.
                 </>
               )}
             </FieldDescription>
@@ -650,7 +702,10 @@ function ChatPreferencesCard() {
 
   function handleSavePhrases() {
     const trimmed = phrasesValue.trim()
-    updateSetting.mutate({ key: APP_SETTINGS_KEYS.THINKING_PHRASES, value: trimmed })
+    updateSetting.mutate({
+      key: APP_SETTINGS_KEYS.THINKING_PHRASES,
+      value: trimmed,
+    })
     setPhrasesSaved(true)
     setTimeout(() => setPhrasesSaved(false), 1500)
   }
@@ -658,10 +713,14 @@ function ChatPreferencesCard() {
   function handleResetPhrases() {
     const defaultRaw = DEFAULT_THINKING_PHRASES.join("\n")
     setPhrasesValue(defaultRaw)
-    updateSetting.mutate({ key: APP_SETTINGS_KEYS.THINKING_PHRASES, value: defaultRaw })
+    updateSetting.mutate({
+      key: APP_SETTINGS_KEYS.THINKING_PHRASES,
+      value: defaultRaw,
+    })
   }
 
-  const isDefaultPhrases = phrasesValue.trim() === DEFAULT_THINKING_PHRASES.join("\n")
+  const isDefaultPhrases =
+    phrasesValue.trim() === DEFAULT_THINKING_PHRASES.join("\n")
 
   return (
     <Card>
@@ -670,7 +729,8 @@ function ChatPreferencesCard() {
           <FieldContent>
             <FieldTitle>Show model thinking</FieldTitle>
             <FieldDescription>
-              Display streamed reasoning blocks in chat when the selected model emits thinking deltas.
+              Display streamed reasoning blocks in chat when the selected model
+              emits thinking deltas.
             </FieldDescription>
           </FieldContent>
           <Toggle
@@ -693,9 +753,12 @@ function ChatPreferencesCard() {
 
         <FieldGroup>
           <Field>
-            <FieldLabel htmlFor="thinking-phrases">Agent working phrases</FieldLabel>
+            <FieldLabel htmlFor="thinking-phrases">
+              Agent working phrases
+            </FieldLabel>
             <FieldDescription>
-              Phrases cycled in the loading indicator while the agent is working. One phrase per line.
+              Phrases cycled in the loading indicator while the agent is
+              working. One phrase per line.
             </FieldDescription>
             <Textarea
               id="thinking-phrases"
@@ -710,12 +773,22 @@ function ChatPreferencesCard() {
           </Field>
           <div className="flex justify-end gap-2">
             {!isDefaultPhrases && (
-              <Button variant="ghost" size="sm" onClick={handleResetPhrases} title="Reset to defaults">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleResetPhrases}
+                title="Reset to defaults"
+              >
                 <RotateCcw className="h-3.5 w-3.5" />
                 Reset
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={handleSavePhrases} disabled={phrasesSaved}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSavePhrases}
+              disabled={phrasesSaved}
+            >
               {phrasesSaved ? (
                 <Check data-icon="inline-start" />
               ) : (
@@ -762,7 +835,8 @@ function ShortcutRecorder({
     }
 
     window.addEventListener("keydown", handleKeyDown, { capture: true })
-    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true })
+    return () =>
+      window.removeEventListener("keydown", handleKeyDown, { capture: true })
   }, [recording, action, onSave])
 
   const isDefault = binding === DEFAULT_SHORTCUTS[action]
@@ -775,7 +849,7 @@ function ShortcutRecorder({
         className={cn(
           "flex min-w-24 items-center justify-center rounded-md border px-2 py-1 text-xs transition-colors",
           recording
-            ? "border-ring bg-primary/10 text-primary animate-pulse"
+            ? "animate-pulse border-ring bg-primary/10 text-primary"
             : "border-border bg-transparent hover:border-ring hover:bg-muted/50"
         )}
         title="Click to record a new shortcut"
@@ -827,7 +901,8 @@ function KeyboardShortcutsCard() {
               key={action}
               className={cn(
                 "flex items-center justify-between py-2",
-                i < SHORTCUT_ACTION_ORDER.length - 1 && "border-b border-border/50"
+                i < SHORTCUT_ACTION_ORDER.length - 1 &&
+                  "border-b border-border/50"
               )}
             >
               <span className="text-sm">{SHORTCUT_LABELS[action]}</span>
@@ -928,7 +1003,11 @@ function SubscriptionsCard() {
     try {
       loginId = await startOAuthLoginMutation.mutateAsync(providerId)
     } catch (err) {
-      setLoginState({ status: "error", providerId, message: err instanceof Error ? err.message : String(err) })
+      setLoginState({
+        status: "error",
+        providerId,
+        message: err instanceof Error ? err.message : String(err),
+      })
       return
     }
 
@@ -936,7 +1015,11 @@ function SubscriptionsCard() {
     try {
       es = await openOAuthEventSourceMutation.mutateAsync(loginId)
     } catch (err) {
-      setLoginState({ status: "error", providerId, message: err instanceof Error ? err.message : String(err) })
+      setLoginState({
+        status: "error",
+        providerId,
+        message: err instanceof Error ? err.message : String(err),
+      })
       return
     }
 
@@ -944,15 +1027,32 @@ function SubscriptionsCard() {
     esRef.current = es
 
     es.addEventListener("auth_url", (e) => {
-      const event = JSON.parse((e as MessageEvent).data) as OAuthSseEvent & { type: "auth_url" }
-      setLoginState({ status: "waiting_auth", providerId, loginId, url: event.url, instructions: event.instructions })
+      const event = JSON.parse((e as MessageEvent).data) as OAuthSseEvent & {
+        type: "auth_url"
+      }
+      setLoginState({
+        status: "waiting_auth",
+        providerId,
+        loginId,
+        url: event.url,
+        instructions: event.instructions,
+      })
       void handleOpenExternal(event.url)
     })
 
     es.addEventListener("prompt", (e) => {
-      const event = JSON.parse((e as MessageEvent).data) as OAuthSseEvent & { type: "prompt" }
+      const event = JSON.parse((e as MessageEvent).data) as OAuthSseEvent & {
+        type: "prompt"
+      }
       setPromptValue("")
-      setLoginState({ status: "waiting_prompt", providerId, loginId, promptId: event.promptId, message: event.message, placeholder: event.placeholder })
+      setLoginState({
+        status: "waiting_prompt",
+        providerId,
+        loginId,
+        promptId: event.promptId,
+        message: event.message,
+        placeholder: event.placeholder,
+      })
     })
 
     es.addEventListener("done", () => {
@@ -973,7 +1073,11 @@ function SubscriptionsCard() {
       } else {
         closeEventSource()
         if (!completed) {
-          setLoginState({ status: "error", providerId, message: "Connection lost" })
+          setLoginState({
+            status: "error",
+            providerId,
+            message: "Connection lost",
+          })
         }
       }
     })
@@ -984,18 +1088,32 @@ function SubscriptionsCard() {
     const { loginId, promptId, providerId } = loginState
     setLoginState((s) => ({ ...s, status: "connecting" }) as LoginState)
     try {
-      await respondToOAuthPromptMutation.mutateAsync({ loginId, promptId, value: promptValue })
+      await respondToOAuthPromptMutation.mutateAsync({
+        loginId,
+        promptId,
+        value: promptValue,
+      })
       setPromptValue("")
     } catch (err) {
-      setLoginState({ status: "error", providerId, message: err instanceof Error ? err.message : String(err) })
+      setLoginState({
+        status: "error",
+        providerId,
+        message: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 
   async function handleAbort() {
     closeEventSource()
-    if (loginState.status === "waiting_auth" || loginState.status === "waiting_prompt" || loginState.status === "connecting") {
+    if (
+      loginState.status === "waiting_auth" ||
+      loginState.status === "waiting_prompt" ||
+      loginState.status === "connecting"
+    ) {
       try {
-        await abortOAuthLoginMutation.mutateAsync((loginState as { loginId?: string }).loginId ?? "")
+        await abortOAuthLoginMutation.mutateAsync(
+          (loginState as { loginId?: string }).loginId ?? ""
+        )
       } catch {
         // ignore
       }
@@ -1011,7 +1129,10 @@ function SubscriptionsCard() {
     }
   }
 
-  const activeProviderId = loginState.status !== "idle" ? (loginState as { providerId: string }).providerId : null
+  const activeProviderId =
+    loginState.status !== "idle"
+      ? (loginState as { providerId: string }).providerId
+      : null
 
   return (
     <Card>
@@ -1019,7 +1140,9 @@ function SubscriptionsCard() {
         {isLoading ? (
           <p className="text-xs text-muted-foreground">Loading…</p>
         ) : !providers?.length ? (
-          <p className="text-xs text-muted-foreground">No OAuth providers available.</p>
+          <p className="text-xs text-muted-foreground">
+            No OAuth providers available.
+          </p>
         ) : (
           <div className="flex flex-col gap-3">
             {providers.map((p, i) => {
@@ -1036,28 +1159,50 @@ function SubscriptionsCard() {
                       <p className="text-sm font-medium">{p.name}</p>
                       {showSignedIn && <SuccessBadge>Signed in</SuccessBadge>}
                       {isActive && loginState.status === "error" && (
-                        <span className="text-[10px] text-destructive">{loginState.message}</span>
+                        <span className="text-[10px] text-destructive">
+                          {loginState.message}
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
                       {p.loggedIn && !isActive ? (
-                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleLogout(p.id)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => handleLogout(p.id)}
+                        >
                           <LogOut data-icon="inline-start" />
                           Sign out
                         </Button>
-                      ) : isActive && loginState.status !== "idle" && loginState.status !== "done" && loginState.status !== "error" ? (
-                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAbort}>
+                      ) : isActive &&
+                        loginState.status !== "idle" &&
+                        loginState.status !== "done" &&
+                        loginState.status !== "error" ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={handleAbort}
+                        >
                           Cancel
                         </Button>
                       ) : (
                         <Button
                           size="sm"
                           className="h-7 text-xs"
-                          disabled={isPending || (activeProviderId !== null && activeProviderId !== p.id)}
+                          disabled={
+                            isPending ||
+                            (activeProviderId !== null &&
+                              activeProviderId !== p.id)
+                          }
                           onClick={() => handleLogin(p.id)}
                         >
                           {isPending ? (
-                            <Loader2 data-icon="inline-start" className="animate-spin" />
+                            <Loader2
+                              data-icon="inline-start"
+                              className="animate-spin"
+                            />
                           ) : (
                             <LogIn data-icon="inline-start" />
                           )}
@@ -1072,15 +1217,21 @@ function SubscriptionsCard() {
                       <div className="flex items-start gap-2">
                         <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium">Browser opened for authentication</p>
+                          <p className="text-xs font-medium">
+                            Browser opened for authentication
+                          </p>
                           {loginState.instructions && (
-                            <p className="mt-0.5 text-xs text-muted-foreground">{loginState.instructions}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {loginState.instructions}
+                            </p>
                           )}
                           <Button
                             variant="link"
                             size="sm"
                             className="h-auto justify-start px-0"
-                            onClick={() => void handleOpenExternal(loginState.url)}
+                            onClick={() =>
+                              void handleOpenExternal(loginState.url)
+                            }
                           >
                             <ExternalLink data-icon="inline-start" />
                             Open again
@@ -1092,7 +1243,9 @@ function SubscriptionsCard() {
 
                   {isActive && loginState.status === "waiting_prompt" && (
                     <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-                      <p className="mb-2 text-xs font-medium">{loginState.message}</p>
+                      <p className="mb-2 text-xs font-medium">
+                        {loginState.message}
+                      </p>
                       <div className="flex gap-2">
                         <Input
                           autoFocus
@@ -1100,7 +1253,9 @@ function SubscriptionsCard() {
                           onChange={(e) => setPromptValue(e.target.value)}
                           placeholder={loginState.placeholder ?? "Enter code…"}
                           className="h-7 font-mono text-xs"
-                          onKeyDown={(e) => { if (e.key === "Enter") handlePromptSubmit() }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handlePromptSubmit()
+                          }}
                         />
                         <Button
                           size="sm"
@@ -1134,7 +1289,14 @@ interface ConfigureKeyDialogProps {
   isSaving: boolean
 }
 
-function ConfigureKeyDialog({ provider, savedKey, open, onOpenChange, onSave, isSaving }: ConfigureKeyDialogProps) {
+function ConfigureKeyDialog({
+  provider,
+  savedKey,
+  open,
+  onOpenChange,
+  onSave,
+  isSaving,
+}: ConfigureKeyDialogProps) {
   const [value, setValue] = useState(savedKey)
   const [visible, setVisible] = useState(false)
 
@@ -1145,7 +1307,10 @@ function ConfigureKeyDialog({ provider, savedKey, open, onOpenChange, onSave, is
           <DialogTitle>Configure {provider.label}</DialogTitle>
           <DialogDescription>
             Enter your API key for {provider.label}. It will be saved to{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-[11px]">~/.pi/agent/auth.json</code>.
+            <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+              ~/.pi/agent/auth.json
+            </code>
+            .
           </DialogDescription>
         </DialogHeader>
 
@@ -1163,10 +1328,16 @@ function ConfigureKeyDialog({ provider, savedKey, open, onOpenChange, onSave, is
                 className="font-mono text-sm"
                 autoComplete="off"
                 spellCheck={false}
-                onKeyDown={(e) => { if (e.key === "Enter") onSave(provider.id, value) }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onSave(provider.id, value)
+                }}
               />
               <InputGroupAddon align="inline-end">
-                <InputGroupButton size="icon-xs" onClick={() => setVisible((v) => !v)} aria-label={visible ? "Hide API key" : "Show API key"}>
+                <InputGroupButton
+                  size="icon-xs"
+                  onClick={() => setVisible((v) => !v)}
+                  aria-label={visible ? "Hide API key" : "Show API key"}
+                >
                   {visible ? <EyeOff /> : <Eye />}
                 </InputGroupButton>
               </InputGroupAddon>
@@ -1176,14 +1347,25 @@ function ConfigureKeyDialog({ provider, savedKey, open, onOpenChange, onSave, is
 
         <DialogFooter>
           {savedKey && (
-            <Button variant="ghost" className="mr-auto text-destructive hover:text-destructive" onClick={() => onSave(provider.id, "")} disabled={isSaving}>
+            <Button
+              variant="ghost"
+              className="mr-auto text-destructive hover:text-destructive"
+              onClick={() => onSave(provider.id, "")}
+              disabled={isSaving}
+            >
               Remove key
             </Button>
           )}
-          <DialogClose render={<Button variant="outline" />} disabled={isSaving}>
+          <DialogClose
+            render={<Button variant="outline" />}
+            disabled={isSaving}
+          >
             Cancel
           </DialogClose>
-          <Button onClick={() => onSave(provider.id, value)} disabled={isSaving || value === savedKey}>
+          <Button
+            onClick={() => onSave(provider.id, value)}
+            disabled={isSaving || value === savedKey}
+          >
             {isSaving ? (
               <>
                 <Loader2 data-icon="inline-start" className="animate-spin" />
@@ -1218,10 +1400,15 @@ function ApiKeysCard() {
     [search]
   )
 
-  const configuredCount = API_KEY_PROVIDERS.filter((p) => !!savedKeys?.[p.id]).length
+  const configuredCount = API_KEY_PROVIDERS.filter(
+    (p) => !!savedKeys?.[p.id]
+  ).length
 
   function handleSave(id: string, key: string) {
-    saveProviders({ ...savedKeys, [id]: key }, { onSuccess: () => setOpenFor(null) })
+    saveProviders(
+      { ...savedKeys, [id]: key },
+      { onSuccess: () => setOpenFor(null) }
+    )
   }
 
   return (
@@ -1233,7 +1420,7 @@ function ApiKeysCard() {
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search providers…"
                   value={search}
@@ -1244,7 +1431,7 @@ function ApiKeysCard() {
                   <button
                     type="button"
                     onClick={() => setSearch("")}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                    className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -1257,7 +1444,9 @@ function ApiKeysCard() {
 
             <div className="flex flex-col gap-0">
               {filteredProviders.length === 0 ? (
-                <p className="py-3 text-center text-xs text-muted-foreground">No providers match</p>
+                <p className="py-3 text-center text-xs text-muted-foreground">
+                  No providers match
+                </p>
               ) : (
                 filteredProviders.map(({ id, label, placeholder }, i) => {
                   const hasKey = !!savedKeys?.[id]
@@ -1266,14 +1455,20 @@ function ApiKeysCard() {
                       key={id}
                       className={cn(
                         "flex items-center justify-between px-1 py-2",
-                        i < filteredProviders.length - 1 && "border-b border-border/40"
+                        i < filteredProviders.length - 1 &&
+                          "border-b border-border/40"
                       )}
                     >
                       <div className="flex items-center gap-2">
                         <p className="text-sm">{label}</p>
                         {hasKey && <SuccessBadge>Configured</SuccessBadge>}
                       </div>
-                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setOpenFor(id)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setOpenFor(id)}
+                      >
                         {hasKey ? "Edit" : "Configure"}
                       </Button>
 
@@ -1282,7 +1477,9 @@ function ApiKeysCard() {
                           provider={{ id, label, placeholder }}
                           savedKey={savedKeys?.[id] ?? ""}
                           open={true}
-                          onOpenChange={(open) => { if (!open) setOpenFor(null) }}
+                          onOpenChange={(open) => {
+                            if (!open) setOpenFor(null)
+                          }}
                           onSave={handleSave}
                           isSaving={isPending}
                         />
@@ -1306,27 +1503,37 @@ const DEFAULT_COMMIT_PROMPT = `Generate a git commit message for the following s
 function CommitPromptCard() {
   const { data: settings } = useAppSettings()
   const updateSetting = useUpdateAppSetting()
-  const persistedValue = settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? DEFAULT_COMMIT_PROMPT
+  const persistedValue =
+    settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? DEFAULT_COMMIT_PROMPT
   const [value, setValue] = useState(persistedValue)
   const [saved, setSaved] = useState(false)
 
   const prevPersistedRef = React.useRef(persistedValue)
   React.useEffect(() => {
-    if (prevPersistedRef.current !== persistedValue && value === prevPersistedRef.current) {
+    if (
+      prevPersistedRef.current !== persistedValue &&
+      value === prevPersistedRef.current
+    ) {
       prevPersistedRef.current = persistedValue
       setValue(persistedValue)
     }
   }, [persistedValue, value])
 
   function handleSave() {
-    updateSetting.mutate({ key: APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT, value: value.trim() })
+    updateSetting.mutate({
+      key: APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT,
+      value: value.trim(),
+    })
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
   }
 
   function handleReset() {
     setValue(DEFAULT_COMMIT_PROMPT)
-    updateSetting.mutate({ key: APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT, value: DEFAULT_COMMIT_PROMPT })
+    updateSetting.mutate({
+      key: APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT,
+      value: DEFAULT_COMMIT_PROMPT,
+    })
   }
 
   const isDefault = value.trim() === DEFAULT_COMMIT_PROMPT
@@ -1337,7 +1544,9 @@ function CommitPromptCard() {
       <CardContent className="flex flex-col gap-3 p-4">
         <FieldGroup>
           <Field data-invalid={!hasDiffPlaceholder || undefined}>
-            <FieldLabel htmlFor="commit-message-prompt">Prompt template</FieldLabel>
+            <FieldLabel htmlFor="commit-message-prompt">
+              Prompt template
+            </FieldLabel>
             <FieldDescription>
               Use{" "}
               <code className="rounded bg-muted px-1 py-0.5">{"{diff}"}</code>{" "}
@@ -1365,11 +1574,22 @@ function CommitPromptCard() {
           </Field>
         </FieldGroup>
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" className="px-2" disabled={isDefault} onClick={handleReset}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-2"
+            disabled={isDefault}
+            onClick={handleReset}
+          >
             <RotateCcw data-icon="inline-start" />
             Reset to default
           </Button>
-          <Button size="sm" className="px-3" disabled={!hasDiffPlaceholder || saved} onClick={handleSave}>
+          <Button
+            size="sm"
+            className="px-3"
+            disabled={!hasDiffPlaceholder || saved}
+            onClick={handleSave}
+          >
             {saved ? (
               <>
                 <Check data-icon="inline-start" />

@@ -33,3 +33,5 @@ interface ElectronAPI {
 declare interface Window {
   electronAPI?: ElectronAPI
 }
+
+declare const __APP_VERSION__: string
