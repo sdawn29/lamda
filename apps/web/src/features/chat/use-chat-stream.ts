@@ -8,7 +8,12 @@ import {
   type AgentEndMessage,
 } from "./session-events"
 import { useSetThreadStatus, useThreadStatus } from "./thread-status-context"
-import { createAssistantMessage, type AssistantMessage, type Message, type ToolMessage } from "./types"
+import {
+  createAssistantMessage,
+  type AssistantMessage,
+  type Message,
+  type ToolMessage,
+} from "./types"
 
 interface TurnMeta {
   startTime: number
@@ -334,14 +339,21 @@ export function useChatStream({
       if (meta) {
         const responseTime = Date.now() - meta.startTime
         const lastAssistantIndex = finalMessages.reduceRight(
-          (found, msg, i) => (found === -1 && msg.role === "assistant" ? i : found),
+          (found, msg, i) =>
+            found === -1 && msg.role === "assistant" ? i : found,
           -1
         )
         if (lastAssistantIndex !== -1) {
           const last = finalMessages[lastAssistantIndex] as AssistantMessage
           finalMessages = [
             ...finalMessages.slice(0, lastAssistantIndex),
-            { ...last, model: meta.model, provider: meta.provider, thinkingLevel: meta.thinkingLevel, responseTime },
+            {
+              ...last,
+              model: meta.model,
+              provider: meta.provider,
+              thinkingLevel: meta.thinkingLevel,
+              responseTime,
+            },
             ...finalMessages.slice(lastAssistantIndex + 1),
           ]
         }
@@ -413,7 +425,10 @@ export function useChatStream({
               if (!turnMetaRef.current.model && assistantEvent.partial?.model) {
                 turnMetaRef.current.model = assistantEvent.partial.model
               }
-              if (!turnMetaRef.current.provider && assistantEvent.partial?.provider) {
+              if (
+                !turnMetaRef.current.provider &&
+                assistantEvent.partial?.provider
+              ) {
                 turnMetaRef.current.provider = assistantEvent.partial.provider
               }
             }
