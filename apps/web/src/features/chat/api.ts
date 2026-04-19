@@ -151,6 +151,7 @@ export interface Model {
   name: string
   provider: string
   reasoning: boolean
+  thinkingLevels: string[]
 }
 
 export interface ModelsResponse {

@@ -32,7 +32,7 @@ export interface SessionMessageStartEvent {
 }
 
 export interface SessionMessageUpdateEvent {
-  assistantMessageEvent?: { type: string; delta?: string }
+  assistantMessageEvent?: { type: string; delta?: string; partial?: { model?: string; provider?: string } }
 }
 
 export interface SessionToolExecutionStartEvent {

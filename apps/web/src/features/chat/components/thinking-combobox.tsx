@@ -16,7 +16,7 @@ import {
 
 export type ThinkingLevel = "low" | "medium" | "high" | "xhigh"
 
-const THINKING_LEVELS: {
+const ALL_THINKING_LEVELS: {
   value: ThinkingLevel
   label: string
   icon: React.ReactNode
@@ -46,12 +46,26 @@ const THINKING_LEVELS: {
 export function ThinkingCombobox({
   selected,
   onSelect,
+  availableLevels,
 }: {
   selected: ThinkingLevel
   onSelect: (level: ThinkingLevel) => void
+  availableLevels?: string[]
 }) {
   const [open, setOpen] = React.useState(false)
-  const selectedLevel = THINKING_LEVELS.find((l) => l.value === selected)
+
+  const levels = React.useMemo(() => {
+    if (!availableLevels || availableLevels.length === 0) return ALL_THINKING_LEVELS
+    return ALL_THINKING_LEVELS.filter((l) => availableLevels.includes(l.value))
+  }, [availableLevels])
+
+  const selectedLevel = levels.find((l) => l.value === selected) ?? levels[levels.length - 1]
+
+  React.useEffect(() => {
+    if (selectedLevel && selectedLevel.value !== selected) {
+      onSelect(selectedLevel.value)
+    }
+  }, [selectedLevel, selected, onSelect])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -73,7 +87,7 @@ export function ThinkingCombobox({
         <Command>
           <CommandList>
             <CommandGroup>
-              {THINKING_LEVELS.map((level) => (
+              {levels.map((level) => (
                 <CommandItem
                   key={level.value}
                   value={level.value}

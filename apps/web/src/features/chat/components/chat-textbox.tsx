@@ -383,6 +383,7 @@ export const ChatTextbox = memo(
                 <ThinkingCombobox
                   selected={thinkingLevel}
                   onSelect={setThinkingLevel}
+                  availableLevels={selectedModel.thinkingLevels}
                 />
               )}
             </div>

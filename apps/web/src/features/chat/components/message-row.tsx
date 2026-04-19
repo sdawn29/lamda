@@ -7,8 +7,16 @@ import { markdownComponents } from "./markdown-components"
 import { UserMessageContent } from "./user-message"
 import { ThinkingBlock } from "./thinking-block"
 import { CopyButton } from "@/shared/components/copy-button"
+import { getProviderMeta } from "@/shared/lib/provider-meta"
 import type { SlashCommand } from "../api"
 import { type AssistantMessage, type Message } from "../types"
+
+const THINKING_LEVEL_LABELS: Record<string, string> = {
+  low: "Low",
+  medium: "Med",
+  high: "High",
+  xhigh: "Max",
+}
 
 function assistantCopyText(
   message: AssistantMessage,
@@ -31,6 +39,11 @@ function assistantCopyText(
   return sections.join("\n\n")
 }
 
+function formatResponseTime(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
 function AssistantMessageBlock({
   message,
   showThinking,
@@ -42,6 +55,10 @@ function AssistantMessageBlock({
   const hasContent = message.content.length > 0
 
   if (!hasThinking && !hasContent) return null
+
+  const providerMeta = message.provider ? getProviderMeta(message.provider) : null
+  const thinkingLabel = message.thinkingLevel ? THINKING_LEVEL_LABELS[message.thinkingLevel] : null
+  const hasMeta = !!(message.model ?? message.responseTime != null)
 
   return (
     <div className="group flex animate-in flex-col gap-2 duration-300 fade-in-0 slide-in-from-bottom-1">
@@ -55,7 +72,25 @@ function AssistantMessageBlock({
         </div>
       )}
 
-      <div>
+      <div className="flex items-center gap-3">
+        {hasMeta && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {providerMeta && <span className="shrink-0">{providerMeta.icon}</span>}
+            {message.model && <span>{message.model}</span>}
+            {thinkingLabel && (
+              <>
+                <span className="opacity-40">·</span>
+                <span>{thinkingLabel}</span>
+              </>
+            )}
+            {message.responseTime != null && (
+              <>
+                <span className="opacity-40">·</span>
+                <span>{formatResponseTime(message.responseTime)}</span>
+              </>
+            )}
+          </div>
+        )}
         <CopyButton text={assistantCopyText(message, showThinking)} />
       </div>
     </div>

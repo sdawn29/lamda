@@ -14,6 +14,8 @@ export interface ModelInfo {
   provider: string;
   /** Whether the model supports extended thinking/reasoning. */
   reasoning: boolean;
+  /** Available thinking/effort levels for this model (empty if reasoning is false). */
+  thinkingLevels: string[];
 }
 
 export interface SdkConfig {

@@ -12,9 +12,9 @@ type MessageStartEvent = {
 
 type AssistantMessageDeltaEvent = {
   assistantMessageEvent?:
-    | { type: "text_delta"; delta: string }
-    | { type: "thinking_delta"; delta: string }
-    | { type: string; delta?: string };
+    | { type: "text_delta"; delta: string; partial?: { model?: string; provider?: string } }
+    | { type: "thinking_delta"; delta: string; partial?: { model?: string; provider?: string } }
+    | { type: string; delta?: string; partial?: { model?: string; provider?: string } };
 };
 
 type ToolExecutionStartEvent = {
@@ -72,12 +72,18 @@ class SessionEventHub {
   private nextEventId = 0;
   private runInProgress = false;
   private disposed = false;
+  private turnStartTime: number | null = null;
+  private pendingThinkingLevel: string | null = null;
 
   constructor(
     private readonly sessionId: string,
     private readonly threadId: string,
     private readonly handle: ManagedSessionHandle,
   ) {}
+
+  setNextThinkingLevel(level: string) {
+    this.pendingThinkingLevel = level;
+  }
 
   ensureStarted() {
     if (this.disposed || this.consumeTask) return;
@@ -194,7 +200,12 @@ class SessionEventHub {
     if (event.type === "message_start") {
       const data = event as MessageStartEvent;
       if (data.message?.role === "assistant") {
+        this.turnStartTime = Date.now();
         messageBuffer.startAssistant(this.sessionId, this.threadId);
+        if (this.pendingThinkingLevel) {
+          messageBuffer.setThinkingLevel(this.sessionId, this.pendingThinkingLevel);
+          this.pendingThinkingLevel = null;
+        }
       }
       return;
     }
@@ -209,6 +220,9 @@ class SessionEventHub {
           this.sessionId,
           data.assistantMessageEvent.delta,
         );
+        const partial = data.assistantMessageEvent.partial;
+        if (partial?.model) messageBuffer.setModel(this.sessionId, partial.model);
+        if (partial?.provider) messageBuffer.setProvider(this.sessionId, partial.provider);
       } else if (
         data.assistantMessageEvent?.type === "thinking_delta" &&
         typeof data.assistantMessageEvent.delta === "string"
@@ -217,6 +231,9 @@ class SessionEventHub {
           this.sessionId,
           data.assistantMessageEvent.delta,
         );
+        const partial = data.assistantMessageEvent.partial;
+        if (partial?.model) messageBuffer.setModel(this.sessionId, partial.model);
+        if (partial?.provider) messageBuffer.setProvider(this.sessionId, partial.provider);
       }
       return;
     }
@@ -250,6 +267,10 @@ class SessionEventHub {
 
     if (event.type === "agent_end") {
       this.toolMeta.clear();
+      if (this.turnStartTime !== null) {
+        messageBuffer.setResponseTime(this.sessionId, Date.now() - this.turnStartTime);
+        this.turnStartTime = null;
+      }
       messageBuffer.flush(this.sessionId);
       return;
     }
@@ -314,6 +335,11 @@ class SessionEventRegistry {
     this.hubs.set(sessionId, hub);
     hub.ensureStarted();
     return hub;
+  }
+
+  setNextThinkingLevel(sessionId: string, level: string) {
+    const hub = this.hubs.get(sessionId);
+    hub?.setNextThinkingLevel(level);
   }
 
   async dispose(sessionId: string) {

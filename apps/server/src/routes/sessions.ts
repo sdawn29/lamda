@@ -74,6 +74,7 @@ sessions.post("/session/:id/prompt", async (c) => {
       entry.handle.setThinkingLevel(
         body.thinkingLevel as "off" | "minimal" | "low" | "medium" | "high" | "xhigh",
       );
+      sessionEvents.setNextThinkingLevel(id, body.thinkingLevel);
     }
     await entry.handle.prompt(body.text!);
   };

@@ -8,7 +8,14 @@ import {
   type AgentEndMessage,
 } from "./session-events"
 import { useSetThreadStatus, useThreadStatus } from "./thread-status-context"
-import { createAssistantMessage, type Message, type ToolMessage } from "./types"
+import { createAssistantMessage, type AssistantMessage, type Message, type ToolMessage } from "./types"
+
+interface TurnMeta {
+  startTime: number
+  model?: string
+  provider?: string
+  thinkingLevel?: string
+}
 
 interface UseChatStreamOptions {
   sessionId: string
@@ -23,7 +30,7 @@ interface UseChatStreamResult {
   isLoading: boolean
   isStopped: boolean
   isCompacting: boolean
-  startUserPrompt: (text: string) => void
+  startUserPrompt: (text: string, thinkingLevel?: string) => void
   markStopped: () => void
   markSendFailed: () => void
 }
@@ -268,6 +275,8 @@ export function useChatStream({
   const [isCompacting, setIsCompacting] = useState(false)
   const initialMessagesRef = useRef<Message[]>(cachedMessages)
   const latestVisibleMessagesRef = useRef<Message[]>(cachedMessages)
+  const turnMetaRef = useRef<TurnMeta | null>(null)
+  const pendingThinkingLevelRef = useRef<string | null>(null)
 
   const applyLocalMessages = useCallback(
     (updater: (currentMessages: Message[]) => Message[]) => {
@@ -301,10 +310,29 @@ export function useChatStream({
 
   const finishStreamingRun = useCallback(
     (runMessages: AgentEndMessage[]) => {
-      const finalMessages = finalizeRunningTools(
+      let finalMessages = finalizeRunningTools(
         latestVisibleMessagesRef.current,
         runMessages
       )
+
+      const meta = turnMetaRef.current
+      if (meta) {
+        const responseTime = Date.now() - meta.startTime
+        const lastAssistantIndex = finalMessages.reduceRight(
+          (found, msg, i) => (found === -1 && msg.role === "assistant" ? i : found),
+          -1
+        )
+        if (lastAssistantIndex !== -1) {
+          const last = finalMessages[lastAssistantIndex] as AssistantMessage
+          finalMessages = [
+            ...finalMessages.slice(0, lastAssistantIndex),
+            { ...last, model: meta.model, provider: meta.provider, thinkingLevel: meta.thinkingLevel, responseTime },
+            ...finalMessages.slice(lastAssistantIndex + 1),
+          ]
+        }
+        turnMetaRef.current = null
+      }
+
       commitFinalMessages(finalMessages)
     },
     [commitFinalMessages]
@@ -351,6 +379,11 @@ export function useChatStream({
             if (!active || data.message?.role !== "assistant") return
             setIsLoading(true)
             setIsStopped(false)
+            turnMetaRef.current = {
+              startTime: Date.now(),
+              thinkingLevel: pendingThinkingLevelRef.current ?? undefined,
+            }
+            pendingThinkingLevelRef.current = null
             applyLocalMessages((prev) => [...prev, createAssistantMessage()])
           },
           onMessageUpdate: (data) => {
@@ -359,6 +392,15 @@ export function useChatStream({
             const assistantEvent = data.assistantMessageEvent
             if (!isAssistantDeltaEvent(assistantEvent)) {
               return
+            }
+
+            if (turnMetaRef.current) {
+              if (!turnMetaRef.current.model && assistantEvent.partial?.model) {
+                turnMetaRef.current.model = assistantEvent.partial.model
+              }
+              if (!turnMetaRef.current.provider && assistantEvent.partial?.provider) {
+                turnMetaRef.current.provider = assistantEvent.partial.provider
+              }
             }
 
             applyLocalMessages((prev) =>
@@ -457,9 +499,10 @@ export function useChatStream({
   )
 
   const startUserPrompt = useCallback(
-    (text: string) => {
+    (text: string, thinkingLevel?: string) => {
       setIsStopped(false)
       setIsLoading(true)
+      pendingThinkingLevelRef.current = thinkingLevel ?? null
       applyLocalMessages((prev) => [...prev, { role: "user", content: text }])
     },
     [applyLocalMessages]

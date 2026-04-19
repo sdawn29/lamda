@@ -226,7 +226,7 @@ export function ChatView({
       }
       pinnedRef.current = true
       updateThreadStopped.mutate({ threadId, stopped: false })
-      startUserPrompt(text)
+      startUserPrompt(text, thinkingLevel)
       const model = modelId && provider ? { provider, modelId } : undefined
       sendPromptMutation.mutate(
         { text, model, thinkingLevel },
