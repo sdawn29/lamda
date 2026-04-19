@@ -9,7 +9,7 @@ export function listWorkspacesWithThreads() {
   return ws.map((w) => ({
     ...w,
     threads: th
-      .filter((t) => t.workspaceId === w.id)
+      .filter((t) => t.workspaceId === w.id && !t.isArchived)
       .sort((a, b) => a.createdAt - b.createdAt),
   }))
 }

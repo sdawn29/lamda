@@ -118,6 +118,28 @@ export function updateThreadLastAccessed(threadId: string): Promise<void> {
   })
 }
 
+export function archiveThread(threadId: string): Promise<void> {
+  return apiFetch<void>(`/thread/${threadId}/archive`, { method: "PATCH" })
+}
+
+export function unarchiveThread(threadId: string): Promise<void> {
+  return apiFetch<void>(`/thread/${threadId}/unarchive`, { method: "PATCH" })
+}
+
+export interface ArchivedThreadDto {
+  id: string
+  workspaceId: string
+  workspaceName: string
+  workspacePath: string
+  title: string
+  modelId: string | null
+  createdAt: number
+}
+
+export function listArchivedThreads(): Promise<{ threads: ArchivedThreadDto[] }> {
+  return apiFetch<{ threads: ArchivedThreadDto[] }>("/threads/archived")
+}
+
 export function resetAllData(): Promise<void> {
   return apiFetch<void>("/reset", { method: "DELETE" })
 }

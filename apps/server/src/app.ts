@@ -51,6 +51,9 @@ import {
   insertThread,
   getThread,
   deleteThread,
+  archiveThread,
+  unarchiveThread,
+  listArchivedThreadsWithWorkspace,
   updateThreadTitle,
   updateThreadSessionFile,
   updateThreadModel,
@@ -351,6 +354,27 @@ app.patch("/thread/:id/last-accessed", (c) => {
   const threadId = c.req.param("id");
   updateThreadLastAccessed(threadId);
   return c.json({ ok: true });
+});
+
+app.patch("/thread/:id/archive", (c) => {
+  const threadId = c.req.param("id");
+  const thread = getThread(threadId);
+  if (!thread) return c.json({ error: "Thread not found" }, 404);
+  archiveThread(threadId);
+  return c.json({ ok: true });
+});
+
+app.patch("/thread/:id/unarchive", (c) => {
+  const threadId = c.req.param("id");
+  const thread = getThread(threadId);
+  if (!thread) return c.json({ error: "Thread not found" }, 404);
+  unarchiveThread(threadId);
+  return c.json({ ok: true });
+});
+
+app.get("/threads/archived", (c) => {
+  const archived = listArchivedThreadsWithWorkspace();
+  return c.json({ threads: archived });
 });
 
 app.patch("/workspace/:id/open-with-app", async (c) => {

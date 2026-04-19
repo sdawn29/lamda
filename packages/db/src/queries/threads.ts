@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
-import { eq } from "drizzle-orm"
+import { eq, and, ne } from "drizzle-orm"
 import { db } from "../client.js"
-import { threads } from "../schema.js"
+import { threads, workspaces } from "../schema.js"
 
 export function insertThread(workspaceId: string): string {
   const id = randomUUID()
@@ -33,6 +33,35 @@ export function updateThreadStopped(id: string, isStopped: boolean) {
 
 export function updateThreadLastAccessed(id: string) {
   db.update(threads).set({ lastAccessedAt: Date.now() }).where(eq(threads.id, id)).run()
+}
+
+export function archiveThread(id: string) {
+  db.update(threads).set({ isArchived: true }).where(eq(threads.id, id)).run()
+}
+
+export function unarchiveThread(id: string) {
+  db.update(threads).set({ isArchived: false }).where(eq(threads.id, id)).run()
+}
+
+export function listArchivedThreadsWithWorkspace() {
+  return db
+    .select({
+      id: threads.id,
+      workspaceId: threads.workspaceId,
+      workspaceName: workspaces.name,
+      workspacePath: workspaces.path,
+      title: threads.title,
+      modelId: threads.modelId,
+      isStopped: threads.isStopped,
+      isArchived: threads.isArchived,
+      sessionFile: threads.sessionFile,
+      lastAccessedAt: threads.lastAccessedAt,
+      createdAt: threads.createdAt,
+    })
+    .from(threads)
+    .innerJoin(workspaces, eq(threads.workspaceId, workspaces.id))
+    .where(eq(threads.isArchived, true))
+    .all()
 }
 
 export function deleteThread(id: string) {

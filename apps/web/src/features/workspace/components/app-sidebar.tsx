@@ -1,5 +1,6 @@
 import { useState } from "react"
 import {
+  Archive,
   ChevronRight,
   ExternalLink,
   Folder,
@@ -44,32 +45,94 @@ import { useWorkspace, useCreateWorkspaceAction } from "../context"
 import { useThreadStatus } from "@/features/chat"
 import type { Thread } from "../context"
 import { useSettingsModal } from "@/features/settings"
+import { ArchivedThreadsDialog } from "./archived-threads-dialog"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/shared/ui/alert-dialog"
+
+function relativeTime(ts: number): string {
+  const diff = Math.floor((Date.now() - ts) / 1000)
+  if (diff < 60) return `${diff}s`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`
+  return `${Math.floor(diff / 86400)}d`
+}
 
 function ThreadRow({
   thread,
+  workspaceId,
   isActive,
   onClick,
 }: {
   thread: Thread
+  workspaceId: string
   isActive: boolean
   onClick: () => void
 }) {
+  const [confirming, setConfirming] = useState(false)
   const status = useThreadStatus(thread.id)
+  const { archiveThread } = useWorkspace()
   return (
-    <SidebarMenuSubItem>
-      <SidebarMenuSubButton isActive={isActive} onClick={onClick}>
-        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-          {status === "running" ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/60" />
-          ) : status === "completed" ? (
-            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-          ) : (
-            <span className="h-1.5 w-1.5 rounded-full bg-transparent" />
-          )}
-        </span>
-        <span className="truncate">{thread.title}</span>
-      </SidebarMenuSubButton>
-    </SidebarMenuSubItem>
+    <>
+      <SidebarMenuSubItem className="group/thread">
+        <SidebarMenuSubButton isActive={isActive} onClick={onClick}>
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+            {status === "running" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/60" />
+            ) : status === "completed" ? (
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+            ) : (
+              <span className="h-1.5 w-1.5 rounded-full bg-transparent" />
+            )}
+          </span>
+          <span className="truncate">{thread.title}</span>
+          <span className="ml-auto shrink-0 text-xs text-muted-foreground/50 group-hover/thread:hidden">
+            {relativeTime(thread.createdAt)}
+          </span>
+          <button
+            className="ml-auto hidden shrink-0 rounded p-0.5 text-muted-foreground/50 hover:bg-accent hover:text-foreground group-hover/thread:flex"
+            onClick={(e) => {
+              e.stopPropagation()
+              setConfirming(true)
+            }}
+            title="Archive thread"
+          >
+            <Archive className="h-3.5 w-3.5" />
+          </button>
+        </SidebarMenuSubButton>
+      </SidebarMenuSubItem>
+
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive thread?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{thread.title}" will be hidden from the sidebar. You can restore it anytime from Archived.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirming(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirming(false)
+                archiveThread(workspaceId, thread.id)
+              }}
+            >
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
@@ -79,6 +142,7 @@ export function AppSidebar() {
   const openPathMutation = useOpenPath()
   const openWithAppMutation = useOpenWorkspaceWithApp()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [archivedOpen, setArchivedOpen] = useState(false)
   const navigate = useNavigate()
   const { openSettings } = useSettingsModal()
 
@@ -218,6 +282,7 @@ export function AppSidebar() {
                           <ThreadRow
                             key={thread.id}
                             thread={thread}
+                            workspaceId={ws.id}
                             isActive={activeThreadId === thread.id}
                             onClick={() =>
                               navigate({
@@ -237,6 +302,15 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="border-t border-border p-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          onClick={() => setArchivedOpen(true)}
+        >
+          <Archive />
+          Archived
+        </Button>
         <Tooltip>
           <TooltipTrigger
             render={
@@ -256,6 +330,7 @@ export function AppSidebar() {
           </TooltipContent>
         </Tooltip>
       </SidebarFooter>
+      <ArchivedThreadsDialog open={archivedOpen} onOpenChange={setArchivedOpen} />
     </Sidebar>
   )
 }

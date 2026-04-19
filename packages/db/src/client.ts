@@ -56,6 +56,7 @@ function createDb() {
       session_file     TEXT,
       model_id         TEXT,
       is_stopped       INTEGER NOT NULL DEFAULT 0,
+      is_archived      INTEGER NOT NULL DEFAULT 0,
       last_accessed_at INTEGER,
       created_at       INTEGER NOT NULL
     );
@@ -70,6 +71,10 @@ function createDb() {
 
     CREATE UNIQUE INDEX IF NOT EXISTS workspaces_path_unique ON workspaces(path);
   `);
+
+  // Incremental migrations
+  try { sqlite.exec(`ALTER TABLE threads ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0`) } catch {}
+
 
   return db;
 }

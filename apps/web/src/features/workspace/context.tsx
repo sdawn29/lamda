@@ -8,6 +8,7 @@ import {
   useDeleteWorkspace as useDeleteWorkspaceMutation,
   useCreateThread as useCreateThreadMutation,
   useDeleteThread as useDeleteThreadMutation,
+  useArchiveThread as useArchiveThreadMutation,
   useUpdateThreadTitle,
   useResetAll as useResetAllMutation,
 } from "./mutations"
@@ -23,6 +24,7 @@ interface WorkspaceContextValue {
   deleteWorkspace: (workspace: Workspace) => Promise<void>
   createThread: (workspaceId: string) => Promise<Thread>
   deleteThread: (workspaceId: string, threadId: string) => Promise<void>
+  archiveThread: (workspaceId: string, threadId: string) => Promise<void>
   setThreadTitle: (workspaceId: string, threadId: string, title: string) => void
   resetAll: () => Promise<void>
 }
@@ -36,6 +38,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const deleteWorkspaceMutation = useDeleteWorkspaceMutation()
   const createThreadMutation = useCreateThreadMutation()
   const deleteThreadMutation = useDeleteThreadMutation()
+  const archiveThreadMutation = useArchiveThreadMutation()
   const updateTitleMutation = useUpdateThreadTitle()
   const resetAllMutation = useResetAllMutation()
 
@@ -72,6 +75,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [deleteThreadMutation]
   )
 
+  const archiveThread = useCallback(
+    async (workspaceId: string, threadId: string): Promise<void> => {
+      await archiveThreadMutation.mutateAsync({ workspaceId, threadId })
+    },
+    [archiveThreadMutation]
+  )
+
   const setThreadTitle = useCallback(
     (workspaceId: string, threadId: string, title: string) => {
       updateTitleMutation.mutate({ workspaceId, threadId, title })
@@ -92,6 +102,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         deleteWorkspace,
         createThread,
         deleteThread,
+        archiveThread,
         setThreadTitle,
         resetAll,
       }}

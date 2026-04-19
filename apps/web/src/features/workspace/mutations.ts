@@ -10,6 +10,8 @@ import {
   updateWorkspaceOpenWithApp as apiUpdateWorkspaceOpenWithApp,
   createThread as apiCreateThread,
   deleteThread as apiDeleteThread,
+  archiveThread as apiArchiveThread,
+  unarchiveThread as apiUnarchiveThread,
   updateThreadTitle as apiUpdateThreadTitle,
   updateThreadModel as apiUpdateThreadModel,
   updateThreadStopped as apiUpdateThreadStopped,
@@ -276,5 +278,37 @@ export function useUpdateThreadStopped() {
 export function useUpdateThreadLastAccessed() {
   return useMutation({
     mutationFn: (threadId: string) => apiUpdateThreadLastAccessed(threadId),
+  })
+}
+
+export function useArchiveThread() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ threadId }: { workspaceId: string; threadId: string }) =>
+      apiArchiveThread(threadId),
+    onSuccess: (_data, { workspaceId, threadId }) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((workspace) =>
+          workspace.id !== workspaceId
+            ? workspace
+            : {
+                ...workspace,
+                threads: workspace.threads.filter((t) => t.id !== threadId),
+              }
+        )
+      )
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+      queryClient.invalidateQueries({ queryKey: ["threads", "archived"] })
+    },
+  })
+}
+
+export function useUnarchiveThread() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (threadId: string) => apiUnarchiveThread(threadId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
   })
 }
