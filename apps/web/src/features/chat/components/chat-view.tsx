@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
-import { SparklesIcon, StopCircleIcon, ArrowDownIcon } from "lucide-react"
+import { SparklesIcon, StopCircleIcon, ArrowDownIcon, Code2Icon, BugIcon, TestTubeIcon } from "lucide-react"
 
 import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
@@ -15,6 +15,7 @@ import {
   AlertDialogAction,
 } from "@/shared/ui/alert-dialog"
 import { Button } from "@/shared/ui/button"
+import { Badge } from "@/shared/ui/badge"
 import { useWorkspace } from "@/features/workspace"
 import { useSlashCommands } from "../queries"
 import { useBranch } from "@/features/git/queries"
@@ -274,32 +275,35 @@ export function ChatView({
           className="flex w-full flex-1 flex-col overflow-y-auto pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {visibleMessages.length === 0 && !isLoading && (
-            <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-4 px-6 text-center select-none">
-              <span className="text-6xl font-light text-muted-foreground/20">
-                λ
-              </span>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Start a conversation
-                </p>
-                <p className="text-xs text-muted-foreground/60">
-                  Ask me to write, fix, or explain code
-                </p>
+            <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-5 px-6 text-center select-none">
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex size-14 items-center justify-center rounded-2xl border border-border/40 bg-muted/50 shadow-sm">
+                  <span className="text-3xl font-light text-muted-foreground/40 leading-none select-none">λ</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-semibold text-foreground/80">
+                    How can I help?
+                  </p>
+                  <p className="text-xs text-muted-foreground/60">
+                    Use <kbd className="rounded border border-border/60 bg-muted px-1 py-0.5 font-mono text-[10px]">@</kbd> for files and <kbd className="rounded border border-border/60 bg-muted px-1 py-0.5 font-mono text-[10px]">/</kbd> for commands
+                  </p>
+                </div>
               </div>
-              <div className="mt-1 flex flex-wrap justify-center gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
                 {[
-                  "Explain this codebase to me",
-                  "Find and fix bugs in my code",
-                  "Write tests for my functions",
-                ].map((prompt) => (
+                  { icon: Code2Icon, text: "Explain this codebase" },
+                  { icon: BugIcon, text: "Find and fix bugs" },
+                  { icon: TestTubeIcon, text: "Write tests" },
+                ].map(({ icon: Icon, text: prompt }) => (
                   <Button
                     key={prompt}
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => chatTextboxRef.current?.setValue(prompt)}
-                    className="h-auto"
+                    className="h-auto gap-1.5 text-muted-foreground hover:text-foreground"
                   >
+                    <Icon className="h-3.5 w-3.5" />
                     {prompt}
                   </Button>
                 ))}
@@ -326,15 +330,19 @@ export function ChatView({
           <div className="mx-auto w-full max-w-2xl px-6">
             {isLoading && <ThinkingIndicator className="py-0.5" />}
             {isCompacting && (
-              <div className="flex animate-in items-center gap-1.5 self-start text-muted-foreground/60 duration-200 fade-in-0">
-                <SparklesIcon className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-xs">Compacting context…</span>
+              <div className="flex animate-in duration-200 fade-in-0">
+                <Badge variant="secondary" className="gap-1">
+                  <SparklesIcon />
+                  Compacting context…
+                </Badge>
               </div>
             )}
             {isStopped && !isLoading && (
-              <div className="flex animate-in items-center gap-1.5 self-start text-muted-foreground/60 duration-200 fade-in-0">
-                <StopCircleIcon className="h-3.5 w-3.5 shrink-0 text-destructive" />
-                <span className="text-xs">Interrupted</span>
+              <div className="flex animate-in duration-200 fade-in-0">
+                <Badge variant="destructive" className="gap-1">
+                  <StopCircleIcon />
+                  Interrupted
+                </Badge>
               </div>
             )}
           </div>

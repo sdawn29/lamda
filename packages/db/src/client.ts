@@ -26,8 +26,20 @@ function resolveDbPath(): string {
   return join(dir, DB_FILENAME);
 }
 
+export const dbPath = resolveDbPath();
+
+let sqliteHandle: Database.Database | null = null;
+
+export function closeDb(): void {
+  if (sqliteHandle?.open) {
+    sqliteHandle.close();
+    sqliteHandle = null;
+  }
+}
+
 function createDb() {
-  const sqlite = new Database(resolveDbPath(), { timeout: 10000 });
+  const sqlite = new Database(dbPath, { timeout: 10000 });
+  sqliteHandle = sqlite;
 
   sqlite.pragma("busy_timeout = 10000");
   sqlite.pragma("journal_mode = WAL");

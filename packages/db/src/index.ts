@@ -1,4 +1,4 @@
-export { db } from "./client.js"
+export { db, dbPath, closeDb } from "./client.js"
 export * from "./schema.js"
 export * from "./queries/settings.js"
 export * from "./queries/workspaces.js"

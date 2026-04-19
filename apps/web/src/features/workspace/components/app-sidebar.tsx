@@ -96,16 +96,22 @@ function ThreadRow({
           <span className="ml-auto shrink-0 text-xs text-muted-foreground/50 group-hover/thread:hidden">
             {relativeTime(thread.createdAt)}
           </span>
-          <button
-            className="ml-auto hidden shrink-0 rounded p-0.5 text-muted-foreground/50 hover:bg-accent hover:text-foreground group-hover/thread:flex"
-            onClick={(e) => {
-              e.stopPropagation()
-              setConfirming(true)
-            }}
-            title="Archive thread"
-          >
-            <Archive className="h-3.5 w-3.5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  className="ml-auto hidden shrink-0 rounded p-0.5 text-muted-foreground/50 hover:bg-accent hover:text-foreground group-hover/thread:flex"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setConfirming(true)
+                  }}
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                </button>
+              }
+            />
+            <TooltipContent>Archive thread</TooltipContent>
+          </Tooltip>
         </SidebarMenuSubButton>
       </SidebarMenuSubItem>
 
@@ -191,8 +197,15 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {workspaces.length === 0 ? (
-                <div className="my-2 text-center text-muted-foreground">
-                  No workspaces available
+                <div className="my-3 flex flex-col items-center gap-2.5 px-2 text-center">
+                  <div className="flex size-9 items-center justify-center rounded-xl border border-border/50 bg-muted/50">
+                    <FolderOpen className="size-4 text-muted-foreground/60" />
+                  </div>
+                  <p className="text-xs text-muted-foreground/70">No workspaces yet</p>
+                  <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={handleCreateWorkspace}>
+                    <Plus className="h-3 w-3" />
+                    Add workspace
+                  </Button>
                 </div>
               ) : (
                 workspaces.map((ws) => (

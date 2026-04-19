@@ -124,7 +124,7 @@ async function spawnServer(): Promise<number> {
             resolve(msg.port);
           }
         } catch {
-          // Non-JSON stdout lines after ready — ignore
+          process.stderr.write(line + "\n");
         }
       }
     });

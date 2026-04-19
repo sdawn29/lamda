@@ -314,7 +314,11 @@ export function SettingsPage() {
     try {
       await resetAll()
       setShowConfirm(false)
-    } finally {
+      // Restart the server (spawns fresh process with a new empty DB),
+      // then hard-reload the page to clear all in-memory state.
+      await window.electronAPI?.restartServer()
+      window.location.reload()
+    } catch {
       setResetting(false)
     }
   }

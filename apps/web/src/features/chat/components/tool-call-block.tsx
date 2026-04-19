@@ -199,6 +199,9 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         {msg.status === "running" && (
           <Loader2Icon className="h-3 w-3 shrink-0 animate-spin text-muted-foreground/40" />
         )}
+        {msg.status === "done" && (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500/50" />
+        )}
         {msg.status === "error" && (
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive/60" />
         )}
