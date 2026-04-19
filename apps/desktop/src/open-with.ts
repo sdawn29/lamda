@@ -1,4 +1,4 @@
-import { app, nativeImage } from "electron";
+import { createRequire } from "node:module";
 import { execFile } from "node:child_process";
 import {
   access,
@@ -11,6 +11,8 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+
+const { app, nativeImage } = createRequire(import.meta.url)("electron") as typeof import("electron");
 
 const execFileAsync = promisify(execFile);
 

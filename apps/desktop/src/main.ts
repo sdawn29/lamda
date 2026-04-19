@@ -8,6 +8,7 @@ import {
   shell,
 } from "electron";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
@@ -15,6 +16,9 @@ import {
   listOpenWithApps,
   openWorkspaceWithApp,
 } from "./open-with.js";
+
+const require = createRequire(import.meta.url);
+const { autoUpdater } = require("electron-updater") as typeof import("electron-updater");
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -43,6 +47,14 @@ type ServerStatus = {
   error: string | null;
 };
 
+type UpdateStatus =
+  | { phase: "idle" }
+  | { phase: "checking" }
+  | { phase: "available"; version: string; releaseNotes: string | null }
+  | { phase: "downloading"; version: string; percent: number; bytesPerSecond: number; total: number }
+  | { phase: "ready"; version: string }
+  | { phase: "error"; message: string };
+
 const SERVER_READY_TIMEOUT_MS = 15_000;
 const STDERR_TAIL_LIMIT = 8_000;
 
@@ -54,10 +66,69 @@ let serverStatus: ServerStatus = {
 };
 let quitting = false;
 let preloadPathPromise: Promise<string> | null = null;
+let updateStatus: UpdateStatus = { phase: "idle" };
+let pendingUpdateVersion = "";
 
 type SelectFolderOptions = {
   canCreateFolder?: boolean;
 };
+
+function setUpdateStatus(next: UpdateStatus) {
+  updateStatus = next;
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("update-status-changed", next);
+    }
+  }
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+
+  autoUpdater.on("checking-for-update", () => {
+    setUpdateStatus({ phase: "checking" });
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    pendingUpdateVersion = info.version;
+    setUpdateStatus({
+      phase: "available",
+      version: info.version,
+      releaseNotes: typeof info.releaseNotes === "string" ? info.releaseNotes : null,
+    });
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    setUpdateStatus({ phase: "idle" });
+  });
+
+  autoUpdater.on("download-progress", (p) => {
+    setUpdateStatus({
+      phase: "downloading",
+      version: pendingUpdateVersion,
+      percent: p.percent,
+      bytesPerSecond: p.bytesPerSecond,
+      total: p.total,
+    });
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    setUpdateStatus({ phase: "ready", version: info.version });
+  });
+
+  autoUpdater.on("error", (err) => {
+    setUpdateStatus({ phase: "error", message: err.message });
+  });
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err: Error) => {
+      setUpdateStatus({ phase: "error", message: err.message });
+    });
+  }, 10_000);
+}
 
 function setServerStatus(next: ServerStatus) {
   serverStatus = next;
@@ -365,7 +436,29 @@ app.whenReady().then(async () => {
     shell.openExternal(url);
   });
 
+  ipcMain.handle("get-update-status", () => updateStatus);
+
+  ipcMain.handle("check-for-updates", async () => {
+    if (!app.isPackaged) return updateStatus;
+    try {
+      await autoUpdater.checkForUpdates();
+    } catch (err) {
+      setUpdateStatus({ phase: "error", message: err instanceof Error ? err.message : String(err) });
+    }
+    return updateStatus;
+  });
+
+  ipcMain.handle("download-update", async () => {
+    if (!app.isPackaged) return;
+    await autoUpdater.downloadUpdate();
+  });
+
+  ipcMain.handle("install-update", () => {
+    autoUpdater.quitAndInstall();
+  });
+
   await createWindow();
+  setupAutoUpdater();
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import {
   Archive,
   ChevronRight,
@@ -57,12 +58,22 @@ import {
   AlertDialogCancel,
 } from "@/shared/ui/alert-dialog"
 
-function relativeTime(ts: number): string {
-  const diff = Math.floor((Date.now() - ts) / 1000)
+function relativeTime(ts: number, now = Date.now()): string {
+  const diff = Math.floor((now - ts) / 1000)
   if (diff < 60) return `${diff}s`
   if (diff < 3600) return `${Math.floor(diff / 60)}m`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`
   return `${Math.floor(diff / 86400)}d`
+}
+
+function useNow() {
+  const { data = Date.now() } = useQuery({
+    queryKey: ["now"],
+    queryFn: () => Date.now(),
+    refetchInterval: 60_000,
+    staleTime: 0,
+  })
+  return data
 }
 
 function ThreadRow({
@@ -78,6 +89,7 @@ function ThreadRow({
 }) {
   const [confirming, setConfirming] = useState(false)
   const status = useThreadStatus(thread.id)
+  const now = useNow()
   const { archiveThread } = useWorkspace()
   return (
     <>
@@ -94,7 +106,7 @@ function ThreadRow({
           </span>
           <span className="truncate">{thread.title}</span>
           <span className="ml-auto shrink-0 text-xs text-muted-foreground/50 group-hover/thread:hidden">
-            {relativeTime(thread.createdAt)}
+            {relativeTime(thread.createdAt, now)}
           </span>
           <Tooltip>
             <TooltipTrigger

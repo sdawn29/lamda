@@ -101,3 +101,27 @@ export function subscribeToFullscreen(
 ): () => void {
   return getElectronAPI()?.onFullscreenChange(callback) ?? (() => {})
 }
+
+export type ElectronUpdateStatus = UpdateStatus
+
+export async function getUpdateStatus(): Promise<ElectronUpdateStatus> {
+  return (await getElectronAPI()?.getUpdateStatus()) ?? { phase: "idle" }
+}
+
+export function subscribeToUpdateStatus(
+  callback: (status: ElectronUpdateStatus) => void
+): () => void {
+  return getElectronAPI()?.onUpdateStatusChange(callback) ?? (() => {})
+}
+
+export async function checkForUpdates(): Promise<ElectronUpdateStatus> {
+  return (await getElectronAPI()?.checkForUpdates()) ?? { phase: "idle" }
+}
+
+export async function downloadUpdate(): Promise<void> {
+  await getElectronAPI()?.downloadUpdate()
+}
+
+export async function installUpdate(): Promise<void> {
+  await getElectronAPI()?.installUpdate()
+}

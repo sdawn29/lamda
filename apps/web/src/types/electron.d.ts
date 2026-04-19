@@ -14,6 +14,14 @@ interface ServerStatus {
   error: string | null
 }
 
+type UpdateStatus =
+  | { phase: "idle" }
+  | { phase: "checking" }
+  | { phase: "available"; version: string; releaseNotes: string | null }
+  | { phase: "downloading"; version: string; percent: number; bytesPerSecond: number; total: number }
+  | { phase: "ready"; version: string }
+  | { phase: "error"; message: string }
+
 interface ElectronAPI {
   platform: string
   selectFolder: (options?: SelectFolderOptions) => Promise<string | null>
@@ -28,6 +36,11 @@ interface ElectronAPI {
   openExternal: (url: string) => Promise<void>
   getFullscreen: () => Promise<boolean>
   onFullscreenChange: (callback: (isFullscreen: boolean) => void) => () => void
+  getUpdateStatus: () => Promise<UpdateStatus>
+  checkForUpdates: () => Promise<UpdateStatus>
+  downloadUpdate: () => Promise<void>
+  installUpdate: () => Promise<void>
+  onUpdateStatusChange: (callback: (status: UpdateStatus) => void) => () => void
 }
 
 declare interface Window {

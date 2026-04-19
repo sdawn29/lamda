@@ -17,7 +17,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@lamda/server": "*"
+    "@lamda/server": "*",
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
@@ -60,6 +61,11 @@
         ]
       }
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "sdawn29",
+      "repo": "lambda"
+    },
     "mac": {
       "icon": "assets/icon.icns",
       "category": "public.app-category.developer-tools",

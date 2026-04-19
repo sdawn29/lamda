@@ -12,9 +12,11 @@ import {
   getOpenWithAppIcon,
   getServerPort,
   getServerStatus,
+  getUpdateStatus,
   listOpenWithApps,
   subscribeToFullscreen,
   subscribeToServerStatus,
+  subscribeToUpdateStatus,
   type OpenWithApp,
 } from "./api"
 
@@ -29,6 +31,7 @@ export const electronKeys = {
   openWithApps: [...electronRootKey, "open-with-apps"] as const,
   openWithAppIcon: (appId: string) =>
     [...electronRootKey, "open-with-app-icon", appId] as const,
+  updateStatus: [...electronRootKey, "update-status"] as const,
 }
 
 export function electronPlatformQueryOptions() {
@@ -149,6 +152,28 @@ export function useOpenWithAppIcons(appIds: string[], enabled = true) {
       }
     },
   })
+}
+
+export function electronUpdateStatusQueryOptions() {
+  return queryOptions({
+    queryKey: electronKeys.updateStatus,
+    queryFn: getUpdateStatus,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+export function useElectronUpdateStatus() {
+  const queryClient = useQueryClient()
+  const query = useQuery(electronUpdateStatusQueryOptions())
+
+  useEffect(() => {
+    return subscribeToUpdateStatus((status) => {
+      queryClient.setQueryData(electronKeys.updateStatus, status)
+    })
+  }, [queryClient])
+
+  return query
 }
 
 export type { OpenWithApp }

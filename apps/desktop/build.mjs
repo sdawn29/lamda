@@ -104,7 +104,7 @@ await build({
   outfile: path.join(__dirname, "dist/main.js"),
   minify: true,
   sourcemap: false,
-  external: ["electron", "esbuild"],
+  external: ["electron", "esbuild", "electron-updater"],
 });
 
 await build({
@@ -120,9 +120,10 @@ await build({
 });
 
 if (!bundleOnly) {
+  const publishFlag = process.env.PUBLISH === "1" ? "always" : "never";
   await run(
     path.join(monorepoRoot, "node_modules", ".bin", "electron-builder"),
-    ["--mac", "dmg", "zip", "--arm64", "--publish", "never"],
+    ["--mac", "dmg", "zip", "--arm64", "--publish", publishFlag],
     __dirname,
   );
 }

@@ -16,6 +16,14 @@ type ServerStatus = {
   error: string | null;
 };
 
+type UpdateStatus =
+  | { phase: "idle" }
+  | { phase: "checking" }
+  | { phase: "available"; version: string; releaseNotes: string | null }
+  | { phase: "downloading"; version: string; percent: number; bytesPerSecond: number; total: number }
+  | { phase: "ready"; version: string }
+  | { phase: "error"; message: string };
+
 contextBridge.exposeInMainWorld("electronAPI", {
   platform: process.platform,
   selectFolder: (options?: SelectFolderOptions) =>
@@ -44,5 +52,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
       callback(isFullscreen);
     ipcRenderer.on("fullscreen-changed", handler);
     return () => ipcRenderer.removeListener("fullscreen-changed", handler);
+  },
+  getUpdateStatus: (): Promise<UpdateStatus> =>
+    ipcRenderer.invoke("get-update-status"),
+  checkForUpdates: (): Promise<UpdateStatus> =>
+    ipcRenderer.invoke("check-for-updates"),
+  downloadUpdate: (): Promise<void> =>
+    ipcRenderer.invoke("download-update"),
+  installUpdate: (): Promise<void> =>
+    ipcRenderer.invoke("install-update"),
+  onUpdateStatusChange: (callback: (status: UpdateStatus) => void) => {
+    const handler = (_: unknown, status: UpdateStatus) => callback(status);
+    ipcRenderer.on("update-status-changed", handler);
+    return () => ipcRenderer.removeListener("update-status-changed", handler);
   },
 });

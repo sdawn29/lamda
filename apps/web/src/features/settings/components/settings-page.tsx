@@ -19,6 +19,8 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  RefreshCw,
+  Download,
 } from "lucide-react"
 
 import { Badge } from "@/shared/ui/badge"
@@ -75,6 +77,13 @@ import {
 } from "@/shared/lib/keyboard-shortcuts"
 import { useConfigureProvider } from "../configure-provider-context"
 import { cn } from "@/shared/lib/utils"
+import {
+  useElectronUpdateStatus,
+  useCheckForUpdates,
+  useDownloadUpdate,
+  useInstallUpdate,
+  type ElectronUpdateStatus,
+} from "@/features/electron"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -172,6 +181,13 @@ const SECTIONS: SettingsSection[] = [
       "binding",
       "keys",
     ],
+  },
+  {
+    id: "updates",
+    label: "Updates",
+    icon: RefreshCw,
+    description: "App version and automatic update controls",
+    keywords: ["update", "version", "install", "download", "upgrade", "release"],
   },
   {
     id: "data",
@@ -475,6 +491,24 @@ export function SettingsPage() {
                   description="Customize bindings for all actions. Click a binding to record a new one."
                 />
                 <KeyboardShortcutsCard />
+              </section>
+            )}
+
+            {/* ── Updates ── */}
+            {visibleSections.some((s) => s.id === "updates") && (
+              <section
+                id="updates"
+                ref={(el) => {
+                  sectionRefs.current["updates"] = el
+                }}
+                className="scroll-mt-8"
+              >
+                <SectionHeader
+                  icon={RefreshCw}
+                  title="Updates"
+                  description="Manage app updates and view the current version."
+                />
+                <UpdateCard />
               </section>
             )}
 
@@ -910,6 +944,139 @@ function ProviderEntryCard({ title, description, onClick }: { title: string; des
       </CardContent>
     </Card>
   )
+}
+
+// ── Update card ────────────────────────────────────────────────────────────────
+
+function UpdateCard() {
+  const { data: status } = useElectronUpdateStatus()
+  const checkForUpdates = useCheckForUpdates()
+  const downloadUpdate = useDownloadUpdate()
+  const installUpdate = useInstallUpdate()
+  const isElectron = !!window.electronAPI
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4 p-4">
+        <Field orientation="horizontal">
+          <FieldContent>
+            <FieldTitle>Current version</FieldTitle>
+            <FieldDescription>
+              {import.meta.env.DEV ? "dev build" : `v${__APP_VERSION__}`}
+            </FieldDescription>
+          </FieldContent>
+          {isElectron && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => checkForUpdates.mutate()}
+              disabled={
+                checkForUpdates.isPending ||
+                status?.phase === "checking" ||
+                status?.phase === "downloading"
+              }
+            >
+              <RefreshCw
+                className={cn(
+                  "mr-1.5 h-3.5 w-3.5",
+                  (checkForUpdates.isPending || status?.phase === "checking") &&
+                    "animate-spin"
+                )}
+              />
+              Check for updates
+            </Button>
+          )}
+        </Field>
+
+        {isElectron && status && status.phase !== "idle" && (
+          <>
+            <Separator />
+            <UpdateStatusRow
+              status={status}
+              onDownload={() => downloadUpdate.mutate()}
+              onInstall={() => installUpdate.mutate()}
+              isDownloading={downloadUpdate.isPending}
+            />
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function UpdateStatusRow({
+  status,
+  onDownload,
+  onInstall,
+  isDownloading,
+}: {
+  status: ElectronUpdateStatus
+  onDownload: () => void
+  onInstall: () => void
+  isDownloading: boolean
+}) {
+  switch (status.phase) {
+    case "idle":
+      return null
+    case "checking":
+      return (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+          Checking for updates…
+        </div>
+      )
+    case "available":
+      return (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-xs">
+            <Download className="h-3.5 w-3.5 text-primary" />
+            <span>
+              Version <strong>{status.version}</strong> is available
+            </span>
+          </div>
+          <Button size="sm" onClick={onDownload} disabled={isDownloading}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            Download
+          </Button>
+        </div>
+      )
+    case "downloading":
+      return (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Downloading update…</span>
+            <span className="tabular-nums">{Math.round(status.percent)}%</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-300"
+              style={{ width: `${status.percent}%` }}
+            />
+          </div>
+        </div>
+      )
+    case "ready":
+      return (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-xs">
+            <Check className="h-3.5 w-3.5 text-green-500" />
+            <span>
+              Version <strong>{status.version}</strong> ready to install
+            </span>
+          </div>
+          <Button size="sm" onClick={onInstall}>
+            Restart & install
+          </Button>
+        </div>
+      )
+    case "error":
+      return (
+        <div className="flex items-center gap-2 text-xs text-destructive">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          <span className="truncate">{status.message}</span>
+        </div>
+      )
+  }
 }
 
 // ── Commit prompt card ─────────────────────────────────────────────────────────
