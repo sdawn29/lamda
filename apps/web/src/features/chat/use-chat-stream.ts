@@ -38,6 +38,10 @@ interface UseChatStreamResult {
 interface AssistantDeltaEvent {
   type: "text_delta" | "thinking_delta"
   delta: string
+  partial?: {
+    model?: string
+    provider?: string
+  }
 }
 
 function isAssistantDeltaEvent(
@@ -45,12 +49,23 @@ function isAssistantDeltaEvent(
     | {
         type: string
         delta?: string
+        partial?: {
+          model?: string
+          provider?: string
+        }
       }
     | undefined
 ): value is AssistantDeltaEvent {
   return Boolean(
     value &&
     typeof value.delta === "string" &&
+    (value.partial === undefined ||
+      (typeof value.partial === "object" &&
+        value.partial !== null &&
+        (value.partial.model === undefined ||
+          typeof value.partial.model === "string") &&
+        (value.partial.provider === undefined ||
+          typeof value.partial.provider === "string"))) &&
     (value.type === "text_delta" || value.type === "thinking_delta")
   )
 }

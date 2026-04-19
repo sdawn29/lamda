@@ -77,7 +77,10 @@ export function createAssistantMessage(
 
 export function parseAssistantMessageContent(
   content: string
-): Pick<AssistantMessage, "content" | "thinking" | "model" | "responseTime"> {
+): Pick<
+  AssistantMessage,
+  "content" | "thinking" | "model" | "provider" | "thinkingLevel" | "responseTime"
+> {
   try {
     const parsed = JSON.parse(content) as unknown
     if (isStoredAssistantMessageContent(parsed)) {
