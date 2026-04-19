@@ -1,3 +1,5 @@
 export { SettingsPage } from "./components/settings-page"
 export { SettingsModal } from "./components/settings-modal"
 export { SettingsModalProvider, useSettingsModal } from "./context"
+export { ConfigureProviderProvider, useConfigureProvider } from "./configure-provider-context"
+export { ConfigureProviderModal } from "./components/configure-provider-modal"

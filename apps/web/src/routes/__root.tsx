@@ -7,12 +7,17 @@ import { TooltipProvider } from "@/shared/ui/tooltip"
 import { WorkspaceProvider, useWorkspace } from "@/features/workspace"
 import { TerminalProvider } from "@/features/terminal"
 import { DiffPanelProvider } from "@/features/git"
-import { ThreadStatusProvider, useGlobalThreadStatusWatcher } from "@/features/chat"
 import {
-  ServerUnavailable,
-  useElectronServerStatus,
-} from "@/features/electron"
-import { SettingsModalProvider, SettingsModal } from "@/features/settings"
+  ThreadStatusProvider,
+  useGlobalThreadStatusWatcher,
+} from "@/features/chat"
+import { ServerUnavailable, useElectronServerStatus } from "@/features/electron"
+import {
+  SettingsModalProvider,
+  SettingsModal,
+  ConfigureProviderProvider,
+  ConfigureProviderModal,
+} from "@/features/settings"
 
 function RootLayoutInner() {
   const { isLoading } = useWorkspace()
@@ -50,18 +55,21 @@ function RootLayoutGate() {
   }
 
   return (
-    <SettingsModalProvider>
-      <WorkspaceProvider>
-        <ThreadStatusProvider>
-          <TerminalProvider>
-            <DiffPanelProvider>
-              <RootLayoutInner />
-              <SettingsModal />
-            </DiffPanelProvider>
-          </TerminalProvider>
-        </ThreadStatusProvider>
-      </WorkspaceProvider>
-    </SettingsModalProvider>
+    <ConfigureProviderProvider>
+      <SettingsModalProvider>
+        <WorkspaceProvider>
+          <ThreadStatusProvider>
+            <TerminalProvider>
+              <DiffPanelProvider>
+                <RootLayoutInner />
+                <SettingsModal />
+                <ConfigureProviderModal />
+              </DiffPanelProvider>
+            </TerminalProvider>
+          </ThreadStatusProvider>
+        </WorkspaceProvider>
+      </SettingsModalProvider>
+    </ConfigureProviderProvider>
   )
 }
 

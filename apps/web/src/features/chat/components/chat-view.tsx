@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
-import { SparklesIcon, StopCircleIcon, ArrowDownIcon, Code2Icon, BugIcon, TestTubeIcon } from "lucide-react"
+import { SparklesIcon, StopCircleIcon, ArrowDownIcon, Code2Icon, BugIcon, TestTubeIcon, PlugZapIcon } from "lucide-react"
 
 import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
@@ -22,6 +22,8 @@ import { useBranch } from "@/features/git/queries"
 import { useBranches } from "@/features/git/queries"
 import { useCheckoutBranch } from "@/features/git/mutations"
 import { useAbortSession, useGenerateTitle, useSendPrompt } from "../mutations"
+import { useModels } from "../queries"
+import { useConfigureProvider } from "@/features/settings"
 import { ThinkingIndicator } from "./thinking-indicator"
 import { useShowThinkingSetting } from "@/shared/lib/thinking-visibility"
 import {
@@ -49,6 +51,9 @@ export function ChatView({
   initialIsStopped,
 }: ChatViewProps) {
   const showThinkingSetting = useShowThinkingSetting()
+  const { data: models, isLoading: modelsLoading } = useModels()
+  const { openConfigure } = useConfigureProvider()
+  const noProvider = !modelsLoading && (!models?.models?.length)
   const {
     visibleMessages,
     hasConversationHistory,
@@ -269,6 +274,22 @@ export function ChatView({
       </AlertDialog>
 
       <div className="relative flex min-w-0 flex-1 flex-col">
+        {noProvider && (
+          <div className="flex shrink-0 items-center gap-3 border-b border-amber-500/20 bg-amber-500/5 px-4 py-2.5">
+            <PlugZapIcon className="h-4 w-4 shrink-0 text-amber-500" />
+            <p className="min-w-0 flex-1 text-xs text-amber-600 dark:text-amber-400">
+              No model provider configured. Add an API key or sign in to start chatting.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 shrink-0 border-amber-500/30 text-xs hover:bg-amber-500/10"
+              onClick={() => openConfigure("subscriptions")}
+            >
+              Configure provider
+            </Button>
+          </div>
+        )}
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
