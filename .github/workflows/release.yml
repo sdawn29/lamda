@@ -87,3 +87,42 @@ jobs:
             --generate-notes \
             --latest \
             --verify-tag
+
+  rollback:
+    runs-on: ubuntu-latest
+    needs: [tag, release]
+    if: failure()
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Delete remote tag if it exists
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            git push origin --delete "v$VERSION"
+            echo "Deleted tag v$VERSION from origin."
+          else
+            echo "Tag v$VERSION not on origin, skipping."
+          fi
+
+      - name: Revert version bump commit if pushed
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          COMMIT=$(git log origin/main --oneline | grep " release: v$VERSION$" | head -1 | awk '{print $1}')
+          if [ -n "$COMMIT" ]; then
+            git revert "$COMMIT" --no-edit
+            git push origin main
+            echo "Reverted commit $COMMIT on main."
+          else
+            echo "Release commit not on origin/main, skipping."
+          fi
