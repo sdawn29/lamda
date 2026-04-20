@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo, memo } from "react"
+import { useCallback, useEffect, useState, useMemo, memo, useRef } from "react"
 import {
   ChevronRight,
   Loader2,
@@ -25,11 +25,7 @@ import {
   Minimize2,
 } from "lucide-react"
 import { Button } from "@/shared/ui/button"
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/shared/ui/tooltip"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -39,11 +35,7 @@ import {
 import { DiffView, type DiffMode } from "./diff-view"
 import { useDiffPanel } from "../context"
 import { cn } from "@/shared/lib/utils"
-import {
-  useGitStatus,
-  useGitStashList,
-  useGitFileDiff,
-} from "../queries"
+import { useGitStatus, useGitStashList, useGitFileDiff } from "../queries"
 import {
   useGitStage,
   useGitStageAll,
@@ -79,21 +71,42 @@ function statusLabel(file: ChangedFile): string {
 }
 
 const STATUS_META: Record<string, { bg: string; text: string }> = {
-  M: { bg: "bg-yellow-500/15 dark:bg-yellow-400/10", text: "text-yellow-600 dark:text-yellow-400" },
-  "M*": { bg: "bg-yellow-500/15 dark:bg-yellow-400/10", text: "text-yellow-600 dark:text-yellow-400" },
-  A: { bg: "bg-green-500/15 dark:bg-green-400/10", text: "text-green-600 dark:text-green-400" },
-  D: { bg: "bg-red-500/15 dark:bg-red-400/10", text: "text-red-600 dark:text-red-400" },
-  U: { bg: "bg-blue-500/15 dark:bg-blue-400/10", text: "text-blue-600 dark:text-blue-400" },
-  R: { bg: "bg-purple-500/15 dark:bg-purple-400/10", text: "text-purple-600 dark:text-purple-400" },
+  M: {
+    bg: "bg-yellow-500/15 dark:bg-yellow-400/10",
+    text: "text-yellow-600 dark:text-yellow-400",
+  },
+  "M*": {
+    bg: "bg-yellow-500/15 dark:bg-yellow-400/10",
+    text: "text-yellow-600 dark:text-yellow-400",
+  },
+  A: {
+    bg: "bg-green-500/15 dark:bg-green-400/10",
+    text: "text-green-600 dark:text-green-400",
+  },
+  D: {
+    bg: "bg-red-500/15 dark:bg-red-400/10",
+    text: "text-red-600 dark:text-red-400",
+  },
+  U: {
+    bg: "bg-blue-500/15 dark:bg-blue-400/10",
+    text: "text-blue-600 dark:text-blue-400",
+  },
+  R: {
+    bg: "bg-purple-500/15 dark:bg-purple-400/10",
+    text: "text-purple-600 dark:text-purple-400",
+  },
 }
 
 function StatusBadge({ file }: { file: ChangedFile }) {
   const label = statusLabel(file)
-  const meta = STATUS_META[label] ?? { bg: "bg-muted", text: "text-muted-foreground" }
+  const meta = STATUS_META[label] ?? {
+    bg: "bg-muted",
+    text: "text-muted-foreground",
+  }
   return (
     <span
       className={cn(
-        "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-0.5 font-mono text-[10px] font-semibold leading-none",
+        "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-0.5 font-mono text-[10px] leading-none font-semibold",
         meta.bg,
         meta.text
       )}
@@ -240,7 +253,10 @@ function FileAccordionItem({
     true
   )
 
-  const counts = useMemo(() => (diff != null ? parseDiffCounts(diff) : null), [diff])
+  const counts = useMemo(
+    () => (diff != null ? parseDiffCounts(diff) : null),
+    [diff]
+  )
 
   async function handleToggle(e: React.MouseEvent) {
     e.stopPropagation()
@@ -266,14 +282,15 @@ function FileAccordionItem({
 
   const pathParts = file.filePath.split("/")
   const fileName = pathParts[pathParts.length - 1] ?? file.filePath
-  const dirPath = pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : null
+  const dirPath =
+    pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : null
 
   return (
     <div className="group/file border-b border-border/30 last:border-0">
-      <div className="flex w-full items-center hover:bg-muted/40 transition-colors">
+      <div className="flex w-full items-center transition-colors hover:bg-muted/40">
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-2.5 pr-1 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+          className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-1 pl-2.5 text-left focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
         >
           <ChevronRight
             className={cn(
@@ -282,7 +299,7 @@ function FileAccordionItem({
             )}
           />
           <StatusBadge file={file} />
-          <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
+          <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden pr-2">
             <span className="shrink-0 font-mono text-xs font-medium text-foreground/85">
               {fileName}
             </span>
@@ -298,7 +315,7 @@ function FileAccordionItem({
         </button>
 
         {/* Action buttons — zero width until row is hovered */}
-        <div className="flex shrink-0 items-center gap-0.5 overflow-hidden max-w-0 group-hover/file:max-w-20 transition-all duration-150 group-hover/file:pr-1">
+        <div className="flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden transition-all duration-150 group-hover/file:max-w-20 group-hover/file:pr-1">
           {!file.isUntracked && (
             <Tooltip>
               <TooltipTrigger
@@ -488,7 +505,10 @@ function StashSection({ sessionId }: { sessionId: string }) {
 
   const stashes = useMemo(() => parseStashList(stashRaw ?? ""), [stashRaw])
 
-  const handleApply = useCallback((ref: string) => apply.mutateAsync(ref), [apply])
+  const handleApply = useCallback(
+    (ref: string) => apply.mutateAsync(ref),
+    [apply]
+  )
   const handlePop = useCallback((ref: string) => pop.mutateAsync(ref), [pop])
   const handleDrop = useCallback((ref: string) => drop.mutateAsync(ref), [drop])
 
@@ -505,7 +525,7 @@ function StashSection({ sessionId }: { sessionId: string }) {
           )}
         />
         <Archive className="h-3 w-3 shrink-0 text-muted-foreground/50" />
-        <span className="flex-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+        <span className="flex-1 text-[10px] font-semibold tracking-widest text-muted-foreground/50 uppercase">
           Stashes
         </span>
         {isLoading && (
@@ -573,7 +593,7 @@ function FilesSection({
             !collapsed && "rotate-90"
           )}
         />
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+        <span className="text-[10px] font-semibold tracking-widest text-muted-foreground/50 uppercase">
           {label}
         </span>
         {files.length > 0 && (
@@ -654,7 +674,9 @@ interface DiffPanelProps {
   sessionId: string
 }
 
-export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) {
+export const DiffPanel = memo(function DiffPanel({
+  sessionId,
+}: DiffPanelProps) {
   const { close, isFullscreen, setIsFullscreen } = useDiffPanel()
   const [mode, setMode] = useState<DiffMode>("inline")
   const [sortMode, setSortMode] = useState<SortMode>("name")
@@ -674,8 +696,14 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
       .filter(Boolean)
       .map(parseStatusLine)
     return {
-      staged: applySortMode(all.filter((f) => f.isStaged), sortMode),
-      unstaged: applySortMode(all.filter((f) => !f.isStaged), sortMode),
+      staged: applySortMode(
+        all.filter((f) => f.isStaged),
+        sortMode
+      ),
+      unstaged: applySortMode(
+        all.filter((f) => !f.isStaged),
+        sortMode
+      ),
     }
   }, [statusRaw, sortMode])
 
@@ -783,11 +811,15 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
                   ) : (
                     <Maximize2 className="h-3.5 w-3.5" />
                   )}
-                  <span className="sr-only">{isFullscreen ? "Exit fullscreen" : "Fullscreen"}</span>
+                  <span className="sr-only">
+                    {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                  </span>
                 </Button>
               }
             />
-            <TooltipContent>{isFullscreen ? "Exit fullscreen" : "Fullscreen"}</TooltipContent>
+            <TooltipContent>
+              {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            </TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger

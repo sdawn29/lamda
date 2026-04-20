@@ -82,7 +82,7 @@ function WorkspaceThreadRoute() {
   }
 
   return (
-    <ResizablePanelGroup orientation="vertical" className="h-full">
+    <ResizablePanelGroup orientation="vertical" className="h-full border-t">
       <ResizablePanel defaultSize={50} minSize={30}>
         <ResizablePanelGroup orientation="horizontal">
           <ResizablePanel defaultSize={50} minSize={30}>
@@ -114,7 +114,7 @@ function WorkspaceThreadRoute() {
       {terminalOpen && (
         <>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={33.33} minSize={20}>
+          <ResizablePanel defaultSize={33.33} minSize={33.33}>
             <Suspense
               fallback={<div className="h-full border-t bg-background" />}
             >

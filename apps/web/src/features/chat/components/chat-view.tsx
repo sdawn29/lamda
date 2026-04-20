@@ -284,7 +284,7 @@ export function ChatView({
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
         {noProvider && (
           <div className="flex shrink-0 items-center gap-3 border-b border-amber-500/20 bg-amber-500/5 px-4 py-2.5">
             <PlugZapIcon className="h-4 w-4 shrink-0 text-amber-500" />
@@ -305,7 +305,7 @@ export function ChatView({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex w-full flex-1 flex-col overflow-y-auto pt-6 pb-15 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex w-full flex-1 flex-col overflow-y-auto pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {visibleMessages.length === 0 && !isLoading && (
             <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-5 px-6 text-center select-none">
@@ -399,7 +399,7 @@ export function ChatView({
         </div>
 
         {showScrollButton && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-42 z-10 flex justify-center">
+          <div className="pointer-events-none absolute inset-x-0 bottom-44 z-10 flex justify-center">
             <Button
               size="icon"
               variant="secondary"
@@ -411,7 +411,7 @@ export function ChatView({
           </div>
         )}
 
-        <div className="absolute inset-x-0 bottom-16 z-10 mx-auto w-full max-w-2xl px-6 pb-6">
+        <div className="mx-auto w-full max-w-2xl shrink-0 border-t border-border/40 bg-background px-6 py-4">
           <ChatTextbox
             ref={chatTextboxRef}
             onSend={handleSend}
