@@ -286,14 +286,14 @@ function FileAccordionItem({
           />
           <StatusBadge file={file} />
           <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
+            <span className="shrink-0 font-mono text-xs font-medium text-foreground/85">
+              {fileName}
+            </span>
             {dirPath && (
-              <span className="shrink-0 truncate font-mono text-[10px] text-muted-foreground/40">
+              <span className="truncate font-mono text-[10px] text-muted-foreground/40">
                 {dirPath}
               </span>
             )}
-            <span className="truncate font-mono text-xs font-medium text-foreground/85">
-              {fileName}
-            </span>
             {counts != null && (
               <DiffStat added={counts.added} removed={counts.removed} />
             )}
