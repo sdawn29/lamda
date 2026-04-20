@@ -12,9 +12,13 @@ import {
   createAssistantMessage,
   createErrorMessage,
   type AssistantMessage,
+  type ErrorMessage,
   type Message,
   type ToolMessage,
 } from "./types"
+
+// Persists error messages across thread navigation (cleared on page reload)
+const sessionClientErrors = new Map<string, ErrorMessage[]>()
 
 interface TurnMeta {
   startTime: number
@@ -228,6 +232,10 @@ function areMessagesEqual(left: Message, right: Message): boolean {
     )
   }
 
+  if (left.role === "error" && right.role === "error") {
+    return left.id === right.id
+  }
+
   return false
 }
 
@@ -393,32 +401,33 @@ export function useChatStream({
             displayError = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error)
           }
         } catch {
-          // Not JSON, use as-is
+          // Not JSON — try stripping a leading HTTP status code ("500 {...}")
+          const jsonStart = displayError.indexOf("{")
+          if (jsonStart > 0) {
+            try {
+              const parsed = JSON.parse(displayError.slice(jsonStart)) as Record<string, unknown>
+              const inner = parsed?.error as Record<string, unknown> | undefined
+              if (typeof inner?.message === "string") {
+                displayError = inner.message
+              }
+            } catch {
+              // use raw string as-is
+            }
+          }
         }
 
-        const lastAssistantIndex = finalMessages.reduceRight(
-          (found, msg, i) =>
-            found === -1 && msg.role === "assistant" ? i : found,
-          -1
-        )
-        if (lastAssistantIndex !== -1) {
-          const last = finalMessages[lastAssistantIndex] as AssistantMessage
-          finalMessages = [
-            ...finalMessages.slice(0, lastAssistantIndex),
-            { ...last, errorMessage: displayError },
-            ...finalMessages.slice(lastAssistantIndex + 1),
-          ]
-        } else {
-          finalMessages = [
-            ...finalMessages,
-            createAssistantMessage({ errorMessage: displayError }),
-          ]
-        }
+        const errorMsg = createErrorMessage("Error", displayError)
+        // Persist in module-level Map so the error survives thread navigation
+        sessionClientErrors.set(sessionId, [
+          ...(sessionClientErrors.get(sessionId) ?? []),
+          errorMsg,
+        ])
+        finalMessages = [...finalMessages, errorMsg]
       }
 
       commitFinalMessages(finalMessages)
     },
-    [commitFinalMessages]
+    [commitFinalMessages, sessionId]
   )
 
   useEffect(() => {
@@ -646,10 +655,16 @@ export function useChatStream({
     sessionId,
   ])
 
-  const visibleMessages = useMemo(
-    () => messages ?? persistedMessages ?? cachedMessages,
-    [cachedMessages, messages, persistedMessages]
-  )
+  const visibleMessages = useMemo(() => {
+    const base = messages ?? persistedMessages ?? cachedMessages
+    const stored = sessionClientErrors.get(sessionId) ?? []
+    if (stored.length === 0) return base
+    const existingIds = new Set(
+      base.filter((m): m is ErrorMessage => m.role === "error").map((m) => m.id)
+    )
+    const toAdd = stored.filter((e) => !existingIds.has(e.id))
+    return toAdd.length > 0 ? [...base, ...toAdd] : base
+  }, [cachedMessages, messages, persistedMessages, sessionId])
 
   const startUserPrompt = useCallback(
     (text: string, thinkingLevel?: string) => {
