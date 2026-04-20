@@ -9,9 +9,11 @@ const monorepoRoot = path.resolve(__dirname, "../..");
 const desktopPackageJson = JSON.parse(
   readFileSync(path.join(__dirname, "package.json"), "utf8"),
 );
-const electronVersion = String(
-  desktopPackageJson.devDependencies.electron,
-).replace(/^[^\d]*/, "");
+const rawElectronVersion = desktopPackageJson.devDependencies?.electron;
+if (!rawElectronVersion) {
+  throw new Error("[desktop build] electron not found in devDependencies");
+}
+const electronVersion = String(rawElectronVersion).replace(/^[^\d]*/, "");
 const bundleOnly = process.argv.includes("--bundle-only");
 
 function run(command, args, cwd = monorepoRoot) {
@@ -23,15 +25,13 @@ function run(command, args, cwd = monorepoRoot) {
     });
 
     child.on("error", reject);
-    child.on("exit", (code) => {
+    child.on("exit", (code, signal) => {
       if (code === 0) {
         resolve();
         return;
       }
-
-      reject(
-        new Error(`${command} ${args.join(" ")} failed with exit code ${code}`),
-      );
+      const reason = signal ? `signal ${signal}` : `exit code ${code}`;
+      reject(new Error(`${command} ${args.join(" ")} failed with ${reason}`));
     });
   });
 }
@@ -78,7 +78,13 @@ const requiredAddons = [
   "@silvia-odwyer/photon-node",
 ];
 const serverCjs = path.join(serverDist, "server.cjs");
-if (!statSync(serverCjs).isFile() || statSync(serverCjs).size === 0) {
+let serverCjsStat;
+try {
+  serverCjsStat = statSync(serverCjs);
+} catch {
+  throw new Error(`[desktop build] ${serverCjs} is missing`);
+}
+if (!serverCjsStat.isFile() || serverCjsStat.size === 0) {
   throw new Error(`[desktop build] ${serverCjs} is missing or empty`);
 }
 const missingAddons = requiredAddons.filter((name) => {
@@ -95,29 +101,30 @@ if (missingAddons.length > 0) {
   );
 }
 
-await build({
-  entryPoints: [path.join(__dirname, "src/main.ts")],
-  bundle: true,
-  platform: "node",
-  target: "node20",
-  format: "esm",
-  outfile: path.join(__dirname, "dist/main.js"),
-  minify: true,
-  sourcemap: false,
-  external: ["electron", "esbuild", "electron-updater"],
-});
-
-await build({
-  entryPoints: [path.join(__dirname, "src/preload.ts")],
-  bundle: true,
-  platform: "node",
-  target: "node20",
-  format: "cjs",
-  outfile: path.join(__dirname, "dist/preload.cjs"),
-  minify: true,
-  sourcemap: false,
-  external: ["electron"],
-});
+await Promise.all([
+  build({
+    entryPoints: [path.join(__dirname, "src/main.ts")],
+    bundle: true,
+    platform: "node",
+    target: "node20",
+    format: "esm",
+    outfile: path.join(__dirname, "dist/main.js"),
+    minify: true,
+    sourcemap: false,
+    external: ["electron", "esbuild", "electron-updater"],
+  }),
+  build({
+    entryPoints: [path.join(__dirname, "src/preload.ts")],
+    bundle: true,
+    platform: "node",
+    target: "node20",
+    format: "cjs",
+    outfile: path.join(__dirname, "dist/preload.cjs"),
+    minify: true,
+    sourcemap: false,
+    external: ["electron"],
+  }),
+]);
 
 if (!bundleOnly) {
   const publishFlag = process.env.PUBLISH === "1" ? "always" : "never";
