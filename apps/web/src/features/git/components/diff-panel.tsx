@@ -1,674 +1,44 @@
-import { useCallback, useEffect, useState, useMemo, memo, useRef } from "react"
+import { useCallback, useMemo, useState, memo } from "react"
 import {
-  ChevronRight,
-  Loader2,
-  X,
+  AlertCircle,
+  Archive,
+  Check,
   Columns2,
   AlignLeft,
-  PackagePlus,
-  PackageMinus,
-  RefreshCw,
-  Plus,
-  Minus,
-  Archive,
-  Trash2,
-  GitBranch,
-  PackageOpen,
-  Download,
-  ArrowUpDown,
-  Check,
-  Undo2,
   GitCompare,
-  AlertCircle,
   GitMerge,
+  Loader2,
   Maximize2,
   Minimize2,
+  PackageMinus,
+  PackagePlus,
+  RefreshCw,
+  X,
+  ArrowUpDown,
 } from "lucide-react"
 import { Button } from "@/shared/ui/button"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
-import { DiffView, type DiffMode } from "./diff-view"
 import { useDiffPanel } from "../context"
-import { cn } from "@/shared/lib/utils"
-import { useGitStatus, useGitStashList, useGitFileDiff } from "../queries"
 import {
+  useGitStatus,
   useGitStage,
   useGitStageAll,
   useGitStashMutations,
   useGitRevertFile,
 } from "../mutations"
-
-// ── Status helpers ──────────────────────────────────────────────────────────
-
-interface ChangedFile {
-  raw: string
-  filePath: string
-  isStaged: boolean
-  isUntracked: boolean
-}
-
-function parseStatusLine(line: string): ChangedFile {
-  const raw = line.slice(0, 2)
-  const filePath = line.slice(3)
-  const X = raw[0] ?? " "
-  const isUntracked = raw.trim() === "??"
-  const isStaged = !isUntracked && X !== " "
-  return { raw, filePath, isStaged, isUntracked }
-}
-
-function statusLabel(file: ChangedFile): string {
-  if (file.isUntracked) return "U"
-  const X = file.raw[0] ?? " "
-  const Y = file.raw[1] ?? " "
-  if (X !== " " && Y !== " ") return "M*"
-  if (X !== " ") return X
-  return Y
-}
-
-const STATUS_META: Record<string, { bg: string; text: string }> = {
-  M: {
-    bg: "bg-yellow-500/15 dark:bg-yellow-400/10",
-    text: "text-yellow-600 dark:text-yellow-400",
-  },
-  "M*": {
-    bg: "bg-yellow-500/15 dark:bg-yellow-400/10",
-    text: "text-yellow-600 dark:text-yellow-400",
-  },
-  A: {
-    bg: "bg-green-500/15 dark:bg-green-400/10",
-    text: "text-green-600 dark:text-green-400",
-  },
-  D: {
-    bg: "bg-red-500/15 dark:bg-red-400/10",
-    text: "text-red-600 dark:text-red-400",
-  },
-  U: {
-    bg: "bg-blue-500/15 dark:bg-blue-400/10",
-    text: "text-blue-600 dark:text-blue-400",
-  },
-  R: {
-    bg: "bg-purple-500/15 dark:bg-purple-400/10",
-    text: "text-purple-600 dark:text-purple-400",
-  },
-}
-
-function StatusBadge({ file }: { file: ChangedFile }) {
-  const label = statusLabel(file)
-  const meta = STATUS_META[label] ?? {
-    bg: "bg-muted",
-    text: "text-muted-foreground",
-  }
-  return (
-    <span
-      className={cn(
-        "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-0.5 font-mono text-[10px] leading-none font-semibold",
-        meta.bg,
-        meta.text
-      )}
-    >
-      {label}
-    </span>
-  )
-}
-
-// ── Stash list ──────────────────────────────────────────────────────────────
-
-interface StashEntry {
-  ref: string
-  index: number
-  branch: string
-  message: string
-}
-
-function parseStashList(raw: string): StashEntry[] {
-  return raw
-    .split("\n")
-    .map((l) => l.trimEnd())
-    .filter(Boolean)
-    .map((l) => {
-      const tab = l.indexOf("\t")
-      const ref = tab === -1 ? l : l.slice(0, tab)
-      const rest = tab === -1 ? l : l.slice(tab + 1)
-
-      const indexMatch = ref.match(/\{(\d+)\}/)
-      const index = indexMatch ? parseInt(indexMatch[1], 10) : 0
-
-      const branchMatch = rest.match(/^(?:WIP )?[Oo]n ([^:]+):?\s*(.*)/)
-      const branch = branchMatch?.[1]?.trim() ?? ""
-      const message = branchMatch?.[2]?.trim() || rest
-
-      return { ref, index, branch, message: message || "WIP changes" }
-    })
-}
-
-// ── Stash input bar ─────────────────────────────────────────────────────────
-
-function StashInputBar({
-  onConfirm,
-  onCancel,
-}: {
-  onConfirm: (message: string) => Promise<void>
-  onCancel: () => void
-}) {
-  const [message, setMessage] = useState("")
-  const [stashing, setStashing] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
-
-  async function handleConfirm() {
-    if (stashing) return
-    setStashing(true)
-    try {
-      await onConfirm(message.trim())
-    } finally {
-      setStashing(false)
-    }
-  }
-
-  return (
-    <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-3 py-2">
-      <Archive className="h-3 w-3 shrink-0 text-muted-foreground/50" />
-      <input
-        ref={inputRef}
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") handleConfirm()
-          if (e.key === "Escape") onCancel()
-        }}
-        placeholder="Stash message (optional) — Enter to confirm"
-        className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/40"
-      />
-      {stashing ? (
-        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground/60" />
-      ) : (
-        <button
-          onClick={onCancel}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground"
-        >
-          <X className="h-3 w-3" />
-          <span className="sr-only">Cancel</span>
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ── Diff stat counts ─────────────────────────────────────────────────────────
-
-function parseDiffCounts(diff: string): { added: number; removed: number } {
-  let added = 0
-  let removed = 0
-  for (const line of diff.split("\n")) {
-    if (line.startsWith("+") && !line.startsWith("+++")) added++
-    else if (line.startsWith("-") && !line.startsWith("---")) removed++
-  }
-  return { added, removed }
-}
-
-function DiffStat({ added, removed }: { added: number; removed: number }) {
-  if (added === 0 && removed === 0) return null
-  return (
-    <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-[10px]">
-      {added > 0 && (
-        <span className="text-green-600 dark:text-green-400">+{added}</span>
-      )}
-      {removed > 0 && (
-        <span className="text-red-500 dark:text-red-400">-{removed}</span>
-      )}
-    </span>
-  )
-}
-
-// ── File accordion item ─────────────────────────────────────────────────────
-
-function FileAccordionItem({
-  file,
-  sessionId,
-  mode,
-  onStageToggle,
-  onRevert,
-}: {
-  file: ChangedFile
-  sessionId: string
-  mode: DiffMode
-  onStageToggle: (file: ChangedFile) => Promise<void>
-  onRevert: (file: ChangedFile) => Promise<void>
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [toggling, setToggling] = useState(false)
-  const [reverting, setReverting] = useState(false)
-  const { data: diff, isLoading: diffLoading } = useGitFileDiff(
-    sessionId,
-    file.filePath,
-    file.raw,
-    true
-  )
-
-  const counts = useMemo(
-    () => (diff != null ? parseDiffCounts(diff) : null),
-    [diff]
-  )
-
-  async function handleToggle(e: React.MouseEvent) {
-    e.stopPropagation()
-    if (toggling) return
-    setToggling(true)
-    try {
-      await onStageToggle(file)
-    } finally {
-      setToggling(false)
-    }
-  }
-
-  async function handleRevert(e: React.MouseEvent) {
-    e.stopPropagation()
-    if (reverting) return
-    setReverting(true)
-    try {
-      await onRevert(file)
-    } finally {
-      setReverting(false)
-    }
-  }
-
-  const pathParts = file.filePath.split("/")
-  const fileName = pathParts[pathParts.length - 1] ?? file.filePath
-  const dirPath =
-    pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : null
-
-  return (
-    <div className="group/file border-b border-border/30 last:border-0">
-      <div className="flex w-full items-center transition-colors hover:bg-muted/40">
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-1 pl-2.5 text-left focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
-        >
-          <ChevronRight
-            className={cn(
-              "size-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
-              expanded && "rotate-90"
-            )}
-          />
-          <StatusBadge file={file} />
-          <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden pr-2">
-            <span className="shrink-0 font-mono text-xs font-medium text-foreground/85">
-              {fileName}
-            </span>
-            {dirPath && (
-              <span className="truncate font-mono text-[10px] text-muted-foreground/40">
-                {dirPath}
-              </span>
-            )}
-            {counts != null && (
-              <DiffStat added={counts.added} removed={counts.removed} />
-            )}
-          </span>
-        </button>
-
-        {/* Action buttons — zero width until row is hovered */}
-        <div className="flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden transition-all duration-150 group-hover/file:max-w-20 group-hover/file:pr-1">
-          {!file.isUntracked && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="h-6 w-6 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
-                    disabled={reverting}
-                    onClick={handleRevert}
-                  >
-                    {reverting ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Undo2 className="h-3 w-3" />
-                    )}
-                    <span className="sr-only">Revert changes</span>
-                  </Button>
-                }
-              />
-              <TooltipContent>Revert changes</TooltipContent>
-            </Tooltip>
-          )}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
-                  disabled={toggling}
-                  onClick={handleToggle}
-                >
-                  {toggling ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : file.isStaged ? (
-                    <Minus className="h-3 w-3" />
-                  ) : (
-                    <Plus className="h-3 w-3" />
-                  )}
-                  <span className="sr-only">
-                    {file.isStaged ? "Unstage" : "Stage"}
-                  </span>
-                </Button>
-              }
-            />
-            <TooltipContent>
-              {file.isStaged ? "Unstage file" : "Stage file"}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-
-      {expanded && (
-        <div className="animate-in border-t border-border/30 bg-muted/10 px-3 pb-3 duration-150 fade-in-0 slide-in-from-top-1">
-          {diffLoading ? (
-            <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
-              <Loader2 className="size-3 animate-spin" />
-              Loading diff…
-            </div>
-          ) : diff != null ? (
-            <DiffView
-              diff={diff}
-              filePath={file.filePath}
-              mode={mode}
-              className="mt-2 rounded-md border-border/50"
-            />
-          ) : null}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Stash entry row ─────────────────────────────────────────────────────────
-
-function StashEntryRow({
-  entry,
-  onApply,
-  onPop,
-  onDrop,
-}: {
-  entry: StashEntry
-  onApply: (ref: string) => Promise<void>
-  onPop: (ref: string) => Promise<void>
-  onDrop: (ref: string) => Promise<void>
-}) {
-  const [working, setWorking] = useState<"apply" | "pop" | "drop" | null>(null)
-
-  async function run(action: "apply" | "pop" | "drop") {
-    if (working) return
-    setWorking(action)
-    try {
-      if (action === "apply") await onApply(entry.ref)
-      else if (action === "pop") await onPop(entry.ref)
-      else await onDrop(entry.ref)
-    } finally {
-      setWorking(null)
-    }
-  }
-
-  return (
-    <div className="group flex items-center gap-2.5 border-b border-border/30 px-3 py-2 last:border-0 hover:bg-muted/40">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground">
-        {entry.index}
-      </span>
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-xs text-foreground/85">{entry.message}</p>
-        {entry.branch && (
-          <div className="mt-0.5 flex items-center gap-1">
-            <GitBranch className="h-2.5 w-2.5 shrink-0 text-muted-foreground/40" />
-            <span className="truncate font-mono text-[10px] text-muted-foreground/50">
-              {entry.branch}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {working ? (
-        <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground/60" />
-      ) : (
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
-                  onClick={() => run("pop")}
-                >
-                  <PackageOpen className="h-3 w-3" />
-                  <span className="sr-only">Pop</span>
-                </Button>
-              }
-            />
-            <TooltipContent>Pop stash</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
-                  onClick={() => run("apply")}
-                >
-                  <Download className="h-3 w-3" />
-                  <span className="sr-only">Apply</span>
-                </Button>
-              }
-            />
-            <TooltipContent>Apply stash</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="h-6 w-6 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => run("drop")}
-                >
-                  <Trash2 className="h-3 w-3" />
-                  <span className="sr-only">Drop</span>
-                </Button>
-              }
-            />
-            <TooltipContent>Drop stash</TooltipContent>
-          </Tooltip>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Stash section ───────────────────────────────────────────────────────────
-
-function StashSection({ sessionId }: { sessionId: string }) {
-  const [collapsed, setCollapsed] = useState(false)
-
-  const { data: stashRaw, isLoading } = useGitStashList(sessionId)
-  const { apply, pop, drop } = useGitStashMutations(sessionId)
-
-  const stashes = useMemo(() => parseStashList(stashRaw ?? ""), [stashRaw])
-
-  const handleApply = useCallback(
-    (ref: string) => apply.mutateAsync(ref),
-    [apply]
-  )
-  const handlePop = useCallback((ref: string) => pop.mutateAsync(ref), [pop])
-  const handleDrop = useCallback((ref: string) => drop.mutateAsync(ref), [drop])
-
-  return (
-    <div className="shrink-0 border-t border-border/50">
-      <button
-        onClick={() => setCollapsed((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/40"
-      >
-        <ChevronRight
-          className={cn(
-            "h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
-            !collapsed && "rotate-90"
-          )}
-        />
-        <Archive className="h-3 w-3 shrink-0 text-muted-foreground/50" />
-        <span className="flex-1 text-[10px] font-semibold tracking-widest text-muted-foreground/50 uppercase">
-          Stashes
-        </span>
-        {isLoading && (
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/40" />
-        )}
-        {!isLoading && stashes.length > 0 && (
-          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-medium text-muted-foreground">
-            {stashes.length}
-          </span>
-        )}
-      </button>
-
-      {!collapsed && (
-        <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
-          {!isLoading && stashes.length === 0 && (
-            <p className="px-4 py-3 text-xs text-muted-foreground/40">
-              No stashes
-            </p>
-          )}
-          {stashes.map((s) => (
-            <StashEntryRow
-              key={s.ref}
-              entry={s}
-              onApply={handleApply}
-              onPop={handlePop}
-              onDrop={handleDrop}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Files section ───────────────────────────────────────────────────────────
-
-function FilesSection({
-  label,
-  files,
-  sessionId,
-  mode,
-  onStageToggle,
-  onRevert,
-  emptyText,
-}: {
-  label: string
-  files: ChangedFile[]
-  sessionId: string
-  mode: DiffMode
-  onStageToggle: (file: ChangedFile) => Promise<void>
-  onRevert: (file: ChangedFile) => Promise<void>
-  emptyText?: string
-}) {
-  const [collapsed, setCollapsed] = useState(false)
-
-  return (
-    <div className="border-b border-border/40 last:border-0">
-      <button
-        onClick={() => setCollapsed((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-muted/40"
-      >
-        <ChevronRight
-          className={cn(
-            "h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
-            !collapsed && "rotate-90"
-          )}
-        />
-        <span className="text-[10px] font-semibold tracking-widest text-muted-foreground/50 uppercase">
-          {label}
-        </span>
-        {files.length > 0 && (
-          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-medium text-muted-foreground">
-            {files.length}
-          </span>
-        )}
-      </button>
-
-      {!collapsed && (
-        <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
-          {files.length === 0 && emptyText && (
-            <p className="px-4 py-2.5 text-xs text-muted-foreground/40">
-              {emptyText}
-            </p>
-          )}
-          {files.map((file, i) => (
-            <FileAccordionItem
-              key={i}
-              file={file}
-              sessionId={sessionId}
-              mode={mode}
-              onStageToggle={onStageToggle}
-              onRevert={onRevert}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Sort ────────────────────────────────────────────────────────────────────
-
-type SortMode = "name" | "name-desc" | "status" | "path"
-
-const SORT_OPTIONS: { value: SortMode; label: string }[] = [
-  { value: "name", label: "Name (A → Z)" },
-  { value: "name-desc", label: "Name (Z → A)" },
-  { value: "status", label: "Status" },
-  { value: "path", label: "Path" },
-]
-
-const STATUS_ORDER: Record<string, number> = { A: 0, M: 1, R: 2, D: 3, U: 4 }
-
-function applySortMode(files: ChangedFile[], sort: SortMode): ChangedFile[] {
-  const sorted = [...files]
-  switch (sort) {
-    case "name":
-      return sorted.sort((a, b) => {
-        const na = a.filePath.split("/").pop() ?? a.filePath
-        const nb = b.filePath.split("/").pop() ?? b.filePath
-        return na.localeCompare(nb)
-      })
-    case "name-desc":
-      return sorted.sort((a, b) => {
-        const na = a.filePath.split("/").pop() ?? a.filePath
-        const nb = b.filePath.split("/").pop() ?? b.filePath
-        return nb.localeCompare(na)
-      })
-    case "status":
-      return sorted.sort((a, b) => {
-        const la = statusLabel(a)
-        const lb = statusLabel(b)
-        return (
-          (STATUS_ORDER[la] ?? 5) - (STATUS_ORDER[lb] ?? 5) ||
-          a.filePath.localeCompare(b.filePath)
-        )
-      })
-    case "path":
-      return sorted.sort((a, b) => a.filePath.localeCompare(b.filePath))
-  }
-}
-
-// ── DiffPanel ───────────────────────────────────────────────────────────────
+import { type ChangedFile, parseStatusLine } from "./status-badge"
+import { type DiffMode } from "./diff-view"
+import { StashInputBar } from "./stash-input-bar"
+import { StashSection } from "./stash-section"
+import { FilesSection } from "./files-section"
+import { SORT_OPTIONS, type SortMode, applySortMode } from "./sort-utils"
+import { cn } from "@/shared/lib/utils"
 
 interface DiffPanelProps {
   sessionId: string
@@ -757,7 +127,6 @@ export const DiffPanel = memo(function DiffPanel({
 
   return (
     <div className="flex h-full shrink-0 flex-col border-l border-border/60 bg-background">
-      {/* Header — title + status summary + controls */}
       <div className="flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-border/50 pr-1.5 pl-4">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-muted">
@@ -840,7 +209,6 @@ export const DiffPanel = memo(function DiffPanel({
         </div>
       </div>
 
-      {/* Toolbar */}
       <div className="flex h-8 min-w-0 shrink-0 items-center gap-0.5 border-b border-border/50 bg-muted/20 px-2">
         <Tooltip>
           <TooltipTrigger
@@ -977,7 +345,6 @@ export const DiffPanel = memo(function DiffPanel({
         </Tooltip>
       </div>
 
-      {/* File list */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {stashInputOpen && (
           <StashInputBar
@@ -1033,7 +400,6 @@ export const DiffPanel = memo(function DiffPanel({
         )}
       </div>
 
-      {/* Stash section */}
       <StashSection sessionId={sessionId} />
     </div>
   )
