@@ -6,6 +6,11 @@ import { threadStatusBroadcaster } from "./thread-status-broadcaster.js";
 
 const MAX_RECENT_EVENTS = 512;
 
+type ServerErrorEvent = { type: "server_error"; message: string };
+
+/** Union of all events that can be emitted through the hub */
+type HubEvent = SessionEvent | ServerErrorEvent;
+
 type MessageStartEvent = {
   message?: { role?: string };
 };
@@ -33,7 +38,7 @@ type ToolExecutionEndEvent = {
 
 type SessionEventRecord = {
   id: number;
-  event: SessionEvent;
+  event: HubEvent;
   data: string;
 };
 
@@ -56,7 +61,7 @@ type SessionEventSubscription = {
   closed: Promise<void>;
 };
 
-function serializeEvent(event: SessionEvent): string {
+function serializeEvent(event: HubEvent): string {
   try {
     return JSON.stringify(event);
   } catch {
@@ -95,7 +100,7 @@ class SessionEventHub {
 
   emitError(message: string) {
     if (this.disposed) return;
-    const event: SessionEvent = { type: "sdk_error", message };
+    const event: ServerErrorEvent = { type: "server_error", message };
     this.persist(event);
     this.emit(event);
   }
@@ -200,7 +205,7 @@ class SessionEventHub {
 
         if (event.type === "compaction_end") {
           const { errorMessage, willRetry, aborted } = event as CompactionEndEvent;
-          // Only surface as sdk_error when compaction has permanently failed and there's
+          // Only surface as server_error when compaction has permanently failed and there's
           // no active run that will produce its own agent_end error event.
           if (errorMessage && !willRetry && !aborted && !this.runInProgress) {
             this.emitError(`Compaction failed: ${errorMessage}`);
@@ -214,12 +219,15 @@ class SessionEventHub {
         this.toolMeta.clear();
         this.runInProgress = false;
         this.currentRunEvents = [];
-        this.emit({ type: "sdk_error", message });
+        this.emit({ type: "server_error", message });
       }
     }
   }
 
-  private persist(event: SessionEvent) {
+  private persist(event: HubEvent) {
+    // Skip persistence for server-level error events
+    if (event.type === "server_error") return;
+
     if (event.type === "message_start") {
       const data = event as MessageStartEvent;
       if (data.message?.role === "assistant") {
@@ -297,14 +305,9 @@ class SessionEventHub {
       messageBuffer.flush(this.sessionId);
       return;
     }
-
-    if (event.type === "sdk_error") {
-      this.toolMeta.clear();
-      messageBuffer.flush(this.sessionId);
-    }
   }
 
-  private emit(event: SessionEvent) {
+  private emit(event: HubEvent) {
     const record: SessionEventRecord = {
       id: ++this.nextEventId,
       event,
@@ -329,7 +332,7 @@ class SessionEventHub {
       this.recentEvents.shift();
     }
 
-    if (event.type === "agent_end" || event.type === "sdk_error") {
+    if (event.type === "agent_end" || event.type === "server_error") {
       this.runInProgress = false;
       threadStatusBroadcaster.broadcast(this.threadId, "idle");
     }

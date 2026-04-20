@@ -9,7 +9,7 @@ import {
   createSessionForThread,
   ensureSessionEventHub,
 } from "../services/session-service.js";
-import type { SdkConfig } from "@lamda/pi-sdk";
+import type { PromptOptions, SdkConfig } from "@lamda/pi-sdk";
 
 const EXCLUDED_DIRS = new Set([
   ".git",
@@ -52,22 +52,34 @@ sessions.post("/session/:id/abort", async (c) => {
   return c.json({ aborted: true });
 });
 
+interface PromptRequestBody {
+  text?: string;
+  provider?: string;
+  model?: string;
+  thinkingLevel?: string;
+  /** Image attachments for the prompt */
+  images?: PromptOptions["images"];
+  /** How to queue when agent is streaming: "steer" (interrupt) or "followUp" (wait) */
+  streamingBehavior?: PromptOptions["streamingBehavior"];
+  /** Whether to expand file-based prompt templates (default: true) */
+  expandPromptTemplates?: PromptOptions["expandPromptTemplates"];
+}
+
 sessions.post("/session/:id/prompt", async (c) => {
   const id = c.req.param("id");
   const entry = store.get(id);
   if (!entry) return c.json({ error: "Not found" }, 404);
 
   const body = await c.req
-    .json<{ text?: string; provider?: string; model?: string; thinkingLevel?: string }>()
-    .catch(
-      (): { text?: string; provider?: string; model?: string; thinkingLevel?: string } => ({}),
-    );
+    .json<PromptRequestBody>()
+    .catch((): PromptRequestBody => ({}));
   if (!body.text) return c.json({ error: "text is required" }, 400);
 
   ensureSessionEventHub(id, entry);
   insertMessage(entry.threadId, "user", body.text);
 
   // Fire and forget — events arrive via GET /session/:id/events
+  const text = body.text;
   const run = async () => {
     if (body.provider && body.model) await entry.handle.setModel(body.provider, body.model);
     if (body.thinkingLevel) {
@@ -76,11 +88,71 @@ sessions.post("/session/:id/prompt", async (c) => {
       );
       sessionEvents.setNextThinkingLevel(id, body.thinkingLevel);
     }
-    await entry.handle.prompt(body.text!);
+
+    const promptOptions: PromptOptions | undefined =
+      body.images || body.streamingBehavior !== undefined || body.expandPromptTemplates !== undefined
+        ? {
+            images: body.images,
+            streamingBehavior: body.streamingBehavior,
+            expandPromptTemplates: body.expandPromptTemplates,
+          }
+        : undefined;
+
+    await entry.handle.prompt(text, promptOptions);
   };
   run().catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[prompt:${id}]`, err);
+    sessionEvents.emitError(id, message);
+  });
+
+  return c.json({ accepted: true }, 202);
+});
+
+/**
+ * Queue a steering message while the agent is running.
+ * Delivered after the current assistant turn finishes its tool calls.
+ */
+sessions.post("/session/:id/steer", async (c) => {
+  const id = c.req.param("id");
+  const entry = store.get(id);
+  if (!entry) return c.json({ error: "Not found" }, 404);
+
+  const body = await c.req.json<{ text?: string }>().catch((): { text?: string } => ({}));
+  if (!body.text) return c.json({ error: "text is required" }, 400);
+
+  ensureSessionEventHub(id, entry);
+  insertMessage(entry.threadId, "user", body.text);
+
+  // Fire and forget
+  entry.handle.steer(body.text).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[steer:${id}]`, err);
+    sessionEvents.emitError(id, message);
+  });
+
+  return c.json({ accepted: true }, 202);
+});
+
+/**
+ * Queue a follow-up message to be processed after the agent finishes.
+ * Only delivered when agent has no more tool calls or steering messages.
+ */
+sessions.post("/session/:id/follow-up", async (c) => {
+  const id = c.req.param("id");
+  const entry = store.get(id);
+  if (!entry) return c.json({ error: "Not found" }, 404);
+
+  const body = await c.req.json<{ text?: string }>().catch((): { text?: string } => ({}));
+  if (!body.text) return c.json({ error: "text is required" }, 400);
+
+  ensureSessionEventHub(id, entry);
+  insertMessage(entry.threadId, "user", body.text);
+
+  // Fire and forget
+  entry.handle.followUp(body.text).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[followUp:${id}]`, err);
     sessionEvents.emitError(id, message);
   });
 

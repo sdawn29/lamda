@@ -108,11 +108,11 @@ export interface SessionEventHandlers {
     willRetry: boolean;
     errorMessage?: string;
   }) => void;
-  onSdkError: (event: SessionSdkErrorEvent) => void;
+  onServerError: (event: SessionServerErrorEvent) => void;
   onTransportError?: (event: Event) => void;
 }
 
-export interface SessionSdkErrorEvent {
+export interface SessionServerErrorEvent {
   message: string
 }
 
@@ -201,10 +201,10 @@ export function subscribeToSessionEvents(
       "compaction_end",
       handlers.onCompactionEnd
     ),
-    addJsonEventSourceListener<SessionSdkErrorEvent>(
+    addJsonEventSourceListener<SessionServerErrorEvent>(
       eventSource,
-      "sdk_error",
-      handlers.onSdkError
+      "server_error",
+      handlers.onServerError
     ),
   ];
 

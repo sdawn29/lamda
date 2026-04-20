@@ -2,4 +2,13 @@ export { createManagedSession, openManagedSession } from "./session.js";
 export { getAvailableModels } from "./models.js";
 export { generateThreadTitle } from "./title.js";
 export { generateCommitMessage, DEFAULT_COMMIT_PROMPT } from "./commit-message.js";
-export type { ManagedSessionHandle, ModelInfo, SdkConfig, SessionEvent } from "./types.js";
+export type {
+  ManagedSessionHandle,
+  ModelInfo,
+  SdkConfig,
+  SessionEvent,
+  PromptOptions,
+  ImageContent,
+  SlashCommand,
+  ContextUsage,
+} from "./types.js";

@@ -60,7 +60,14 @@ export interface ErrorMessage {
   message: string
   retryable?: boolean
   retryCount?: number
+  /** Action to show on the error block */
+  action?: ErrorAction
 }
+
+export type ErrorAction =
+  | { type: "retry"; /** The last prompt text to retry */ prompt?: string }
+  | { type: "continue" }
+  | { type: "dismiss" }
 
 export type TextMessage = UserMessage | AssistantMessage
 
@@ -110,7 +117,7 @@ export function createAssistantMessage(
 export function createErrorMessage(
   title: string,
   message: string,
-  options: { retryable?: boolean; retryCount?: number } = {}
+  options: { retryable?: boolean; retryCount?: number; action?: ErrorAction } = {}
 ): ErrorMessage {
   return {
     role: "error",
@@ -119,6 +126,7 @@ export function createErrorMessage(
     message,
     ...(options.retryable !== undefined ? { retryable: options.retryable } : {}),
     ...(options.retryCount !== undefined ? { retryCount: options.retryCount } : {}),
+    ...(options.action !== undefined ? { action: options.action } : {}),
   }
 }
 

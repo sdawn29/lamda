@@ -43,6 +43,7 @@ interface UseChatStreamResult {
   startUserPrompt: (text: string, thinkingLevel?: string) => void
   markStopped: () => void
   markSendFailed: () => void
+  clearError: (errorId: string) => void
 }
 
 interface AssistantDeltaEvent {
@@ -313,6 +314,8 @@ export function useChatStream({
   const pendingThinkingLevelRef = useRef<string | null>(null)
   const pendingDeltasRef = useRef<AssistantDeltaEvent[]>([])
   const rafRef = useRef<number | null>(null)
+  // Track last prompt for retry functionality
+  const lastPromptRef = useRef<{ text: string; thinkingLevel?: string } | null>(null)
 
   const applyLocalMessages = useCallback(
     (updater: (currentMessages: Message[]) => Message[]) => {
@@ -575,7 +578,11 @@ export function useChatStream({
               createErrorMessage(
                 "Retrying",
                 errorMessage,
-                { retryable: true, retryCount: attempt }
+                {
+                  retryable: true,
+                  retryCount: attempt,
+                  action: { type: "dismiss" },
+                }
               )
             )
           },
@@ -583,9 +590,11 @@ export function useChatStream({
             if (!active) return
             autoRetryCountRef.current = 0
             if (!success && finalError) {
+              const lastPrompt = lastPromptRef.current
               setPendingError(
                 createErrorMessage("Retry Failed", finalError, {
-                  retryable: false,
+                  retryable: true,
+                  action: lastPrompt ? { type: "retry", prompt: lastPrompt.text } : { type: "dismiss" },
                 })
               )
             } else {
@@ -607,9 +616,9 @@ export function useChatStream({
               setPendingError(null)
             }
           },
-          onSdkError: ({ message }) => {
+          onServerError: ({ message }) => {
             if (!active) return
-            console.error("[session-events] sdk_error:", message)
+            console.error("[session-events] server_error:", message)
             finishStreamingRun([
               {
                 role: "assistant",
@@ -617,6 +626,14 @@ export function useChatStream({
                 errorMessage: message,
               },
             ])
+            // Add retry action to the last message after streaming finishes
+            const lastPrompt = lastPromptRef.current
+            setPendingError(
+              createErrorMessage("Error", message, {
+                retryable: true,
+                action: lastPrompt ? { type: "retry", prompt: lastPrompt.text } : { type: "dismiss" },
+              })
+            )
           },
           onTransportError: () => {
             if (!active || nextEventSource.readyState !== EventSource.CLOSED) {
@@ -625,8 +642,11 @@ export function useChatStream({
             console.error("[session-events] connection closed")
             setIsLoading(false)
             setIsCompacting(false)
+            const lastPrompt = lastPromptRef.current
             setPendingError(
-              createErrorMessage("Connection Lost", "The connection to the server was lost. Please try again.")
+              createErrorMessage("Connection Lost", "The connection to the server was lost. Please try again.", {
+                action: lastPrompt ? { type: "retry", prompt: lastPrompt.text } : { type: "dismiss" },
+              })
             )
             invalidatePersistedMessages()
           },
@@ -671,6 +691,7 @@ export function useChatStream({
       setIsStopped(false)
       setIsLoading(true)
       pendingThinkingLevelRef.current = thinkingLevel ?? null
+      lastPromptRef.current = { text, thinkingLevel }
       applyLocalMessages((prev) => [...prev, { role: "user", content: text }])
     },
     [applyLocalMessages]
@@ -685,6 +706,24 @@ export function useChatStream({
     setIsLoading(false)
   }, [])
 
+  const clearError = useCallback(
+    (errorId: string) => {
+      // Clear from pending error if it's the same
+      setPendingError((prev) => (prev?.id === errorId ? null : prev))
+      // Clear from session client errors
+      const stored = sessionClientErrors.get(sessionId) ?? []
+      const filtered = stored.filter((e) => e.id !== errorId)
+      if (filtered.length !== stored.length) {
+        if (filtered.length === 0) {
+          sessionClientErrors.delete(sessionId)
+        } else {
+          sessionClientErrors.set(sessionId, filtered)
+        }
+      }
+    },
+    [sessionId]
+  )
+
   return {
     visibleMessages,
     hasConversationHistory: visibleMessages.length > 0,
@@ -696,5 +735,6 @@ export function useChatStream({
     startUserPrompt,
     markStopped,
     markSendFailed,
+    clearError,
   }
 }

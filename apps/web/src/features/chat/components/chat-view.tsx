@@ -72,6 +72,7 @@ export function ChatView({
     startUserPrompt,
     markStopped,
     markSendFailed,
+    clearError,
   } = useChatStream({
     sessionId,
     threadId,
@@ -263,6 +264,26 @@ export function ChatView({
     ]
   )
 
+  const handleErrorAction = useCallback(
+    (messageId: string, action: { type: string; prompt?: string } | undefined) => {
+      if (!action) return
+
+      if (action.type === "retry" && action.prompt) {
+        // Dismiss the error
+        clearError(messageId)
+        // Retry the prompt
+        handleSend(action.prompt, selectedModelId?.split("::")[1] ?? "", selectedModelId?.split("::")[0] ?? "")
+      } else if (action.type === "continue") {
+        clearError(messageId)
+        // Continue with an empty prompt to resume
+        startUserPrompt("")
+      } else if (action.type === "dismiss") {
+        clearError(messageId)
+      }
+    },
+    [clearError, handleSend, selectedModelId, startUserPrompt]
+  )
+
   return (
     <>
       <AlertDialog
@@ -371,6 +392,7 @@ export function ChatView({
                       message={message}
                       commandsByName={commandsByName}
                       showThinking={showThinkingSetting}
+                      onErrorAction={handleErrorAction}
                     />
                   </div>
                 )

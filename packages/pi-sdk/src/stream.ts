@@ -1,4 +1,7 @@
-import type { AgentSession, AgentSessionEvent } from "@mariozechner/pi-coding-agent";
+import type {
+  AgentSession,
+  AgentSessionEvent,
+} from "@mariozechner/pi-coding-agent";
 import type { SessionEvent } from "./types.js";
 
 /**

@@ -1,6 +1,24 @@
 import { apiFetch, getServerUrl } from "@/shared/lib/client"
 import type { StoredMessageDto } from "./types"
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface ImageContent {
+  type: "image"
+  source: {
+    type: "base64" | "url"
+    mediaType?: string
+    data: string
+    url?: string
+  }
+}
+
+export interface PromptOptions {
+  images?: ImageContent[]
+  streamingBehavior?: "steer" | "followUp"
+  expandPromptTemplates?: boolean
+}
+
 // ── Session ───────────────────────────────────────────────────────────────────
 
 export interface CreateSessionBody {
@@ -46,21 +64,61 @@ export async function openGlobalEventSource(): Promise<EventSource> {
   return new EventSource(`${base}/events`)
 }
 
+export interface SendPromptParams {
+  text: string
+  model?: { provider: string; modelId: string }
+  thinkingLevel?: string
+  images?: ImageContent[]
+  streamingBehavior?: "steer" | "followUp"
+  expandPromptTemplates?: boolean
+}
+
 export function sendPrompt(
   id: string,
-  text: string,
-  model?: { provider: string; modelId: string },
-  thinkingLevel?: string
+  params: SendPromptParams
 ): Promise<SendPromptResponse> {
   return apiFetch<SendPromptResponse>(`/session/${id}/prompt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      text,
-      provider: model?.provider,
-      model: model?.modelId,
-      thinkingLevel,
+      text: params.text,
+      provider: params.model?.provider,
+      model: params.model?.modelId,
+      thinkingLevel: params.thinkingLevel,
+      images: params.images,
+      streamingBehavior: params.streamingBehavior,
+      expandPromptTemplates: params.expandPromptTemplates,
     }),
+  })
+}
+
+/**
+ * Queue a steering message while the agent is running.
+ * Delivered after the current assistant turn finishes its tool calls.
+ */
+export function steer(
+  id: string,
+  text: string
+): Promise<SendPromptResponse> {
+  return apiFetch<SendPromptResponse>(`/session/${id}/steer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  })
+}
+
+/**
+ * Queue a follow-up message to be processed after the agent finishes.
+ * Only delivered when agent has no more tool calls or steering messages.
+ */
+export function followUp(
+  id: string,
+  text: string
+): Promise<SendPromptResponse> {
+  return apiFetch<SendPromptResponse>(`/session/${id}/follow-up`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
   })
 }
 

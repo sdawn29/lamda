@@ -1,4 +1,8 @@
-import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
+import type {
+  AgentSessionEvent,
+  AuthStorage,
+  ModelRegistry,
+} from "@mariozechner/pi-coding-agent";
 
 /** A slash command available in the current session. */
 export interface SlashCommand {
@@ -18,6 +22,31 @@ export interface ModelInfo {
   thinkingLevels: string[];
 }
 
+/** Options for the prompt() method. */
+export interface PromptOptions {
+  /** Image attachments to include with the prompt. */
+  images?: ImageContent[];
+  /**
+   * When streaming, how to queue the message:
+   * - "steer": Interrupt current work, deliver immediately after current tool calls finish
+   * - "followUp": Wait until agent finishes all work before delivering
+   */
+  streamingBehavior?: "steer" | "followUp";
+  /** Whether to expand file-based prompt templates (default: true). */
+  expandPromptTemplates?: boolean;
+}
+
+/** Image content for prompts. */
+export interface ImageContent {
+  type: "image";
+  source: {
+    type: "base64" | "url";
+    mediaType?: string;
+    data: string;
+    url?: string;
+  };
+}
+
 export interface SdkConfig {
   /** Anthropic API key. Falls back to ANTHROPIC_API_KEY env var, then ~/.pi/agent/auth.json. */
   anthropicApiKey?: string;
@@ -29,15 +58,16 @@ export interface SdkConfig {
   model?: string;
   /** Thinking/reasoning effort level. Only applies to models with reasoning support. */
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  /** Pre-configured auth storage (creates one if not provided). */
+  authStorage?: AuthStorage;
+  /** Pre-configured model registry (creates one if not provided). */
+  modelRegistry?: ModelRegistry;
 }
 
 /**
  * All events emitted by a managed session.
- * Extends the pi-coding-agent AgentSessionEvent union with an sdk_error variant.
  */
-export type SessionEvent =
-  | AgentSessionEvent
-  | { type: "sdk_error"; message: string };
+export type SessionEvent = AgentSessionEvent;
 
 export interface ContextUsage {
   /** Estimated context tokens used, or null if unknown. */
@@ -49,8 +79,28 @@ export interface ContextUsage {
 }
 
 export interface ManagedSessionHandle {
-  /** Send a prompt to the agent (non-blocking — events stream via events()). */
-  prompt(text: string): Promise<void>;
+  /**
+   * Send a prompt to the agent (non-blocking — events stream via events()).
+   *
+   * During streaming, you must specify `streamingBehavior` to indicate how to queue:
+   * - "steer": Interrupt and redirect immediately
+   * - "followUp": Wait until done, then process
+   *
+   * @param text - The prompt text
+   * @param options - Optional settings for the prompt
+   */
+  prompt(text: string, options?: PromptOptions): Promise<void>;
+  /**
+   * Queue a steering message while the agent is running.
+   * Delivered after the current assistant turn finishes its tool calls.
+   * Useful for redirecting mid-task.
+   */
+  steer(text: string): Promise<void>;
+  /**
+   * Queue a follow-up message to be processed after the agent finishes.
+   * Only delivered when agent has no more tool calls or steering messages.
+   */
+  followUp(text: string): Promise<void>;
   /** Switch the model used for subsequent prompts. */
   setModel(provider: string, modelId: string): Promise<void>;
   /** Set the thinking/reasoning effort level. Only affects reasoning-capable models. */

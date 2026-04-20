@@ -6,6 +6,8 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   RefreshCwIcon,
+  PlayIcon,
+  XIcon,
 } from "lucide-react"
 
 import { ToolCallBlock } from "./tool-call-block"
@@ -13,9 +15,10 @@ import { markdownComponents } from "./markdown-components"
 import { UserMessageContent } from "./user-message"
 import { ThinkingBlock } from "./thinking-block"
 import { CopyButton } from "@/shared/components/copy-button"
+import { Button } from "@/shared/ui/button"
 import { getProviderMeta } from "@/shared/lib/provider-meta"
 import type { SlashCommand } from "../api"
-import { type AssistantMessage, type Message } from "../types"
+import { type AssistantMessage, type ErrorMessage, type Message } from "../types"
 
 function assistantCopyText(
   message: AssistantMessage,
@@ -152,6 +155,95 @@ function AssistantMessageBlock({
   )
 }
 
+function ErrorActions({
+  action,
+  onAction,
+}: {
+  action: ErrorMessage["action"]
+  onAction?: (action: ErrorMessage["action"]) => void
+}) {
+  if (!action || !onAction) return null
+
+  if (action.type === "retry") {
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 gap-1.5 border-destructive/30 text-xs text-destructive hover:bg-destructive/10"
+        onClick={() => onAction(action)}
+      >
+        <RefreshCwIcon className="h-3.5 w-3.5" />
+        Retry
+      </Button>
+    )
+  }
+
+  if (action.type === "continue") {
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 gap-1.5 border-primary/30 text-xs text-primary hover:bg-primary/10"
+        onClick={() => onAction(action)}
+      >
+        <PlayIcon className="h-3.5 w-3.5" />
+        Continue
+      </Button>
+    )
+  }
+
+  if (action.type === "dismiss") {
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 gap-1.5 text-xs text-muted-foreground hover:bg-muted"
+        onClick={() => onAction(action)}
+      >
+        <XIcon className="h-3.5 w-3.5" />
+        Dismiss
+      </Button>
+    )
+  }
+
+  return null
+}
+
+function ErrorMessageBlock({
+  message,
+  onAction,
+}: {
+  message: ErrorMessage
+  onAction?: (action: ErrorMessage["action"]) => void
+}) {
+  return (
+    <div className="group flex animate-in flex-col gap-2 duration-300 fade-in-0 slide-in-from-bottom-1">
+      <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5">
+        {message.retryable ? (
+          <RefreshCwIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+        ) : (
+          <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+        )}
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-destructive">
+              {message.title}
+            </span>
+            <ErrorActions action={message.action} onAction={onAction} />
+          </div>
+          <span className="text-sm text-destructive/80">{message.message}</span>
+          {message.retryable && message.retryCount !== undefined && (
+            <span className="text-xs text-muted-foreground">
+              Retry attempt {message.retryCount}
+            </span>
+          )}
+        </div>
+      </div>
+      <CopyButton text={`${message.title}: ${message.message}`} />
+    </div>
+  )
+}
+
 export function getMessageKey(message: Message, index: number): string {
   if (message.role === "error") return message.id
   return message.role === "tool" ? message.toolCallId : `${message.role}-${index}`
@@ -177,15 +269,19 @@ export function estimateMessageSize(message: Message): number {
   return 104
 }
 
+export interface MessageRowProps {
+  message: Message
+  commandsByName: ReadonlyMap<string, SlashCommand>
+  showThinking: boolean
+  onErrorAction?: (messageId: string, action: ErrorMessage["action"]) => void
+}
+
 export const MessageRow = memo(function MessageRow({
   message,
   commandsByName,
   showThinking,
-}: {
-  message: Message
-  commandsByName: ReadonlyMap<string, SlashCommand>
-  showThinking: boolean
-}) {
+  onErrorAction,
+}: MessageRowProps) {
   if (message.role === "tool") {
     return <ToolCallBlock msg={message} />
   }
@@ -212,27 +308,14 @@ export const MessageRow = memo(function MessageRow({
 
   if (message.role === "error") {
     return (
-      <div className="group flex animate-in flex-col gap-2 duration-300 fade-in-0 slide-in-from-bottom-1">
-        <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5">
-          {message.retryable ? (
-            <RefreshCwIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-          ) : (
-            <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-          )}
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-sm font-medium text-destructive">
-              {message.title}
-            </span>
-            <span className="text-sm text-destructive/80">{message.message}</span>
-            {message.retryable && message.retryCount !== undefined && (
-              <span className="text-xs text-muted-foreground">
-                Retry attempt {message.retryCount}
-              </span>
-            )}
-          </div>
-        </div>
-        <CopyButton text={`${message.title}: ${message.message}`} />
-      </div>
+      <ErrorMessageBlock
+        message={message}
+        onAction={
+          onErrorAction
+            ? (action) => onErrorAction(message.id, action)
+            : undefined
+        }
+      />
     )
   }
 
