@@ -29,7 +29,7 @@ function WorkspaceThreadRoute() {
   const { threadId } = Route.useParams()
   const { workspaces, isLoading } = useWorkspace()
   const navigate = useNavigate()
-  const { isOpen: diffOpen } = useDiffPanel()
+  const { isOpen: diffOpen, isFullscreen: diffFullscreen } = useDiffPanel()
   const { isOpen: terminalOpen } = useTerminal()
   const updateSetting = useUpdateAppSetting()
   const updateLastAccessed = useUpdateThreadLastAccessed()
@@ -71,14 +71,16 @@ function WorkspaceThreadRoute() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 overflow-hidden border-t">
-        <ChatView
-          key={foundThread.id}
-          sessionId={foundThread.sessionId}
-          workspaceId={foundWorkspace.id}
-          threadId={foundThread.id}
-          initialModelId={foundThread.modelId}
-          initialIsStopped={foundThread.isStopped}
-        />
+        {!diffFullscreen && (
+          <ChatView
+            key={foundThread.id}
+            sessionId={foundThread.sessionId}
+            workspaceId={foundWorkspace.id}
+            threadId={foundThread.id}
+            initialModelId={foundThread.modelId}
+            initialIsStopped={foundThread.isStopped}
+          />
+        )}
 
         {diffOpen && (
           <Suspense

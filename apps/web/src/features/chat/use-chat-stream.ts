@@ -297,6 +297,8 @@ export function useChatStream({
   const latestVisibleMessagesRef = useRef<Message[]>(cachedMessages)
   const turnMetaRef = useRef<TurnMeta | null>(null)
   const pendingThinkingLevelRef = useRef<string | null>(null)
+  const pendingDeltasRef = useRef<AssistantDeltaEvent[]>([])
+  const rafRef = useRef<number | null>(null)
 
   const applyLocalMessages = useCallback(
     (updater: (currentMessages: Message[]) => Message[]) => {
@@ -433,9 +435,21 @@ export function useChatStream({
               }
             }
 
-            applyLocalMessages((prev) =>
-              appendAssistantDelta(prev, assistantEvent)
-            )
+            pendingDeltasRef.current.push(assistantEvent)
+            if (rafRef.current === null) {
+              rafRef.current = requestAnimationFrame(() => {
+                rafRef.current = null
+                const deltas = pendingDeltasRef.current
+                if (deltas.length === 0) return
+                pendingDeltasRef.current = []
+                applyLocalMessages((prev) =>
+                  deltas.reduce(
+                    (msgs, delta) => appendAssistantDelta(msgs, delta),
+                    prev
+                  )
+                )
+              })
+            }
           },
           onToolExecutionStart: (data) => {
             if (!active) return
@@ -513,6 +527,11 @@ export function useChatStream({
 
     return () => {
       active = false
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+      pendingDeltasRef.current = []
       cleanupListeners?.()
       eventSource?.close()
     }

@@ -12,20 +12,26 @@ interface DiffPanelContextValue {
   toggle: () => void
   open: () => void
   close: () => void
+  isFullscreen: boolean
+  setIsFullscreen: (v: boolean) => void
 }
 
 const DiffPanelContext = createContext<DiffPanelContextValue | null>(null)
 
 export function DiffPanelProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const toggle = useCallback(() => setIsOpen((v) => !v), [])
   const open = useCallback(() => setIsOpen(true), [])
-  const close = useCallback(() => setIsOpen(false), [])
+  const close = useCallback(() => {
+    setIsOpen(false)
+    setIsFullscreen(false)
+  }, [])
 
   const value = useMemo(
-    () => ({ isOpen, toggle, open, close }),
-    [isOpen, toggle, open, close]
+    () => ({ isOpen, toggle, open, close, isFullscreen, setIsFullscreen }),
+    [isOpen, toggle, open, close, isFullscreen, setIsFullscreen]
   )
 
   return <DiffPanelContext value={value}>{children}</DiffPanelContext>

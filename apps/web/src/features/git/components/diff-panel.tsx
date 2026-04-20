@@ -22,6 +22,8 @@ import {
   GitCompare,
   AlertCircle,
   GitMerge,
+  Maximize2,
+  Minimize2,
 } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import {
@@ -658,7 +660,7 @@ interface DiffPanelProps {
 }
 
 export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) {
-  const { close } = useDiffPanel()
+  const { close, isFullscreen, setIsFullscreen } = useDiffPanel()
   const [width, setWidth] = useState(DEFAULT_WIDTH)
   const [mode, setMode] = useState<DiffMode>("inline")
   const [sortMode, setSortMode] = useState<SortMode>("name")
@@ -741,10 +743,14 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
         const delta = dragStartRef.current.x - ev.clientX
         const parentWidth =
           panelRef.current?.parentElement?.clientWidth ?? window.innerWidth
-        const maxWidth = parentWidth - MIN_CHAT_WIDTH
-        setWidth(
-          Math.max(MIN_WIDTH, Math.min(maxWidth, dragStartRef.current.w + delta))
-        )
+        const newWidth = dragStartRef.current.w + delta
+        if (newWidth >= parentWidth - MIN_CHAT_WIDTH) {
+          setIsFullscreen(true)
+          setWidth(parentWidth)
+        } else {
+          setIsFullscreen(false)
+          setWidth(Math.max(MIN_WIDTH, Math.min(parentWidth - MIN_CHAT_WIDTH, newWidth)))
+        }
       }
 
       const onUp = () => {
@@ -758,7 +764,7 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
       window.addEventListener("mousemove", onMove)
       window.addEventListener("mouseup", onUp)
     },
-    [width]
+    [width, setIsFullscreen]
   )
 
   const hasStaged = staged.length > 0
@@ -769,15 +775,17 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
     <div
       ref={panelRef}
       className="relative flex h-full shrink-0 flex-col border-l border-border/60 bg-background"
-      style={{ width, maxWidth: "80%" }}
+      style={isFullscreen ? { width: "100%" } : { width, maxWidth: "80%" }}
     >
       {/* Left-edge drag handle */}
-      <div
-        className="group absolute inset-y-0 left-0 z-10 flex w-1.5 cursor-col-resize items-center justify-center transition-colors hover:bg-border/60"
-        onMouseDown={onDragStart}
-      >
-        <GripVertical className="h-4 w-3 text-muted-foreground/20 transition-colors group-hover:text-muted-foreground/60" />
-      </div>
+      {!isFullscreen && (
+        <div
+          className="group absolute inset-y-0 left-0 z-10 flex w-1.5 cursor-col-resize items-center justify-center transition-colors hover:bg-border/60"
+          onMouseDown={onDragStart}
+        >
+          <GripVertical className="h-4 w-3 text-muted-foreground/20 transition-colors group-hover:text-muted-foreground/60" />
+        </div>
+      )}
 
       {/* Header — title + status summary + controls */}
       <div className="flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-border/50 pr-1.5 pl-4">
@@ -818,6 +826,26 @@ export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) 
               }
             />
             <TooltipContent>Refresh status</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                  <span className="sr-only">{isFullscreen ? "Exit fullscreen" : "Fullscreen"}</span>
+                </Button>
+              }
+            />
+            <TooltipContent>{isFullscreen ? "Exit fullscreen" : "Fullscreen"}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
