@@ -23,6 +23,7 @@ import {
   ConfigureProviderProvider,
   ConfigureProviderModal,
 } from "@/features/settings"
+import { ErrorBoundary } from "@/shared/components/error-boundary"
 
 function RootLayoutInner() {
   const { isLoading } = useWorkspace()
@@ -116,4 +117,12 @@ function UpdateBanner() {
   )
 }
 
-export const Route = createRootRoute({ component: RootLayoutGate })
+function Root() {
+  return (
+    <ErrorBoundary>
+      <RootLayoutGate />
+    </ErrorBoundary>
+  )
+}
+
+export const Route = createRootRoute({ component: Root })
