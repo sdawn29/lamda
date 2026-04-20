@@ -123,9 +123,9 @@ function AssistantMessageBlock({
 
       <div className="flex items-center gap-3">
         {hasMeta && (
-          <div className={isError ? "text-xs text-destructive/60" : "text-xs text-muted-foreground"}>
+          <div className={isError ? "flex items-center gap-1.5 text-xs text-destructive/60" : "flex items-center gap-1.5 text-xs text-muted-foreground"}>
             {providerMeta && (
-              <span className="shrink-0">{providerMeta.icon}</span>
+              <span className="flex shrink-0 items-center">{providerMeta.icon}</span>
             )}
             {message.model && <span>{message.model}</span>}
             {thinkingLabel && (
