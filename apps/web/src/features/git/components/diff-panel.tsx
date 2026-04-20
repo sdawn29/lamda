@@ -273,10 +273,10 @@ function FileAccordionItem({
 
   return (
     <div className="group/file border-b border-border/30 last:border-0">
-      <div className="relative flex w-full items-center">
+      <div className="flex w-full items-center hover:bg-muted/40 transition-colors">
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-14 pl-2.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+          className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-2.5 pr-1 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
         >
           <ChevronRight
             className={cn(
@@ -300,8 +300,8 @@ function FileAccordionItem({
           </span>
         </button>
 
-        {/* Hover action buttons */}
-        <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/file:opacity-100">
+        {/* Action buttons — zero width until row is hovered */}
+        <div className="flex shrink-0 items-center gap-0.5 overflow-hidden max-w-0 group-hover/file:max-w-20 transition-all duration-150 group-hover/file:pr-1">
           {!file.isUntracked && (
             <Tooltip>
               <TooltipTrigger
