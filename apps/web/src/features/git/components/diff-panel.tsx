@@ -20,6 +20,8 @@ import {
   Check,
   Undo2,
   GitCompare,
+  AlertCircle,
+  GitMerge,
 } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import {
@@ -79,15 +81,29 @@ function statusLabel(file: ChangedFile): string {
   return Y
 }
 
-function statusColor(file: ChangedFile) {
+const STATUS_META: Record<string, { bg: string; text: string }> = {
+  M: { bg: "bg-yellow-500/15 dark:bg-yellow-400/10", text: "text-yellow-600 dark:text-yellow-400" },
+  "M*": { bg: "bg-yellow-500/15 dark:bg-yellow-400/10", text: "text-yellow-600 dark:text-yellow-400" },
+  A: { bg: "bg-green-500/15 dark:bg-green-400/10", text: "text-green-600 dark:text-green-400" },
+  D: { bg: "bg-red-500/15 dark:bg-red-400/10", text: "text-red-600 dark:text-red-400" },
+  U: { bg: "bg-blue-500/15 dark:bg-blue-400/10", text: "text-blue-600 dark:text-blue-400" },
+  R: { bg: "bg-purple-500/15 dark:bg-purple-400/10", text: "text-purple-600 dark:text-purple-400" },
+}
+
+function StatusBadge({ file }: { file: ChangedFile }) {
   const label = statusLabel(file)
-  if (label === "M" || label === "M*")
-    return "text-yellow-500 dark:text-yellow-400"
-  if (label === "A") return "text-green-600 dark:text-green-400"
-  if (label === "D") return "text-red-500 dark:text-red-400"
-  if (label === "U") return "text-blue-500 dark:text-blue-400"
-  if (label === "R") return "text-purple-500 dark:text-purple-400"
-  return "text-muted-foreground"
+  const meta = STATUS_META[label] ?? { bg: "bg-muted", text: "text-muted-foreground" }
+  return (
+    <span
+      className={cn(
+        "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-0.5 font-mono text-[10px] font-semibold leading-none",
+        meta.bg,
+        meta.text
+      )}
+    >
+      {label}
+    </span>
+  )
 }
 
 // ── Stash list ──────────────────────────────────────────────────────────────
@@ -112,7 +128,6 @@ function parseStashList(raw: string): StashEntry[] {
       const indexMatch = ref.match(/\{(\d+)\}/)
       const index = indexMatch ? parseInt(indexMatch[1], 10) : 0
 
-      // "On branch: msg" or "WIP on branch: msg"
       const branchMatch = rest.match(/^(?:WIP )?[Oo]n ([^:]+):?\s*(.*)/)
       const branch = branchMatch?.[1]?.trim() ?? ""
       const message = branchMatch?.[2]?.trim() || rest
@@ -121,7 +136,7 @@ function parseStashList(raw: string): StashEntry[] {
     })
 }
 
-// ── Stash input bar (VS Code style) ─────────────────────────────────────────
+// ── Stash input bar ─────────────────────────────────────────────────────────
 
 function StashInputBar({
   onConfirm,
@@ -149,7 +164,8 @@ function StashInputBar({
   }
 
   return (
-    <div className="flex items-center gap-1.5 border-b border-border/60 bg-muted/30 px-3 py-2">
+    <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-3 py-2">
+      <Archive className="h-3 w-3 shrink-0 text-muted-foreground/50" />
       <input
         ref={inputRef}
         value={message}
@@ -158,27 +174,25 @@ function StashInputBar({
           if (e.key === "Enter") handleConfirm()
           if (e.key === "Escape") onCancel()
         }}
-        placeholder="Stash message (optional, Enter to confirm)"
-        className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/50"
+        placeholder="Stash message (optional) — Enter to confirm"
+        className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/40"
       />
       {stashing ? (
-        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground/60" />
       ) : (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
+        <button
           onClick={onCancel}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground"
         >
           <X className="h-3 w-3" />
           <span className="sr-only">Cancel</span>
-        </Button>
+        </button>
       )}
     </div>
   )
 }
 
-// ── File accordion item ─────────────────────────────────────────────────────
+// ── Diff stat counts ─────────────────────────────────────────────────────────
 
 function parseDiffCounts(diff: string): { added: number; removed: number } {
   let added = 0
@@ -189,6 +203,22 @@ function parseDiffCounts(diff: string): { added: number; removed: number } {
   }
   return { added, removed }
 }
+
+function DiffStat({ added, removed }: { added: number; removed: number }) {
+  if (added === 0 && removed === 0) return null
+  return (
+    <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-[10px]">
+      {added > 0 && (
+        <span className="text-green-600 dark:text-green-400">+{added}</span>
+      )}
+      {removed > 0 && (
+        <span className="text-red-500 dark:text-red-400">-{removed}</span>
+      )}
+    </span>
+  )
+}
+
+// ── File accordion item ─────────────────────────────────────────────────────
 
 function FileAccordionItem({
   file,
@@ -237,52 +267,41 @@ function FileAccordionItem({
     }
   }
 
-  const label = statusLabel(file)
   const pathParts = file.filePath.split("/")
   const fileName = pathParts[pathParts.length - 1] ?? file.filePath
-  const dirPath = pathParts.length > 1 ? pathParts.slice(0, -1).join("/") : null
+  const dirPath = pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : null
 
   return (
-    <div className="group/file border-b border-border/40 last:border-0">
+    <div className="group/file border-b border-border/30 last:border-0">
       <div className="relative flex w-full items-center">
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-1.5 py-2 pr-14 pl-2 text-left transition-colors hover:bg-muted/40"
+          className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-14 pl-2.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
         >
           <ChevronRight
             className={cn(
-              "size-3 shrink-0 text-muted-foreground transition-transform duration-150",
+              "size-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
               expanded && "rotate-90"
             )}
           />
-          <span
-            className={cn("w-6 shrink-0 font-mono text-xs", statusColor(file))}
-          >
-            {label}
-          </span>
-          <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-            <span className="shrink-0 font-mono text-xs text-foreground/90">
-              {fileName}
-            </span>
+          <StatusBadge file={file} />
+          <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
             {dirPath && (
-              <span className="truncate font-mono text-[10px] text-muted-foreground/50">
+              <span className="shrink-0 truncate font-mono text-[10px] text-muted-foreground/40">
                 {dirPath}
               </span>
             )}
+            <span className="truncate font-mono text-xs font-medium text-foreground/85">
+              {fileName}
+            </span>
             {counts != null && (
-              <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-[10px]">
-                {counts.added > 0 && (
-                  <span className="text-green-600 dark:text-green-400">+{counts.added}</span>
-                )}
-                {counts.removed > 0 && (
-                  <span className="text-red-500 dark:text-red-400">-{counts.removed}</span>
-                )}
-              </span>
+              <DiffStat added={counts.added} removed={counts.removed} />
             )}
           </span>
         </button>
 
-        <div className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/file:opacity-100">
+        {/* Hover action buttons */}
+        <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/file:opacity-100">
           {!file.isUntracked && (
             <Tooltip>
               <TooltipTrigger
@@ -290,7 +309,7 @@ function FileAccordionItem({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    className="h-6 w-6 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
                     disabled={reverting}
                     onClick={handleRevert}
                   >
@@ -312,7 +331,7 @@ function FileAccordionItem({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
                   disabled={toggling}
                   onClick={handleToggle}
                 >
@@ -337,9 +356,9 @@ function FileAccordionItem({
       </div>
 
       {expanded && (
-        <div className="animate-in border-t border-border/40 px-3 pb-3 duration-150 fade-in-0 slide-in-from-top-1">
+        <div className="animate-in border-t border-border/30 bg-muted/10 px-3 pb-3 duration-150 fade-in-0 slide-in-from-top-1">
           {diffLoading ? (
-            <div className="flex items-center gap-1.5 py-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
               Loading diff…
             </div>
@@ -385,16 +404,11 @@ function StashEntryRow({
   }
 
   return (
-    <div className="group flex items-start gap-2.5 px-3 py-2 hover:bg-muted/40">
-      {/* Index badge + icon */}
-      <div className="relative mt-0.5 shrink-0">
-        <Archive className="h-3.5 w-3.5 text-muted-foreground/50" />
-        <span className="absolute -top-1.5 -right-1.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-muted px-0.5 text-[8px] font-semibold text-muted-foreground">
-          {entry.index}
-        </span>
-      </div>
+    <div className="group flex items-center gap-2.5 border-b border-border/30 px-3 py-2 last:border-0 hover:bg-muted/40">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground">
+        {entry.index}
+      </span>
 
-      {/* Label + branch */}
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs text-foreground/85">{entry.message}</p>
         {entry.branch && (
@@ -407,9 +421,8 @@ function StashEntryRow({
         )}
       </div>
 
-      {/* Actions */}
       {working ? (
-        <Loader2 className="mt-0.5 h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
+        <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground/60" />
       ) : (
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           <Tooltip>
@@ -418,7 +431,7 @@ function StashEntryRow({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                  className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
                   onClick={() => run("pop")}
                 >
                   <PackageOpen className="h-3 w-3" />
@@ -435,7 +448,7 @@ function StashEntryRow({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                  className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
                   onClick={() => run("apply")}
                 >
                   <Download className="h-3 w-3" />
@@ -452,7 +465,7 @@ function StashEntryRow({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="h-5 w-5 text-destructive/60 hover:text-destructive"
+                  className="h-6 w-6 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => run("drop")}
                 >
                   <Trash2 className="h-3 w-3" />
@@ -478,34 +491,31 @@ function StashSection({ sessionId }: { sessionId: string }) {
 
   const stashes = useMemo(() => parseStashList(stashRaw ?? ""), [stashRaw])
 
-  const handleApply = useCallback(
-    (ref: string) => apply.mutateAsync(ref),
-    [apply]
-  )
+  const handleApply = useCallback((ref: string) => apply.mutateAsync(ref), [apply])
   const handlePop = useCallback((ref: string) => pop.mutateAsync(ref), [pop])
   const handleDrop = useCallback((ref: string) => drop.mutateAsync(ref), [drop])
 
   return (
-    <div className="shrink-0 border-t border-border/60">
+    <div className="shrink-0 border-t border-border/50">
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className="flex w-full items-center gap-1.5 bg-muted/30 px-2 py-1.5 text-left transition-colors duration-150 hover:bg-muted/60"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/40"
       >
         <ChevronRight
           className={cn(
-            "h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-150",
+            "h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
             !collapsed && "rotate-90"
           )}
         />
-        <Archive className="h-3 w-3 shrink-0 text-muted-foreground/60" />
-        <span className="flex-1 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+        <Archive className="h-3 w-3 shrink-0 text-muted-foreground/50" />
+        <span className="flex-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
           Stashes
         </span>
         {isLoading && (
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/50" />
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/40" />
         )}
         {!isLoading && stashes.length > 0 && (
-          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-medium text-muted-foreground">
             {stashes.length}
           </span>
         )}
@@ -514,7 +524,7 @@ function StashSection({ sessionId }: { sessionId: string }) {
       {!collapsed && (
         <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
           {!isLoading && stashes.length === 0 && (
-            <p className="px-4 py-2.5 text-xs text-muted-foreground/40">
+            <p className="px-4 py-3 text-xs text-muted-foreground/40">
               No stashes
             </p>
           )}
@@ -558,19 +568,19 @@ function FilesSection({
     <div className="border-b border-border/40 last:border-0">
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className="flex w-full items-center gap-1.5 bg-muted/30 px-2 py-1.5 text-left transition-colors duration-150 hover:bg-muted/60"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-muted/40"
       >
         <ChevronRight
           className={cn(
-            "h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-150",
+            "h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
             !collapsed && "rotate-90"
           )}
         />
-        <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
           {label}
         </span>
         {files.length > 0 && (
-          <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-medium text-muted-foreground">
             {files.length}
           </span>
         )}
@@ -579,7 +589,7 @@ function FilesSection({
       {!collapsed && (
         <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
           {files.length === 0 && emptyText && (
-            <p className="px-3 py-2 text-xs text-muted-foreground/50">
+            <p className="px-4 py-2.5 text-xs text-muted-foreground/40">
               {emptyText}
             </p>
           )}
@@ -647,9 +657,7 @@ interface DiffPanelProps {
   sessionId: string
 }
 
-export const DiffPanel = memo(function DiffPanel({
-  sessionId,
-}: DiffPanelProps) {
+export const DiffPanel = memo(function DiffPanel({ sessionId }: DiffPanelProps) {
   const { close } = useDiffPanel()
   const [width, setWidth] = useState(DEFAULT_WIDTH)
   const [mode, setMode] = useState<DiffMode>("inline")
@@ -664,6 +672,7 @@ export const DiffPanel = memo(function DiffPanel({
     error: statusError,
     refetch,
   } = useGitStatus(sessionId)
+
   const { staged, unstaged } = useMemo(() => {
     const all = (statusRaw ?? "")
       .split("\n")
@@ -671,16 +680,11 @@ export const DiffPanel = memo(function DiffPanel({
       .filter(Boolean)
       .map(parseStatusLine)
     return {
-      staged: applySortMode(
-        all.filter((f) => f.isStaged),
-        sortMode
-      ),
-      unstaged: applySortMode(
-        all.filter((f) => !f.isStaged),
-        sortMode
-      ),
+      staged: applySortMode(all.filter((f) => f.isStaged), sortMode),
+      unstaged: applySortMode(all.filter((f) => !f.isStaged), sortMode),
     }
   }, [statusRaw, sortMode])
+
   const files = useMemo(() => [...staged, ...unstaged], [staged, unstaged])
   const error = statusError instanceof Error ? statusError.message : null
 
@@ -739,10 +743,7 @@ export const DiffPanel = memo(function DiffPanel({
           panelRef.current?.parentElement?.clientWidth ?? window.innerWidth
         const maxWidth = parentWidth - MIN_CHAT_WIDTH
         setWidth(
-          Math.max(
-            MIN_WIDTH,
-            Math.min(maxWidth, dragStartRef.current.w + delta)
-          )
+          Math.max(MIN_WIDTH, Math.min(maxWidth, dragStartRef.current.w + delta))
         )
       }
 
@@ -760,43 +761,47 @@ export const DiffPanel = memo(function DiffPanel({
     [width]
   )
 
-  const stagedCount = staged.length
-  const hasStaged = stagedCount > 0
+  const hasStaged = staged.length > 0
   const hasUnstaged = unstaged.length > 0
   const hasChanges = files.length > 0
 
   return (
     <div
       ref={panelRef}
-      className="relative flex h-full shrink-0 flex-col border-l bg-background"
+      className="relative flex h-full shrink-0 flex-col border-l border-border/60 bg-background"
       style={{ width, maxWidth: "80%" }}
     >
       {/* Left-edge drag handle */}
       <div
-        className="group absolute inset-y-0 left-0 flex w-2 cursor-col-resize items-center justify-center transition-[background-color,width] duration-150 hover:w-2 hover:bg-border/40"
+        className="group absolute inset-y-0 left-0 z-10 flex w-1.5 cursor-col-resize items-center justify-center transition-colors hover:bg-border/60"
         onMouseDown={onDragStart}
       >
-        <GripVertical className="h-4 w-3 text-muted-foreground/20 transition-[color,opacity] duration-150 group-hover:text-muted-foreground/70" />
+        <GripVertical className="h-4 w-3 text-muted-foreground/20 transition-colors group-hover:text-muted-foreground/60" />
       </div>
 
-      {/* Header – Row 1: title + status badges + refresh + close */}
-      <div className="flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-border/60 pr-2 pl-4">
-        <GitCompare className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
-        <span className="text-xs font-semibold tracking-wide">
-          Source Control
-        </span>
-        <div className="flex flex-1 items-center justify-end gap-1">
+      {/* Header — title + status summary + controls */}
+      <div className="flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-border/50 pr-1.5 pl-4">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-muted">
+            <GitCompare className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+          <span className="text-xs font-semibold">Source Control</span>
+        </div>
+
+        <div className="flex flex-1 items-center gap-1.5 overflow-hidden pl-1">
           {hasStaged && (
-            <span className="rounded-full bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
-              {stagedCount} staged
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
+              <GitMerge className="h-2.5 w-2.5" />
+              {staged.length} staged
             </span>
           )}
-          {unstaged.length > 0 && (
-            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          {hasUnstaged && (
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
               {unstaged.length} changed
             </span>
           )}
         </div>
+
         <div className="flex shrink-0 items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger
@@ -805,14 +810,14 @@ export const DiffPanel = memo(function DiffPanel({
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => refetch()}
-                  className="h-6 w-6 text-muted-foreground"
+                  className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
                 >
-                  <RefreshCw className="h-3 w-3" />
+                  <RefreshCw className="h-3.5 w-3.5" />
                   <span className="sr-only">Refresh</span>
                 </Button>
               }
             />
-            <TooltipContent>Refresh</TooltipContent>
+            <TooltipContent>Refresh status</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -821,9 +826,9 @@ export const DiffPanel = memo(function DiffPanel({
                   variant="ghost"
                   size="icon-sm"
                   onClick={close}
-                  className="h-6 w-6"
+                  className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3.5 w-3.5" />
                   <span className="sr-only">Close panel</span>
                 </Button>
               }
@@ -833,9 +838,8 @@ export const DiffPanel = memo(function DiffPanel({
         </div>
       </div>
 
-      {/* Header – Row 2: action toolbar */}
-      <div className="flex h-8 min-w-0 shrink-0 items-center gap-0.5 border-b border-border/60 bg-muted/20 px-2">
-        {/* Stage / unstage all */}
+      {/* Toolbar */}
+      <div className="flex h-8 min-w-0 shrink-0 items-center gap-0.5 border-b border-border/50 bg-muted/20 px-2">
         <Tooltip>
           <TooltipTrigger
             render={
@@ -844,7 +848,7 @@ export const DiffPanel = memo(function DiffPanel({
                 size="icon-sm"
                 onClick={handleStageAll}
                 disabled={bulkWorking || !hasUnstaged}
-                className="h-6 w-6"
+                className="h-6 w-6 text-muted-foreground/70 hover:text-foreground disabled:opacity-35"
               >
                 {bulkWorking ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -866,7 +870,7 @@ export const DiffPanel = memo(function DiffPanel({
                 size="icon-sm"
                 onClick={handleUnstageAll}
                 disabled={bulkWorking || !hasStaged}
-                className="h-6 w-6"
+                className="h-6 w-6 text-muted-foreground/70 hover:text-foreground disabled:opacity-35"
               >
                 <PackageMinus className="h-3 w-3" />
                 <span className="sr-only">Unstage all</span>
@@ -876,9 +880,8 @@ export const DiffPanel = memo(function DiffPanel({
           <TooltipContent>Unstage all changes</TooltipContent>
         </Tooltip>
 
-        <div className="mx-1 h-4 w-px bg-border/60" />
+        <div className="mx-1.5 h-4 w-px bg-border/50" />
 
-        {/* View mode */}
         <Tooltip>
           <TooltipTrigger
             render={
@@ -887,14 +890,14 @@ export const DiffPanel = memo(function DiffPanel({
                 size="icon-sm"
                 onClick={() => setMode("inline")}
                 data-active={mode === "inline"}
-                className="h-6 w-6 data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+                className="h-6 w-6 text-muted-foreground/70 hover:text-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
               >
                 <AlignLeft className="h-3 w-3" />
                 <span className="sr-only">Inline view</span>
               </Button>
             }
           />
-          <TooltipContent>Inline view</TooltipContent>
+          <TooltipContent>Inline diff</TooltipContent>
         </Tooltip>
 
         <Tooltip>
@@ -905,26 +908,28 @@ export const DiffPanel = memo(function DiffPanel({
                 size="icon-sm"
                 onClick={() => setMode("side-by-side")}
                 data-active={mode === "side-by-side"}
-                className="h-6 w-6 data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+                className="h-6 w-6 text-muted-foreground/70 hover:text-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
               >
                 <Columns2 className="h-3 w-3" />
                 <span className="sr-only">Side-by-side</span>
               </Button>
             }
           />
-          <TooltipContent>Side-by-side view</TooltipContent>
+          <TooltipContent>Side-by-side diff</TooltipContent>
         </Tooltip>
 
-        <div className="mx-1 h-4 w-px bg-border/60" />
+        <div className="mx-1.5 h-4 w-px bg-border/50" />
 
-        {/* Sort */}
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger
               render={
                 <DropdownMenuTrigger
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-                  data-active={sortMode !== "name"}
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded-md transition-colors",
+                    "text-muted-foreground/70 hover:bg-accent hover:text-accent-foreground",
+                    sortMode !== "name" && "bg-accent text-accent-foreground"
+                  )}
                 >
                   <ArrowUpDown className="h-3 w-3" />
                   <span className="sr-only">Sort files</span>
@@ -949,9 +954,8 @@ export const DiffPanel = memo(function DiffPanel({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="mx-1 h-4 w-px bg-border/60" />
+        <div className="mx-1.5 h-4 w-px bg-border/50" />
 
-        {/* Stash */}
         <Tooltip>
           <TooltipTrigger
             render={
@@ -960,7 +964,7 @@ export const DiffPanel = memo(function DiffPanel({
                 size="icon-sm"
                 onClick={() => setStashInputOpen(true)}
                 disabled={!hasChanges}
-                className="h-6 w-6"
+                className="h-6 w-6 text-muted-foreground/70 hover:text-foreground disabled:opacity-35"
               >
                 <Archive className="h-3 w-3" />
                 <span className="sr-only">Stash changes</span>
@@ -971,9 +975,8 @@ export const DiffPanel = memo(function DiffPanel({
         </Tooltip>
       </div>
 
-      {/* File list + stash input */}
+      {/* File list */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {/* VS Code-style stash message input bar */}
         {stashInputOpen && (
           <StashInputBar
             onConfirm={handleStashConfirm}
@@ -982,19 +985,28 @@ export const DiffPanel = memo(function DiffPanel({
         )}
 
         {loading && files.length === 0 && (
-          <div className="flex items-center gap-1.5 px-3 py-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
             <Loader2 className="size-3 animate-spin" />
-            Loading…
+            Loading status…
           </div>
         )}
+
         {!loading && error && (
-          <p className="px-3 py-3 text-xs text-destructive">{error}</p>
-        )}
-        {!loading && !error && files.length === 0 && (
-          <p className="px-3 py-3 text-xs text-muted-foreground">No changes</p>
+          <div className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-xs text-destructive">
+            <AlertCircle className="mt-px size-3.5 shrink-0" />
+            <span className="leading-snug">{error}</span>
+          </div>
         )}
 
-        {/* Staged section */}
+        {!loading && !error && files.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+              <GitCompare className="h-4 w-4 text-muted-foreground/50" />
+            </div>
+            <p className="text-xs text-muted-foreground/50">No changes</p>
+          </div>
+        )}
+
         {!loading && !error && (staged.length > 0 || unstaged.length > 0) && (
           <FilesSection
             label="Staged"
@@ -1007,7 +1019,6 @@ export const DiffPanel = memo(function DiffPanel({
           />
         )}
 
-        {/* Unstaged section */}
         {!loading && !error && unstaged.length > 0 && (
           <FilesSection
             label="Changes"
