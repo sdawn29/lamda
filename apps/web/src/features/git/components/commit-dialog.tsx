@@ -8,7 +8,7 @@ import {
   Sparkles,
   Settings2,
 } from "lucide-react"
-import { useNavigate } from "@tanstack/react-router"
+import { useSettingsModal } from "@/features/settings/context"
 import { Button } from "@/shared/ui/button"
 import { Dialog, DialogContent, DialogTrigger } from "@/shared/ui/dialog"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
@@ -111,9 +111,7 @@ function FileAccordionItem({
           {statusChar(file.statusCode)}
         </span>
         <span className="flex min-w-0 flex-1 items-baseline gap-2">
-          <span className="shrink-0 text-xs text-foreground/90">
-            {fileName}
-          </span>
+          <span className="shrink-0 text-xs text-foreground/90">{fileName}</span>
           {dirPath && (
             <span className="truncate font-mono text-[10px] text-muted-foreground/50">
               {dirPath}
@@ -142,19 +140,20 @@ function FileAccordionItem({
   )
 }
 
-// Auto-growing textarea
 function AutoTextarea({
   value,
   onChange,
   placeholder,
   className,
   onKeyDown,
+  autoFocus,
 }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   className?: string
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
+  autoFocus?: boolean
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -171,9 +170,10 @@ function AutoTextarea({
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={onKeyDown}
       placeholder={placeholder}
+      autoFocus={autoFocus}
       rows={3}
       className={cn(
-        "w-full resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground/40",
+        "w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground/40",
         className
       )}
     />
@@ -183,15 +183,13 @@ function AutoTextarea({
 export function CommitDialog({ sessionId }: CommitDialogProps) {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState("")
-  const navigate = useNavigate()
+  const { openSettings } = useSettingsModal()
   const { data: settings } = useAppSettings()
 
   const { data: statusRaw, isLoading: loading } = useGitStatus(sessionId ?? "")
   const { data: branchData } = useBranch(sessionId ?? "")
   const commitMutation = useGitCommit(sessionId ?? "")
-  const generateCommitMessageMutation = useGenerateCommitMessage(
-    sessionId ?? ""
-  )
+  const generateCommitMessageMutation = useGenerateCommitMessage(sessionId ?? "")
   const pushMutation = useGitPush(sessionId ?? "")
 
   const branch = branchData?.branch ?? null
@@ -258,7 +256,8 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
   async function handleGenerate() {
     if (!sessionId || generateCommitMessageMutation.isPending) return
     try {
-      const promptTemplate = settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? undefined
+      const promptTemplate =
+        settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? undefined
       const generated =
         await generateCommitMessageMutation.mutateAsync(promptTemplate)
       setMessage(generated)
@@ -269,7 +268,7 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
 
   function handleConfigure() {
     setOpen(false)
-    navigate({ to: "/settings" })
+    openSettings()
   }
 
   const committing = commitMutation.isPending
@@ -289,6 +288,8 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
     !!message.trim() &&
     staged.length > 0 &&
     !loading
+
+  const hasFiles = staged.length > 0 || unstaged.length > 0
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -313,22 +314,33 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
             </DialogTrigger>
           }
         />
-        <TooltipContent>Commit staged changes <ShortcutKbd binding={commitBinding} className="ml-1" /></TooltipContent>
+        <TooltipContent>
+          Commit staged changes{" "}
+          <ShortcutKbd binding={commitBinding} className="ml-1" />
+        </TooltipContent>
       </Tooltip>
 
       <DialogContent
         showCloseButton
-        className="flex flex-col gap-0 bg-background p-0 sm:max-w-lg"
+        className="flex flex-col gap-0 overflow-hidden bg-background p-0 sm:max-w-lg"
       >
         {/* Header */}
-        <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
-          <GitCommit className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Commit changes</span>
+        <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 pr-10">
+          <div className="flex items-center gap-2">
+            <GitCommit className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Commit changes</span>
+          </div>
+          {branch && (
+            <div className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">
+              <GitBranch className="h-3 w-3 shrink-0" />
+              <span className="max-w-45 truncate">{branch}</span>
+            </div>
+          )}
         </div>
 
         {/* Files */}
         <div className="flex flex-col">
-          {/* Staged */}
+          {/* Staged section */}
           <div>
             <div className="flex items-center justify-between bg-muted/30 px-3 py-1.5">
               <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
@@ -340,17 +352,25 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
                 </span>
               )}
             </div>
+
             <div className="max-h-44 overflow-y-auto">
               {loading && (
-                <div className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5 px-3 py-3 text-xs text-muted-foreground">
                   <Loader2 className="size-3 animate-spin" />
                   Loading…
                 </div>
               )}
               {!loading && staged.length === 0 && (
-                <p className="px-3 py-2 text-xs text-muted-foreground/50">
-                  No staged changes — stage files in the diff panel first.
-                </p>
+                <div className="flex flex-col gap-0.5 px-3 py-3">
+                  <p className="text-xs text-muted-foreground/60">
+                    No files staged yet.
+                  </p>
+                  {hasFiles && (
+                    <p className="text-[11px] text-muted-foreground/40">
+                      Stage files from the diff panel to include them here.
+                    </p>
+                  )}
+                </div>
               )}
               {!loading &&
                 sessionId &&
@@ -364,7 +384,7 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
             </div>
           </div>
 
-          {/* Unstaged (if any) */}
+          {/* Unstaged section */}
           {unstaged.length > 0 && (
             <div className="border-t border-border/40">
               <div className="flex items-center justify-between bg-muted/30 px-3 py-1.5">
@@ -390,94 +410,109 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
           )}
         </div>
 
-        {/* Message */}
-        <div className="flex flex-col border-t border-border/60">
-          <div className="relative px-4 pt-3 pb-2">
+        {/* Message input */}
+        <div className="border-t border-border/60 px-4 pt-3 pb-2">
+          <div className="relative rounded-lg border border-border/60 bg-muted/20 focus-within:border-border/80 focus-within:bg-muted/30 transition-colors">
             <AutoTextarea
               value={message}
               onChange={setMessage}
-              placeholder="Summary (required)"
+              placeholder="Commit message…"
+              autoFocus
+              className="px-3 pt-2.5 pb-8 min-h-20"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey))
                   handleCommit()
               }}
             />
-            <div className="mt-1 flex items-center justify-between">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-                onClick={handleConfigure}
-              >
-                <Settings2 className="size-3" />
-                Configure
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-                disabled={generating || staged.length === 0}
-                onClick={handleGenerate}
-              >
-                {generating ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Sparkles className="size-3" />
-                )}
-                {generating ? "Generating…" : "Generate message"}
-              </Button>
+            {/* Toolbar inside textarea card */}
+            <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2 py-1.5 border-t border-border/40">
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      onClick={handleConfigure}
+                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground"
+                    >
+                      <Settings2 className="size-3" />
+                      Configure
+                    </button>
+                  }
+                />
+                <TooltipContent>Customize commit message prompt</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      onClick={handleGenerate}
+                      disabled={generating || staged.length === 0}
+                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      {generating ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-3" />
+                      )}
+                      {generating ? "Generating…" : "Generate"}
+                    </button>
+                  }
+                />
+                <TooltipContent>
+                  {staged.length === 0
+                    ? "Stage files first"
+                    : "Generate commit message from staged diff"}
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
+        </div>
 
-          {error && (
-            <p className="mx-4 mb-2 rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">
-              {error}
-            </p>
-          )}
-
-          {/* Footer */}
-          <div className="flex items-center justify-between border-t border-border/40 px-4 py-2.5">
-            <p className="text-[11px] text-muted-foreground/50">
-              {staged.length > 0
-                ? `${staged.length} file${staged.length !== 1 ? "s" : ""} will be committed`
-                : "Stage files to commit"}
-            </p>
-            <div className="flex items-center gap-2">
-              {branch && (
-                <div className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                  <GitBranch className="h-3 w-3" />
-                  {branch}
-                </div>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCommitAndPush}
-                disabled={!canCommit}
-                className="h-7 px-3 text-xs"
-              >
-                {committing || pushing ? (
-                  <Loader2 className="mr-1.5 size-3 animate-spin" />
-                ) : (
-                  <CloudUpload className="mr-1.5 size-3" />
-                )}
-                Commit & Push
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleCommit}
-                disabled={!canCommit}
-                className="h-7 px-3 text-xs"
-              >
-                {committing ? (
-                  <Loader2 className="mr-1.5 size-3 animate-spin" />
-                ) : (
-                  <GitCommit className="mr-1.5 size-3" />
-                )}
-                Commit
-              </Button>
-            </div>
+        {/* Error */}
+        {error && (
+          <div className="mx-4 mb-2 rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">
+            {error}
           </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 border-t border-border/40 px-4 py-2.5">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCommitAndPush}
+            disabled={!canCommit}
+            className="h-7 gap-1.5 px-3 text-xs"
+          >
+            {committing || pushing ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <CloudUpload className="size-3" />
+            )}
+            Commit & Push
+          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="sm"
+                  onClick={handleCommit}
+                  disabled={!canCommit}
+                  className="h-7 gap-1.5 px-3 text-xs"
+                >
+                  {committing ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <GitCommit className="size-3" />
+                  )}
+                  Commit
+                </Button>
+              }
+            />
+            <TooltipContent>
+              Commit staged changes <ShortcutKbd binding="⌘↵" className="ml-1" />
+            </TooltipContent>
+          </Tooltip>
         </div>
       </DialogContent>
     </Dialog>
