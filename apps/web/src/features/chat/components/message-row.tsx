@@ -1,6 +1,7 @@
 import { memo } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { ArrowDownIcon, ArrowUpIcon } from "lucide-react"
 
 import { ToolCallBlock } from "./tool-call-block"
 import { markdownComponents } from "./markdown-components"
@@ -36,6 +37,34 @@ function assistantCopyText(
 function formatResponseTime(ms: number): string {
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(1)}s`
+}
+
+function estimateTokens(text: string): number {
+  return Math.max(1, Math.round(text.length / 4))
+}
+
+function formatTokenCount(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+  return String(n)
+}
+
+function TokenCounter({ up, down }: { up?: number; down?: number }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground/50">
+      {up != null && (
+        <span className="flex items-center gap-0.5">
+          <ArrowUpIcon className="h-3 w-3" />
+          {formatTokenCount(up)}
+        </span>
+      )}
+      {down != null && (
+        <span className="flex items-center gap-0.5">
+          <ArrowDownIcon className="h-3 w-3" />
+          {formatTokenCount(down)}
+        </span>
+      )}
+    </div>
+  )
 }
 
 function AssistantMessageBlock({
@@ -91,6 +120,10 @@ function AssistantMessageBlock({
             )}
           </div>
         )}
+        <TokenCounter
+          up={message.thinking.length > 0 ? estimateTokens(message.thinking) : undefined}
+          down={estimateTokens(message.content)}
+        />
         <CopyButton text={assistantCopyText(message, showThinking)} />
       </div>
     </div>
@@ -141,7 +174,10 @@ export const MessageRow = memo(function MessageRow({
             commandsByName={commandsByName}
           />
         </div>
-        <CopyButton text={message.content} />
+        <div className="flex items-center gap-2">
+          <TokenCounter up={estimateTokens(message.content)} />
+          <CopyButton text={message.content} />
+        </div>
       </div>
     )
   }
