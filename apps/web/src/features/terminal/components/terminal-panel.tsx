@@ -1,12 +1,14 @@
 import { useEffect, useRef, memo } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
-import { X } from "lucide-react"
+import { Plus, X } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { useTheme } from "@/shared/components/theme-provider"
 import { useTerminal } from "../context"
 import { getServerUrl } from "@/shared/lib/client"
+import { cn } from "@/shared/lib/utils"
 import "@xterm/xterm/css/xterm.css"
+
 const TERMINAL_OUTPUT_FLUSH_MS = 16
 const TERMINAL_IMMEDIATE_FLUSH_THRESHOLD = 8_192
 
@@ -58,14 +60,21 @@ const LIGHT_TERMINAL_THEME = {
   brightWhite: "#ffffff",
 }
 
-interface TerminalPanelProps {
+// ─── Single terminal instance (keeps mounted when inactive for session persistence) ───
+
+interface TerminalInstanceProps {
+  id: string
   cwd: string
+  isActive: boolean
+  onTitleChange: (id: string, title: string) => void
 }
 
-export const TerminalPanel = memo(function TerminalPanel({
+const TerminalInstance = memo(function TerminalInstance({
+  id,
   cwd,
-}: TerminalPanelProps) {
-  const { close } = useTerminal()
+  isActive,
+  onTitleChange,
+}: TerminalInstanceProps) {
   const { resolvedTheme } = useTheme()
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
@@ -74,7 +83,7 @@ export const TerminalPanel = memo(function TerminalPanel({
   const terminalTheme =
     resolvedTheme === "dark" ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME
 
-  // Initialize xterm + WebSocket once
+  // Mount xterm + WebSocket once
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -82,8 +91,7 @@ export const TerminalPanel = memo(function TerminalPanel({
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 13,
-      fontFamily:
-        '"JetBrains Mono", "Menlo", "Monaco", "Courier New", monospace',
+      fontFamily: '"JetBrains Mono", "Menlo", "Monaco", "Courier New", monospace',
       scrollback: 500,
       theme: document.documentElement.classList.contains("dark")
         ? DARK_TERMINAL_THEME
@@ -97,6 +105,10 @@ export const TerminalPanel = memo(function TerminalPanel({
 
     termRef.current = term
     fitAddonRef.current = fitAddon
+
+    term.onTitleChange((title) => {
+      if (title) onTitleChange(id, title)
+    })
 
     let cancelled = false
     let ws: WebSocket | null = null
@@ -122,9 +134,7 @@ export const TerminalPanel = memo(function TerminalPanel({
       fitAddon.fit()
       const dims = fitAddon.proposeDimensions()
       if (dims && ws?.readyState === WebSocket.OPEN) {
-        ws.send(
-          JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
-        )
+        ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }))
       }
     })
     resizeObserver.observe(container)
@@ -139,9 +149,7 @@ export const TerminalPanel = memo(function TerminalPanel({
       ws.onopen = () => {
         const dims = fitAddon.proposeDimensions()
         if (dims) {
-          ws!.send(
-            JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
-          )
+          ws!.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }))
         }
       }
 
@@ -149,9 +157,7 @@ export const TerminalPanel = memo(function TerminalPanel({
         if (typeof e.data !== "string") return
         pendingOutput += e.data
         scheduleFlush(
-          pendingOutput.length >= TERMINAL_IMMEDIATE_FLUSH_THRESHOLD
-            ? 0
-            : undefined
+          pendingOutput.length >= TERMINAL_IMMEDIATE_FLUSH_THRESHOLD ? 0 : undefined
         )
       }
 
@@ -169,9 +175,7 @@ export const TerminalPanel = memo(function TerminalPanel({
 
     return () => {
       cancelled = true
-      if (flushTimeout !== null) {
-        window.clearTimeout(flushTimeout)
-      }
+      if (flushTimeout !== null) window.clearTimeout(flushTimeout)
       pendingOutput = ""
       resizeObserver.disconnect()
       ws?.close()
@@ -180,40 +184,139 @@ export const TerminalPanel = memo(function TerminalPanel({
       fitAddonRef.current = null
       wsRef.current = null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cwd])
 
+  // Refit when this tab becomes active (container was hidden)
+  useEffect(() => {
+    if (!isActive) return
+    const fit = fitAddonRef.current
+    const ws = wsRef.current
+    if (!fit) return
+    requestAnimationFrame(() => {
+      fit.fit()
+      const dims = fit.proposeDimensions()
+      if (dims && ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }))
+      }
+      termRef.current?.focus()
+    })
+  }, [isActive])
+
+  // Sync theme
   useEffect(() => {
     const term = termRef.current
     if (!term) return
-
     term.options.theme = terminalTheme
   }, [terminalTheme])
 
   return (
+    <div
+      ref={containerRef}
+      className={cn(
+        "min-h-0 flex-1 overflow-hidden px-2 py-1",
+        !isActive && "hidden"
+      )}
+      style={{ display: isActive ? undefined : "none" }}
+    />
+  )
+})
+
+// ─── Panel with tab bar ───────────────────────────────────────────────────────
+
+interface TerminalPanelProps {
+  cwd: string
+}
+
+export const TerminalPanel = memo(function TerminalPanel({ cwd }: TerminalPanelProps) {
+  const { close, tabs, activeTabId, addTab, closeTab, setActiveTab, renameTab } =
+    useTerminal()
+
+  return (
     <div className="flex h-full shrink-0 flex-col border-t bg-background">
-      {/* Header */}
-      <div className="flex h-8 shrink-0 items-center justify-between border-b px-3">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-muted-foreground">
-            terminal
-          </span>
+      {/* Tab bar */}
+      <div className="flex h-8 shrink-0 items-stretch border-b">
+        {/* Scrollable tab list */}
+        <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto scrollbar-none">
+          {tabs.map((tab) => {
+            const isActive = tab.id === activeTabId
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "group relative flex shrink-0 items-center gap-1.5 border-r px-3 font-mono text-xs transition-colors",
+                  isActive
+                    ? "bg-background text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-primary"
+                    : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <span className="max-w-30 truncate">{tab.title}</span>
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={`Close ${tab.title}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    closeTab(tab.id)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation()
+                      closeTab(tab.id)
+                    }
+                  }}
+                  className={cn(
+                    "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-muted-foreground/20",
+                    isActive
+                      ? "opacity-60 hover:opacity-100"
+                      : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100"
+                  )}
+                >
+                  <X className="h-2.5 w-2.5" />
+                </span>
+              </button>
+            )
+          })}
+
+          {/* New tab */}
+          <button
+            type="button"
+            onClick={addTab}
+            aria-label="New terminal tab"
+            className="flex items-center px-2 text-muted-foreground hover:text-foreground"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="h-5 w-5 text-muted-foreground hover:text-foreground"
-          onClick={close}
-        >
-          <X className="h-3 w-3" />
-          <span className="sr-only">Close terminal</span>
-        </Button>
+
+        {/* Close panel */}
+        <div className="flex items-center border-l px-1.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="h-5 w-5 text-muted-foreground hover:text-foreground"
+            onClick={close}
+          >
+            <X className="h-3 w-3" />
+            <span className="sr-only">Close terminal panel</span>
+          </Button>
+        </div>
       </div>
 
-      {/* xterm container */}
-      <div
-        ref={containerRef}
-        className="min-h-0 flex-1 overflow-hidden px-2 py-1"
-      />
+      {/* Terminal instances — all mounted, inactive ones are hidden */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {tabs.map((tab) => (
+          <TerminalInstance
+            key={tab.id}
+            id={tab.id}
+            cwd={cwd}
+            isActive={tab.id === activeTabId}
+            onTitleChange={renameTab}
+          />
+        ))}
+      </div>
     </div>
   )
 })
