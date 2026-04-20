@@ -46,6 +46,8 @@ function storedToMessage(m: StoredMessageDto): Message {
       args: unknown
       result: unknown
       status: "running" | "done" | "error"
+      startTime?: number
+      duration?: number
     }
     return {
       role: "tool",
@@ -54,6 +56,8 @@ function storedToMessage(m: StoredMessageDto): Message {
       args: data.args,
       result: data.result,
       status: data.status,
+      startTime: data.startTime,
+      duration: data.duration,
     }
   }
   if (m.role === "assistant") {

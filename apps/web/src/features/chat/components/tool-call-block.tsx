@@ -2,6 +2,9 @@ import { lazy, memo, Suspense, useMemo, useState } from "react"
 import {
   AlertCircleIcon,
   BookOpenTextIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  CopyIcon,
   FileEditIcon,
   FilePlusIcon,
   FolderSearchIcon,
@@ -10,6 +13,7 @@ import {
   SearchIcon,
   TerminalSquareIcon,
   WrenchIcon,
+  XIcon,
 } from "lucide-react"
 import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 
@@ -21,8 +25,18 @@ import type { ToolMessage } from "../types"
 
 const PrismCode = lazy(() => import("./prism-code"))
 
+// ── Formatting helpers ─────────────────────────────────────────────────────────
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+  return `${Math.floor(ms / 1000)}s`
+}
+
+// ── Tool glyph icons ────────────────────────────────────────────────────────────
+
 function ToolGlyph({ toolName }: { toolName: string }) {
-  const cls = "h-3 w-3 text-muted-foreground/40"
+  const cls = "h-3 w-3 shrink-0"
   switch (toolName.toLowerCase()) {
     case "bash":
       return <TerminalSquareIcon className={cls} />
@@ -41,6 +55,28 @@ function ToolGlyph({ toolName }: { toolName: string }) {
     default:
       return <WrenchIcon className={cls} />
   }
+}
+
+// ── Status badge ────────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: ToolMessage["status"] }) {
+  if (status === "running") {
+    return (
+      <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+        <Loader2Icon className="h-2.5 w-2.5 animate-spin" />
+        Running
+      </span>
+    )
+  }
+  if (status === "error") {
+    return (
+      <span className="flex items-center gap-1 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+        <XIcon className="h-2.5 w-2.5" />
+        Error
+      </span>
+    )
+  }
+  return null
 }
 
 // ── Edit tool detection ────────────────────────────────────────────────────────
@@ -110,6 +146,8 @@ function isReadTool(toolName: string, args: unknown): boolean {
   return toolName.toLowerCase() === "read" && getReadFilePath(args) !== null
 }
 
+// ── ReadView ───────────────────────────────────────────────────────────────────
+
 function ReadView({
   text,
   filePath,
@@ -127,7 +165,7 @@ function ReadView({
   const language = detectLanguage(filePath) ?? "text"
 
   return (
-    <div className="max-h-64 overflow-auto rounded border border-border/30 text-xs text-muted-foreground/60">
+    <div className="overflow-auto rounded border border-border/30 text-xs text-muted-foreground/60 max-h-64">
       <Suspense
         fallback={
           <pre className="overflow-auto px-3 py-2 text-xs text-muted-foreground/60">
@@ -160,58 +198,94 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const isRead = isReadTool(normalizedToolName, msg.args)
   const readFilePath = isRead ? getReadFilePath(msg.args) : null
 
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(isEdit)
+  const [copied, setCopied] = useState(false)
 
-  function toggle() {
-    setExpanded((e) => !e)
+  function toggle(e: React.MouseEvent) {
+    e.stopPropagation()
+    setExpanded((prev) => !prev)
+  }
+
+  function handleCopy(e: React.MouseEvent) {
+    e.stopPropagation()
+    const text = resultText ?? summary
+    if (!text) return
+    void navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   const resultText = useMemo(() => getResultText(msg), [msg])
   const summary = argsSummary(msg.args)
+  const hasBody =
+    (isEdit && diff !== null) ||
+    (isRead && readFilePath && resultText) ||
+    (!isEdit && !isRead && resultText)
 
   return (
-    <div className="w-full max-w-2xl animate-in text-xs duration-150 fade-in-0 slide-in-from-bottom-1">
-      {/* Header */}
-      <button
-        className="group flex w-full items-center gap-1.5 py-0.5 text-left transition-colors"
-        onClick={toggle}
-      >
-        {msg.status === "running" ? (
-          <Loader2Icon className="h-3 w-3 animate-spin text-muted-foreground/40" />
-        ) : (
+    <div
+      className={cn(
+        "group w-full max-w-2xl animate-in cursor-pointer rounded-lg border border-border/50 text-xs duration-150 fade-in-0 slide-in-from-bottom-1",
+        "transition-all duration-150 hover:border-border/80 hover:bg-muted/20",
+        expanded && "bg-muted/15"
+      )}
+      onClick={toggle}
+      role="button"
+      aria-expanded={expanded}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          setExpanded((prev) => !prev)
+        }
+      }}
+    >
+      {/* Card header row */}
+      <div className="flex items-center gap-2 px-2.5 py-1.5">
+        {/* Tool badge — icon + name pill */}
+        <span className="flex shrink-0 items-center gap-1.5 rounded bg-muted/70 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
           <ToolGlyph toolName={msg.toolName} />
-        )}
-        <span
-          className={cn(
-            "shrink-0 leading-none text-muted-foreground/60 group-hover:text-muted-foreground/80",
-            msg.status === "error" && "text-destructive/60"
-          )}
-        >
-          {msg.toolName}
+          <span className="leading-none">{msg.toolName}</span>
         </span>
+
+        {/* Summary — fills available space, truncated */}
         {summary && (
-          <span className="min-w-0 flex-1 truncate leading-none text-muted-foreground/35 group-hover:text-muted-foreground/55">
+          <span className="min-w-0 flex-1 truncate text-muted-foreground/55 group-hover:text-muted-foreground/75">
             {summary}
           </span>
         )}
-        {msg.status === "error" && (
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive/60" />
-        )}
-      </button>
 
-      {/* Body */}
+        {/* Right side — status + chevron */}
+        <span className="flex shrink-0 items-center gap-1.5">
+          <StatusBadge status={msg.status} />
+          {msg.duration != null && msg.status !== "running" && (
+            <span className="text-muted-foreground/30 tabular-nums">
+              {formatDuration(msg.duration)}
+            </span>
+          )}
+          <ChevronRightIcon
+            className={cn(
+              "h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform duration-200",
+              expanded && "rotate-90"
+            )}
+          />
+        </span>
+      </div>
+
+      {/* Collapsible content — inside the card */}
       <div
         className={cn(
-          "grid transition-all duration-500 ease-in-out",
-          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          "grid transition-all duration-300 ease-in-out",
+          expanded && hasBody ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
         )}
       >
         <div className="overflow-hidden">
-          <div className="mt-0.5 ml-1.5 border-l border-border/30 pl-4">
-            {/* Bash: command as first line */}
-            {normalizedToolName === "bash" && summary && (
-              <pre className="mb-1 whitespace-pre-wrap break-all text-muted-foreground/60">{`$ ${summary}`}</pre>
+          <div className="border-t border-border/30 px-3 py-2">
+            {/* Running placeholder */}
+            {msg.status === "running" && !hasBody && (
+              <span className="text-muted-foreground/40">Running…</span>
             )}
+
             {/* Edit: show pre-computed diff from SDK */}
             {isEdit && diff !== null && (
               <DiffView
@@ -250,7 +324,26 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                   </pre>
                 </div>
               ) : (
-                <LivePre text={resultText} live={msg.status === "running"} />
+                <div className="group/copy relative">
+                  <LivePre text={resultText} live={msg.status === "running"} />
+                  {msg.status !== "running" && (
+                    <button
+                      type="button"
+                      onClick={handleCopy}
+                      className={cn(
+                        "absolute right-1.5 top-1.5 rounded p-1 text-muted-foreground/40 opacity-0 transition-colors hover:bg-muted hover:text-muted-foreground group-hover/copy:opacity-100",
+                        copied && "text-emerald-500"
+                      )}
+                      aria-label="Copy result"
+                    >
+                      {copied ? (
+                        <CheckIcon className="h-3 w-3" />
+                      ) : (
+                        <CopyIcon className="h-3 w-3" />
+                      )}
+                    </button>
+                  )}
+                </div>
               ))}
 
             {!isEdit && !isRead && !resultText && msg.status === "running" && (

@@ -78,6 +78,10 @@ export interface ToolMessage {
   args: unknown
   status: "running" | "done" | "error"
   result?: unknown
+  /** Execution time in milliseconds, set when status transitions to done or error */
+  duration?: number
+  /** Timestamp (ms) when the tool started — used to compute duration in finalizeRunningTools */
+  startTime?: number
 }
 
 export type Message = TextMessage | ToolMessage | ErrorMessage

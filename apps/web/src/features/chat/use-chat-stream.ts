@@ -86,6 +86,9 @@ interface ToolMessageUpdate {
   args?: unknown
   status: ToolMessage["status"]
   result?: unknown
+  duration?: number
+  /** Timestamp (ms) when the tool started — stored on the message so finalizeRunningTools can compute duration */
+  startTime?: number
 }
 
 function upsertToolMessage(
@@ -115,6 +118,8 @@ function upsertToolExecutionMessage(
     args: update.args ?? existing?.args ?? {},
     status: update.status,
     result: update.result ?? existing?.result,
+    duration: update.duration ?? existing?.duration,
+    startTime: update.startTime ?? existing?.startTime,
   }))
 }
 
@@ -185,6 +190,10 @@ function finalizeRunningTools(
 
     const toolResult = toolResults.get(msg.toolCallId)
     if (toolResult) {
+      const duration =
+        msg.startTime !== undefined
+          ? Date.now() - msg.startTime
+          : undefined
       return {
         ...msg,
         toolName: toolResult.toolName || msg.toolName,
@@ -193,15 +202,21 @@ function finalizeRunningTools(
           content: toolResult.content,
           details: toolResult.details,
         },
+        duration: msg.duration ?? duration,
       }
     }
 
+    const duration =
+      msg.startTime !== undefined
+        ? Date.now() - msg.startTime
+        : undefined
     return {
       ...msg,
       status: "error",
       result: msg.result ?? {
         content: [{ type: "text", text: fallbackError }],
       },
+      duration: msg.duration ?? duration,
     }
   })
 }
@@ -254,12 +269,15 @@ function getMessageOverlapLength(
   for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
     let matches = true
 
-    for (let index = 0; index < overlap; index += 1) {
-      const persistedMessage =
-        persistedMessages[persistedMessages.length - overlap + index]
-      const currentMessage = currentMessages[index]
+    // Compare the last `overlap` messages of persisted with the first
+    // `overlap` messages of current (suffix-to-prefix match).
+    // Start from the end of persisted so we short-circuit early on large
+    // overlaps.
+    for (let offset = overlap - 1; offset >= 0; offset -= 1) {
+      const pIdx = persistedMessages.length - 1 - offset
+      const currentMessage = currentMessages[offset]
 
-      if (!areMessagesEqual(persistedMessage, currentMessage)) {
+      if (!areMessagesEqual(persistedMessages[pIdx], currentMessage)) {
         matches = false
         break
       }
@@ -315,6 +333,8 @@ export function useChatStream({
   const rafRef = useRef<number | null>(null)
   // Track last prompt for retry functionality
   const lastPromptRef = useRef<{ text: string; thinkingLevel?: string } | null>(null)
+  // Track tool execution start times for duration display
+  const toolStartTimesRef = useRef<Map<string, number>>(new Map())
 
   const applyLocalMessages = useCallback(
     (updater: (currentMessages: Message[]) => Message[]) => {
@@ -518,12 +538,15 @@ export function useChatStream({
           },
           onToolExecutionStart: (data) => {
             if (!active) return
+            const startTime = Date.now()
+            toolStartTimesRef.current.set(data.toolCallId, startTime)
             applyLocalMessages((prev) =>
               upsertToolExecutionMessage(prev, {
                 toolCallId: data.toolCallId,
                 toolName: data.toolName,
                 args: data.args,
                 status: "running",
+                startTime,
               })
             )
           },
@@ -541,12 +564,17 @@ export function useChatStream({
           },
           onToolExecutionEnd: (data) => {
             if (!active) return
+            const startTime = toolStartTimesRef.current.get(data.toolCallId)
+            const duration =
+              startTime !== undefined ? Date.now() - startTime : undefined
+            toolStartTimesRef.current.delete(data.toolCallId)
             applyLocalMessages((prev) =>
               upsertToolExecutionMessage(prev, {
                 toolCallId: data.toolCallId,
                 toolName: data.toolName,
                 status: data.isError ? "error" : "done",
                 result: data.result,
+                duration,
               })
             )
           },
