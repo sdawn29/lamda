@@ -18,7 +18,6 @@ interface ErrorToastContextValue {
 const ErrorToastContext = createContext<ErrorToastContextValue | null>(null)
 
 export function ErrorToastProvider({ children }: { children: ReactNode }) {
-  // Track active error toasts by error ID to avoid duplicates
   const activeToastsRef = useRef<Map<string, string>>(new Map())
 
   const dismissApiError = useCallback((id: string) => {
@@ -33,35 +32,24 @@ export function ErrorToastProvider({ children }: { children: ReactNode }) {
     (error: ErrorMessage) => {
       const existingToastId = activeToastsRef.current.get(error.id)
 
-      const content = (
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className="text-sm font-medium leading-tight text-foreground">
-            {error.title}
-          </p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            {error.message}
-          </p>
-          {error.retryCount != null && (
-            <p className="text-xs text-muted-foreground/60">
-              Retry attempt {error.retryCount}
-            </p>
-          )}
-        </div>
-      )
+      const retryAction = error.action?.type === "retry" ? error.action : null
+      const canRetry = retryAction != null && !!retryAction.prompt
+
+      const description = error.retryCount != null
+        ? `Retry attempt ${error.retryCount}`
+        : error.message
 
       if (existingToastId) {
-        // Update existing toast while preserving the same toast ID
-        toast.error(content, {
+        toast.error(error.title, {
           id: existingToastId,
+          description,
           duration: Infinity,
         })
         return
       }
 
-      const retryAction = error.action?.type === "retry" ? error.action : null
-      const canRetry = retryAction != null && !!retryAction.prompt
-
-      const toastId = toast.error(content, {
+      const toastId = toast.error(error.title, {
+        description,
         duration: canRetry ? Infinity : 8000,
         action:
           canRetry
