@@ -10,11 +10,6 @@ import {
 import { toast } from "sonner"
 import { type ErrorMessage } from "@/features/chat"
 
-interface ErrorToastEntry {
-  id: string
-  toastId: string | number
-}
-
 interface ErrorToastContextValue {
   showApiError: (error: ErrorMessage) => void
   dismissApiError: (id: string) => void
@@ -26,42 +21,6 @@ export function ErrorToastProvider({ children }: { children: ReactNode }) {
   // Track active error toasts by error ID to avoid duplicates
   const activeToastsRef = useRef<Map<string, string>>(new Map())
 
-  const showApiError = useCallback((error: ErrorMessage) => {
-    const existingToastId = activeToastsRef.current.get(error.id)
-
-    if (existingToastId) {
-      // Update existing toast
-      toast.error(error.title, {
-        id: existingToastId,
-        description: error.message,
-        duration: 8000,
-      })
-      return
-    }
-
-    const canRetry = error.action?.type === "retry"
-    const toastId = toast.error(error.title, {
-      description: error.message,
-      duration: 8000,
-      action:
-        canRetry && error.action?.type === "retry"
-          ? {
-              label: "Retry",
-              onClick: () => {
-                // Dispatch a retry event that the chat view can listen to
-                window.dispatchEvent(
-                  new CustomEvent("chat-retry", {
-                    detail: { prompt: error.action?.prompt },
-                  })
-                )
-              },
-            }
-          : undefined,
-    })
-
-    activeToastsRef.current.set(error.id, String(toastId))
-  }, [])
-
   const dismissApiError = useCallback((id: string) => {
     const toastId = activeToastsRef.current.get(id)
     if (toastId) {
@@ -69,6 +28,67 @@ export function ErrorToastProvider({ children }: { children: ReactNode }) {
       activeToastsRef.current.delete(id)
     }
   }, [])
+
+  const showApiError = useCallback(
+    (error: ErrorMessage) => {
+      const existingToastId = activeToastsRef.current.get(error.id)
+
+      const content = (
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <p className="text-sm font-medium leading-tight text-foreground">
+            {error.title}
+          </p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {error.message}
+          </p>
+          {error.retryCount != null && (
+            <p className="text-xs text-muted-foreground/60">
+              Retry attempt {error.retryCount}
+            </p>
+          )}
+        </div>
+      )
+
+      if (existingToastId) {
+        // Update existing toast while preserving the same toast ID
+        toast.error(content, {
+          id: existingToastId,
+          duration: Infinity,
+        })
+        return
+      }
+
+      const retryAction = error.action?.type === "retry" ? error.action : null
+      const canRetry = retryAction != null && !!retryAction.prompt
+
+      const toastId = toast.error(content, {
+        duration: canRetry ? Infinity : 8000,
+        action:
+          canRetry
+            ? {
+                label: "Retry",
+                onClick: () => {
+                  window.dispatchEvent(
+                    new CustomEvent("chat-retry", {
+                      detail: { prompt: retryAction.prompt },
+                    })
+                  )
+                },
+              }
+            : undefined,
+        cancel:
+          error.action?.type === "dismiss"
+            ? {
+                label: "Dismiss",
+                onClick: () => dismissApiError(error.id),
+              }
+            : undefined,
+      })
+
+      activeToastsRef.current.set(error.id, String(toastId))
+    },
+    [dismissApiError]
+  )
 
   return (
     <ErrorToastContext.Provider value={{ showApiError, dismissApiError }}>

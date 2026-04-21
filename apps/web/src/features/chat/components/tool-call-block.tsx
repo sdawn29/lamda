@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useMemo, useState } from "react"
+import { lazy, memo, Suspense, useState } from "react"
 import {
   AlertCircleIcon,
   BookOpenTextIcon,
@@ -215,7 +215,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     setTimeout(() => setCopied(false), 1500)
   }
 
-  const resultText = useMemo(() => getResultText(msg), [msg])
+  const resultText = getResultText(msg)
   const summary = argsSummary(msg.args)
   const hasBody =
     (isEdit && diff !== null) ||
