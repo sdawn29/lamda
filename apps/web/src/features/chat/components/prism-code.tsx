@@ -100,7 +100,6 @@ export default function PrismCode({
         fontStyle: "normal",
         fontWeight: "normal",
         fontSize,
-        className: "line-number",
       }}
       customStyle={{
         margin: 0,
