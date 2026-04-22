@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/shared/ui/tooltip"
 import { WorkspaceProvider, useWorkspace } from "@/features/workspace"
 import { TerminalProvider } from "@/features/terminal"
 import { DiffPanelProvider } from "@/features/git"
+import { FileTreeProvider } from "@/features/file-tree"
 import {
   ThreadStatusProvider,
   useGlobalThreadStatusWatcher,
@@ -76,9 +77,11 @@ function RootLayoutGate() {
           <ThreadStatusProvider>
             <TerminalProvider>
               <DiffPanelProvider>
-                <RootLayoutInner />
-                <SettingsModal />
-                <ConfigureProviderModal />
+                <FileTreeProvider>
+                  <RootLayoutInner />
+                  <SettingsModal />
+                  <ConfigureProviderModal />
+                </FileTreeProvider>
               </DiffPanelProvider>
             </TerminalProvider>
           </ThreadStatusProvider>

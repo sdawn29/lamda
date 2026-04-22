@@ -13,6 +13,7 @@ import {
   Pencil,
   Trash2,
   FileDiff,
+  FolderTree,
 } from "lucide-react"
 import {
   useRouter,
@@ -33,6 +34,7 @@ import {
 import { useWorkspace } from "@/features/workspace"
 import { useTerminal } from "@/features/terminal"
 import { useDiffPanel } from "@/features/git"
+import { useFileTree } from "@/features/file-tree"
 import { useElectronFullscreen, useElectronPlatform } from "@/features/electron"
 import { CommitDialog } from "@/features/git"
 import { useGitDiffStat } from "@/features/git/queries"
@@ -53,6 +55,7 @@ export function TitleBar() {
   const { workspaces, setThreadTitle, deleteThread } = useWorkspace()
   const { isOpen: terminalOpen, toggle: toggleTerminal } = useTerminal()
   const { isOpen: diffOpen, toggle: toggleDiff } = useDiffPanel()
+  const { isOpen: fileTreeOpen, toggle: toggleFileTree } = useFileTree()
   const { threadId } = useParams({ strict: false }) as { threadId?: string }
   const activeThread = threadId
     ? workspaces.flatMap((w) => w.threads).find((t) => t.id === threadId)
@@ -365,6 +368,25 @@ export function TitleBar() {
             <TooltipContent>Toggle terminal <ShortcutKbd binding={terminalBinding} className="ml-1" /></TooltipContent>
           </Tooltip>
         )}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleFileTree}
+                aria-pressed={fileTreeOpen}
+                data-active={fileTreeOpen}
+                disabled={!activeWorkspace?.path}
+                className={activeTitleBarButtonClassName}
+              >
+                <FolderTree />
+                <span className="sr-only">Toggle file tree</span>
+              </Button>
+            }
+          />
+          <TooltipContent>Toggle file tree</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   )

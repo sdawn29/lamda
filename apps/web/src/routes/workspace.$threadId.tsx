@@ -5,6 +5,7 @@ import { ChatView, useSetThreadStatus } from "@/features/chat"
 import { useWorkspace } from "@/features/workspace"
 import { useDiffPanel } from "@/features/git"
 import { useTerminal } from "@/features/terminal"
+import { useFileTree } from "@/features/file-tree"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
 import { useUpdateThreadLastAccessed } from "@/features/workspace/mutations"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
@@ -26,6 +27,12 @@ const TerminalPanel = lazy(() =>
   }))
 )
 
+const FileTree = lazy(() =>
+  import("@/features/file-tree").then((module) => ({
+    default: module.FileTree,
+  }))
+)
+
 export const Route = createFileRoute("/workspace/$threadId")({
   component: WorkspaceThreadRoute,
 })
@@ -36,6 +43,7 @@ function WorkspaceThreadRoute() {
   const navigate = useNavigate()
   const { isOpen: diffOpen, isFullscreen: diffFullscreen } = useDiffPanel()
   const { isOpen: terminalOpen } = useTerminal()
+  const { isOpen: fileTreeOpen } = useFileTree()
   const updateSetting = useUpdateAppSetting()
   const updateLastAccessed = useUpdateThreadLastAccessed()
   const setThreadStatus = useSetThreadStatus()
@@ -97,13 +105,27 @@ function WorkspaceThreadRoute() {
           {diffOpen && (
             <>
               <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={50} minSize={30}>
+              <ResizablePanel defaultSize={50} minSize={25}>
                 <Suspense
                   fallback={
                     <div className="h-full border-l border-border/60 bg-muted/10" />
                   }
                 >
                   <DiffPanel sessionId={foundThread.sessionId} />
+                </Suspense>
+              </ResizablePanel>
+            </>
+          )}
+          {fileTreeOpen && (
+            <>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={25} minSize={25}>
+                <Suspense
+                  fallback={
+                    <div className="h-full border-l border-border/60 bg-muted/10" />
+                  }
+                >
+                  <FileTree workspacePath={foundWorkspace.path} />
                 </Suspense>
               </ResizablePanel>
             </>

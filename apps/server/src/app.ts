@@ -8,6 +8,7 @@ import threads from "./routes/threads.js";
 import sessions from "./routes/sessions.js";
 import git from "./routes/git.js";
 import auth from "./routes/auth.js";
+import directory from "./routes/directory.js";
 
 const app = new Hono();
 
@@ -21,5 +22,6 @@ app.route("/", threads);
 app.route("/", sessions);
 app.route("/", git);
 app.route("/", auth);
+app.route("/", directory);
 
 export default app;
