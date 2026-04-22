@@ -129,7 +129,7 @@ export function ContextChart({
               />
             </svg>
             {pct != null && (
-              <span className="max-w-0 overflow-hidden text-[10px] leading-none text-muted-foreground tabular-nums transition-all duration-200 ease-out group-hover:max-w-[3ch] group-hover:pl-1">
+              <span className="max-w-0 overflow-hidden text-[10px] leading-none text-muted-foreground tabular-nums transition-all duration-200 ease-out group-hover:max-w-[4ch] group-hover:pl-1">
                 {Math.round(pct)}%
               </span>
             )}
