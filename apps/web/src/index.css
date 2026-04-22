@@ -150,6 +150,26 @@
     user-select: none;
   }
 
+
+  /* Allow text selection in code blocks */
+  pre code,
+  pre span,
+  .syntax-highlighter,
+  .syntax-highlighter * {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
+
+  /* Line numbers should not be selectable or italic */
+  .line-number,
+  .syntax-highlighter .linenumber,
+  .react-syntax-highlighter-line-number {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    font-style: normal !important;
+    font-weight: normal !important;
+  }
+
   /* ── Sonner toast theming ─────────────────────────────────────────────── */
   .sonner-toast {
     background: var(--popover) !important;

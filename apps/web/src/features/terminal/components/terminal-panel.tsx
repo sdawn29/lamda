@@ -1,7 +1,7 @@
 import { useEffect, useRef, memo } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
-import { Plus, X } from "lucide-react"
+import { Plus, X, TerminalSquare } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { useTheme } from "@/shared/components/theme-provider"
 import { useTerminal } from "../context"
@@ -252,6 +252,7 @@ export const TerminalPanel = memo(function TerminalPanel({ cwd }: TerminalPanelP
                     : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
+                <TerminalSquare className="h-3 w-3 shrink-0" />
                 <span className="max-w-30 truncate">{tab.title}</span>
                 <span
                   role="button"

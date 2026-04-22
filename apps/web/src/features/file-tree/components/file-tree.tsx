@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Folder, ChevronRight, ChevronDown, File, RefreshCw } from "lucide-react"
 import { Button } from "@/shared/ui/button"
+import { useDiffPanel } from "@/features/git"
 
 interface TreeNode {
   name: string
@@ -93,6 +94,7 @@ export function FileTree({ workspacePath }: FileTreeProps) {
   const [entries, setEntries] = useState<TreeNode[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { addTab, open: openDiffPanel } = useDiffPanel()
 
   const loadDirectory = useCallback(async () => {
     setLoading(true)
@@ -106,6 +108,16 @@ export function FileTree({ workspacePath }: FileTreeProps) {
       setLoading(false)
     }
   }, [workspacePath])
+
+  const handleFileSelect = useCallback((filePath: string) => {
+    const fileName = filePath.split(/[/\\]/).pop() || filePath
+    addTab({
+      title: fileName,
+      type: "file",
+      filePath,
+    })
+    openDiffPanel() // Open diff panel to show the file
+  }, [addTab, openDiffPanel])
 
   useEffect(() => {
     loadDirectory()
@@ -136,7 +148,7 @@ export function FileTree({ workspacePath }: FileTreeProps) {
           <div className="p-2 text-xs text-muted-foreground">No files found</div>
         ) : (
           entries.map((node) => (
-            <TreeItem key={node.path} node={node} />
+            <TreeItem key={node.path} node={node} onSelect={handleFileSelect} />
           ))
         )}
       </div>

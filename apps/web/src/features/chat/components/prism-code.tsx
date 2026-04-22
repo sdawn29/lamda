@@ -87,6 +87,7 @@ export default function PrismCode({
       style={style}
       PreTag="div"
       showLineNumbers={showLineNumbers}
+      className="syntax-highlighter"
       lineNumberStyle={{
         minWidth: "2.5em",
         paddingRight: "1em",
@@ -97,7 +98,9 @@ export default function PrismCode({
         color: "var(--muted-foreground)",
         userSelect: "none",
         fontStyle: "normal",
+        fontWeight: "normal",
         fontSize,
+        className: "line-number",
       }}
       customStyle={{
         margin: 0,
@@ -107,6 +110,7 @@ export default function PrismCode({
         lineHeight: "1.6",
         background: "transparent",
         opacity,
+        userSelect: "text",
       }}
       codeTagProps={{
         style: {

@@ -9,6 +9,7 @@ import sessions from "./routes/sessions.js";
 import git from "./routes/git.js";
 import auth from "./routes/auth.js";
 import directory from "./routes/directory.js";
+import file from "./routes/file.js";
 
 const app = new Hono();
 
@@ -23,5 +24,6 @@ app.route("/", sessions);
 app.route("/", git);
 app.route("/", auth);
 app.route("/", directory);
+app.route("/", file);
 
 export default app;

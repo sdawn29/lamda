@@ -1,4 +1,12 @@
-import { useCallback, useMemo, useState, memo } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  lazy,
+  memo,
+  Suspense,
+} from "react"
 import {
   AlertCircle,
   Archive,
@@ -6,15 +14,16 @@ import {
   Columns2,
   AlignLeft,
   GitCompare,
-  GitMerge,
   Loader2,
   Maximize2,
   Minimize2,
   PackageMinus,
   PackagePlus,
-  RefreshCw,
+  Plus,
   X,
   ArrowUpDown,
+  FileText,
+  ExternalLink,
 } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
@@ -24,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
-import { useDiffPanel } from "../context"
+import { useDiffPanel, type DiffPanelTab } from "../context"
 import { useGitStatus } from "../queries"
 import {
   useGitStage,
@@ -39,15 +48,27 @@ import { StashSection } from "./stash-section"
 import { FilesSection } from "./files-section"
 import { SORT_OPTIONS, type SortMode, applySortMode } from "./sort-utils"
 import { cn } from "@/shared/lib/utils"
+import { useTheme } from "@/shared/components/theme-provider"
+import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
+import { getServerUrl } from "@/shared/lib/client"
+
+const PrismCode = lazy(() =>
+  import("@/features/chat/components/prism-code").then((m) => ({
+    default: m.default,
+  }))
+)
 
 interface DiffPanelProps {
   sessionId: string
 }
 
-export const DiffPanel = memo(function DiffPanel({
+// ─── Source Control Content ───────────────────────────────────────────────────
+
+const SourceControlContent = memo(function SourceControlContent({
   sessionId,
-}: DiffPanelProps) {
-  const { close, isFullscreen, setIsFullscreen } = useDiffPanel()
+}: {
+  sessionId: string
+}) {
   const [mode, setMode] = useState<DiffMode>("inline")
   const [sortMode, setSortMode] = useState<SortMode>("name")
   const [stashInputOpen, setStashInputOpen] = useState(false)
@@ -56,7 +77,6 @@ export const DiffPanel = memo(function DiffPanel({
     data: statusRaw,
     isLoading: loading,
     error: statusError,
-    refetch,
   } = useGitStatus(sessionId)
 
   const { staged, unstaged } = useMemo(() => {
@@ -130,89 +150,7 @@ export const DiffPanel = memo(function DiffPanel({
   const hasChanges = files.length > 0
 
   return (
-    <div className="flex h-full shrink-0 flex-col border-l border-border/60 bg-background">
-      <div className="flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-border/50 pr-1.5 pl-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-muted">
-            <GitCompare className="h-3.5 w-3.5 text-muted-foreground" />
-          </div>
-          <span className="text-xs font-semibold">Source Control</span>
-        </div>
-
-        <div className="flex flex-1 items-center gap-1.5 overflow-hidden pl-1">
-          {hasStaged && (
-            <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
-              <GitMerge className="h-2.5 w-2.5" />
-              {staged.length} staged
-            </span>
-          )}
-          {hasUnstaged && (
-            <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {unstaged.length} changed
-            </span>
-          )}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-0.5">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => refetch()}
-                  className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  <span className="sr-only">Refresh</span>
-                </Button>
-              }
-            />
-            <TooltipContent>Refresh status</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
-                >
-                  {isFullscreen ? (
-                    <Minimize2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <Maximize2 className="h-3.5 w-3.5" />
-                  )}
-                  <span className="sr-only">
-                    {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-                  </span>
-                </Button>
-              }
-            />
-            <TooltipContent>
-              {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={close}
-                  className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  <span className="sr-only">Close panel</span>
-                </Button>
-              }
-            />
-            <TooltipContent>Close panel</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-
+    <>
       <div className="flex h-8 min-w-0 shrink-0 items-center gap-0.5 border-b border-border/50 bg-muted/20 px-2">
         <Tooltip>
           <TooltipTrigger
@@ -409,6 +347,349 @@ export const DiffPanel = memo(function DiffPanel({
       </div>
 
       <StashSection sessionId={sessionId} />
+    </>
+  )
+})
+
+// ─── File Header ───────────────────────────────────────────────────────────────
+
+const FileHeader = ({ pathParts }: { pathParts: string[] }) => {
+  return (
+    <div className="scrollbar-none flex min-w-0 items-center overflow-x-auto px-2 py-1 font-mono text-xs">
+      {pathParts.map((part, i) => (
+        <span key={i} className="flex shrink-0 items-center">
+          {i > 0 && <span className="mx-1 text-muted-foreground/50">›</span>}
+          <span
+            className={
+              i === pathParts.length - 1
+                ? "font-medium text-foreground"
+                : "text-muted-foreground"
+            }
+          >
+            {part}
+          </span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ─── File Content ─────────────────────────────────────────────────────────────
+
+const FileContent = memo(function FileContent({
+  filePath,
+}: {
+  filePath: string
+}) {
+  const [content, setContent] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === "dark"
+
+  const pathParts = filePath.split(/[/\\]/)
+  const fileName = pathParts[pathParts.length - 1] ?? ""
+  const fileExtension = fileName.split(".").pop()?.toLowerCase() ?? ""
+  const languageMap: Record<string, string> = {
+    ts: "typescript",
+    tsx: "tsx",
+    js: "javascript",
+    jsx: "jsx",
+    py: "python",
+    rb: "ruby",
+    rs: "rust",
+    yml: "yaml",
+    md: "markdown",
+  }
+  const language = languageMap[fileExtension] ?? fileExtension
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    setContent(null)
+
+    const loadFile = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(
+          `${serverUrl}/file?path=${encodeURIComponent(filePath)}`
+        )
+        if (!response.ok) {
+          throw new Error(`Failed to load file: ${response.statusText}`)
+        }
+        const text = await response.text()
+        if (!cancelled) {
+          setContent(text)
+          setLoading(false)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load file")
+          setLoading(false)
+        }
+      }
+    }
+
+    loadFile()
+    return () => {
+      cancelled = true
+    }
+  }, [filePath])
+
+  if (loading) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border/50">
+          <FileHeader pathParts={pathParts} />
+        </div>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="size-3 animate-spin" />
+            Loading file…
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border/50">
+          <FileHeader pathParts={pathParts} />
+        </div>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="mx-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-xs text-destructive">
+            <AlertCircle className="mt-px size-3.5 shrink-0" />
+            <span className="leading-snug">{error}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="border-b border-border/50">
+        <FileHeader pathParts={pathParts} />
+      </div>
+      <div
+        className="file-viewer-code min-h-0 flex-1 overflow-auto"
+        style={{ userSelect: "text" }}
+      >
+        <Suspense
+          fallback={
+            <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              Loading…
+            </div>
+          }
+        >
+          <PrismCode
+            code={content ?? ""}
+            language={language}
+            style={isDark ? jellybeansdark : jellybeanslight}
+            showLineNumbers
+            fontSize="0.75rem"
+          />
+        </Suspense>
+      </div>
+    </div>
+  )
+})
+
+// ─── Tab Content Router ───────────────────────────────────────────────────────
+
+function TabContent({
+  tab,
+  sessionId,
+}: {
+  tab: DiffPanelTab
+  sessionId: string
+}) {
+  if (tab.type === "source-control") {
+    return <SourceControlContent sessionId={sessionId} />
+  }
+  if (tab.type === "file" && tab.filePath) {
+    return <FileContent filePath={tab.filePath} />
+  }
+  return (
+    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+      Unknown tab type
+    </div>
+  )
+}
+
+// ─── Main DiffPanel ────────────────────────────────────────────────────────────
+
+export const DiffPanel = memo(function DiffPanel({
+  sessionId,
+}: DiffPanelProps) {
+  const {
+    close,
+    isFullscreen,
+    setIsFullscreen,
+    tabs,
+    activeTabId,
+    addTab,
+    closeTab,
+    setActiveTab,
+  } = useDiffPanel()
+  const [showAddMenu, setShowAddMenu] = useState(false)
+
+  const activeTab = useMemo(
+    () => tabs.find((t) => t.id === activeTabId),
+    [tabs, activeTabId]
+  )
+
+  const handleAddFileTab = useCallback(() => {
+    const filePath = window.prompt("Enter file path to open:")
+    if (filePath) {
+      const fileName = filePath.split(/[/\\]/).pop() || filePath
+      addTab({
+        title: fileName,
+        type: "file",
+        filePath,
+      })
+    }
+    setShowAddMenu(false)
+  }, [addTab])
+
+  return (
+    <div className="flex h-full shrink-0 flex-col border-l border-border/60 bg-background">
+      {/* Tab bar */}
+      <div className="flex h-8 shrink-0 items-stretch border-b">
+        <div className="scrollbar-none flex min-w-0 flex-1 items-stretch overflow-x-auto">
+          {tabs.map((tab) => {
+            const isActive = tab.id === activeTabId
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "group relative flex shrink-0 items-center gap-1.5 border-r px-3 text-xs transition-colors",
+                  isActive
+                    ? "bg-background text-foreground after:absolute after:right-0 after:bottom-0 after:left-0 after:h-px after:bg-primary"
+                    : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                {tab.type === "source-control" ? (
+                  <GitCompare className="h-3 w-3 shrink-0" />
+                ) : (
+                  <FileText className="h-3 w-3 shrink-0" />
+                )}
+                <span className="max-w-30 truncate">{tab.title}</span>
+                {tab.type !== "source-control" && (
+                  <span
+                    role="button"
+                    tabIndex={-1}
+                    aria-label={`Close ${tab.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      closeTab(tab.id)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.stopPropagation()
+                        closeTab(tab.id)
+                      }
+                    }}
+                    className={cn(
+                      "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-muted-foreground/20",
+                      isActive
+                        ? "opacity-60 hover:opacity-100"
+                        : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100"
+                    )}
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </span>
+                )}
+              </button>
+            )
+          })}
+
+          {/* Add tab dropdown */}
+          <DropdownMenu open={showAddMenu} onOpenChange={setShowAddMenu}>
+            <DropdownMenuTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label="Add new tab"
+                  className="flex items-center px-2 text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              }
+            />
+            <DropdownMenuContent align="start" className="w-44">
+              <DropdownMenuItem onClick={handleAddFileTab}>
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Open File
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Right side buttons */}
+        <div className="flex shrink-0 items-center gap-0.5 border-l px-1">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                  <span className="sr-only">
+                    {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                  </span>
+                </Button>
+              }
+            />
+            <TooltipContent>
+              {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={close}
+                  className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span className="sr-only">Close panel</span>
+                </Button>
+              }
+            />
+            <TooltipContent>Close panel</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      {/* Tab content */}
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {activeTab ? (
+          <TabContent tab={activeTab} sessionId={sessionId} />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+              <GitCompare className="h-5 w-5 text-muted-foreground/50" />
+            </div>
+            <p className="text-xs">Select or add a tab to view content</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 })
