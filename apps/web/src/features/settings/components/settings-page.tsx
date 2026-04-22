@@ -19,6 +19,7 @@ import {
   ChevronRight,
   RefreshCw,
   Download,
+  DollarSign,
 } from "lucide-react"
 
 import { Badge } from "@/shared/ui/badge"
@@ -130,7 +131,7 @@ const SECTIONS: SettingsSection[] = [
   {
     id: "subscriptions",
     label: "Subscriptions",
-    icon: Key,
+    icon: DollarSign,
     description: "OAuth sign-in for Claude Pro, GitHub Copilot, etc.",
     keywords: [
       "oauth",
@@ -242,9 +243,17 @@ export function SettingsPage() {
     function updateActive() {
       if (isScrollingTo.current) return
       const c = container!
-      const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 8
 
-      if (atBottom) {
+      const atTop = c.scrollTop < 8
+      if (atTop) {
+        const first = visibleSections[0]
+        if (first) setActiveSection(first.id)
+        return
+      }
+
+      // If we're in the bottom 30%, select the last visible section
+      const scrollProgress = c.scrollTop / (c.scrollHeight - c.clientHeight)
+      if (scrollProgress > 0.7) {
         const last = visibleSections[visibleSections.length - 1]
         if (last) setActiveSection(last.id)
         return
@@ -424,7 +433,7 @@ export function SettingsPage() {
                 className="scroll-mt-8"
               >
                 <SectionHeader
-                  icon={Key}
+                  icon={DollarSign}
                   title="Subscriptions"
                   description="Sign in with Claude Pro, GitHub Copilot, and more."
                 />
@@ -645,16 +654,16 @@ function AppearanceCard() {
               if (typeof value === "string") setTheme(value as Theme)
             }}
           >
-            <SelectTrigger className="min-w-32" aria-label="Theme">
+            <SelectTrigger className="min-w-32 gap-2" aria-label="Theme">
               <ActiveThemeIcon data-icon="inline-start" />
-              <SelectValue placeholder="Theme" />
+              <SelectValue>{activeTheme.label}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 {THEMES.map(({ value, label, icon: Icon }) => (
                   <SelectItem key={value} value={value}>
-                    <Icon />
-                    {label}
+                    <Icon data-icon="inline-start" />
+                    <span>{label}</span>
                   </SelectItem>
                 ))}
               </SelectGroup>

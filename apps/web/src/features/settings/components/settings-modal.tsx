@@ -9,7 +9,7 @@ export function SettingsModal() {
     <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings() }}>
       <DialogContent
         showCloseButton={true}
-        className="h-[82vh] max-h-[720px] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl"
+        className="h-[82vh] max-h-[720px] w-full gap-0 overflow-hidden bg-background p-0 sm:max-w-4xl"
       >
         <SettingsPage />
       </DialogContent>
