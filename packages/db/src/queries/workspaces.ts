@@ -10,7 +10,13 @@ export function listWorkspacesWithThreads() {
     ...w,
     threads: th
       .filter((t) => t.workspaceId === w.id && !t.isArchived)
-      .sort((a, b) => a.createdAt - b.createdAt),
+      .sort((a, b) => {
+        // Pinned threads first
+        if (a.isPinned && !b.isPinned) return -1
+        if (!a.isPinned && b.isPinned) return 1
+        // Then by creation time
+        return a.createdAt - b.createdAt
+      }),
   }))
 }
 

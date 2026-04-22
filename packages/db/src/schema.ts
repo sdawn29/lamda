@@ -23,6 +23,7 @@ export const threads = sqliteTable("threads", {
   modelId: text("model_id"),
   isStopped: integer("is_stopped", { mode: "boolean" }).notNull().default(false),
   isArchived: integer("is_archived", { mode: "boolean" }).notNull().default(false),
+  isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
   lastAccessedAt: integer("last_accessed_at"),
   createdAt: integer("created_at").notNull(),
 })

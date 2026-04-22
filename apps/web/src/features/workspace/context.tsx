@@ -9,6 +9,8 @@ import {
   useCreateThread as useCreateThreadMutation,
   useDeleteThread as useDeleteThreadMutation,
   useArchiveThread as useArchiveThreadMutation,
+  usePinThread as usePinThreadMutation,
+  useUnpinThread as useUnpinThreadMutation,
   useUpdateThreadTitle,
   useResetAll as useResetAllMutation,
 } from "./mutations"
@@ -25,6 +27,8 @@ interface WorkspaceContextValue {
   createThread: (workspaceId: string) => Promise<Thread>
   deleteThread: (workspaceId: string, threadId: string) => Promise<void>
   archiveThread: (workspaceId: string, threadId: string) => Promise<void>
+  pinThread: (workspaceId: string, threadId: string) => Promise<void>
+  unpinThread: (workspaceId: string, threadId: string) => Promise<void>
   setThreadTitle: (workspaceId: string, threadId: string, title: string) => void
   resetAll: () => Promise<void>
 }
@@ -39,6 +43,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const createThreadMutation = useCreateThreadMutation()
   const deleteThreadMutation = useDeleteThreadMutation()
   const archiveThreadMutation = useArchiveThreadMutation()
+  const pinThreadMutation = usePinThreadMutation()
+  const unpinThreadMutation = useUnpinThreadMutation()
   const updateTitleMutation = useUpdateThreadTitle()
   const resetAllMutation = useResetAllMutation()
 
@@ -82,6 +88,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [archiveThreadMutation]
   )
 
+  const pinThread = useCallback(
+    async (workspaceId: string, threadId: string): Promise<void> => {
+      await pinThreadMutation.mutateAsync(threadId)
+    },
+    [pinThreadMutation]
+  )
+
+  const unpinThread = useCallback(
+    async (workspaceId: string, threadId: string): Promise<void> => {
+      await unpinThreadMutation.mutateAsync(threadId)
+    },
+    [unpinThreadMutation]
+  )
+
   const setThreadTitle = useCallback(
     (workspaceId: string, threadId: string, title: string) => {
       updateTitleMutation.mutate({ workspaceId, threadId, title })
@@ -103,6 +123,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         createThread,
         deleteThread,
         archiveThread,
+        pinThread,
+        unpinThread,
         setThreadTitle,
         resetAll,
       }}

@@ -8,6 +8,8 @@ import {
   FolderOpen,
   Loader2,
   MoreHorizontal,
+  Pin,
+  PinOff,
   Plus,
   Settings,
   Trash2,
@@ -43,6 +45,7 @@ import {
 import { useOpenPath, useOpenWorkspaceWithApp } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
 import { useWorkspace, useCreateWorkspaceAction } from "../context"
+import { usePinThread, useUnpinThread } from "../mutations"
 import { useThreadStatus } from "@/features/chat"
 import type { Thread } from "../context"
 import { useSettingsModal } from "@/features/settings"
@@ -90,19 +93,47 @@ function ThreadRow({
   const [confirming, setConfirming] = useState(false)
   const status = useThreadStatus(thread.id)
   const now = useNow()
-  const { archiveThread } = useWorkspace()
+  const { archiveThread, pinThread, unpinThread } = useWorkspace()
+
+  async function handlePinToggle(e: React.MouseEvent) {
+    e.stopPropagation()
+    e.preventDefault()
+    try {
+      if (thread.isPinned) {
+        await unpinThread(workspaceId, thread.id)
+      } else {
+        await pinThread(workspaceId, thread.id)
+      }
+    } catch (err) {
+      console.error("Failed to toggle pin:", err)
+    }
+  }
+
   return (
     <>
       <SidebarMenuSubItem className="group/thread">
         <SidebarMenuSubButton isActive={isActive} onClick={onClick}>
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-            {status === "running" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/60" />
-            ) : status === "completed" ? (
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-            ) : (
-              <span className="h-1.5 w-1.5 rounded-full bg-transparent" />
-            )}
+          <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+              {status === "running" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/60" />
+              ) : status === "completed" ? (
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+              ) : (
+                <span className="h-1.5 w-1.5 rounded-full bg-transparent" />
+              )}
+            </span>
+            <button
+              className="absolute inset-0 hidden items-center justify-center rounded p-0.5 hover:bg-accent group-hover/thread:flex"
+              onClick={handlePinToggle}
+              title={thread.isPinned ? "Unpin thread" : "Pin thread"}
+            >
+              {thread.isPinned ? (
+                <PinOff className="h-3 w-3 text-muted-foreground/60" />
+              ) : (
+                <Pin className="h-3 w-3 text-muted-foreground/50 opacity-0 group-hover/thread:opacity-100" />
+              )}
+            </button>
           </span>
           <span className="truncate">{thread.title}</span>
           <span className="ml-auto shrink-0 text-xs text-muted-foreground/50 group-hover/thread:hidden">
@@ -205,9 +236,44 @@ export function AppSidebar() {
   const newThreadBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_THREAD)
   const openSettingsBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_SETTINGS)
 
+  // Collect all pinned threads across all workspaces
+  const pinnedThreads = workspaces.flatMap((ws) =>
+    ws.threads.filter((t) => t.isPinned).map((t) => ({ ...t, workspaceId: ws.id, workspaceName: ws.name }))
+  )
+
   return (
     <Sidebar collapsible="offcanvas">
       <SidebarContent className="mt-10">
+        {/* Pinned threads section */}
+        {pinnedThreads.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>
+              <span className="flex items-center gap-1.5">
+                <Pin className="h-3 w-3" />
+                Pinned
+              </span>
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {pinnedThreads.map((thread) => (
+                  <ThreadRow
+                    key={thread.id}
+                    thread={thread}
+                    workspaceId={thread.workspaceId}
+                    isActive={activeThreadId === thread.id}
+                    onClick={() =>
+                      navigate({
+                        to: "/workspace/$threadId",
+                        params: { threadId: thread.id },
+                      })
+                    }
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         <SidebarGroup>
           <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
           <Tooltip>
@@ -321,9 +387,11 @@ export function AppSidebar() {
                       </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {!collapsed[ws.id] && ws.threads.length > 0 && (
+                    {!collapsed[ws.id] && ws.threads.filter((t) => !t.isPinned).length > 0 && (
                       <SidebarMenuSub className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
-                        {ws.threads.map((thread) => (
+                        {ws.threads
+                          .filter((t) => !t.isPinned)
+                          .map((thread) => (
                           <ThreadRow
                             key={thread.id}
                             thread={thread}

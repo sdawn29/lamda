@@ -15,6 +15,7 @@ export interface ThreadDto {
   isStopped: boolean
   createdAt: number
   sessionId: string | null
+  isPinned?: boolean
 }
 
 export interface WorkspaceDto {
@@ -124,6 +125,14 @@ export function archiveThread(threadId: string): Promise<void> {
 
 export function unarchiveThread(threadId: string): Promise<void> {
   return apiFetch<void>(`/thread/${threadId}/unarchive`, { method: "PATCH" })
+}
+
+export function pinThread(threadId: string): Promise<void> {
+  return apiFetch<void>(`/thread/${threadId}/pin`, { method: "PATCH" })
+}
+
+export function unpinThread(threadId: string): Promise<void> {
+  return apiFetch<void>(`/thread/${threadId}/unpin`, { method: "PATCH" })
 }
 
 export interface ArchivedThreadDto {

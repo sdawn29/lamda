@@ -16,7 +16,7 @@ import { createSessionForThread } from "../services/session-service.js";
 const workspaces = new Hono();
 
 function mapThread(
-  t: { id: string; title: string | null; modelId: string | null; isStopped: boolean; createdAt: number },
+  t: { id: string; title: string | null; modelId: string | null; isStopped: boolean; createdAt: number; isPinned: boolean },
   workspaceId: string,
 ) {
   const session = store.getByThreadId(t.id);
@@ -26,6 +26,7 @@ function mapThread(
     title: t.title,
     modelId: t.modelId ?? null,
     isStopped: t.isStopped,
+    isPinned: t.isPinned,
     createdAt: t.createdAt,
     sessionId: session?.sessionId ?? null,
   };

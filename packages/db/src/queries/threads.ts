@@ -43,6 +43,14 @@ export function unarchiveThread(id: string) {
   db.update(threads).set({ isArchived: false }).where(eq(threads.id, id)).run()
 }
 
+export function pinThread(id: string) {
+  db.update(threads).set({ isPinned: true }).where(eq(threads.id, id)).run()
+}
+
+export function unpinThread(id: string) {
+  db.update(threads).set({ isPinned: false }).where(eq(threads.id, id)).run()
+}
+
 export function listArchivedThreadsWithWorkspace() {
   return db
     .select({

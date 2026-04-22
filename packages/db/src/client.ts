@@ -86,6 +86,7 @@ function createDb() {
 
   // Incremental migrations
   try { sqlite.exec(`ALTER TABLE threads ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0`) } catch {}
+  try { sqlite.exec(`ALTER TABLE threads ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0`) } catch {}
 
 
   return db;

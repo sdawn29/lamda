@@ -6,6 +6,8 @@ import {
   deleteThread,
   archiveThread,
   unarchiveThread,
+  pinThread,
+  unpinThread,
   listArchivedThreadsWithWorkspace,
   updateThreadTitle,
   updateThreadModel,
@@ -41,6 +43,7 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
         title: "New Thread",
         modelId: null,
         isStopped: false,
+        isPinned: false,
         createdAt: Date.now(),
         sessionId,
       },
@@ -115,6 +118,22 @@ threads.patch("/thread/:id/unarchive", (c) => {
   unarchiveThread(threadId);
   return c.json({ ok: true });
 });
+
+threads.patch("/thread/:id/pin", (c) => {
+  const threadId = c.req.param("id")
+  const thread = getThread(threadId)
+  if (!thread) return c.json({ error: "Thread not found" }, 404)
+  pinThread(threadId)
+  return c.json({ ok: true })
+})
+
+threads.patch("/thread/:id/unpin", (c) => {
+  const threadId = c.req.param("id")
+  const thread = getThread(threadId)
+  if (!thread) return c.json({ error: "Thread not found" }, 404)
+  unpinThread(threadId)
+  return c.json({ ok: true })
+})
 
 threads.get("/threads/archived", (c) => {
   const archived = listArchivedThreadsWithWorkspace();

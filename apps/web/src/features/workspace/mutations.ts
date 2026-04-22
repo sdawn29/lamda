@@ -12,6 +12,8 @@ import {
   deleteThread as apiDeleteThread,
   archiveThread as apiArchiveThread,
   unarchiveThread as apiUnarchiveThread,
+  pinThread as apiPinThread,
+  unpinThread as apiUnpinThread,
   updateThreadTitle as apiUpdateThreadTitle,
   updateThreadModel as apiUpdateThreadModel,
   updateThreadStopped as apiUpdateThreadStopped,
@@ -308,6 +310,46 @@ export function useUnarchiveThread() {
   return useMutation({
     mutationFn: (threadId: string) => apiUnarchiveThread(threadId),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function usePinThread() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (threadId: string) => apiPinThread(threadId),
+    onMutate: (threadId) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((workspace) => ({
+          ...workspace,
+          threads: workspace.threads.map((t) =>
+            t.id === threadId ? { ...t, isPinned: true } : t
+          ),
+        }))
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function useUnpinThread() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (threadId: string) => apiUnpinThread(threadId),
+    onMutate: (threadId) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((workspace) => ({
+          ...workspace,
+          threads: workspace.threads.map((t) =>
+            t.id === threadId ? { ...t, isPinned: false } : t
+          ),
+        }))
+      )
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
   })
