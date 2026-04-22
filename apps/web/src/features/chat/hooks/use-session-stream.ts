@@ -274,6 +274,8 @@ export function useSessionStream({
   useEffect(() => {
     let active = true
     let eventSource: EventSource | null = null
+    // Track the sessionId for this connection to ignore stale events
+    const currentSessionId = sessionId
 
     openSessionEventSource(sessionId)
       .then((es) => {
@@ -286,6 +288,7 @@ export function useSessionStream({
         return subscribeToSessionEvents(es, {
           // Restore running tools on connect
           onAgentStart: () => {
+            if (!active || currentSessionId !== sessionId) return
             // Fetch and inject running tools from server on initial connect
             void (async () => {
               try {
@@ -308,7 +311,7 @@ export function useSessionStream({
             })()
           },
           onMessageStart: (data) => {
-            if (!active || data.message?.role !== "assistant") return
+            if (!active || currentSessionId !== sessionId || data.message?.role !== "assistant") return
             onMessageStart?.()
             onIsLoadingChange?.(true)
             turnMetaRef.current = {

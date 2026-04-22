@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Check, ChevronDown, ExternalLink, Loader2 } from "lucide-react"
+import { Check, ChevronDown, Loader2 } from "lucide-react"
 
 import { cn } from "@/shared/lib/utils"
 import {
@@ -32,7 +32,9 @@ function AppIcon({
   iconDataUrl: string | null
   className?: string
 }) {
-  const [failedIconDataUrl, setFailedIconDataUrl] = useState<string | null>(null)
+  const [failedIconDataUrl, setFailedIconDataUrl] = useState<string | null>(
+    null
+  )
   const hasLoadError = iconDataUrl !== null && failedIconDataUrl === iconDataUrl
 
   if (iconDataUrl && !hasLoadError) {
@@ -40,7 +42,7 @@ function AppIcon({
       <img
         alt=""
         aria-hidden="true"
-        className={cn("size-4 shrink-0 rounded-lg object-contain", className)}
+        className={cn("size-5 shrink-0 rounded-lg object-contain", className)}
         draggable={false}
         onError={() => {
           setFailedIconDataUrl(iconDataUrl)
@@ -155,11 +157,6 @@ export function OpenWithButton({
             iconDataUrl={selectedAppIconDataUrl}
           />
         )}
-        <span className="truncate text-xs">{selectedAppName}</span>
-        <ExternalLink
-          className="text-muted-foreground"
-          data-icon="inline-end"
-        />
       </Button>
 
       <DropdownMenu>

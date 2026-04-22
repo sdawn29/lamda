@@ -45,6 +45,7 @@ import {
 } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { ShortcutKbd } from "@/shared/ui/kbd"
+import { Separator } from "@/shared/ui/separator"
 
 const activeTitleBarButtonClassName =
   "transition-[background-color,border-color,color,box-shadow] duration-150 aria-pressed:border-primary/35 aria-pressed:bg-primary/10 aria-pressed:text-primary aria-pressed:shadow-sm dark:aria-pressed:border-primary/45 dark:aria-pressed:bg-primary/20 dark:aria-pressed:text-primary-foreground"
@@ -341,68 +342,65 @@ export function TitleBar() {
           workspacePath={activeWorkspace?.path}
           openWithAppId={activeWorkspace?.openWithAppId}
         />
-        {!isSettings && (
-          <CommitDialog sessionId={activeThread?.sessionId ?? undefined} />
-        )}
-        <div className="px-1"></div>
-        {!isSettings && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={toggleTerminal}
-                  aria-pressed={terminalOpen}
-                  data-active={terminalOpen}
-                  className={activeTitleBarButtonClassName}
-                >
-                  <TerminalSquare />
-                  <span className="sr-only">Toggle terminal</span>
-                </Button>
-              }
-            />
-            <TooltipContent>
-              Toggle terminal{" "}
-              <ShortcutKbd binding={terminalBinding} className="ml-1" />
-            </TooltipContent>
-          </Tooltip>
-        )}
-        {!isSettings && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="default"
-                  onClick={toggleDiff}
-                  aria-pressed={diffOpen}
-                  data-active={diffOpen}
-                  disabled={!activeWorkspace?.path}
-                  className={`gap-1 px-1.5 ${activeTitleBarButtonClassName}`}
-                >
-                  <FileDiff className="size-3.5 shrink-0" />
-                  {diffStat &&
-                    (diffStat.additions > 0 || diffStat.deletions > 0) && (
-                      <span className="flex animate-in items-center gap-1 font-mono leading-none duration-200 fade-in-0 zoom-in-90">
-                        <span className="text-green-500">
-                          +{diffStat.additions}
-                        </span>
-                        <span className="text-red-500">
-                          -{diffStat.deletions}
-                        </span>
+        <CommitDialog sessionId={activeThread?.sessionId ?? undefined} />
+
+        <Separator orientation="vertical" className="mx-1" />
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleTerminal}
+                aria-pressed={terminalOpen}
+                data-active={terminalOpen}
+                className={activeTitleBarButtonClassName}
+              >
+                <TerminalSquare />
+                <span className="sr-only">Toggle terminal</span>
+              </Button>
+            }
+          />
+          <TooltipContent>
+            Toggle terminal{" "}
+            <ShortcutKbd binding={terminalBinding} className="ml-1" />
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="default"
+                onClick={toggleDiff}
+                aria-pressed={diffOpen}
+                data-active={diffOpen}
+                disabled={!activeWorkspace?.path}
+                className={`gap-1 px-1.5 ${activeTitleBarButtonClassName}`}
+              >
+                <FileDiff className="size-3.5 shrink-0" />
+                {diffStat &&
+                  (diffStat.additions > 0 || diffStat.deletions > 0) && (
+                    <span className="flex animate-in items-center gap-1 font-mono leading-none duration-200 fade-in-0 zoom-in-90">
+                      <span className="text-green-500">
+                        +{diffStat.additions}
                       </span>
-                    )}
-                  <span className="sr-only">Toggle diff panel</span>
-                </Button>
-              }
-            />
-            <TooltipContent>
-              Toggle diff panel{" "}
-              <ShortcutKbd binding={diffBinding} className="ml-1" />
-            </TooltipContent>
-          </Tooltip>
-        )}
+                      <span className="text-red-500">
+                        -{diffStat.deletions}
+                      </span>
+                    </span>
+                  )}
+                <span className="sr-only">Toggle diff panel</span>
+              </Button>
+            }
+          />
+          <TooltipContent>
+            Toggle diff panel{" "}
+            <ShortcutKbd binding={diffBinding} className="ml-1" />
+          </TooltipContent>
+        </Tooltip>
 
         <Tooltip>
           <TooltipTrigger
