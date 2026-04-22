@@ -225,7 +225,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   return (
     <div
       className={cn(
-        "group w-full max-w-2xl animate-in cursor-pointer rounded-lg border border-border/50 text-xs duration-150 fade-in-0 slide-in-from-bottom-1",
+        "group w-full animate-in cursor-pointer rounded-lg border border-border/50 text-xs duration-150 fade-in-0 slide-in-from-bottom-1",
         "transition-all duration-150 hover:border-border/80 hover:bg-muted/20",
         expanded && "bg-muted/15"
       )}
