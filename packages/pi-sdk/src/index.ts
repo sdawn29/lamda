@@ -4,6 +4,8 @@ export { generateThreadTitle } from "./title.js";
 export { generateCommitMessage, DEFAULT_COMMIT_PROMPT } from "./commit-message.js";
 export type {
   ManagedSessionHandle,
+  ManagedSessionStats,
+  SessionTokenStats,
   ModelInfo,
   SdkConfig,
   SessionEvent,
@@ -11,4 +13,4 @@ export type {
   ImageContent,
   SlashCommand,
   ContextUsage,
-} from "./types.js";
+} from "./types.js"

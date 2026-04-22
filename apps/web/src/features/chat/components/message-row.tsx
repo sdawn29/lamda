@@ -3,8 +3,6 @@ import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import {
   AlertCircleIcon,
-  ArrowDownIcon,
-  ArrowUpIcon,
   RotateCwIcon,
   XIcon,
 } from "lucide-react"
@@ -51,33 +49,7 @@ function formatResponseTime(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-function estimateTokens(text: string): number {
-  return Math.max(1, Math.round(text.length / 4))
-}
 
-function formatTokenCount(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
-  return String(n)
-}
-
-function TokenCounter({ up, down }: { up?: number; down?: number }) {
-  return (
-    <div className="flex items-center gap-1.5 text-xs text-muted-foreground/50">
-      {up != null && (
-        <span className="flex items-center gap-0.5">
-          <ArrowUpIcon className="h-3 w-3" />
-          {formatTokenCount(up)}
-        </span>
-      )}
-      {down != null && (
-        <span className="flex items-center gap-0.5">
-          <ArrowDownIcon className="h-3 w-3" />
-          {formatTokenCount(down)}
-        </span>
-      )}
-    </div>
-  )
-}
 
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp)
@@ -177,14 +149,6 @@ function AssistantMessageBlock({
             )}
           </div>
         )}
-        <TokenCounter
-          up={
-            message.thinking.length > 0
-              ? estimateTokens(message.thinking)
-              : undefined
-          }
-          down={estimateTokens(message.content)}
-        />
         {message.createdAt != null && (
           <TimeStamp timestamp={message.createdAt} />
         )}
@@ -318,7 +282,6 @@ export const MessageRow = memo(function MessageRow({
         </div>
         <div className="flex items-center gap-2">
           <CopyButton text={message.content} />
-          <TokenCounter up={estimateTokens(message.content)} />
           {(message as UserMessage).createdAt != null && (
             <TimeStamp timestamp={(message as UserMessage).createdAt!} />
           )}

@@ -27,7 +27,7 @@ import {
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { useWorkspace } from "@/features/workspace"
-import { useSlashCommands, chatKeys } from "../queries"
+import { useSlashCommands, useSessionStats, chatKeys } from "../queries"
 import { useBranch } from "@/features/git/queries"
 import { useBranches } from "@/features/git/queries"
 import { useCheckoutBranch } from "@/features/git/mutations"
@@ -127,6 +127,10 @@ export function ChatView({
   const abortSessionMutation = useAbortSession(sessionId)
   const generateTitleMutation = useGenerateTitle()
   const sendPromptMutation = useSendPrompt(sessionId)
+
+  // ── Session stats ─────────────────────────────────────────────────────────────
+  // Fetch detailed token stats from the server
+  const { data: sessionStats } = useSessionStats(sessionId)
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────────
   // During streaming, smooth scrolling is called on every delta and the browser
@@ -490,6 +494,7 @@ export function ChatView({
             sessionId={sessionId}
             selectedModelId={selectedModelId}
             onModelChange={handleModelChange}
+            sessionStats={sessionStats}
           />
         </div>
       </div>

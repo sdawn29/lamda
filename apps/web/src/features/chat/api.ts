@@ -311,6 +311,39 @@ export function compactSession(sessionId: string): Promise<{ ok: boolean }> {
   })
 }
 
+// ── Session stats ──────────────────────────────────────────────────────────
+
+export interface SessionTokenStats {
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  total: number
+}
+
+export interface SessionStats {
+  sessionFile: string | null
+  sessionId: string
+  userMessages: number
+  assistantMessages: number
+  toolCalls: number
+  toolResults: number
+  totalMessages: number
+  tokens: SessionTokenStats
+  cost: number
+  contextUsage?: ContextUsage
+}
+
+export interface SessionStatsResponse {
+  stats: SessionStats | null
+}
+
+export function fetchSessionStats(
+  sessionId: string
+): Promise<SessionStatsResponse> {
+  return apiFetch<SessionStatsResponse>(`/session/${sessionId}/stats`)
+}
+
 // ── Workspace files ────────────────────────────────────────────────────────
 
 export type WorkspaceEntry = { path: string; type: "file" | "dir" }

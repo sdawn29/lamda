@@ -78,6 +78,27 @@ export interface ContextUsage {
   percent: number | null;
 }
 
+export interface SessionTokenStats {
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  total: number
+}
+
+export interface ManagedSessionStats {
+  sessionFile: string | null
+  sessionId: string
+  userMessages: number
+  assistantMessages: number
+  toolCalls: number
+  toolResults: number
+  totalMessages: number
+  tokens: SessionTokenStats
+  cost: number
+  contextUsage?: ContextUsage
+}
+
 export interface ManagedSessionHandle {
   /**
    * Send a prompt to the agent (non-blocking — events stream via events()).
@@ -89,40 +110,42 @@ export interface ManagedSessionHandle {
    * @param text - The prompt text
    * @param options - Optional settings for the prompt
    */
-  prompt(text: string, options?: PromptOptions): Promise<void>;
+  prompt(text: string, options?: PromptOptions): Promise<void>
   /**
    * Queue a steering message while the agent is running.
    * Delivered after the current assistant turn finishes its tool calls.
    * Useful for redirecting mid-task.
    */
-  steer(text: string): Promise<void>;
+  steer(text: string): Promise<void>
   /**
    * Queue a follow-up message to be processed after the agent finishes.
    * Only delivered when agent has no more tool calls or steering messages.
    */
-  followUp(text: string): Promise<void>;
+  followUp(text: string): Promise<void>
   /** Switch the model used for subsequent prompts. */
-  setModel(provider: string, modelId: string): Promise<void>;
+  setModel(provider: string, modelId: string): Promise<void>
   /** Set the thinking/reasoning effort level. Only affects reasoning-capable models. */
-  setThinkingLevel(level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh"): void;
+  setThinkingLevel(level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh"): void
   /** Path to the persisted session file, or undefined for in-memory sessions. */
-  readonly sessionFile: string | undefined;
+  readonly sessionFile: string | undefined
   /** Abort the current agent turn. */
-  abort(): Promise<void>;
+  abort(): Promise<void>
   /** Dispose the session and free resources. */
-  dispose(): void;
+  dispose(): void
   /**
    * Returns an async generator that yields all session events.
    * The generator stays alive across multiple prompts.
    * Breaking out of the loop or calling return() cleans up the subscription.
    */
-  events(): AsyncGenerator<SessionEvent>;
+  events(): AsyncGenerator<SessionEvent>
   /** List available slash commands (skills) for the current workspace. */
-  getCommands(): SlashCommand[];
+  getCommands(): SlashCommand[]
   /** Get current context window usage. Returns undefined if unavailable. */
-  getContextUsage(): ContextUsage | undefined;
+  getContextUsage(): ContextUsage | undefined
   /** Compact the context window by summarizing conversation history. */
-  compact(): Promise<void>;
+  compact(): Promise<void>
   /** Get the thinking/effort levels available for the current model. */
-  getAvailableThinkingLevels(): string[];
+  getAvailableThinkingLevels(): string[]
+  /** Get detailed session statistics including token usage and cost. */
+  getSessionStats(): ManagedSessionStats
 }

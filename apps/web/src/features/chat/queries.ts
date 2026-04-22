@@ -6,6 +6,7 @@ import {
   fetchSlashCommands,
   fetchContextUsage,
   fetchThinkingLevels,
+  fetchSessionStats,
 } from "./api"
 import { blocksToMessages, type MessageBlock, type Message } from "./types"
 import { getChatSyncEngine, loadThreadFromStorage } from "./hooks/use-chat-sync-engine"
@@ -28,6 +29,8 @@ export const chatKeys = {
     [...chatSessionKey(sessionId), "commands"] as const,
   contextUsage: (sessionId: string) =>
     [...chatSessionKey(sessionId), "context-usage"] as const,
+  sessionStats: (sessionId: string) =>
+    [...chatSessionKey(sessionId), "stats"] as const,
   thinkingLevels: (sessionId: string) =>
     [...chatSessionKey(sessionId), "thinking-levels"] as const,
   scroll: (sessionId: string) =>
@@ -155,5 +158,23 @@ export function useContextUsage(sessionId: string | undefined) {
     refetchIntervalInBackground: false,
     staleTime: 0,
     select: (data) => data.contextUsage,
+  })
+}
+
+// ── Session stats ─────────────────────────────────────────────────────────
+
+export function useSessionStats(sessionId: string | undefined) {
+  return useQuery({
+    queryKey: sessionId ? chatKeys.sessionStats(sessionId) : chatKeys.all,
+    queryFn: () => fetchSessionStats(sessionId!),
+    enabled: !!sessionId,
+    gcTime: 30 * 1000,
+    refetchInterval: () =>
+      typeof document === "undefined" || document.visibilityState !== "visible"
+        ? false
+        : 5_000,
+    refetchIntervalInBackground: false,
+    staleTime: 0,
+    select: (data) => data.stats,
   })
 }

@@ -1,6 +1,6 @@
 # AGENTS.md — web
 
-> Auto-generated context for coding agents. Last updated: 2026-04-24
+> Auto-generated context for coding agents. Last updated: 2026-04-25
 
 ## Purpose
 
@@ -62,13 +62,13 @@ Each feature module follows a consistent structure with `api.ts`, `queries.ts`, 
 - `src/features/chat/` — Chat feature module
   - `api.ts` — API client for session endpoints
   - `index.ts` — Barrel exports: ChatView, useSessionStream, sync engine, error handling
-  - `queries.ts` — TanStack Query hooks for messages
+  - `queries.ts` — TanStack Query hooks (useSessionStats, useContextUsage, useThinkingLevels)
   - `mutations.ts` — TanStack Mutation hooks for prompts
   - `types.ts` — TypeScript types for messages, tool calls, errors
   - `session-events.ts` — Event type definitions and subscription helpers
-  - `hooks/` — Streaming and state management hooks
-  - `components/` — Chat UI components
-- `src/features/chat/hooks/use-session-stream.ts` — SSE subscription for real-time events
+  - `hooks/` — Streaming hooks (useSessionStream, useChatSyncEngine)
+  - `components/` — Chat UI components (ChatView, MessageRow, ToolCallBlock, ContextChart)
+- `src/features/chat/components/context-chart.tsx` — Context usage and cost display component
 - `src/features/chat/hooks/use-chat-sync-engine.ts` — Message persistence sync engine
 - `src/features/git/components/diff-panel.tsx` — Git diff side panel
 - `src/features/workspace/components/app-sidebar.tsx` — Application sidebar navigation

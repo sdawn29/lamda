@@ -9,8 +9,10 @@ import { buildAuthStorage } from "./auth.js";
 import { sessionEventGenerator } from "./stream.js";
 import type {
   ManagedSessionHandle,
+  ManagedSessionStats,
   PromptOptions,
   SdkConfig,
+  SessionTokenStats,
 } from "./types.js";
 
 function buildHandle(
@@ -50,29 +52,44 @@ function buildHandle(
       await session.compact();
     },
     getAvailableThinkingLevels() {
-      return session.getAvailableThinkingLevels() as string[];
+      return session.getAvailableThinkingLevels() as string[]
     },
     getCommands() {
       // Use the SDK's resource loader for consistent discovery
-      const resourceLoader = session.resourceLoader;
-      const { skills } = resourceLoader.getSkills();
-      const { prompts } = resourceLoader.getPrompts();
+      const resourceLoader = session.resourceLoader
+      const { skills } = resourceLoader.getSkills()
+      const { prompts } = resourceLoader.getPrompts()
 
       const skillCommands = skills.map((skill) => ({
         name: `skill:${skill.name}`,
         description: skill.description,
         source: "skill" as const,
-      }));
+      }))
 
       const promptCommands = prompts.map((prompt) => ({
         name: prompt.name,
         description: prompt.description,
         source: "prompt" as const,
-      }));
+      }))
 
-      return [...skillCommands, ...promptCommands];
+      return [...skillCommands, ...promptCommands]
     },
-  };
+    getSessionStats(): ManagedSessionStats {
+      const stats = session.getSessionStats()
+      return {
+        sessionFile: stats.sessionFile ?? null,
+        sessionId: stats.sessionId,
+        userMessages: stats.userMessages,
+        assistantMessages: stats.assistantMessages,
+        toolCalls: stats.toolCalls,
+        toolResults: stats.toolResults,
+        totalMessages: stats.totalMessages,
+        tokens: stats.tokens as SessionTokenStats,
+        cost: stats.cost,
+        contextUsage: stats.contextUsage,
+      }
+    },
+  }
 }
 
 /**

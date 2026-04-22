@@ -31,7 +31,7 @@ import {
 import { FileMentionDropdown } from "./file-mention-dropdown"
 import { SlashCommandDropdown } from "./slash-command-dropdown"
 import { ContextChart } from "./context-chart"
-import type { SlashCommand } from "../api"
+import type { SessionStats, SlashCommand } from "../api"
 
 interface ChatTextboxProps {
   onSend?: (
@@ -51,6 +51,7 @@ interface ChatTextboxProps {
   sessionId?: string
   selectedModelId?: string | null
   onModelChange?: (modelId: string) => void
+  sessionStats?: SessionStats | null
 }
 
 export const ChatTextbox = memo(
@@ -68,6 +69,7 @@ export const ChatTextbox = memo(
       sessionId,
       selectedModelId: controlledModelId,
       onModelChange,
+      sessionStats,
     }: ChatTextboxProps,
     ref
   ) {
@@ -415,7 +417,7 @@ export const ChatTextbox = memo(
             </div>
 
             <div className="flex items-center gap-1.5 pr-0.5">
-              <ContextChart contextUsage={contextUsage} sessionId={sessionId} />
+              <ContextChart contextUsage={contextUsage} sessionId={sessionId} sessionStats={sessionStats} />
               {isLoading ? (
                 <Tooltip>
                   <TooltipTrigger

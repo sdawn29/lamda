@@ -1,6 +1,6 @@
 # AGENTS.md — server
 
-> Auto-generated context for coding agents. Last updated: 2026-04-23
+> Auto-generated context for coding agents. Last updated: 2026-04-25
 
 ## Purpose
 
@@ -60,6 +60,7 @@ Hono server (default port 3001) with three layers:
 | `GET`    | `/session/:id/commands`          | Get available slash commands                             |
 | `GET`    | `/session/:id/thinking-levels`   | Get available thinking levels                           |
 | `GET`    | `/session/:id/context-usage`     | Get current context window usage                         |
+| `GET`    | `/session/:id/stats`             | Get session statistics (messages, tokens, cost)        |
 | `POST`   | `/session/:id/compact`           | Trigger context window compaction                        |
 | `GET`    | `/session/:id/branch`           | Get current git branch for session's cwd                  |
 | `GET`    | `/session/:id/branches`         | List all git branches for session's cwd                  |

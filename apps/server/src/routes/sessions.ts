@@ -187,6 +187,19 @@ sessions.get("/session/:id/context-usage", (c) => {
   return c.json({ contextUsage: usage ?? null });
 });
 
+sessions.get("/session/:id/stats", (c) => {
+  const id = c.req.param("id");
+  const entry = store.get(id);
+  if (!entry) return c.json({ stats: null });
+  try {
+    const stats = entry.handle.getSessionStats();
+    return c.json({ stats });
+  } catch (err) {
+    console.error(`[stats:${id}]`, err);
+    return c.json({ stats: null, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 sessions.post("/session/:id/compact", async (c) => {
   const id = c.req.param("id");
   const entry = store.get(id);
