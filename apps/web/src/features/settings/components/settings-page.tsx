@@ -17,7 +17,6 @@ import {
   Keyboard,
   Database,
   ChevronRight,
-  Eye,
   RefreshCw,
   Download,
 } from "lucide-react"
@@ -26,7 +25,6 @@ import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
 import { Card, CardContent } from "@/shared/ui/card"
-import { Toggle } from "@/shared/ui/toggle"
 import { Switch } from "@/shared/ui/switch"
 import {
   Dialog,

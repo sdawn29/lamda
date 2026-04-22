@@ -64,6 +64,9 @@ export interface SessionQueueUpdateEvent {
 export interface SessionTurnStartEvent {}
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface SessionTurnEndEvent {}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface SessionAgentStartEvent {}
 
 export interface SessionAgentEndEvent {

@@ -7,12 +7,8 @@ import {
   fetchContextUsage,
   fetchThinkingLevels,
 } from "./api"
-import {
-  createAssistantMessage,
-  parseAssistantMessageContent,
-  type StoredMessageDto,
-  type Message,
-} from "./types"
+import { createAssistantMessage, parseAssistantMessageContent, type StoredMessageDto } from "./types"
+import type { Message } from "./types"
 
 export type { WorkspaceEntry } from "./api"
 
@@ -34,11 +30,18 @@ export const chatKeys = {
     [...chatSessionKey(sessionId), "context-usage"] as const,
   thinkingLevels: (sessionId: string) =>
     [...chatSessionKey(sessionId), "thinking-levels"] as const,
+  // Meta keys for streaming state (replaces module-level Maps)
+  scroll: (sessionId: string) =>
+    [...chatSessionKey(sessionId), "meta", "scroll"] as const,
+  errors: (sessionId: string) =>
+    [...chatSessionKey(sessionId), "meta", "errors"] as const,
+  pendingError: (sessionId: string) =>
+    [...chatSessionKey(sessionId), "meta", "pendingError"] as const,
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 
-function storedToMessage(m: StoredMessageDto): Message {
+export function storedToMessage(m: StoredMessageDto): Message {
   if (m.role === "tool") {
     const data = JSON.parse(m.content) as {
       toolCallId: string
@@ -75,13 +78,15 @@ export const messagesQueryKey = (sessionId: string) =>
 export function useMessages(sessionId: string) {
   return useQuery({
     queryKey: messagesQueryKey(sessionId),
-    queryFn: async () => {
+    queryFn: async (): Promise<Message[]> => {
       const { messages: stored } = await listMessages(sessionId)
       return stored.map(storedToMessage)
     },
-    gcTime: 60 * 1000,
-    staleTime: 5 * 60 * 1000,
-    refetchOnMount: "always",
+    // Keep messages cached for a long time - they shouldn't need frequent refresh
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 30 * 60 * 1000, // 30 minutes - messages are fresh for a long time
+    refetchOnMount: false, // Use cached data, don't refetch on every mount
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
     enabled: !!sessionId,
   })
 }

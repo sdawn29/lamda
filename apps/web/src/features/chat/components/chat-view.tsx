@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import type { ErrorMessage, Message } from "../types"
 import {
   SparklesIcon,
@@ -26,7 +27,7 @@ import {
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { useWorkspace } from "@/features/workspace"
-import { useSlashCommands } from "../queries"
+import { useSlashCommands, chatKeys } from "../queries"
 import { useBranch } from "@/features/git/queries"
 import { useBranches } from "@/features/git/queries"
 import { useCheckoutBranch } from "@/features/git/mutations"
@@ -41,9 +42,7 @@ import {
 } from "@/features/workspace/mutations"
 import { useChatStream } from "../use-chat-stream"
 import { useApiErrorToasts } from "../hooks/use-api-error-toasts"
-
-// Persists scroll positions across thread switches (survives remounts, cleared on page reload)
-const threadScrollPositions = new Map<string, number>()
+import { usePrefetchMessages } from "../hooks/use-prefetch-messages"
 
 interface ChatViewProps {
   sessionId: string
@@ -60,10 +59,16 @@ export function ChatView({
   initialModelId,
   initialIsStopped,
 }: ChatViewProps) {
+  const queryClient = useQueryClient()
   const showThinkingSetting = useShowThinkingSetting()
   const { data: models, isLoading: modelsLoading } = useModels()
   const { openConfigure } = useConfigureProvider()
+  const { workspaces } = useWorkspace()
   const noProvider = !modelsLoading && !models?.models?.length
+
+  // Prefetch messages for smooth initial render
+  usePrefetchMessages({ threadId, workspaces })
+
   const {
     visibleMessages,
     hasConversationHistory,
@@ -99,6 +104,7 @@ export function ChatView({
     [apiErrors]
   )
   useApiErrorToasts({ visibleErrorIds: apiErrorIds, errors: apiErrors })
+
   const [gitError, setGitError] = useState<string | null>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(
@@ -111,14 +117,12 @@ export function ChatView({
   const pinnedRef = useRef(false)
   const initialScrollDoneRef = useRef(false)
   const chatTextboxRef = useRef<ChatTextboxHandle>(null)
-
   const { setThreadTitle } = useWorkspace()
 
   // ── Queries ───────────────────────────────────────────────────────────────────
   const { data: commandsData } = useSlashCommands(sessionId)
   const { data: branchData } = useBranch(sessionId)
   const { data: branchesData } = useBranches(sessionId)
-
   const branch = branchData?.branch ?? null
   const branches = branchesData?.branches ?? []
 
@@ -146,29 +150,39 @@ export function ChatView({
     [commandsData]
   )
 
-  // ── Restore scroll position on mount ─────────────────────────────────────────
-  // Wait for messages to be available before restoring so scroll heights are correct.
+  // ── Scroll position persistence via query cache ───────────────────────────────
+  // Scroll positions are stored in TanStack Query cache instead of a module-level Map.
+  // This provides automatic garbage collection and reactive updates.
+  const saveScrollPosition = useCallback(
+    (scrollTop: number) => {
+      queryClient.setQueryData(chatKeys.scroll(sessionId), {
+        scrollTop,
+        isPinned: pinnedRef.current,
+      })
+    },
+    [queryClient, sessionId]
+  )
+
+  // ── Initial scroll to bottom on mount ──────────────────────────────────────────
+  // When a thread is opened, always scroll to the bottom to show the latest messages.
+  // The saved scroll position is used only for tracking, not for restoration on mount.
   useEffect(() => {
     if (initialScrollDoneRef.current) return
+    // Wait for messages to be available so scrollHeight is correct
     if (!hasLoadedMessages && visibleMessages.length === 0) return
 
     initialScrollDoneRef.current = true
-    const saved = threadScrollPositions.get(threadId)
+    pinnedRef.current = true
 
     const frame = requestAnimationFrame(() => {
       const el = scrollContainerRef.current
       if (!el) return
-      if (saved !== undefined) {
-        el.scrollTop = saved
-      } else {
-        // First visit to this thread — start pinned at the bottom
-        el.scrollTop = el.scrollHeight
-        pinnedRef.current = true
-      }
+      // Always scroll to bottom on initial load
+      el.scrollTop = el.scrollHeight
     })
 
     return () => cancelAnimationFrame(frame)
-  }, [hasLoadedMessages, threadId, visibleMessages.length])
+  }, [hasLoadedMessages, visibleMessages.length])
 
   useEffect(() => {
     if (!pinnedRef.current) return
@@ -191,8 +205,8 @@ export function ChatView({
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     pinnedRef.current = distanceFromBottom < 80
     setShowScrollButton(distanceFromBottom >= 80)
-    threadScrollPositions.set(threadId, el.scrollTop)
-  }, [threadId])
+    saveScrollPosition(el.scrollTop)
+  }, [saveScrollPosition])
 
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current

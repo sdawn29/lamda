@@ -82,22 +82,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   )
 
   const archiveThread = useCallback(
-    async (workspaceId: string, threadId: string): Promise<void> => {
-      await archiveThreadMutation.mutateAsync({ workspaceId, threadId })
+    async (_workspaceId: string, threadId: string): Promise<void> => {
+      await archiveThreadMutation.mutateAsync({ workspaceId: _workspaceId, threadId })
     },
     [archiveThreadMutation]
   )
 
   const pinThread = useCallback(
-    async (workspaceId: string, threadId: string): Promise<void> => {
+    async (_workspaceId: string, threadId: string): Promise<void> => {
       await pinThreadMutation.mutateAsync(threadId)
+      void _workspaceId // reserved for future use
     },
     [pinThreadMutation]
   )
 
   const unpinThread = useCallback(
-    async (workspaceId: string, threadId: string): Promise<void> => {
+    async (_workspaceId: string, threadId: string): Promise<void> => {
       await unpinThreadMutation.mutateAsync(threadId)
+      void _workspaceId // reserved for future use
     },
     [unpinThreadMutation]
   )
