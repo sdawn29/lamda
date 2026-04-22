@@ -25,7 +25,7 @@ interface TerminalContextValue {
   close: () => void
   tabs: TerminalTab[]
   activeTabId: string | null
-  addTab: () => void
+  addTab: () => string
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
   renameTab: (id: string, title: string) => void
@@ -39,24 +39,18 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
 
   const open = useCallback(() => {
+    const tab = makeTab()
     setIsOpen(true)
-    setTabs((prev) => {
-      if (prev.length > 0) return prev
-      const tab = makeTab()
-      setActiveTabId(tab.id)
-      return [tab]
-    })
+    setTabs([tab])
+    setActiveTabId(tab.id)
   }, [])
 
   const toggle = useCallback(() => {
     setIsOpen((v) => {
       if (!v) {
-        setTabs((prev) => {
-          if (prev.length > 0) return prev
-          const tab = makeTab()
-          setActiveTabId(tab.id)
-          return [tab]
-        })
+        const tab = makeTab()
+        setTabs([tab])
+        setActiveTabId(tab.id)
       }
       return !v
     })
@@ -68,6 +62,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     const tab = makeTab()
     setTabs((prev) => [...prev, tab])
     setActiveTabId(tab.id)
+    return tab.id
   }, [])
 
   const closeTab = useCallback((id: string) => {
@@ -83,7 +78,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       }
       setActiveTabId((active) => {
         if (active !== id) return active
-        // switch to adjacent tab
         const newIdx = idx > 0 ? idx - 1 : 0
         return next[newIdx].id
       })
