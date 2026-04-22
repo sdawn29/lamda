@@ -450,7 +450,15 @@ export const RichInput = React.forwardRef<
         frag.appendChild(buildMentionChip(path))
         frag.appendChild(document.createTextNode("\u200B"))
       } else if (part) {
-        frag.appendChild(document.createTextNode(part))
+        const lines = part.split("\n")
+        for (let i = 0; i < lines.length; i++) {
+          if (i > 0) {
+            frag.appendChild(document.createElement("br"))
+          }
+          if (lines[i]) {
+            frag.appendChild(document.createTextNode(lines[i]))
+          }
+        }
       }
     }
     range.insertNode(frag)
