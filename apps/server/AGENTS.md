@@ -1,6 +1,6 @@
 # AGENTS.md — server
 
-> Auto-generated context for coding agents. Last updated: 2026-04-22
+> Auto-generated context for coding agents. Last updated: 2026-04-23
 
 ## Purpose
 
@@ -54,12 +54,21 @@ Hono server (default port 3001) with three layers:
 | `POST`   | `/session`                        | Legacy: create standalone session                        |
 | `DELETE` | `/session/:id`                    | Delete session                                           |
 | `POST`   | `/session/:id/prompt`            | Send user prompt to agent (returns 202, fire-and-forget)  |
-| `GET`    | `/session/:id/branch`            | Get current git branch for session's cwd                  |
-| `GET`    | `/session/:id/branches`          | List all git branches for session's cwd                  |
-| `POST`   | `/session/:id/checkout`          | Checkout a git branch                                    |
-| `GET`    | `/session/:id/messages`          | Get persisted messages for session                       |
+| `POST`   | `/session/:id/steer`             | Queue steering message (interrupts after tool calls)     |
+| `POST`   | `/session/:id/follow-up`         | Queue follow-up message (waits for idle)                 |
+| `POST`   | `/session/:id/abort`             | Abort current agent operation                            |
+| `GET`    | `/session/:id/commands`          | Get available slash commands                             |
+| `GET`    | `/session/:id/thinking-levels`   | Get available thinking levels                           |
+| `GET`    | `/session/:id/context-usage`     | Get current context window usage                         |
+| `POST`   | `/session/:id/compact`           | Trigger context window compaction                        |
+| `GET`    | `/session/:id/branch`           | Get current git branch for session's cwd                  |
+| `GET`    | `/session/:id/branches`         | List all git branches for session's cwd                  |
+| `POST`   | `/session/:id/checkout`         | Checkout a git branch                                    |
+| `GET`    | `/session/:id/messages`          | Get persisted message blocks for session                 |
+| `GET`    | `/session/:id/running-tools`     | Get running tools for state restoration                  |
 | `GET`    | `/session/:id/events`            | SSE stream of agent events                               |
-| `DELETE` | `/reset`                          | Delete all workspaces and sessions (debug)               |
+| `GET`    | `/session/:id/workspace-files`   | List all files in workspace (recursive)                  |
+| `DELETE` | `/reset`                         | Delete all workspaces and sessions (debug)               |
 | `GET`    | `/directory`                     | List directory contents for file browser                 |
 | `GET`    | `/file`                          | Read file contents for preview                           |
 

@@ -263,12 +263,14 @@ export function useSessionStream({
 
   // Cleanup on unmount or sessionId change
   useEffect(() => {
+    // This effect handles sessionId changes by closing the previous SSE
     return () => {
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
       }
     }
-  }, [])
+  }, [sessionId])
 
   // Main SSE effect
   useEffect(() => {

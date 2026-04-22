@@ -1,6 +1,6 @@
 # AGENTS.md — web
 
-> Auto-generated context for coding agents. Last updated: 2026-04-22
+> Auto-generated context for coding agents. Last updated: 2026-04-23
 
 ## Purpose
 
@@ -32,6 +32,7 @@ Single-page React app using Vite + TanStack Router for file-based routing. UI co
 Each feature module follows a consistent structure with `api.ts`, `queries.ts`, `mutations.ts`, `context.tsx`, and `components/` subdirectory:
 
 - `features/chat/` — Chat interface, message rendering, streaming, tool calls, thinking indicators
+- `features/chat/hooks/` — Streaming hooks: `useSessionStream`, `useChatSyncEngine`, `useVisibleMessages`, `useScrollMeta`, `usePrefetchMessages`, `useApiErrorToasts`
 - `features/git/` — Git diff panel, branch selector, staging, committing, stash management
 - `features/workspace/` — Workspace/sidebar management, thread creation, app sidebar
 - `features/settings/` — Settings modal, provider configuration
@@ -39,6 +40,7 @@ Each feature module follows a consistent structure with `api.ts`, `queries.ts`, 
 - `features/layout/` — Title bar, open-with button
 - `features/electron/` — Electron-specific APIs (server port discovery)
 - `features/file-tree/` — File browser with directory listing via server API
+- `features/chat-v2/` — (scaffold for future work, not currently used)
 
 ### Routes (src/routes/)
 
@@ -57,18 +59,28 @@ Each feature module follows a consistent structure with `api.ts`, `queries.ts`, 
 - `src/routes/workspace.$threadId.tsx` — Thread view with ChatView, DiffPanel, TerminalPanel, FileTree
 - `src/routes/settings.tsx` — Settings page route
 - `src/routeTree.gen.ts` — Auto-generated route tree (do not edit manually)
-- `src/features/chat/components/chat-view.tsx` — Main chat interface
-- `src/features/chat/components/chat-textbox.tsx` — Chat input with model/branch selectors
+- `src/features/chat/` — Chat feature module
+  - `api.ts` — API client for session endpoints
+  - `index.ts` — Barrel exports: ChatView, useSessionStream, sync engine, error handling
+  - `queries.ts` — TanStack Query hooks for messages
+  - `mutations.ts` — TanStack Mutation hooks for prompts
+  - `types.ts` — TypeScript types for messages, tool calls, errors
+  - `session-events.ts` — Event type definitions and subscription helpers
+  - `hooks/` — Streaming and state management hooks
+  - `components/` — Chat UI components
+- `src/features/chat/hooks/use-session-stream.ts` — SSE subscription for real-time events
+- `src/features/chat/hooks/use-chat-sync-engine.ts` — Message persistence sync engine
 - `src/features/git/components/diff-panel.tsx` — Git diff side panel
 - `src/features/workspace/components/app-sidebar.tsx` — Application sidebar navigation
 - `src/features/terminal/components/terminal-panel.tsx` — Terminal output panel
 - `src/features/layout/components/title-bar.tsx` — Custom title bar (for Electron frameless window)
-- `src/features/file-tree/components/file-tree.tsx` — File browser with lazy loading
+- `src/features/file-tree/` — File browser feature module
 - `src/shared/ui/` — shadcn/ui components
 
 ## Conventions
 
 - **Feature-based architecture** — Each feature (chat, git, workspace, etc.) is a self-contained module
+- **Feature index.ts** — Each feature exports its public API via `index.ts` barrel file
 - **File-based routing** — Routes defined in `src/routes/` using TanStack Router conventions
 - **Component naming** — kebab-case for files, PascalCase for exported components
 - **UI components** — shadcn/ui components live in `src/shared/ui/` — regenerate via `npx shadcn` CLI
@@ -76,6 +88,7 @@ Each feature module follows a consistent structure with `api.ts`, `queries.ts`, 
 - **Styling** — Tailwind CSS 4 with `@tailwindcss/vite` plugin; use `cn()` utility for conditional classes
 - **React Compiler** — enabled via `babel-plugin-react-compiler` in Vite config
 - **Lazy loading** — Heavy components (DiffPanel, TerminalPanel, FileTree) use `React.lazy()` with Suspense
+- **Chat streaming** — `useSessionStream` hook manages SSE connection and real-time UI updates
 
 ## Dependencies
 
