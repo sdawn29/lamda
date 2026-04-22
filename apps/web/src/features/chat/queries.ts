@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   listMessages,
   fetchModels,
@@ -9,6 +9,7 @@ import {
 } from "./api"
 import { createAssistantMessage, parseAssistantMessageContent, type StoredMessageDto } from "./types"
 import type { Message } from "./types"
+import { getChatSyncEngine, loadThreadFromStorage } from "./hooks/use-chat-sync-engine"
 
 export type { WorkspaceEntry } from "./api"
 
@@ -76,17 +77,34 @@ export const messagesQueryKey = (sessionId: string) =>
   chatKeys.messages(sessionId)
 
 export function useMessages(sessionId: string) {
+  const queryClient = useQueryClient()
+  const syncEngine = getChatSyncEngine()
+
   return useQuery({
     queryKey: messagesQueryKey(sessionId),
     queryFn: async (): Promise<Message[]> => {
+      // Fetch from server
       const { messages: stored } = await listMessages(sessionId)
-      return stored.map(storedToMessage)
+      const serverMessages = stored.map(storedToMessage)
+
+      // Save to localStorage for next time
+      syncEngine.saveMessages(sessionId, serverMessages)
+
+      // Update query cache with server data
+      queryClient.setQueryData(messagesQueryKey(sessionId), serverMessages)
+
+      return serverMessages
     },
-    // Keep messages cached for a long time - they shouldn't need frequent refresh
+    // Load initial data from localStorage immediately (no network)
+    initialData: () => {
+      const localData = loadThreadFromStorage(sessionId)
+      return localData?.messages ?? undefined
+    },
+    // Keep messages cached for a long time
     gcTime: 30 * 60 * 1000, // 30 minutes
-    staleTime: 30 * 60 * 1000, // 30 minutes - messages are fresh for a long time
-    refetchOnMount: false, // Use cached data, don't refetch on every mount
-    refetchOnWindowFocus: false, // Don't refetch when window regains focus
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnMount: false, // Use cached data
+    refetchOnWindowFocus: false, // Don't refetch on window focus
     enabled: !!sessionId,
   })
 }

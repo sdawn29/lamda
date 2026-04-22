@@ -42,6 +42,7 @@ import {
 } from "@/features/workspace/mutations"
 import { useChatStream } from "../use-chat-stream"
 import { useApiErrorToasts } from "../hooks/use-api-error-toasts"
+import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
 
 interface ChatViewProps {
   sessionId: string
@@ -59,6 +60,7 @@ export function ChatView({
   initialIsStopped,
 }: ChatViewProps) {
   const queryClient = useQueryClient()
+  const syncEngine = getChatSyncEngine()
   const showThinkingSetting = useShowThinkingSetting()
   const { data: models, isLoading: modelsLoading } = useModels()
   const { openConfigure } = useConfigureProvider()
@@ -67,7 +69,6 @@ export function ChatView({
   const {
     visibleMessages,
     hasConversationHistory,
-    hasLoadedMessages,
     isLoading,
     isStopped,
     isCompacting,
@@ -145,55 +146,72 @@ export function ChatView({
     [commandsData]
   )
 
-  // ── Reset scroll state when thread changes ───────────────────────────────────
-  // When threadId changes (without remounting), reset scroll state and scroll to bottom.
+  // ── Scroll position persistence via query cache & localStorage ──────────────────
+  // Scroll positions are stored in both TanStack Query cache and localStorage.
+  // localStorage persists across garbage collection and page reloads.
+  const saveScrollPosition = useCallback(
+    (scrollTop: number) => {
+      const meta = {
+        scrollTop,
+        isPinned: pinnedRef.current,
+        visited: true,
+      }
+      // Save to query cache
+      queryClient.setQueryData(chatKeys.scroll(sessionId), meta)
+      // Also persist to localStorage for cross-session persistence
+      syncEngine.saveScrollMeta(sessionId, meta)
+    },
+    [queryClient, sessionId, syncEngine]
+  )
+
+  // ── Restore scroll position or scroll to bottom on thread change ──────────────
+  // If the thread has been visited before and has a saved position, restore it.
+  // Otherwise, scroll to bottom (new thread behavior).
   useEffect(() => {
     initialScrollDoneRef.current = false
     pinnedRef.current = true
-    setShowScrollButton(false)
-    
-    const frame = requestAnimationFrame(() => {
-      const el = scrollContainerRef.current
-      if (!el) return
-      el.scrollTop = el.scrollHeight
-    })
-    
-    return () => cancelAnimationFrame(frame)
-  }, [threadId])
-
-  // ── Scroll position persistence via query cache ───────────────────────────────
-  // Scroll positions are stored in TanStack Query cache instead of a module-level Map.
-  // This provides automatic garbage collection and reactive updates.
-  const saveScrollPosition = useCallback(
-    (scrollTop: number) => {
-      queryClient.setQueryData(chatKeys.scroll(sessionId), {
-        scrollTop,
-        isPinned: pinnedRef.current,
-      })
-    },
-    [queryClient, sessionId]
-  )
-
-  // ── Initial scroll to bottom on mount ──────────────────────────────────────────
-  // When a thread is opened, always scroll to the bottom to show the latest messages.
-  // The saved scroll position is used only for tracking, not for restoration on mount.
-  useEffect(() => {
-    if (initialScrollDoneRef.current) return
-    // Wait for messages to be available so scrollHeight is correct
-    if (!hasLoadedMessages && visibleMessages.length === 0) return
-
-    initialScrollDoneRef.current = true
-    pinnedRef.current = true
 
     const frame = requestAnimationFrame(() => {
       const el = scrollContainerRef.current
       if (!el) return
-      // Always scroll to bottom on initial load
-      el.scrollTop = el.scrollHeight
+
+      // Update scroll button visibility inside RAF callback to avoid sync setState in effect
+      setShowScrollButton(false)
+
+      // Check if this thread has been visited before
+      // First check query cache, then localStorage
+      let savedMeta = queryClient.getQueryData<{ scrollTop: number; isPinned: boolean; visited?: boolean }>(
+        chatKeys.scroll(sessionId)
+      )
+
+      // If not in cache, check localStorage (persisted across sessions)
+      if (!savedMeta?.visited) {
+        const localMeta = syncEngine.getScrollMeta(sessionId)
+        if (localMeta) {
+          savedMeta = localMeta
+        }
+      }
+
+      if (savedMeta?.visited) {
+        // Restore previous scroll position
+        el.scrollTop = savedMeta.scrollTop
+        pinnedRef.current = savedMeta.isPinned
+      } else {
+        // New thread - scroll to bottom and mark as visited
+        el.scrollTop = el.scrollHeight
+        // Mark as visited so next time we restore this position
+        const visitedMeta = {
+          scrollTop: el.scrollTop,
+          isPinned: pinnedRef.current,
+          visited: true,
+        }
+        queryClient.setQueryData(chatKeys.scroll(sessionId), visitedMeta)
+        syncEngine.saveScrollMeta(sessionId, visitedMeta)
+      }
     })
 
     return () => cancelAnimationFrame(frame)
-  }, [hasLoadedMessages, visibleMessages.length])
+  }, [threadId, sessionId, queryClient, syncEngine])
 
   useEffect(() => {
     if (!pinnedRef.current) return

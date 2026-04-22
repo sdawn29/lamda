@@ -15,6 +15,15 @@ export type {
   UseSessionStreamOptions,
 } from "./hooks/use-session-stream"
 export type { UseVisibleMessagesOptions } from "./hooks/use-visible-messages"
+// Sync engine
+export {
+  getChatSyncEngine,
+  useChatSyncEngine,
+  saveThreadToStorage,
+  loadThreadFromStorage,
+  clearThreadFromStorage,
+  getAllStoredThreadIds,
+} from "./hooks/use-chat-sync-engine"
 export type {
   AssistantMessage,
   Message,

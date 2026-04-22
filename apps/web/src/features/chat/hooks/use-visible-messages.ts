@@ -22,10 +22,12 @@ export function useVisibleMessages({
   sessionId,
   pendingError,
 }: UseVisibleMessagesOptions) {
-  const { data: persistedMessages = [], isLoading, isFetching } = useMessages(sessionId)
+  const { data: persistedMessages = [], isLoading, isFetching, dataUpdatedAt } = useMessages(sessionId)
 
-  // Messages are considered loaded once we have data OR we're done fetching
-  const hasLoadedMessages = persistedMessages.length > 0 || !isFetching
+  // Loading state: true only when truly loading (no data and fetching)
+  // Once we have data from localStorage, show it immediately
+  // isFetching indicates background sync with server
+  const isLoadingMessages = isLoading || (!persistedMessages.length && isFetching)
 
   const visibleMessages = useMemo(() => {
     // Collect error IDs already in base messages to avoid duplicates
@@ -49,7 +51,8 @@ export function useVisibleMessages({
 
   return {
     messages: visibleMessages,
-    isLoading,
-    hasLoadedMessages,
+    isLoading: isLoadingMessages,
+    isFetching,
+    dataUpdatedAt,
   }
 }
