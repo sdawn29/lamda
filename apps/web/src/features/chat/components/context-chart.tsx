@@ -7,7 +7,6 @@ import {
   PopoverTrigger,
 } from "@/shared/ui/popover"
 import { Button } from "@/shared/ui/button"
-import { Separator } from "@/shared/ui/separator"
 import type { ContextUsage } from "../api"
 import type { SessionStats } from "../api"
 import { compactSession } from "../api"
@@ -31,56 +30,6 @@ function formatCost(n: number): string {
   return `$${(n * 1000).toFixed(1)}m`
 }
 
-function StatRow({
-  label,
-  value,
-  subvalue,
-  highlight = false,
-}: {
-  label: string
-  value: string | number
-  subvalue?: string
-  highlight?: boolean
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <span
-        className={`text-[11px] tabular-nums font-medium ${
-          highlight ? "text-foreground" : "text-foreground/80"
-        }`}
-      >
-        {value}
-        {subvalue && (
-          <span className="ml-1 text-[10px] text-muted-foreground/60">
-            {subvalue}
-          </span>
-        )}
-      </span>
-    </div>
-  )
-}
-
-function TokenBar({
-  value,
-  max,
-  colorClass,
-}: {
-  value: number
-  max: number
-  colorClass: string
-}) {
-  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
-  return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-      <div
-        className={`h-full rounded-full transition-all duration-300 ${colorClass}`}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  )
-}
-
 export function ContextChart({
   contextUsage,
   sessionId,
@@ -89,7 +38,6 @@ export function ContextChart({
   const queryClient = useQueryClient()
   const [isCompacting, setIsCompacting] = useState(false)
   const [compactError, setCompactError] = useState<string | null>(null)
-  // Hold the last valid (non-null-tokens) snapshot so we never flash "?"
   const lastValidRef = useRef<ContextUsage | null>(null)
 
   if (contextUsage && contextUsage.tokens != null) {
@@ -119,16 +67,12 @@ export function ContextChart({
         ? "stroke-yellow-500 dark:stroke-yellow-400"
         : "stroke-muted-foreground/40"
 
-  const barColorClass =
-    fill >= 0.9
-      ? "bg-destructive"
-      : fill >= 0.75
-        ? "bg-yellow-500 dark:bg-yellow-400"
-        : "bg-primary"
-
   const pctLabel = pct != null ? `${Math.round(pct)}%` : "?"
   const usedLabel = display.tokens != null ? formatTokens(display.tokens) : "?"
   const totalLabel = formatTokens(display.contextWindow)
+
+  const tokens = sessionStats?.tokens
+  const cost = sessionStats?.cost ?? null
 
   async function handleCompact() {
     if (!sessionId || isCompacting) return
@@ -148,18 +92,6 @@ export function ContextChart({
       setIsCompacting(false)
     }
   }
-
-  // Get token stats from session stats
-  const hasTokens = sessionStats && sessionStats.tokens
-  const tokens = sessionStats?.tokens
-  const cost = sessionStats?.cost ?? null
-  const messages = sessionStats
-    ? {
-        user: sessionStats.userMessages,
-        assistant: sessionStats.assistantMessages,
-        toolCalls: sessionStats.toolCalls,
-      }
-    : null
 
   return (
     <Popover>
@@ -204,15 +136,12 @@ export function ContextChart({
           </button>
         }
       />
-      <PopoverContent side="top" align="end" className="w-64 p-3">
-        {/* Header with context window */}
-        <div className="flex items-baseline justify-between mb-2">
-          <span className="text-xs font-medium text-popover-foreground">
-            Context
-          </span>
-          <div className="flex items-center gap-2">
+      <PopoverContent side="top" align="end" className="w-56 p-0">
+        <div className="px-3 py-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">Context</span>
             <span
-              className={`text-sm font-semibold tabular-nums ${
+              className={`text-xs font-semibold tabular-nums ${
                 fill >= 0.9
                   ? "text-destructive"
                   : fill >= 0.75
@@ -223,123 +152,104 @@ export function ContextChart({
               {pctLabel}
             </span>
           </div>
-        </div>
-
-        {/* Context window bar */}
-        <div className="mb-3">
-          <TokenBar value={fill} max={100} colorClass={barColorClass} />
-          <div className="mt-1 flex justify-between">
-            <span className="text-[10px] text-muted-foreground">
-              {usedLabel} used
-            </span>
-            <span className="text-[10px] text-muted-foreground">
-              {totalLabel} window
-            </span>
+          <div className="mt-0.5 text-[10px] text-muted-foreground/60">
+            {usedLabel} / {totalLabel}
           </div>
         </div>
 
-        {/* Token breakdown from session stats */}
-        {tokens && (
-          <>
-            <Separator className="my-2" />
-            <div className="space-y-1.5">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 mb-1">
+        {sessionStats && tokens && (
+          <div className="border-t border-border/50">
+            {/* Tokens section */}
+            <div className="px-3 py-1.5">
+              <div className="mb-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/60">
                 Tokens
               </div>
-              <StatRow
-                label="Input"
-                value={formatTokens(tokens.input)}
-              />
-              <StatRow
-                label="Output"
-                value={formatTokens(tokens.output)}
-              />
-              {tokens.cacheRead > 0 && (
-                <StatRow
-                  label="Cache reads"
-                  value={formatTokens(tokens.cacheRead)}
-                />
-              )}
-              {tokens.cacheWrite > 0 && (
-                <StatRow
-                  label="Cache writes"
-                  value={formatTokens(tokens.cacheWrite)}
-                />
-              )}
-              <StatRow
-                label="Total"
-                value={formatTokens(tokens.total)}
-                highlight
-              />
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
+                <span className="text-muted-foreground">Input</span>
+                <span className="text-right tabular-nums font-medium">
+                  {formatTokens(tokens.input)}
+                </span>
+                <span className="text-muted-foreground">Output</span>
+                <span className="text-right tabular-nums font-medium">
+                  {formatTokens(tokens.output)}
+                </span>
+                {tokens.cacheRead > 0 && (
+                  <>
+                    <span className="text-muted-foreground">Cache Reads</span>
+                    <span className="text-right tabular-nums font-medium">
+                      {formatTokens(tokens.cacheRead)}
+                    </span>
+                  </>
+                )}
+                {tokens.cacheWrite > 0 && (
+                  <>
+                    <span className="text-muted-foreground">Cache Writes</span>
+                    <span className="text-right tabular-nums font-medium">
+                      {formatTokens(tokens.cacheWrite)}
+                    </span>
+                  </>
+                )}
+                <span className="text-muted-foreground">Total</span>
+                <span className="text-right tabular-nums font-semibold">
+                  {formatTokens(tokens.total)}
+                </span>
+              </div>
             </div>
-          </>
-        )}
 
-        {/* Message counts */}
-        {messages && (
-          <>
-            <Separator className="my-2" />
-            <div className="space-y-1.5">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 mb-1">
+            {/* Messages section */}
+            <div className="border-t border-border/50 px-3 py-1.5">
+              <div className="mb-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/60">
                 Messages
               </div>
-              <StatRow
-                label="User"
-                value={messages.user}
-              />
-              <StatRow
-                label="Assistant"
-                value={messages.assistant}
-              />
-              <StatRow
-                label="Tool calls"
-                value={messages.toolCalls}
-              />
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
+                <span className="text-muted-foreground">User</span>
+                <span className="text-right tabular-nums font-medium">{sessionStats.userMessages}</span>
+                <span className="text-muted-foreground">Assistant</span>
+                <span className="text-right tabular-nums font-medium">{sessionStats.assistantMessages}</span>
+                <span className="text-muted-foreground">Tools</span>
+                <span className="text-right tabular-nums font-medium">{sessionStats.toolCalls}</span>
+              </div>
             </div>
-          </>
+          </div>
         )}
 
-        {/* Cost */}
         {cost != null && cost > 0 && (
-          <>
-            <Separator className="my-2" />
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground">Est. cost</span>
-              <span className="text-[11px] font-medium text-foreground/80">
-                {formatCost(cost)}
-              </span>
+          <div className="border-t border-border/50 px-3 py-1.5">
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="text-muted-foreground">Estimated Cost</span>
+              <span className="tabular-nums font-semibold">{formatCost(cost)}</span>
             </div>
-          </>
+          </div>
         )}
 
-        {/* Compact button */}
         {sessionId && (
-          <>
-            <Separator className="my-2" />
+          <div className="border-t border-border/50 px-3 py-2">
             <Button
               size="sm"
               variant="secondary"
               onClick={handleCompact}
               disabled={isCompacting}
-              className="w-full h-7 text-[11px]"
+              className="w-full h-6 text-[10px]"
             >
               {isCompacting ? (
                 <>
-                  <Loader2Icon className="h-3 w-3 animate-spin mr-1.5" />
+                  <Loader2Icon className="h-2.5 w-2.5 animate-spin mr-1" />
                   Compacting...
                 </>
               ) : (
                 <>
-                  <SparklesIcon className="h-3 w-3 mr-1.5" />
-                  Compact context
+                  <SparklesIcon className="h-2.5 w-2.5 mr-1" />
+                  Compact
                 </>
               )}
             </Button>
-          </>
+          </div>
         )}
 
         {compactError && (
-          <p className="mt-2 text-[10px] text-destructive">{compactError}</p>
+          <div className="px-3 pb-2">
+            <p className="text-[9px] text-destructive">{compactError}</p>
+          </div>
         )}
       </PopoverContent>
     </Popover>
