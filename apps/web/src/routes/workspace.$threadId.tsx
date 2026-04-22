@@ -41,7 +41,7 @@ function WorkspaceThreadRoute() {
   const { threadId } = Route.useParams()
   const { workspaces, isLoading } = useWorkspace()
   const navigate = useNavigate()
-  const { isOpen: diffOpen, isFullscreen: diffFullscreen, setCurrentWorkspace } = useDiffPanel()
+  const { isOpen: diffOpen } = useDiffPanel()
   const { isOpen: terminalOpen } = useTerminal()
   const { isOpen: fileTreeOpen } = useFileTree()
   const updateSetting = useUpdateAppSetting()
@@ -53,11 +53,6 @@ function WorkspaceThreadRoute() {
     ws.threads.some((t) => t.id === threadId)
   )
   const foundThread = foundWorkspace?.threads.find((t) => t.id === threadId)
-
-  // Set current workspace when entering a workspace
-  useEffect(() => {
-    setCurrentWorkspace(foundWorkspace?.path ?? null)
-  }, [foundWorkspace?.path, setCurrentWorkspace])
 
   useEffect(() => {
     updateSetting.mutate({
@@ -77,19 +72,6 @@ function WorkspaceThreadRoute() {
 
   if (!foundWorkspace || !foundThread || !foundThread.sessionId) {
     return null
-  }
-
-  const cwd = foundWorkspace.path
-
-  if (diffFullscreen) {
-    return (
-      <Suspense fallback={<div className="h-full w-full bg-muted/10" />}>
-        <DiffPanel
-          sessionId={foundThread.sessionId}
-          openWithAppId={foundWorkspace.openWithAppId}
-        />
-      </Suspense>
-    )
   }
 
   return (
@@ -141,7 +123,7 @@ function WorkspaceThreadRoute() {
             <Suspense
               fallback={<div className="h-full border-t bg-background" />}
             >
-              <TerminalPanel cwd={cwd} />
+              <TerminalPanel cwd={foundWorkspace.path} />
             </Suspense>
           </ResizablePanel>
         </>

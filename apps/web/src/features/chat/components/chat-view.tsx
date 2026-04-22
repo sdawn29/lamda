@@ -42,6 +42,7 @@ import {
 import { useChatStream } from "../use-chat-stream"
 import { useApiErrorToasts } from "../hooks/use-api-error-toasts"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
+import { useFileChangeInvalidation } from "../hooks/use-file-change-invalidation"
 
 interface ChatViewProps {
   sessionId: string
@@ -129,6 +130,9 @@ export function ChatView({
   // ── Session stats ─────────────────────────────────────────────────────────────
   // Fetch detailed token stats from the server
   const { data: sessionStats } = useSessionStats(sessionId)
+
+  // Watch for file-modifying tool completions and refresh UI
+  useFileChangeInvalidation(sessionId)
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────────
   // During streaming, smooth scrolling is called on every delta and the browser

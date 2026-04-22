@@ -29,6 +29,15 @@ import {
 } from "@/features/chat/api"
 import { chatKeys } from "@/features/chat/queries"
 import { gitKeys } from "@/features/git/queries"
+import { apiFetch } from "@/shared/lib/client"
+
+async function prefetchDirectory(path: string) {
+  try {
+    await apiFetch(`/directory?path=${encodeURIComponent(path)}`)
+  } catch {
+    // Silently fail - the data will be fetched on demand
+  }
+}
 
 function setWorkspacesData(
   queryClient: QueryClient,
@@ -72,6 +81,8 @@ export function useCreateWorkspace() {
       setWorkspacesData(queryClient, (current) =>
         upsertWorkspace(current, workspace)
       )
+      // Prefetch the file tree for the new workspace asynchronously
+      void prefetchDirectory(workspace.path)
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
   })

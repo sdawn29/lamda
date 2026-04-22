@@ -19,8 +19,6 @@ interface DiffPanelContextValue {
   toggle: () => void
   open: () => void
   close: () => void
-  isFullscreen: boolean
-  setIsFullscreen: (v: boolean) => void
   tabs: DiffPanelTab[]
   activeTabId: string | null
   addTab: (tab: Omit<DiffPanelTab, "id">) => void
@@ -41,7 +39,6 @@ const DiffPanelContext = createContext<DiffPanelContextValue | null>(null)
 
 export function DiffPanelProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
   const [tabs, setTabs] = useState<DiffPanelTab[]>([SOURCE_CONTROL_TAB])
   const [activeTabId, setActiveTabId] = useState<string | null>("tab-source-control")
   const [currentWorkspacePath, setCurrentWorkspacePath] = useState<string | null>(null)
@@ -54,7 +51,6 @@ export function DiffPanelProvider({ children }: { children: ReactNode }) {
   }, [])
   const close = useCallback(() => {
     setIsOpen(false)
-    setIsFullscreen(false)
   }, [])
 
   const addTab = useCallback((tab: Omit<DiffPanelTab, "id">) => {
@@ -181,8 +177,6 @@ export function DiffPanelProvider({ children }: { children: ReactNode }) {
       toggle,
       open,
       close,
-      isFullscreen,
-      setIsFullscreen,
       tabs,
       activeTabId,
       addTab,
@@ -197,8 +191,6 @@ export function DiffPanelProvider({ children }: { children: ReactNode }) {
       toggle,
       open,
       close,
-      isFullscreen,
-      setIsFullscreen,
       tabs,
       activeTabId,
       addTab,

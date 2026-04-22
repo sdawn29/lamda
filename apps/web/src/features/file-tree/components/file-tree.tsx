@@ -1,26 +1,16 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { Folder, ChevronRight, ChevronDown, File, RefreshCw } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { useDiffPanel } from "@/features/git"
-import { apiFetch } from "@/shared/lib/client"
+import { useDirectoryEntries } from "../queries"
+import type { DirectoryEntry } from "../queries"
 
-interface TreeNode {
-  name: string
-  path: string
-  type: "file" | "directory"
+interface TreeNode extends DirectoryEntry {
   children?: TreeNode[]
 }
 
 interface FileTreeProps {
   workspacePath: string
-}
-
-async function fetchDirectory(path: string): Promise<TreeNode[]> {
-  try {
-    return await apiFetch<TreeNode[]>(`/directory?path=${encodeURIComponent(path)}`)
-  } catch {
-    return []
-  }
 }
 
 function TreeItem({
@@ -36,11 +26,15 @@ function TreeItem({
   const [children, setChildren] = useState<TreeNode[]>([])
   const isDirectory = node.type === "directory"
 
+  const { data: childEntries } = useDirectoryEntries(
+    isExpanded && isDirectory && children.length === 0 ? node.path : null
+  )
+
   useEffect(() => {
-    if (isExpanded && isDirectory && children.length === 0) {
-      fetchDirectory(node.path).then(setChildren)
+    if (childEntries && childEntries.length > 0) {
+      setChildren(childEntries)
     }
-  }, [isExpanded, isDirectory, node.path, children.length])
+  }, [childEntries])
 
   const toggleExpand = useCallback(() => {
     if (isDirectory) {
@@ -90,23 +84,8 @@ function TreeItem({
 }
 
 export function FileTree({ workspacePath }: FileTreeProps) {
-  const [entries, setEntries] = useState<TreeNode[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: entries = [], isLoading, refetch, isFetching } = useDirectoryEntries(workspacePath)
   const { addTab, open: openDiffPanel } = useDiffPanel()
-
-  const loadDirectory = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await fetchDirectory(workspacePath)
-      setEntries(data)
-    } catch {
-      setError("Failed to load directory")
-    } finally {
-      setLoading(false)
-    }
-  }, [workspacePath])
 
   const handleFileSelect = useCallback((filePath: string) => {
     const fileName = filePath.split(/[/\\]/).pop() || filePath
@@ -115,12 +94,8 @@ export function FileTree({ workspacePath }: FileTreeProps) {
       type: "file",
       filePath,
     })
-    openDiffPanel() // Open diff panel to show the file
+    openDiffPanel()
   }, [addTab, openDiffPanel])
-
-  useEffect(() => {
-    loadDirectory()
-  }, [loadDirectory])
 
   return (
     <div className="flex h-full flex-col">
@@ -129,20 +104,18 @@ export function FileTree({ workspacePath }: FileTreeProps) {
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={loadDirectory}
-          disabled={loading}
+          onClick={() => refetch()}
+          disabled={isFetching}
         >
-          <RefreshCw className={`size-3 ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw className={`size-3 ${isFetching ? "animate-spin" : ""}`} />
           <span className="sr-only">Refresh</span>
         </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-1">
-        {loading && entries.length === 0 ? (
+        {isLoading ? (
           <div className="flex items-center justify-center p-4 text-xs text-muted-foreground">
             Loading...
           </div>
-        ) : error ? (
-          <div className="p-2 text-xs text-destructive">{error}</div>
         ) : entries.length === 0 ? (
           <div className="p-2 text-xs text-muted-foreground">No files found</div>
         ) : (

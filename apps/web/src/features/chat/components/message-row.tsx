@@ -259,7 +259,7 @@ export interface MessageRowProps {
   onAction?: (action: ErrorAction, id: string) => void
 }
 
-function AbortBlock({ message }: { message: AbortMessage }) {
+function AbortBlock({ message: _message }: { message: AbortMessage }) {
   return (
     <div className="flex items-center gap-3 py-3">
       <div className="flex-1 h-px bg-border" />

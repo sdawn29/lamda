@@ -15,8 +15,6 @@ import {
   AlignLeft,
   GitCompare,
   Loader2,
-  Maximize2,
-  Minimize2,
   PackageMinus,
   PackagePlus,
   Plus,
@@ -514,8 +512,6 @@ export const DiffPanel = memo(function DiffPanel({
 }: DiffPanelProps) {
   const {
     close,
-    isFullscreen,
-    setIsFullscreen,
     tabs,
     activeTabId,
     addTab,
@@ -620,30 +616,6 @@ export const DiffPanel = memo(function DiffPanel({
 
         {/* Right side buttons */}
         <div className="flex shrink-0 items-center gap-0.5 border-l px-1">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
-                >
-                  {isFullscreen ? (
-                    <Minimize2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <Maximize2 className="h-3.5 w-3.5" />
-                  )}
-                  <span className="sr-only">
-                    {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-                  </span>
-                </Button>
-              }
-            />
-            <TooltipContent>
-              {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-            </TooltipContent>
-          </Tooltip>
           <Tooltip>
             <TooltipTrigger
               render={
