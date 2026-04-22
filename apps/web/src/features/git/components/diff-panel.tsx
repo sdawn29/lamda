@@ -7,22 +7,8 @@ import {
   memo,
   Suspense,
 } from "react"
-import {
-  AlertCircle,
-  Archive,
-  Check,
-  Columns2,
-  AlignLeft,
-  GitCompare,
-  Loader2,
-  PackageMinus,
-  PackagePlus,
-  Plus,
-  X,
-  ArrowUpDown,
-  FileText,
-  ExternalLink,
-} from "lucide-react"
+import { AlertCircle, Archive, Check, Columns2, AlignLeft, GitCompare, Loader2, PackageMinus, PackagePlus, Plus, X, ArrowUpDown, ExternalLink, } from "lucide-react"
+import { getFileIcon } from "@/shared/ui/file-icon"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import {
@@ -560,7 +546,10 @@ export const DiffPanel = memo(function DiffPanel({
                 {tab.type === "source-control" ? (
                   <GitCompare className="h-3 w-3 shrink-0" />
                 ) : (
-                  <FileText className="h-3 w-3 shrink-0" />
+                  (() => {
+                    const FileIcon = getFileIcon(tab.title)
+                    return <FileIcon className="h-3 w-3 shrink-0" />
+                  })()
                 )}
                 <span className="max-w-30 truncate">{tab.title}</span>
                 {tab.type !== "source-control" && (

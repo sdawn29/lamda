@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect } from "react"
-import { Folder, ChevronRight, ChevronDown, File, RefreshCw } from "lucide-react"
+import { ChevronRight, ChevronDown, Folder, RefreshCw } from "lucide-react"
 import { Button } from "@/shared/ui/button"
+import { getFileIcon, getFileColorClass } from "@/shared/ui/file-icon"
 import { useDiffPanel } from "@/features/git"
 import { useDirectoryEntries } from "../queries"
 import type { DirectoryEntry } from "../queries"
@@ -61,9 +62,13 @@ function TreeItem({
           <span className="size-3 shrink-0" />
         )}
         {isDirectory ? (
-          <Folder className="size-4 shrink-0 text-muted-foreground" />
+          <Folder className="size-4 shrink-0 text-[#1e6ef4]" />
         ) : (
-          <File className="size-4 shrink-0 text-muted-foreground/70" />
+          (() => {
+            const FileIcon = getFileIcon(node.name)
+            const colorClass = getFileColorClass(node.name)
+            return <FileIcon className={`size-4 shrink-0 ${colorClass}`} />
+          })()
         )}
         <span className="truncate">{node.name}</span>
       </button>
