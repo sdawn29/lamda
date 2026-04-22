@@ -25,7 +25,7 @@ export const StashSection = memo(function StashSection({
   const handleDrop = useCallback((ref: string) => drop.mutateAsync(ref), [drop])
 
   return (
-    <div className="border-b border-border/40">
+    <div className="shrink-0 border-b border-border/40">
       <button
         onClick={() => setCollapsed((v) => !v)}
         className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-muted/40"

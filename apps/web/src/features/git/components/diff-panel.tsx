@@ -152,7 +152,7 @@ const SourceControlContent = memo(function SourceControlContent({
   const hasChanges = files.length > 0
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-8 min-w-0 shrink-0 items-center gap-0.5 border-b border-border/50 bg-muted/20 px-2">
         <Tooltip>
           <TooltipTrigger
@@ -295,63 +295,63 @@ const SourceControlContent = memo(function SourceControlContent({
 
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto">
-        {stashInputOpen && (
-          <StashInputBar
-            onConfirm={handleStashConfirm}
-            onCancel={() => setStashInputOpen(false)}
-          />
-        )}
+          {stashInputOpen && (
+            <StashInputBar
+              onConfirm={handleStashConfirm}
+              onCancel={() => setStashInputOpen(false)}
+            />
+          )}
 
-        {loading && files.length === 0 && (
-          <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" />
-            Loading status…
-          </div>
-        )}
-
-        {!loading && error && (
-          <div className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-xs text-destructive">
-            <AlertCircle className="mt-px size-3.5 shrink-0" />
-            <span className="leading-snug">{error}</span>
-          </div>
-        )}
-
-        {!loading && !error && files.length === 0 && (
-          <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-              <GitCompare className="h-4 w-4 text-muted-foreground/50" />
+          {loading && files.length === 0 && (
+            <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              Loading status…
             </div>
-            <p className="text-xs text-muted-foreground/50">No changes</p>
-          </div>
-        )}
+          )}
 
-        {!loading && !error && (staged.length > 0 || unstaged.length > 0) && (
-          <FilesSection
-            label="Staged"
-            files={staged}
-            sessionId={sessionId}
-            mode={mode}
-            onStageToggle={handleStageToggle}
-            onRevert={handleRevert}
-            emptyText="No staged changes"
-          />
-        )}
+          {!loading && error && (
+            <div className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-xs text-destructive">
+              <AlertCircle className="mt-px size-3.5 shrink-0" />
+              <span className="leading-snug">{error}</span>
+            </div>
+          )}
 
-        {!loading && !error && unstaged.length > 0 && (
-          <FilesSection
-            label="Changes"
-            files={unstaged}
-            sessionId={sessionId}
-            mode={mode}
-            onStageToggle={handleStageToggle}
-            onRevert={handleRevert}
-          />
-        )}
+          {!loading && !error && files.length === 0 && (
+            <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                <GitCompare className="h-4 w-4 text-muted-foreground/50" />
+              </div>
+              <p className="text-xs text-muted-foreground/50">No changes</p>
+            </div>
+          )}
+
+          {!loading && !error && (staged.length > 0 || unstaged.length > 0) && (
+            <FilesSection
+              label="Staged"
+              files={staged}
+              sessionId={sessionId}
+              mode={mode}
+              onStageToggle={handleStageToggle}
+              onRevert={handleRevert}
+              emptyText="No staged changes"
+            />
+          )}
+
+          {!loading && !error && unstaged.length > 0 && (
+            <FilesSection
+              label="Changes"
+              files={unstaged}
+              sessionId={sessionId}
+              mode={mode}
+              onStageToggle={handleStageToggle}
+              onRevert={handleRevert}
+            />
+          )}
+        </div>
 
         <StashSection sessionId={sessionId} />
-        </div>
       </div>
-    </>
+    </div>
   )
 })
 
