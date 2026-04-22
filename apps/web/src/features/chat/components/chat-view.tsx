@@ -309,6 +309,13 @@ export function ChatView({
       pinnedRef.current = true
       updateThreadStopped.mutate({ threadId, stopped: false })
       startUserPrompt(text, thinkingLevel)
+      
+      // Scroll immediately when sending
+      const el = scrollContainerRef.current
+      if (el) {
+        el.scrollTop = el.scrollHeight
+      }
+      
       const model = modelId && provider ? { provider, modelId } : undefined
       sendPromptMutation.mutate(
         { text, model, thinkingLevel },
