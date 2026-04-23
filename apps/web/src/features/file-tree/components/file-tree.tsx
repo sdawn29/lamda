@@ -1,7 +1,6 @@
 import { useCallback, useState, useEffect } from "react"
-import { ChevronRight, ChevronDown, Folder, RefreshCw } from "lucide-react"
+import { File, ChevronRight, ChevronDown, Folder, RefreshCw } from "lucide-react"
 import { Button } from "@/shared/ui/button"
-import { getFileIcon, getFileColorClass } from "@/shared/ui/file-icon"
 import { useDiffPanel } from "@/features/git"
 import { useDirectoryEntries } from "../queries"
 import type { DirectoryEntry } from "../queries"
@@ -49,7 +48,7 @@ function TreeItem({
     <div>
       <button
         onClick={toggleExpand}
-        className="flex w-full items-center gap-1 rounded-md px-2 py-0.5 text-sm hover:bg-muted/50"
+        className="flex w-full items-center gap-1 px-2 py-0.5 text-xs"
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
         {isDirectory ? (
@@ -62,13 +61,9 @@ function TreeItem({
           <span className="size-3 shrink-0" />
         )}
         {isDirectory ? (
-          <Folder className="size-4 shrink-0 text-[#1e6ef4]" />
+          <Folder className="size-4 shrink-0" />
         ) : (
-          (() => {
-            const FileIcon = getFileIcon(node.name)
-            const colorClass = getFileColorClass(node.name)
-            return <FileIcon className={`size-4 shrink-0 ${colorClass}`} />
-          })()
+          <File className="size-4 shrink-0" />
         )}
         <span className="truncate">{node.name}</span>
       </button>
@@ -105,7 +100,7 @@ export function FileTree({ workspacePath }: FileTreeProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/60 px-2">
-        <span className="text-xs font-medium text-muted-foreground">Files</span>
+        <span className="text-[10px] font-medium text-muted-foreground">FILES</span>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -118,11 +113,11 @@ export function FileTree({ workspacePath }: FileTreeProps) {
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-1">
         {isLoading ? (
-          <div className="flex items-center justify-center p-4 text-xs text-muted-foreground">
+          <div className="flex items-center justify-center p-4 text-[10px] text-muted-foreground">
             Loading...
           </div>
         ) : entries.length === 0 ? (
-          <div className="p-2 text-xs text-muted-foreground">No files found</div>
+          <div className="p-2 text-[10px] text-muted-foreground">No files found</div>
         ) : (
           entries.map((node) => (
             <TreeItem key={node.path} node={node} onSelect={handleFileSelect} />
