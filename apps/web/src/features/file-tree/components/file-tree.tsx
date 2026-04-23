@@ -85,7 +85,7 @@ function TreeItem({
 
 export function FileTree({ workspacePath }: FileTreeProps) {
   const { data: entries = [], isLoading, refetch, isFetching } = useDirectoryEntries(workspacePath)
-  const { addTab, open: openDiffPanel } = useDiffPanel()
+  const { addTab, setActiveTabByFilePath, open: openDiffPanel } = useDiffPanel()
 
   const handleFileSelect = useCallback((filePath: string) => {
     const fileName = filePath.split(/[/\\]/).pop() || filePath
@@ -94,11 +94,13 @@ export function FileTree({ workspacePath }: FileTreeProps) {
       type: "file",
       filePath,
     })
+    // Set the tab as active by file path (this triggers the focus effect)
+    setActiveTabByFilePath(filePath)
     openDiffPanel()
-  }, [addTab, openDiffPanel])
+  }, [addTab, setActiveTabByFilePath, openDiffPanel])
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full w-full flex-col">
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/60 px-2">
         <span className="text-[10px] font-medium text-muted-foreground">FILES</span>
         <Button

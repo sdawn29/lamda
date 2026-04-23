@@ -2,12 +2,13 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   lazy,
   memo,
   Suspense,
 } from "react"
-import { AlertCircle, Archive, Check, Columns2, AlignLeft, GitCompare, Loader2, PackageMinus, PackagePlus, Plus, X, ArrowUpDown, ExternalLink, } from "lucide-react"
+import { AlertCircle, Archive, Check, Columns2, AlignLeft, GitCompare, Loader2, PackageMinus, PackagePlus, Plus, X, ArrowUpDown, ExternalLink, Maximize2, Minimize2, } from "lucide-react"
 import { getFileIcon } from "@/shared/ui/file-icon"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
@@ -498,6 +499,8 @@ export const DiffPanel = memo(function DiffPanel({
 }: DiffPanelProps) {
   const {
     close,
+    toggleFullscreen,
+    isFullscreen,
     tabs,
     activeTabId,
     addTab,
@@ -505,11 +508,21 @@ export const DiffPanel = memo(function DiffPanel({
     setActiveTab,
   } = useDiffPanel()
   const [showAddMenu, setShowAddMenu] = useState(false)
+  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
 
   const activeTab = useMemo(
     () => tabs.find((t) => t.id === activeTabId),
     [tabs, activeTabId]
   )
+
+  // Focus the active tab whenever activeTabId changes
+  useEffect(() => {
+    const tabEl = tabRefs.current.get(activeTabId)
+    if (tabEl) {
+      tabEl.scrollIntoView({ block: "nearest", inline: "nearest" })
+      tabEl.focus()
+    }
+  }, [activeTabId])
 
   const handleAddFileTab = useCallback(() => {
     const filePath = window.prompt("Enter file path to open:")
@@ -525,7 +538,7 @@ export const DiffPanel = memo(function DiffPanel({
   }, [addTab])
 
   return (
-    <div className="flex h-full shrink-0 flex-col border-l border-border/60 bg-background">
+    <div className="flex h-full w-full flex-col bg-background">
       {/* Tab bar */}
       <div className="flex h-8 shrink-0 items-stretch border-b">
         <div className="scrollbar-none flex min-w-0 flex-1 items-stretch overflow-x-auto">
@@ -535,6 +548,13 @@ export const DiffPanel = memo(function DiffPanel({
               <button
                 key={tab.id}
                 type="button"
+                ref={(el) => {
+                  if (el) {
+                    tabRefs.current.set(tab.id, el)
+                  } else {
+                    tabRefs.current.delete(tab.id)
+                  }
+                }}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
                   "group relative flex shrink-0 items-center gap-1.5 border-r px-3 text-xs transition-colors",
@@ -583,19 +603,11 @@ export const DiffPanel = memo(function DiffPanel({
 
           {/* Add tab dropdown */}
           <DropdownMenu open={showAddMenu} onOpenChange={setShowAddMenu}>
-            <DropdownMenuTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label="Add new tab"
-                  className="flex items-center px-2 text-muted-foreground hover:text-foreground"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              }
-            />
+            <DropdownMenuTrigger className="flex items-center px-2 text-muted-foreground hover:text-foreground">
+              <Plus className="h-3.5 w-3.5" />
+            </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-44">
-              <DropdownMenuItem onClick={handleAddFileTab}>
+              <DropdownMenuItem onSelect={handleAddFileTab}>
                 <ExternalLink className="mr-2 h-4 w-4" />
                 Open File
               </DropdownMenuItem>
@@ -605,6 +617,26 @@ export const DiffPanel = memo(function DiffPanel({
 
         {/* Right side buttons */}
         <div className="flex shrink-0 items-center gap-0.5 border-l px-1">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggleFullscreen}
+                  className="h-7 w-7 text-muted-foreground/60 hover:text-foreground"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                  <span className="sr-only">{isFullscreen ? "Exit fullscreen" : "Fullscreen"}</span>
+                </Button>
+              }
+            />
+            <TooltipContent>{isFullscreen ? "Exit fullscreen" : "Fullscreen"}</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger
               render={

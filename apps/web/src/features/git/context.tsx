@@ -19,11 +19,14 @@ interface DiffPanelContextValue {
   toggle: () => void
   open: () => void
   close: () => void
+  isFullscreen: boolean
+  toggleFullscreen: () => void
   tabs: DiffPanelTab[]
   activeTabId: string | null
   addTab: (tab: Omit<DiffPanelTab, "id">) => void
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
+  setActiveTabByFilePath: (filePath: string) => void
   renameTab: (id: string, title: string) => void
   currentWorkspacePath: string | null
   setCurrentWorkspace: (path: string | null) => void
@@ -39,19 +42,29 @@ const DiffPanelContext = createContext<DiffPanelContextValue | null>(null)
 
 export function DiffPanelProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [tabs, setTabs] = useState<DiffPanelTab[]>([SOURCE_CONTROL_TAB])
   const [activeTabId, setActiveTabId] = useState<string | null>("tab-source-control")
   const [currentWorkspacePath, setCurrentWorkspacePath] = useState<string | null>(null)
   // Store file tabs per workspace
   const [workspaceTabs, setWorkspaceTabsState] = useState<Record<string, DiffPanelTab[]>>({})
 
-  const toggle = useCallback(() => setIsOpen((v) => !v), [])
+  const toggle = useCallback(
+    () =>
+      setIsOpen((v) => {
+        if (v) setIsFullscreen(false)
+        return !v
+      }),
+    []
+  )
   const open = useCallback(() => {
     setIsOpen(true)
   }, [])
   const close = useCallback(() => {
     setIsOpen(false)
+    setIsFullscreen(false)
   }, [])
+  const toggleFullscreen = useCallback(() => setIsFullscreen((v) => !v), [])
 
   const addTab = useCallback((tab: Omit<DiffPanelTab, "id">) => {
     // Prevent duplicate Source Control tabs
@@ -59,19 +72,20 @@ export function DiffPanelProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    // Check if file already exists in tabs
     setTabs((prev) => {
-      if (tab.filePath && prev.some((t) => t.filePath === tab.filePath)) {
-        // File already open, just switch to it
+      // Check if file already exists in tabs
+      if (tab.filePath) {
         const existingTab = prev.find((t) => t.filePath === tab.filePath)
         if (existingTab) {
+          // File already open, just switch to it
           setActiveTabId(existingTab.id)
+          return prev
         }
-        return prev
       }
 
       const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       const newTabs = [...prev, { ...tab, id }]
+      setActiveTabId(id)
 
       // Save to workspace tabs if we have a current workspace
       if (currentWorkspacePath) {
@@ -83,19 +97,6 @@ export function DiffPanelProvider({ children }: { children: ReactNode }) {
       }
 
       return newTabs
-    })
-    // Also update active tab after checking for duplicates
-    setTabs((prev) => {
-      if (tab.filePath) {
-        const existingTab = prev.find((t) => t.filePath === tab.filePath)
-        if (existingTab) {
-          setActiveTabId(existingTab.id)
-          return prev
-        }
-      }
-      const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-      setActiveTabId(id)
-      return [...prev, { ...tab, id }]
     })
   }, [currentWorkspacePath])
 
@@ -131,6 +132,16 @@ export function DiffPanelProvider({ children }: { children: ReactNode }) {
   }, [activeTabId, currentWorkspacePath])
 
   const setActiveTab = useCallback((id: string) => setActiveTabId(id), [])
+
+  const setActiveTabByFilePath = useCallback((filePath: string) => {
+    setTabs((prev) => {
+      const tab = prev.find((t) => t.filePath === filePath)
+      if (tab) {
+        setActiveTabId(tab.id)
+      }
+      return prev
+    })
+  }, [])
 
   const renameTab = useCallback((id: string, title: string) => {
     setTabs((prev) =>
@@ -177,11 +188,14 @@ export function DiffPanelProvider({ children }: { children: ReactNode }) {
       toggle,
       open,
       close,
+      isFullscreen,
+      toggleFullscreen,
       tabs,
       activeTabId,
       addTab,
       closeTab,
       setActiveTab,
+      setActiveTabByFilePath,
       renameTab,
       currentWorkspacePath,
       setCurrentWorkspace,
@@ -191,11 +205,14 @@ export function DiffPanelProvider({ children }: { children: ReactNode }) {
       toggle,
       open,
       close,
+      isFullscreen,
+      toggleFullscreen,
       tabs,
       activeTabId,
       addTab,
       closeTab,
       setActiveTab,
+      setActiveTabByFilePath,
       renameTab,
       currentWorkspacePath,
       setCurrentWorkspace,
