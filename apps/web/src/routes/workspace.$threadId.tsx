@@ -42,7 +42,7 @@ function WorkspaceThreadRoute() {
   const { threadId } = Route.useParams()
   const { workspaces, isLoading } = useWorkspace()
   const navigate = useNavigate()
-  const { isOpen: diffOpen, isFullscreen: diffFullscreen } = useDiffPanel()
+  const { isOpen: diffOpen, isFullscreen: diffFullscreen, setCurrentWorkspace } = useDiffPanel()
   const { isOpen: terminalOpen } = useTerminal()
   const { isOpen: fileTreeOpen } = useFileTree()
   const updateSetting = useUpdateAppSetting()
@@ -54,6 +54,15 @@ function WorkspaceThreadRoute() {
     ws.threads.some((t) => t.id === threadId)
   )
   const foundThread = foundWorkspace?.threads.find((t) => t.id === threadId)
+
+  // Set workspace path in diff panel context for breadcrumb navigation
+  useEffect(() => {
+    if (foundWorkspace?.path) {
+      setCurrentWorkspace(foundWorkspace.path)
+    }
+    return () => setCurrentWorkspace(null)
+  }, [foundWorkspace?.path, setCurrentWorkspace])
+
 
   useEffect(() => {
     updateSetting.mutate({

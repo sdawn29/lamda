@@ -347,9 +347,11 @@ const SourceControlContent = memo(function SourceControlContent({
 const FileContent = memo(function FileContent({
   filePath,
   openWithAppId,
+  workspacePath,
 }: {
   filePath: string
   openWithAppId?: string | null
+  workspacePath?: string
 }) {
   const [content, setContent] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -358,7 +360,13 @@ const FileContent = memo(function FileContent({
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
-  const pathParts = filePath.split(/[/\\]/)
+  // Extract relative path from workspace
+  const relativePath = workspacePath
+    ? filePath.startsWith(workspacePath)
+      ? filePath.slice(workspacePath.length).replace(/^[\/\\]+/, "")
+      : filePath
+    : filePath
+  const pathParts = relativePath.split(/[/\\]/).filter(Boolean)
   const fileName = pathParts[pathParts.length - 1] ?? ""
   const fileExtension = fileName.split(".").pop()?.toLowerCase() ?? ""
   const isMarkdown = fileExtension === "md" || fileExtension === "markdown"
@@ -498,16 +506,18 @@ function TabContent({
   tab,
   sessionId,
   openWithAppId,
+  workspacePath,
 }: {
   tab: DiffPanelTab
   sessionId: string
   openWithAppId?: string | null
+  workspacePath?: string
 }) {
   if (tab.type === "source-control") {
     return <SourceControlContent sessionId={sessionId} />
   }
   if (tab.type === "file" && tab.filePath) {
-    return <FileContent filePath={tab.filePath} openWithAppId={openWithAppId} />
+    return <FileContent filePath={tab.filePath} openWithAppId={openWithAppId} workspacePath={workspacePath} />
   }
   return (
     <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
@@ -528,9 +538,12 @@ export const DiffPanel = memo(function DiffPanel({
     isFullscreen,
     tabs,
     activeTabId,
+    pendingTabId,
     addTab,
     closeTab,
     setActiveTab,
+    clearPendingTab,
+    currentWorkspacePath,
   } = useDiffPanel()
   const [showAddMenu, setShowAddMenu] = useState(false)
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
@@ -543,13 +556,18 @@ export const DiffPanel = memo(function DiffPanel({
   // Focus the active tab whenever activeTabId changes
   useEffect(() => {
     if (activeTabId) {
+      // Focus the newly added or active tab
       const tabEl = tabRefs.current.get(activeTabId)
       if (tabEl) {
         tabEl.scrollIntoView({ block: "nearest", inline: "nearest" })
         tabEl.focus()
       }
+      // Clear pending tab after focus
+      if (pendingTabId === activeTabId) {
+        clearPendingTab()
+      }
     }
-  }, [activeTabId])
+  }, [activeTabId, pendingTabId, clearPendingTab])
 
   const handleAddFileTab = useCallback(() => {
     const filePath = window.prompt("Enter file path to open:")
@@ -686,7 +704,7 @@ export const DiffPanel = memo(function DiffPanel({
       {/* Tab content */}
       <div className="min-h-0 flex-1 overflow-hidden">
         {activeTab ? (
-          <TabContent tab={activeTab} sessionId={sessionId} openWithAppId={openWithAppId} />
+          <TabContent tab={activeTab} sessionId={sessionId} openWithAppId={openWithAppId} workspacePath={currentWorkspacePath ?? undefined} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
