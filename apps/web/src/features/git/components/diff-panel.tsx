@@ -373,10 +373,8 @@ const FileContent = memo(function FileContent({
 
   // Enable rich text preview by default for markdown files
   useEffect(() => {
-    if (isMarkdown) {
-      setMarkdownPreview(true)
-    }
-  }, [isMarkdown])
+    setMarkdownPreview(isMarkdown)
+  }, [isMarkdown, filePath])
   const languageMap: Record<string, string> = {
     ts: "typescript",
     tsx: "tsx",
