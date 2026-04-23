@@ -8,7 +8,7 @@ import {
   memo,
   Suspense,
 } from "react"
-import { AlertCircle, Archive, Check, Columns2, AlignLeft, GitCompare, Loader2, PackageMinus, PackagePlus, Plus, X, ArrowUpDown, ExternalLink, Maximize2, Minimize2, } from "lucide-react"
+import { AlertCircle, Archive, Check, Columns2, AlignLeft, GitCompare, Loader2, PackageMinus, PackagePlus, Plus, X, ArrowUpDown, ExternalLink, Maximize2, Minimize2 } from "lucide-react"
 import { getFileIcon } from "@/shared/ui/file-icon"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
@@ -37,6 +37,8 @@ import { cn } from "@/shared/lib/utils"
 import { useTheme } from "@/shared/components/theme-provider"
 import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 import { getServerUrl } from "@/shared/lib/client"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 const PrismCode = lazy(() =>
   import("@/features/chat/components/prism-code").then((m) => ({
@@ -352,12 +354,21 @@ const FileContent = memo(function FileContent({
   const [content, setContent] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [markdownPreview, setMarkdownPreview] = useState(false)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
   const pathParts = filePath.split(/[/\\]/)
   const fileName = pathParts[pathParts.length - 1] ?? ""
   const fileExtension = fileName.split(".").pop()?.toLowerCase() ?? ""
+  const isMarkdown = fileExtension === "md" || fileExtension === "markdown"
+
+  // Enable rich text preview by default for markdown files
+  useEffect(() => {
+    if (isMarkdown) {
+      setMarkdownPreview(true)
+    }
+  }, [isMarkdown])
   const languageMap: Record<string, string> = {
     ts: "typescript",
     tsx: "tsx",
@@ -440,28 +451,42 @@ const FileContent = memo(function FileContent({
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border/50">
-        <FileHeader pathParts={pathParts} filePath={filePath} openWithAppId={openWithAppId} />
+        <FileHeader
+          pathParts={pathParts}
+          filePath={filePath}
+          openWithAppId={openWithAppId}
+          isMarkdown={isMarkdown}
+          markdownPreview={markdownPreview}
+          onToggleMarkdownPreview={isMarkdown ? () => setMarkdownPreview(!markdownPreview) : undefined}
+        />
       </div>
       <div
-        className="file-viewer-code min-h-0 flex-1 overflow-auto"
-        style={{ userSelect: "text" }}
+        className={cn(
+          "min-h-0 flex-1 overflow-auto",
+          markdownPreview ? "prose prose-sm max-w-none p-4 dark:prose-invert" : "file-viewer-code"
+        )}
+        style={markdownPreview ? undefined : { userSelect: "text" }}
       >
-        <Suspense
-          fallback={
-            <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
-              <Loader2 className="size-3 animate-spin" />
-              Loading…
-            </div>
-          }
-        >
-          <PrismCode
-            code={content ?? ""}
-            language={language}
-            style={isDark ? jellybeansdark : jellybeanslight}
-            showLineNumbers
-            fontSize="0.75rem"
-          />
-        </Suspense>
+        {markdownPreview ? (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content ?? ""}</ReactMarkdown>
+        ) : (
+          <Suspense
+            fallback={
+              <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
+                <Loader2 className="size-3 animate-spin" />
+                Loading…
+              </div>
+            }
+          >
+            <PrismCode
+              code={content ?? ""}
+              language={language}
+              style={isDark ? jellybeansdark : jellybeanslight}
+              showLineNumbers
+              fontSize="0.75rem"
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   )
@@ -517,10 +542,12 @@ export const DiffPanel = memo(function DiffPanel({
 
   // Focus the active tab whenever activeTabId changes
   useEffect(() => {
-    const tabEl = tabRefs.current.get(activeTabId)
-    if (tabEl) {
-      tabEl.scrollIntoView({ block: "nearest", inline: "nearest" })
-      tabEl.focus()
+    if (activeTabId) {
+      const tabEl = tabRefs.current.get(activeTabId)
+      if (tabEl) {
+        tabEl.scrollIntoView({ block: "nearest", inline: "nearest" })
+        tabEl.focus()
+      }
     }
   }, [activeTabId])
 

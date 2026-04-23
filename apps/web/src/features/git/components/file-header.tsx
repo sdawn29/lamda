@@ -1,7 +1,7 @@
 // ─── File Header ───────────────────────────────────────────────────────────────
 
 import { useCallback } from "react"
-import { ExternalLink } from "lucide-react"
+import { ExternalLink, FileText } from "lucide-react"
 import { openFileWithApp } from "@/features/electron/api"
 import { Button } from "@/shared/ui/button"
 
@@ -9,9 +9,19 @@ interface FileHeaderProps {
   pathParts: string[]
   filePath: string
   openWithAppId?: string | null
+  isMarkdown?: boolean
+  markdownPreview?: boolean
+  onToggleMarkdownPreview?: () => void
 }
 
-export function FileHeader({ pathParts, filePath, openWithAppId }: FileHeaderProps) {
+export function FileHeader({
+  pathParts,
+  filePath,
+  openWithAppId,
+  isMarkdown,
+  markdownPreview,
+  onToggleMarkdownPreview,
+}: FileHeaderProps) {
   const handleOpenClick = useCallback(() => {
     // Open with the selected editor (or default if none selected)
     openFileWithApp(filePath, openWithAppId ?? undefined)
@@ -36,15 +46,26 @@ export function FileHeader({ pathParts, filePath, openWithAppId }: FileHeaderPro
         ))}
       </div>
 
+      {isMarkdown && onToggleMarkdownPreview && (
+        <Button
+          variant={markdownPreview ? "secondary" : "outline"}
+          size="icon"
+          onClick={onToggleMarkdownPreview}
+          className="h-6 gap-1 text-[10px]"
+          title={markdownPreview ? "Show raw markdown" : "Preview markdown"}
+        >
+          <FileText data-icon="inline-start" />
+        </Button>
+      )}
+
       <Button
         variant="outline"
-        size="sm"
+        size="icon"
         onClick={handleOpenClick}
         className="h-6 gap-1 text-[10px]"
         title="Open in editor"
       >
         <ExternalLink data-icon="inline-start" />
-        Open
       </Button>
     </div>
   )
