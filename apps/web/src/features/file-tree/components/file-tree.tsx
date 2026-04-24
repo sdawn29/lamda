@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect } from "react"
 import { File, ChevronRight, ChevronDown, Folder, RefreshCw } from "lucide-react"
 import { Button } from "@/shared/ui/button"
+import { Skeleton } from "@/shared/ui/skeleton"
 import { useDiffPanel } from "@/features/git"
 import { useDirectoryEntries } from "../queries"
 import type { DirectoryEntry } from "../queries"
@@ -83,6 +84,39 @@ function TreeItem({
   )
 }
 
+const SKELETON_ROWS = [
+  { indent: 0, width: "w-24", isDir: true },
+  { indent: 1, width: "w-20" },
+  { indent: 1, width: "w-28" },
+  { indent: 1, width: "w-16" },
+  { indent: 0, width: "w-20", isDir: true },
+  { indent: 1, width: "w-24" },
+  { indent: 1, width: "w-32" },
+  { indent: 0, width: "w-16" },
+  { indent: 0, width: "w-28", isDir: true },
+  { indent: 1, width: "w-20" },
+  { indent: 1, width: "w-24" },
+  { indent: 1, width: "w-16" },
+]
+
+function FileTreeSkeleton() {
+  return (
+    <div className="space-y-0.5 p-1 animate-in fade-in duration-200">
+      {SKELETON_ROWS.map((row, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-1 py-0.5"
+          style={{ paddingLeft: `${row.indent * 16 + 8}px` }}
+        >
+          <Skeleton className="size-3 shrink-0 rounded-sm" />
+          <Skeleton className="size-4 shrink-0 rounded-sm" />
+          <Skeleton className={`h-2.5 rounded-sm ${row.width}`} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function FileTree({ workspacePath }: FileTreeProps) {
   const { data: entries = [], isLoading, refetch, isFetching } = useDirectoryEntries(workspacePath)
   const diffPanelContext = useDiffPanel()
@@ -119,15 +153,15 @@ export function FileTree({ workspacePath }: FileTreeProps) {
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-1">
         {isLoading ? (
-          <div className="flex items-center justify-center p-4 text-[10px] text-muted-foreground">
-            Loading...
-          </div>
+          <FileTreeSkeleton />
         ) : entries.length === 0 ? (
           <div className="p-2 text-[10px] text-muted-foreground">No files found</div>
         ) : (
-          entries.map((node) => (
-            <TreeItem key={node.path} node={node} onSelect={handleFileSelect} />
-          ))
+          <div className="animate-in fade-in duration-150">
+            {entries.map((node) => (
+              <TreeItem key={node.path} node={node} onSelect={handleFileSelect} />
+            ))}
+          </div>
         )}
       </div>
     </div>

@@ -93,9 +93,7 @@ class WorkspaceIndexer {
       }
     }
 
-    // replaceWorkspaceFiles yields the event loop between chunks so HTTP
-    // requests are serviced while the index is being written
-    await replaceWorkspaceFiles(workspaceId, files);
+    replaceWorkspaceFiles(workspaceId, files);
   }
 
   private scheduleRescan(workspaceId: string, workspacePath: string): void {

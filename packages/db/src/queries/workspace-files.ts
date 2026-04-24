@@ -10,27 +10,17 @@ export interface WorkspaceFileEntry {
 
 const CHUNK_SIZE = 200
 
-function yieldToEventLoop(): Promise<void> {
-  return new Promise((resolve) => setImmediate(resolve))
-}
-
-/**
- * Replaces all file entries for a workspace, yielding the event loop between
- * each chunk so that HTTP requests are not starved while indexing large trees.
- */
-export async function replaceWorkspaceFiles(workspaceId: string, files: WorkspaceFileEntry[]): Promise<void> {
-  // Yield before starting so any queued I/O (e.g. GET /workspace/:id/files) runs first
-  await yieldToEventLoop()
-
-  db.delete(workspaceFiles).where(eq(workspaceFiles.workspaceId, workspaceId)).run()
-
-  for (let i = 0; i < files.length; i += CHUNK_SIZE) {
-    const chunk = files.slice(i, i + CHUNK_SIZE)
-    db.insert(workspaceFiles)
-      .values(chunk.map((f) => ({ workspaceId, relativePath: f.relativePath, name: f.name, isDirectory: f.isDirectory })))
-      .run()
-    await yieldToEventLoop()
-  }
+export function replaceWorkspaceFiles(workspaceId: string, files: WorkspaceFileEntry[]): void {
+  db.transaction(() => {
+    db.delete(workspaceFiles).where(eq(workspaceFiles.workspaceId, workspaceId)).run()
+    for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+      const chunk = files.slice(i, i + CHUNK_SIZE)
+      db.insert(workspaceFiles)
+        .values(chunk.map((f) => ({ workspaceId, relativePath: f.relativePath, name: f.name, isDirectory: f.isDirectory })))
+        .onConflictDoNothing()
+        .run()
+    }
+  })
 }
 
 export function listWorkspaceFileEntries(workspaceId: string): WorkspaceFileEntry[] {
