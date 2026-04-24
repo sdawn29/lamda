@@ -30,8 +30,6 @@ import {
   createBranch,
   initializeGitRepository,
 } from "@/features/chat/api"
-import { workspaceFilesQueryKey } from "@/features/chat/queries"
-
 async function invalidateGitSession(
   queryClient: QueryClient,
   sessionId: string
@@ -39,13 +37,8 @@ async function invalidateGitSession(
   await queryClient.invalidateQueries({ queryKey: gitKeys.session(sessionId) })
 }
 
-async function invalidateWorkspaceFiles(
-  queryClient: QueryClient,
-  sessionId: string
-) {
-  await queryClient.invalidateQueries({
-    queryKey: workspaceFilesQueryKey(sessionId),
-  })
+async function invalidateWorkspaceFiles(queryClient: QueryClient) {
+  await queryClient.invalidateQueries({ queryKey: ["workspace-files"] })
 }
 
 // ── Commit ────────────────────────────────────────────────────────────────────
@@ -56,7 +49,7 @@ export function useGitCommit(sessionId: string) {
     mutationFn: (message: string) => gitCommit(sessionId, message),
     onSuccess: async () => {
       await invalidateGitSession(queryClient, sessionId)
-      await invalidateWorkspaceFiles(queryClient, sessionId)
+      await invalidateWorkspaceFiles(queryClient)
     },
   })
 }
@@ -110,7 +103,7 @@ export function useGitStashMutations(sessionId: string) {
     queryClient.invalidateQueries({ queryKey: gitStashListKey(sessionId) })
   const invalidateWorkingTree = async () => {
     await invalidateStatus()
-    await invalidateWorkspaceFiles(queryClient, sessionId)
+    await invalidateWorkspaceFiles(queryClient)
   }
 
   return {
@@ -142,7 +135,7 @@ export function useGitRevertFile(sessionId: string) {
       gitRevertFile(sessionId, filePath, raw),
     onSuccess: async () => {
       await invalidateGitSession(queryClient, sessionId)
-      await invalidateWorkspaceFiles(queryClient, sessionId)
+      await invalidateWorkspaceFiles(queryClient)
     },
   })
 }
@@ -163,7 +156,7 @@ export function useCheckoutBranch(sessionId: string) {
     mutationFn: (branch: string) => checkoutBranch(sessionId, branch),
     onSuccess: async () => {
       await invalidateGitSession(queryClient, sessionId)
-      await invalidateWorkspaceFiles(queryClient, sessionId)
+      await invalidateWorkspaceFiles(queryClient)
     },
   })
 }

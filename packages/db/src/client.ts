@@ -104,8 +104,17 @@ function createDb() {
       created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS workspace_files (
+      workspace_id   TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      relative_path  TEXT NOT NULL,
+      name           TEXT NOT NULL,
+      is_directory   INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (workspace_id, relative_path)
+    );
+
     CREATE UNIQUE INDEX IF NOT EXISTS workspaces_path_unique ON workspaces(path);
     CREATE INDEX IF NOT EXISTS message_blocks_thread_idx ON message_blocks(thread_id, block_index);
+    CREATE INDEX IF NOT EXISTS workspace_files_workspace_idx ON workspace_files(workspace_id);
   `);
 
   // Migration: Update message_blocks CHECK constraint to include 'abort' role

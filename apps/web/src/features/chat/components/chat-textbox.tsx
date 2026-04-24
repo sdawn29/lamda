@@ -12,11 +12,11 @@ import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import {
   useModels,
-  useWorkspaceFiles,
   useSlashCommands,
   useContextUsage,
   type WorkspaceEntry,
 } from "../queries"
+import { useWorkspaceIndex } from "@/features/workspace/queries"
 import { BranchSelector } from "@/features/git"
 import { ModelCombobox } from "./model-combobox"
 import { ThinkingCombobox, type ThinkingLevel } from "./thinking-combobox"
@@ -49,6 +49,7 @@ interface ChatTextboxProps {
   onBranchSelect?: (branch: string) => void
   onBranchError?: (message: string) => void
   sessionId?: string
+  workspaceId?: string
   selectedModelId?: string | null
   onModelChange?: (modelId: string) => void
   sessionStats?: SessionStats | null
@@ -67,6 +68,7 @@ export const ChatTextbox = memo(
       onBranchSelect,
       onBranchError,
       sessionId,
+      workspaceId,
       selectedModelId: controlledModelId,
       onModelChange,
       sessionStats,
@@ -133,10 +135,17 @@ export const ChatTextbox = memo(
     const fileMentionOpen = atMention !== null
     const slashCommandOpen = slashMention !== null
 
-    const { data: fileData, isLoading: filesLoading } = useWorkspaceFiles(
-      sessionId,
+    const { data: indexedFiles, isLoading: filesLoading } = useWorkspaceIndex(
+      workspaceId,
       fileMentionOpen
     )
+    const fileData = React.useMemo((): WorkspaceEntry[] => {
+      if (!indexedFiles) return []
+      return indexedFiles.map((f) => ({
+        path: f.relativePath,
+        type: f.isDirectory ? "dir" : "file",
+      }))
+    }, [indexedFiles])
     const {
       data: commandsData,
       isLoading: commandsLoading,

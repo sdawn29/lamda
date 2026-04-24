@@ -483,6 +483,7 @@ export function ChatView({
             onBranchSelect={handleBranchSelect}
             onBranchError={handleGitError}
             sessionId={sessionId}
+            workspaceId={workspaceId}
             selectedModelId={selectedModelId}
             onModelChange={handleModelChange}
             sessionStats={sessionStats}

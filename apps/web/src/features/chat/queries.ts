@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   listMessages,
   fetchModels,
-  listWorkspaceFiles,
   fetchSlashCommands,
   fetchContextUsage,
   fetchThinkingLevels,
@@ -23,8 +22,6 @@ export const chatKeys = {
   messages: (sessionId: string) =>
     [...chatSessionKey(sessionId), "messages"] as const,
   models: [...chatRootKey, "models"] as const,
-  workspaceFiles: (sessionId: string) =>
-    [...chatSessionKey(sessionId), "workspace-files"] as const,
   commands: (sessionId: string) =>
     [...chatSessionKey(sessionId), "commands"] as const,
   contextUsage: (sessionId: string) =>
@@ -94,25 +91,6 @@ export function useModels() {
     queryFn: ({ signal }) => fetchModels(signal),
     staleTime: 5 * 60 * 1000,
     retry: false,
-  })
-}
-
-// ── Workspace files ─────────────────────────────────────────────────────────
-
-export const workspaceFilesQueryKey = (sessionId: string) =>
-  chatKeys.workspaceFiles(sessionId)
-
-export function useWorkspaceFiles(
-  sessionId: string | undefined,
-  enabled = true
-) {
-  return useQuery({
-    queryKey: sessionId ? workspaceFilesQueryKey(sessionId) : chatKeys.all,
-    queryFn: () => listWorkspaceFiles(sessionId!),
-    enabled: enabled && !!sessionId,
-    gcTime: 60 * 1000,
-    staleTime: 30_000,
-    select: (data) => data,
   })
 }
 

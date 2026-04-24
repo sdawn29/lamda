@@ -152,3 +152,19 @@ export function listArchivedThreads(): Promise<{ threads: ArchivedThreadDto[] }>
 export function resetAllData(): Promise<void> {
   return apiFetch<void>("/reset", { method: "DELETE" })
 }
+
+export interface WorkspaceFileEntry {
+  relativePath: string
+  name: string
+  isDirectory: boolean
+}
+
+export function listWorkspaceIndexFiles(
+  workspaceId: string
+): Promise<{ files: WorkspaceFileEntry[] }> {
+  return apiFetch<{ files: WorkspaceFileEntry[] }>(`/workspace/${workspaceId}/files`)
+}
+
+export function triggerWorkspaceReindex(workspaceId: string): Promise<void> {
+  return apiFetch<void>(`/workspace/${workspaceId}/reindex`, { method: "POST" })
+}

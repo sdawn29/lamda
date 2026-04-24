@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useCallback } from "react"
 import { Loader2 } from "lucide-react"
 import {
   CommandDialog,
@@ -10,89 +10,29 @@ import {
   CommandItem,
 } from "@/shared/ui/command"
 import { getFileIcon } from "@/shared/ui/file-icon"
-import { fetchDirectory } from "../queries"
-
-const IGNORED_DIRS = new Set([
-  ".git",
-  "node_modules",
-  "dist",
-  "build",
-  ".next",
-  ".nuxt",
-  ".turbo",
-  ".cache",
-  "coverage",
-  "out",
-  ".svelte-kit",
-])
-
-interface FileEntry {
-  name: string
-  path: string
-  relativePath: string
-}
-
-async function collectFiles(
-  dir: string,
-  rootPath: string,
-  depth = 0,
-  acc: FileEntry[] = []
-): Promise<FileEntry[]> {
-  if (depth > 8 || acc.length >= 3000) return acc
-  const entries = await fetchDirectory(dir)
-  for (const entry of entries) {
-    if (entry.type === "directory") {
-      if (!IGNORED_DIRS.has(entry.name)) {
-        await collectFiles(entry.path, rootPath, depth + 1, acc)
-      }
-    } else {
-      acc.push({
-        name: entry.name,
-        path: entry.path,
-        relativePath: entry.path.slice(rootPath.length).replace(/^[/\\]/, ""),
-      })
-    }
-  }
-  return acc
-}
+import { useWorkspaceIndex } from "@/features/workspace/queries"
 
 interface FileSearchModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  rootPath: string
-  onSelect: (filePath: string) => void
+  workspaceId: string
+  /** Called with the relative path of the selected file (relative to workspace root) */
+  onSelect: (relativePath: string) => void
 }
 
 export function FileSearchModal({
   open,
   onOpenChange,
-  rootPath,
+  workspaceId,
   onSelect,
 }: FileSearchModalProps) {
-  const [files, setFiles] = useState<FileEntry[]>([])
-  const [loading, setLoading] = useState(false)
+  const { data: entries = [], isLoading } = useWorkspaceIndex(workspaceId)
 
-  useEffect(() => {
-    if (!open) return
-    let cancelled = false
-    setLoading(true)
-    setFiles([])
-
-    collectFiles(rootPath, rootPath).then((result) => {
-      if (!cancelled) {
-        setFiles(result)
-        setLoading(false)
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [open, rootPath])
+  const files = entries.filter((e) => !e.isDirectory)
 
   const handleSelect = useCallback(
-    (file: FileEntry) => {
-      onSelect(file.path)
+    (relativePath: string) => {
+      onSelect(relativePath)
       onOpenChange(false)
     },
     [onSelect, onOpenChange]
@@ -109,14 +49,14 @@ export function FileSearchModal({
       <Command shouldFilter>
         <CommandInput placeholder="Search files…" autoFocus />
         <CommandList className="max-h-96">
-          {loading && (
+          {isLoading && (
             <div className="flex items-center gap-2 px-3 py-6 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
               Indexing workspace…
             </div>
           )}
-          {!loading && <CommandEmpty>No files found.</CommandEmpty>}
-          {!loading && files.length > 0 && (
+          {!isLoading && <CommandEmpty>No files found.</CommandEmpty>}
+          {!isLoading && files.length > 0 && (
             <CommandGroup>
               {files.map((file) => {
                 const FileIcon = getFileIcon(file.name)
@@ -126,10 +66,9 @@ export function FileSearchModal({
                   .join("/")
                 return (
                   <CommandItem
-                    key={file.path}
+                    key={file.relativePath}
                     value={file.relativePath}
-                    onSelect={() => handleSelect(file)}
-                    className=""
+                    onSelect={() => handleSelect(file.relativePath)}
                   >
                     <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">

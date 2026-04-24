@@ -1,6 +1,7 @@
 import { createManagedSession, openManagedSession } from "@lamda/pi-sdk";
 import { listWorkspacesWithThreads } from "@lamda/db";
 import { store } from "./store.js";
+import { workspaceIndexer } from "./services/workspace-indexer.js";
 
 /**
  * Recreate Pi sessions for every persisted thread on server startup.
@@ -32,5 +33,12 @@ export async function bootstrapSessions(): Promise<void> {
   const failed = results.filter((r) => r.status === "rejected").length;
   if (total > 0) {
     console.error(`[bootstrap] restored ${total - failed}/${total} sessions`);
+  }
+
+  // Start file indexing for all workspaces (non-blocking)
+  for (const ws of workspaceList) {
+    workspaceIndexer.startIndexing(ws.id, ws.path).catch((err) =>
+      console.error(`[bootstrap] indexing failed for workspace ${ws.id}:`, err)
+    );
   }
 }

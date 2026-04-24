@@ -8,10 +8,12 @@ import {
   deleteWorkspace,
   deleteAllWorkspaces,
   updateWorkspaceOpenWithApp,
+  listWorkspaceFileEntries,
 } from "@lamda/db";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { createSessionForThread } from "../services/session-service.js";
+import { workspaceIndexer } from "../services/workspace-indexer.js";
 
 const workspaces = new Hono();
 
@@ -71,6 +73,10 @@ workspaces.post("/workspace", async (c) => {
     model: body.model,
   });
 
+  workspaceIndexer.startIndexing(workspaceId, body.path).catch((err) =>
+    console.error("[workspace-indexer] failed to start indexing:", err)
+  );
+
   return c.json(
     {
       workspace: {
@@ -108,8 +114,27 @@ workspaces.delete("/reset", async (_c) => {
   return new Response(null, { status: 204 });
 });
 
+workspaces.get("/workspace/:id/files", (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  const files = listWorkspaceFileEntries(workspaceId);
+  return c.json({ files });
+});
+
+workspaces.post("/workspace/:id/reindex", async (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  workspaceIndexer.reindex(workspaceId).catch((err) =>
+    console.error("[workspace-indexer] reindex failed:", err)
+  );
+  return c.json({ ok: true });
+});
+
 workspaces.delete("/workspace/:id", async (c) => {
   const workspaceId = c.req.param("id");
+  workspaceIndexer.stopIndexing(workspaceId);
   const ws = listWorkspacesWithThreads().find((w) => w.id === workspaceId);
   if (ws) {
     for (const thread of ws.threads) {

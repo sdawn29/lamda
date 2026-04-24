@@ -20,6 +20,7 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { FileSearchModal } from "@/features/file-tree"
 import { useDiffPanel, type DiffPanelTab } from "../context"
+import { useWorkspace } from "@/features/workspace"
 import { useGitStatus } from "../queries"
 import {
   useGitStage,
@@ -544,6 +545,8 @@ export const DiffPanel = memo(function DiffPanel({
     clearPendingTab,
     currentWorkspacePath,
   } = useDiffPanel()
+  const { workspaces } = useWorkspace()
+  const currentWorkspaceId = workspaces.find((ws) => ws.path === currentWorkspacePath)?.id
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [fileSearchOpen, setFileSearchOpen] = useState(false)
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
@@ -574,18 +577,21 @@ export const DiffPanel = memo(function DiffPanel({
     setFileSearchOpen(true)
   }, [])
 
-  const handleFileSelect = useCallback((filePath: string) => {
-    const fileName = filePath.split(/[/\\]/).pop() || filePath
+  const handleFileSelect = useCallback((relativePath: string) => {
+    const filePath = currentWorkspacePath
+      ? `${currentWorkspacePath}/${relativePath}`
+      : relativePath
+    const fileName = relativePath.split(/[/\\]/).pop() || relativePath
     addTab({ title: fileName, type: "file", filePath })
-  }, [addTab])
+  }, [addTab, currentWorkspacePath])
 
   return (
     <>
-    {currentWorkspacePath && (
+    {currentWorkspaceId && (
       <FileSearchModal
         open={fileSearchOpen}
         onOpenChange={setFileSearchOpen}
-        rootPath={currentWorkspacePath}
+        workspaceId={currentWorkspaceId}
         onSelect={handleFileSelect}
       />
     )}

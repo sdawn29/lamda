@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"
+import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core"
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
@@ -55,6 +55,19 @@ export const messageBlocks = sqliteTable("message_blocks", {
   toolStartTime: integer("tool_start_time"),
   createdAt: integer("created_at").notNull(),
 })
+
+export const workspaceFiles = sqliteTable(
+  "workspace_files",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    relativePath: text("relative_path").notNull(),
+    name: text("name").notNull(),
+    isDirectory: integer("is_directory", { mode: "boolean" }).notNull().default(false),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.relativePath] })]
+)
 
 /**
  * @deprecated Legacy messages table - kept for migration reference
