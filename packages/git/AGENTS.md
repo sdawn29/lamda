@@ -1,6 +1,6 @@
 # AGENTS.md — git
 
-> Auto-generated context for coding agents. Last updated: 2026-04-23
+> Auto-generated context for coding agents. Last updated: 2026-04-26
 
 ## Purpose
 
@@ -8,9 +8,9 @@ Git operations utility — provides async functions for detecting git repositori
 
 ## Quick Reference
 
-| Action    | Command                             |
-| --------- | ---------------------------------- |
-| Typecheck | `npm run check-types -w @lamda/git |
+| Action    | Command                                |
+| --------- | -------------------------------------- |
+| Typecheck | `npm run check-types -w @lamda/git` |
 
 ## Architecture
 

@@ -1,6 +1,6 @@
 # AGENTS.md — lamda (root)
 
-> Auto-generated context for coding agents. Last updated: 2026-04-25
+> Auto-generated context for coding agents. Last updated: 2026-04-26
 
 ## Purpose
 
