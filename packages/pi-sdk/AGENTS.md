@@ -1,6 +1,6 @@
 # AGENTS.md — pi-sdk
 
-> Auto-generated context for coding agents. Last updated: 2026-04-26
+> Auto-generated context for coding agents. Last updated: 2026-04-27
 
 ## Purpose
 
@@ -108,11 +108,11 @@ Priority order for API key:
 
 ## Dependencies
 
-- `@mariozechner/pi-coding-agent` (v0.64.0) — Core Pi coding agent SDK
+- `@mariozechner/pi-coding-agent` (v0.70.2) — Core Pi coding agent SDK
 
 ## Gotchas
 
-- **SDK version is pinned** to `0.64.0` — upgrading may break the event type mapping in `stream.ts`
+- **SDK version is pinned** to `0.70.2` — upgrading may break the event type mapping in `stream.ts`
 - **Event generator is long-lived** — it survives across multiple `prompt()` calls; breaking out of the loop unsubscribes and cleans up
 - **Title generation creates a disposable session** — each call to `generateThreadTitle` spins up and tears down its own agent session with `tools: []`
 - **Node.js single-threaded guarantee** — the event queue in `stream.ts` relies on Node.js being single-threaded to avoid races between the subscribe callback and the generator

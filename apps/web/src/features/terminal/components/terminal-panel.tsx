@@ -1,7 +1,7 @@
 import { useEffect, useRef, memo } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
-import { Plus, X, TerminalSquare } from "lucide-react"
+import { Plus, Trash2, X, TerminalSquare } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { useTheme } from "@/shared/components/theme-provider"
 import { useTerminal } from "../context"
@@ -90,9 +90,10 @@ const TerminalInstance = memo(function TerminalInstance({
 
     const term = new Terminal({
       cursorBlink: true,
-      fontSize: 13,
-      fontFamily: '"JetBrains Mono", "Menlo", "Monaco", "Courier New", monospace',
-      scrollback: 500,
+      fontSize: 12,
+      fontFamily:
+        '"JetBrains Mono", "Menlo", "Monaco", "Courier New", monospace',
+      scrollback: 100,
       theme: document.documentElement.classList.contains("dark")
         ? DARK_TERMINAL_THEME
         : LIGHT_TERMINAL_THEME,
@@ -134,7 +135,9 @@ const TerminalInstance = memo(function TerminalInstance({
       fitAddon.fit()
       const dims = fitAddon.proposeDimensions()
       if (dims && ws?.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }))
+        ws.send(
+          JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
+        )
       }
     })
     resizeObserver.observe(container)
@@ -149,7 +152,9 @@ const TerminalInstance = memo(function TerminalInstance({
       ws.onopen = () => {
         const dims = fitAddon.proposeDimensions()
         if (dims) {
-          ws!.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }))
+          ws!.send(
+            JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
+          )
         }
       }
 
@@ -157,7 +162,9 @@ const TerminalInstance = memo(function TerminalInstance({
         if (typeof e.data !== "string") return
         pendingOutput += e.data
         scheduleFlush(
-          pendingOutput.length >= TERMINAL_IMMEDIATE_FLUSH_THRESHOLD ? 0 : undefined
+          pendingOutput.length >= TERMINAL_IMMEDIATE_FLUSH_THRESHOLD
+            ? 0
+            : undefined
         )
       }
 
@@ -197,7 +204,9 @@ const TerminalInstance = memo(function TerminalInstance({
       fit.fit()
       const dims = fit.proposeDimensions()
       if (dims && ws?.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }))
+        ws.send(
+          JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
+        )
       }
       termRef.current?.focus()
     })
@@ -214,10 +223,10 @@ const TerminalInstance = memo(function TerminalInstance({
     <div
       ref={containerRef}
       className={cn(
-        "min-h-0 flex-1 overflow-hidden px-2 py-1",
+        "min-h-0 flex-1 overflow-hidden",
         !isActive && "hidden"
       )}
-      style={{ display: isActive ? undefined : "none" }}
+      style={{ display: isActive ? undefined : "none", height: "100%", overflow: "hidden", padding: "0 8px" }}
     />
   )
 })
@@ -228,16 +237,25 @@ interface TerminalPanelProps {
   cwd: string
 }
 
-export const TerminalPanel = memo(function TerminalPanel({ cwd }: TerminalPanelProps) {
-  const { close, tabs, activeTabId, addTab, closeTab, setActiveTab, renameTab } =
-    useTerminal()
+export const TerminalPanel = memo(function TerminalPanel({
+  cwd,
+}: TerminalPanelProps) {
+  const {
+    tabs,
+    activeTabId,
+    addTab,
+    closeTab,
+    setActiveTab,
+    renameTab,
+    killAll,
+  } = useTerminal()
 
   return (
     <div className="flex h-full shrink-0 flex-col border-t bg-background">
       {/* Tab bar */}
       <div className="flex h-8 shrink-0 items-stretch border-b">
         {/* Scrollable tab list */}
-        <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto scrollbar-none">
+        <div className="scrollbar-none flex min-w-0 flex-1 items-stretch overflow-x-auto">
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId
             return (
@@ -248,7 +266,7 @@ export const TerminalPanel = memo(function TerminalPanel({ cwd }: TerminalPanelP
                 className={cn(
                   "group relative flex shrink-0 items-center gap-1.5 border-r px-3 font-mono text-xs transition-colors",
                   isActive
-                    ? "bg-background text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-primary"
+                    ? "bg-background text-foreground after:absolute after:right-0 after:bottom-0 after:left-0 after:h-px after:bg-primary"
                     : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
@@ -297,11 +315,12 @@ export const TerminalPanel = memo(function TerminalPanel({ cwd }: TerminalPanelP
           <Button
             variant="ghost"
             size="icon-sm"
-            className="h-5 w-5 text-muted-foreground hover:text-foreground"
-            onClick={close}
+            className="h-5 w-5 text-muted-foreground hover:text-destructive"
+            onClick={killAll}
+            title="Kill all terminals"
           >
-            <X className="h-3 w-3" />
-            <span className="sr-only">Close terminal panel</span>
+            <Trash2 className="h-3 w-3" />
+            <span className="sr-only">Kill all terminals</span>
           </Button>
         </div>
       </div>

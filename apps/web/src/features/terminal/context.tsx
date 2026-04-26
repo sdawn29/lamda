@@ -29,6 +29,7 @@ interface TerminalContextValue {
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
   renameTab: (id: string, title: string) => void
+  killAll: () => void
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -91,6 +92,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
+  const killAll = useCallback(() => {
+    tabCounter = 0
+    setTabs([])
+    setIsOpen(false)
+    setActiveTabId(null)
+  }, [])
+
   const value = useMemo(
     () => ({
       isOpen,
@@ -103,8 +111,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       closeTab,
       setActiveTab: setActiveTabId,
       renameTab,
+      killAll,
     }),
-    [isOpen, toggle, open, close, tabs, activeTabId, addTab, closeTab, renameTab]
+    [isOpen, toggle, open, close, tabs, activeTabId, addTab, closeTab, renameTab, killAll]
   )
 
   return <TerminalContext value={value}>{children}</TerminalContext>

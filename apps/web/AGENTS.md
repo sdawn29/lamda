@@ -1,6 +1,6 @@
 # AGENTS.md — web
 
-> Auto-generated context for coding agents. Last updated: 2026-04-26
+> Auto-generated context for coding agents. Last updated: 2026-04-27
 
 ## Purpose
 
@@ -40,6 +40,7 @@ Each feature module follows a consistent structure with `api.ts`, `queries.ts`, 
 - `features/layout/` — Title bar, open-with button
 - `features/electron/` — Electron-specific APIs (server port discovery)
 - `features/file-tree/` — File browser with directory listing via server API
+- `features/file-opening/` — File opening helper with editor discovery and open-with functionality (macOS)
 - `features/chat-v2/` — (scaffold for future work, not currently used)
 
 ### Routes (src/routes/)
