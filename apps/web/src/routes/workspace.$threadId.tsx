@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { lazy, Suspense, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 
 import { ChatView, useSetThreadStatus } from "@/features/chat"
 import { useWorkspace } from "@/features/workspace"
+import { chatKeys } from "@/features/chat/queries"
 import { useDiffPanel } from "@/features/git"
 import { useTerminal } from "@/features/terminal"
 import { useFileTree } from "@/features/file-tree"
@@ -48,6 +50,7 @@ function WorkspaceThreadRoute() {
   const updateSetting = useUpdateAppSetting()
   const updateLastAccessed = useUpdateThreadLastAccessed()
   const setThreadStatus = useSetThreadStatus()
+  const queryClient = useQueryClient()
 
   // Find current workspace
   const foundWorkspace = workspaces.find((ws) =>
@@ -73,6 +76,14 @@ function WorkspaceThreadRoute() {
     setThreadStatus(threadId, "idle")
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId])
+
+  // Refetch messages when switching to a thread
+  // This ensures we get up-to-date results when switching back to a completed thread
+  useEffect(() => {
+    if (foundThread?.sessionId) {
+      queryClient.invalidateQueries({ queryKey: chatKeys.messages(foundThread.sessionId) })
+    }
+  }, [threadId, foundThread?.sessionId, queryClient])
 
   useEffect(() => {
     if (!isLoading && !foundThread) {

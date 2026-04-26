@@ -5,6 +5,8 @@ export type { ThreadStatus } from "./thread-status-context"
 export { useGlobalThreadStatusWatcher } from "./use-global-thread-status-watcher"
 export { ErrorToastProvider, useErrorToast } from "./contexts/error-toast-context"
 export { useApiErrorToasts } from "./hooks/use-api-error-toasts"
+// Queries
+export { chatKeys, messagesQueryKey, type WorkspaceEntry } from "./queries"
 // Core hooks
 export {
   useSessionStream,
