@@ -15,9 +15,9 @@ const TERMINAL_IMMEDIATE_FLUSH_THRESHOLD = 8_192
 const DARK_TERMINAL_THEME = {
   background: "#08090a",
   foreground: "#f7f8f8",
-  cursor: "#0a84ff",
+  cursor: "#5e5ce6",
   cursorAccent: "#08090a",
-  selectionBackground: "#0a84ff40",
+  selectionBackground: "#5e5ce640",
   black: "#1a1b1f",
   red: "#f2555a",
   green: "#4cc38a",
@@ -39,9 +39,9 @@ const DARK_TERMINAL_THEME = {
 const LIGHT_TERMINAL_THEME = {
   background: "#fbfbfc",
   foreground: "#08090a",
-  cursor: "#007aff",
+  cursor: "#5856d6",
   cursorAccent: "#fbfbfc",
-  selectionBackground: "#007aff33",
+  selectionBackground: "#5856d633",
   black: "#08090a",
   red: "#d63638",
   green: "#2e7d4f",

@@ -4,7 +4,7 @@ export { CommitDialog } from "./components/commit-dialog"
 export { BranchSelector } from "./components/branch-selector"
 export { DiffView, detectLanguage } from "./components/diff-view"
 export type { DiffMode } from "./components/diff-view"
-export { useGitDiffStat, useBranch, useBranches, gitStatusKey } from "./queries"
+export { useGitDiffStat, useBranch, useBranches, gitStatusKey, useGitStatus, useGitFileDiff } from "./queries"
 export {
   useCheckoutBranch,
   useCreateBranch,

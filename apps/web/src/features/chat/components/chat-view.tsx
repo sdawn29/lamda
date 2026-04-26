@@ -43,6 +43,7 @@ import { useChatStream } from "../use-chat-stream"
 import { useApiErrorToasts } from "../hooks/use-api-error-toasts"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
 import { useFileChangeInvalidation } from "../hooks/use-file-change-invalidation"
+import { FileChangesCard } from "./file-changes-card"
 
 interface ChatViewProps {
   sessionId: string
@@ -457,6 +458,11 @@ export function ChatView({
               </div>
             )}
           </div>
+
+          {/* File changes card - shown after chat completion */}
+          {!isLoading && chatMessages.length > 0 && (
+            <FileChangesCard sessionId={sessionId} />
+          )}
         </div>
 
         {showScrollButton && (

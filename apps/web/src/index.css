@@ -59,7 +59,7 @@
   --card-foreground: #08090a;
   --popover: #ffffff;
   --popover-foreground: #08090a;
-  --primary: #007aff;
+  --primary: #5856d6;
   --primary-foreground: #ffffff;
   --secondary: #f1f2f5;
   --secondary-foreground: #111216;
@@ -70,8 +70,8 @@
   --destructive: #e5484d;
   --border: #e6e7eb;
   --input: #e6e7eb;
-  --ring: #007aff;
-  --chart-1: #007aff;
+  --ring: #5856d6;
+  --chart-1: #5856d6;
   --chart-2: #26a69a;
   --chart-3: #f2994a;
   --chart-4: #eb5757;
@@ -79,12 +79,12 @@
   --radius: 0.5rem;
   --sidebar: #f6f7f9;
   --sidebar-foreground: #0e0f12;
-  --sidebar-primary: #007aff;
+  --sidebar-primary: #5856d6;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #ebedf1;
   --sidebar-accent-foreground: #1a1b20;
   --sidebar-border: #e3e5e9;
-  --sidebar-ring: #007aff;
+  --sidebar-ring: #5856d6;
 }
 
 /* ── Linear Dark — near-black charcoal with indigo accent ─────────────── */
@@ -95,7 +95,7 @@
   --card-foreground: #f7f8f8;
   --popover: #131417;
   --popover-foreground: #f7f8f8;
-  --primary: #0a84ff;
+  --primary: #5e5ce6;
   --primary-foreground: #ffffff;
   --secondary: #1a1b1f;
   --secondary-foreground: #f7f8f8;
@@ -106,20 +106,20 @@
   --destructive: #f2555a;
   --border: #1f2024;
   --input: #1a1b1f;
-  --ring: #0a84ff;
-  --chart-1: #0a84ff;
+  --ring: #5e5ce6;
+  --chart-1: #5e5ce6;
   --chart-2: #4cc38a;
   --chart-3: #f2994a;
   --chart-4: #f2555a;
   --chart-5: #b794f6;
   --sidebar: #0c0d0f;
   --sidebar-foreground: #d0d6e0;
-  --sidebar-primary: #0a84ff;
+  --sidebar-primary: #5e5ce6;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #161719;
   --sidebar-accent-foreground: #f7f8f8;
   --sidebar-border: #1a1b1f;
-  --sidebar-ring: #0a84ff;
+  --sidebar-ring: #5e5ce6;
 }
 
 /* ── Thinking shimmer animation ────────────────────────────────────────── */
