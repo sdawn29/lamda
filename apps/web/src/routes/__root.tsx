@@ -8,11 +8,7 @@ import { WorkspaceProvider, useWorkspace } from "@/features/workspace"
 import { TerminalProvider } from "@/features/terminal"
 import { DiffPanelProvider } from "@/features/git"
 import { FileTreeProvider } from "@/features/file-tree"
-import {
-  ThreadStatusProvider,
-  useGlobalThreadStatusWatcher,
-  ErrorToastProvider,
-} from "@/features/chat"
+import { useGlobalThreadStatusWatcher } from "@/features/chat"
 import { usePrefetchThreadsMessages } from "@/features/chat/hooks"
 import {
   ServerUnavailable,
@@ -20,12 +16,7 @@ import {
   useElectronUpdateStatus,
   useInstallUpdate,
 } from "@/features/electron"
-import {
-  SettingsModalProvider,
-  SettingsModal,
-  ConfigureProviderProvider,
-  ConfigureProviderModal,
-} from "@/features/settings"
+import { SettingsModal, ConfigureProviderModal } from "@/features/settings"
 import { ErrorBoundary } from "@/shared/components/error-boundary"
 import { Toaster } from "@/shared/ui/sonner"
 
@@ -45,7 +36,6 @@ function RootLayoutInner() {
 
   return (
     <TooltipProvider>
-      <ErrorToastProvider>
       <SidebarProvider className="h-svh flex-col">
         <TitleBar />
         <UpdateBanner />
@@ -56,7 +46,6 @@ function RootLayoutInner() {
           </SidebarInset>
         </div>
       </SidebarProvider>
-      </ErrorToastProvider>
       {/* <TanStackRouterDevtools /> */}
     </TooltipProvider>
   )
@@ -71,23 +60,17 @@ function RootLayoutGate() {
   }
 
   return (
-    <ConfigureProviderProvider>
-      <SettingsModalProvider>
-        <WorkspaceProvider>
-          <ThreadStatusProvider>
-            <TerminalProvider>
-              <DiffPanelProvider>
-                <FileTreeProvider>
-                  <RootLayoutInner />
-                  <SettingsModal />
-                  <ConfigureProviderModal />
-                </FileTreeProvider>
-              </DiffPanelProvider>
-            </TerminalProvider>
-          </ThreadStatusProvider>
-        </WorkspaceProvider>
-      </SettingsModalProvider>
-    </ConfigureProviderProvider>
+    <WorkspaceProvider>
+      <TerminalProvider>
+        <DiffPanelProvider>
+          <FileTreeProvider>
+            <RootLayoutInner />
+            <SettingsModal />
+            <ConfigureProviderModal />
+          </FileTreeProvider>
+        </DiffPanelProvider>
+      </TerminalProvider>
+    </WorkspaceProvider>
   )
 }
 

@@ -15,6 +15,8 @@ import { ThemeProvider } from "./shared/components/theme-provider"
 import { KeyboardShortcutsProvider } from "./shared/components/keyboard-shortcuts-provider"
 import { queryClient } from "./shared/lib/query-client"
 
+import { AppProviders } from "./providers/app-providers"
+
 const router = createRouter({ routeTree, history: createHashHistory() })
 
 // Register the router instance for type safety
@@ -33,7 +35,9 @@ if (!rootElement.innerHTML) {
       <QueryClientProvider client={queryClient}>
         <KeyboardShortcutsProvider>
           <ThemeProvider>
-            <RouterProvider router={router} />
+            <AppProviders>
+              <RouterProvider router={router} />
+            </AppProviders>
           </ThemeProvider>
         </KeyboardShortcutsProvider>
       </QueryClientProvider>

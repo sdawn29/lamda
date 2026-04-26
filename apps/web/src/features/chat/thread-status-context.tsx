@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react"
 
-type ThreadStatus = "running" | "idle" | "completed"
+export type ThreadStatus = "running" | "idle" | "completed"
 
 interface ThreadStatusContextValue {
   getStatus: (threadId: string) => ThreadStatus
