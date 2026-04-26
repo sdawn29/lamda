@@ -55,21 +55,53 @@ export function apiUrl(path: string): string {
   )
 }
 
+// Default request timeout in milliseconds
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
   const base = await getServerUrl()
+  
+  // Create abort controller for timeout
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS)
+  
+  // Merge signals if parent signal provided
+  let signal: AbortSignal | undefined = controller.signal
+  if (init?.signal) {
+    // Combine parent signal with timeout signal
+    // If either aborts, the request should be cancelled
+    signal = anySignal([init.signal, controller.signal])
+    // When parent aborts, clear the timeout to avoid unnecessary abort
+    init.signal.addEventListener("abort", () => clearTimeout(timeoutId), { once: true })
+  }
+
   let res: Response
   try {
-    res = await fetch(`${base}${path}`, init)
+    res = await fetch(`${base}${path}`, { ...init, signal })
   } catch (err) {
+    clearTimeout(timeoutId)
+    // Ignore abort errors - they are expected when canceling requests
+    if (err instanceof Error) {
+      if (err.name === "AbortError") {
+        throw err
+      }
+      // Check if it's a timeout error
+      if (err.message?.includes("abort") || err.message?.includes("timeout")) {
+        throw new Error(`Request timeout (${DEFAULT_REQUEST_TIMEOUT_MS / 1000}s)`)
+      }
+    }
     throw new ServerUnreachableError(
       err instanceof Error
         ? `Server unreachable: ${err.message}`
         : "Server unreachable"
     )
   }
+  
+  clearTimeout(timeoutId)
+  
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
     throw new Error(`API ${res.status}: ${text}`)
@@ -78,4 +110,19 @@ export async function apiFetch<T>(
     return undefined as T
   }
   return res.json() as Promise<T>
+}
+
+/**
+ * Create a signal that aborts when any of the given signals abort.
+ */
+function anySignal(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController()
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason)
+      break
+    }
+    signal.addEventListener("abort", () => controller.abort(signal.reason))
+  }
+  return controller.signal
 }

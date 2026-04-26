@@ -52,13 +52,15 @@ export function useFileChangeInvalidation(sessionId: string | null) {
     if (!sessionId) return
 
     let active = true
+    let es: EventSource | null = null
 
     openSessionEventSource(sessionId)
-      .then((es) => {
+      .then((eventSource) => {
         if (!active) {
-          es.close()
+          eventSource.close()
           return
         }
+        es = eventSource
 
         return subscribeToSessionEvents(es, {
           onToolExecutionEnd: (data) => {
@@ -135,6 +137,7 @@ export function useFileChangeInvalidation(sessionId: string | null) {
 
     return () => {
       active = false
+      es?.close()
     }
   }, [sessionId, queryClient])
 }
