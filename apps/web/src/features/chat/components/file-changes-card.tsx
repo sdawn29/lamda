@@ -10,7 +10,7 @@ import {
   FileIcon,
   type LucideIcon,
 } from "lucide-react"
-import { useGitStatus, useGitDiffStat } from "@/features/git/queries"
+import { useGitStatus, useGitDiffStat, useGitFileDiff, parseDiffCounts } from "@/features/git"
 import { useDiffPanel } from "@/features/git/context"
 import { Button } from "@/shared/ui/button"
 import { parseStatusLine, type ChangedFile, statusLabel } from "@/features/git/components/status-badge"
@@ -31,14 +31,25 @@ const FILE_ICON_MAP: Record<string, LucideIcon> = {
 
 interface FileRowProps {
   file: ChangedFile
+  sessionId: string
   onOpenDiff: (filePath: string) => void
 }
 
-function FileRow({ file, onOpenDiff }: FileRowProps) {
+function FileRow({ file, sessionId, onOpenDiff }: FileRowProps) {
   const FileIconComponent = FILE_ICON_MAP[statusLabel(file)] ?? FileIcon
   const pathParts = file.filePath.split("/")
   const fileName = pathParts[pathParts.length - 1] ?? file.filePath
   const dirPath = pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : null
+
+  // Fetch diff for this file to get line counts
+  const { data: diff, isLoading: diffLoading } = useGitFileDiff(
+    sessionId,
+    file.filePath,
+    file.raw,
+    true
+  )
+
+  const counts = useMemo(() => (diff ? parseDiffCounts(diff) : null), [diff])
 
   return (
     <div
@@ -76,6 +87,20 @@ function FileRow({ file, onOpenDiff }: FileRowProps) {
           </span>
         )}
       </span>
+
+      {/* Per-file line stats */}
+      {diffLoading ? (
+        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/30 shrink-0" />
+      ) : counts && (counts.added > 0 || counts.removed > 0) ? (
+        <span className="flex shrink-0 items-center gap-1 font-mono text-[10px]">
+          {counts.added > 0 && (
+            <span className="text-green-600 dark:text-green-400">+{counts.added}</span>
+          )}
+          {counts.removed > 0 && (
+            <span className="text-red-500 dark:text-red-400">-{counts.removed}</span>
+          )}
+        </span>
+      ) : null}
     </div>
   )
 }
@@ -202,6 +227,7 @@ export const FileChangesCard = memo(function FileChangesCard({
               <FileRow
                 key={`${file.filePath}-${index}`}
                 file={file}
+                sessionId={sessionId}
                 onOpenDiff={handleOpenFileDiff}
               />
             ))}

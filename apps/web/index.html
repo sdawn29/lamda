@@ -20,8 +20,8 @@
           // Apply the exact background values defined in index.css so the
           // window background matches from the very first paint.
           document.documentElement.style.background = dark
-            ? "#101010"
-            : "#f5f5f0";
+            ? "#08090a"
+            : "#fbfbfc";
         } catch (e) {}
       })();
     </script>
@@ -31,7 +31,7 @@
         /* Fallback for the brief moment before index.css is parsed. The
            inline script above will have already set the correct colour on
            <html> via style attribute, so this just acts as a safety net. */
-        background: var(--background, #101010);
+        background: var(--background, #08090a);
       }
     </style>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />

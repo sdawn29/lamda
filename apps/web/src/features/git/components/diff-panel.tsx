@@ -471,7 +471,7 @@ const FileContent = memo(function FileContent({
       <div
         className={cn(
           "min-h-0 flex-1 overflow-auto",
-          markdownPreview ? "prose prose-sm max-w-none p-4 dark:prose-invert" : "file-viewer-code"
+          markdownPreview ? "prose prose-sm max-w-none p-4 dark:prose-invert" : "file-viewer-code pl-4"
         )}
         style={markdownPreview ? undefined : { userSelect: "text" }}
       >
