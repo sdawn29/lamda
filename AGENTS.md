@@ -63,9 +63,20 @@ lamda/
 
 ## Related
 
-- [apps/web](apps/web/AGENTS.md)
-- [apps/desktop](apps/desktop/AGENTS.md)
-- [apps/server](apps/server/AGENTS.md)
-- [packages/db](packages/db/AGENTS.md)
-- [packages/git](packages/git/AGENTS.md)
-- [packages/pi-sdk](packages/pi-sdk/AGENTS.md)
+- [apps/web](apps/web/AGENTS.md) — React UI layer with features: chat, git, terminal, settings, workspace
+- [apps/desktop](apps/desktop/AGENTS.md) — Electron shell that loads the web app
+- [apps/server](apps/server/AGENTS.md) — Hono API server for Pi agent sessions
+- [packages/db](packages/db/AGENTS.md) — Drizzle ORM + SQLite persistence
+- [packages/git](packages/git/AGENTS.md) — Git CLI wrappers
+- [packages/pi-sdk](packages/pi-sdk/AGENTS.md) — Wrapper around @mariozechner/pi-coding-agent
+
+## Feature Module AGENTS.md
+
+Detailed AGENTS.md files for complex web feature modules:
+
+| Feature | Path | Complexity |
+|---------|------|-------------|
+| [Chat](apps/web/src/features/chat/AGENTS.md) | `web/src/features/chat/` | 34 files, streaming architecture |
+| [Git](apps/web/src/features/git/AGENTS.md) | `web/src/features/git/` | 26 files, diff + staging workflow |
+| [Terminal](apps/web/src/features/terminal/AGENTS.md) | `web/src/features/terminal/` | xterm.js + WebSocket PTY |
+| [Settings](apps/web/src/features/settings/AGENTS.md) | `web/src/features/settings/` | Provider config, API keys |

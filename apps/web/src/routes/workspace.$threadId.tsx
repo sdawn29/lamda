@@ -1,10 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { lazy, Suspense, useEffect } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { lazy, Suspense, useEffect, useRef } from "react"
 
 import { ChatView, useSetThreadStatus } from "@/features/chat"
 import { useWorkspace } from "@/features/workspace"
-import { chatKeys } from "@/features/chat/queries"
 import { useDiffPanel } from "@/features/git"
 import { useTerminal } from "@/features/terminal"
 import { useFileTree } from "@/features/file-tree"
@@ -47,10 +45,9 @@ function WorkspaceThreadRoute() {
   const { isOpen: diffOpen, isFullscreen: diffFullscreen, setCurrentWorkspace } = useDiffPanel()
   const { isOpen: terminalOpen } = useTerminal()
   const { isOpen: fileTreeOpen } = useFileTree()
-  const updateSetting = useUpdateAppSetting()
-  const updateLastAccessed = useUpdateThreadLastAccessed()
+  const { mutate: updateSetting } = useUpdateAppSetting()
+  const { mutate: updateLastAccessed } = useUpdateThreadLastAccessed()
   const setThreadStatus = useSetThreadStatus()
-  const queryClient = useQueryClient()
 
   // Find current workspace
   const foundWorkspace = workspaces.find((ws) =>
@@ -59,31 +56,28 @@ function WorkspaceThreadRoute() {
   const foundThread = foundWorkspace?.threads.find((t) => t.id === threadId)
 
   // Set workspace path in diff panel context for breadcrumb navigation
+  // Use ref to track the current path and avoid infinite loops from effect re-runs
+  const currentPathRef = useRef<string | null>(null)
   useEffect(() => {
-    if (foundWorkspace?.path) {
-      setCurrentWorkspace(foundWorkspace.path)
+    const newPath = foundWorkspace?.path ?? null
+    if (newPath !== currentPathRef.current) {
+      currentPathRef.current = newPath
+      setCurrentWorkspace(newPath)
     }
-    return () => setCurrentWorkspace(null)
+    return () => {
+      currentPathRef.current = null
+    }
   }, [foundWorkspace?.path, setCurrentWorkspace])
 
 
   useEffect(() => {
-    updateSetting.mutate({
+    updateSetting({
       key: APP_SETTINGS_KEYS.ACTIVE_THREAD_ID,
       value: threadId,
     })
-    updateLastAccessed.mutate(threadId)
+    updateLastAccessed(threadId)
     setThreadStatus(threadId, "idle")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadId])
-
-  // Refetch messages when switching to a thread
-  // This ensures we get up-to-date results when switching back to a completed thread
-  useEffect(() => {
-    if (foundThread?.sessionId) {
-      queryClient.invalidateQueries({ queryKey: chatKeys.messages(foundThread.sessionId) })
-    }
-  }, [threadId, foundThread?.sessionId, queryClient])
+  }, [threadId, updateSetting, updateLastAccessed, setThreadStatus])
 
   useEffect(() => {
     if (!isLoading && !foundThread) {

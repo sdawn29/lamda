@@ -14,6 +14,7 @@ import { ThinkingBlock } from "./thinking-block"
 import { CopyButton } from "@/shared/components/copy-button"
 import { Button } from "@/shared/ui/button"
 import { getProviderMeta } from "@/shared/lib/provider-meta"
+import { formatDuration, formatTime } from "@/shared/lib/formatters"
 import type { SlashCommand } from "../api"
 import {
   type AssistantMessage,
@@ -43,22 +44,6 @@ function assistantCopyText(
   }
 
   return sections.join("\n\n")
-}
-
-function formatResponseTime(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(1)}s`
-}
-
-
-
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp)
-  const hours = date.getHours()
-  const minutes = date.getMinutes().toString().padStart(2, "0")
-  const ampm = hours >= 12 ? "pm" : "am"
-  const displayHours = hours % 12 || 12
-  return `${displayHours}:${minutes} ${ampm}`
 }
 
 interface TimeStampProps {
@@ -145,7 +130,7 @@ function AssistantMessageBlock({
             {message.responseTime != null && (
               <>
                 <span className="opacity-40">·</span>
-                <span>{formatResponseTime(message.responseTime)}</span>
+                <span>{formatDuration(message.responseTime)}</span>
               </>
             )}
           </div>
@@ -259,7 +244,8 @@ export interface MessageRowProps {
   onAction?: (action: ErrorAction, id: string) => void
 }
 
-function AbortBlock({ message: _message }: { message: AbortMessage }) {
+function AbortBlock({ message: _ }: { message: AbortMessage }) {
+  void _
   return (
     <div className="flex items-center gap-3 py-3">
       <div className="flex-1 h-px bg-border" />

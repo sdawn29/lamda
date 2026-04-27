@@ -88,6 +88,9 @@ const TerminalInstance = memo(function TerminalInstance({
     const container = containerRef.current
     if (!container) return
 
+    // Capture cwd in a stable ref so the async callback has the correct value
+    const cwdRef = { current: cwd }
+
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 12,
@@ -145,7 +148,7 @@ const TerminalInstance = memo(function TerminalInstance({
     getServerUrl().then((serverUrl) => {
       if (cancelled) return
       const wsBase = serverUrl.replace(/^http/, "ws")
-      const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwd)}`
+      const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwdRef.current)}`
       ws = new WebSocket(url)
       wsRef.current = ws
 
@@ -191,7 +194,6 @@ const TerminalInstance = memo(function TerminalInstance({
       fitAddonRef.current = null
       wsRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cwd])
 
   // Refit when this tab becomes active (container was hidden)

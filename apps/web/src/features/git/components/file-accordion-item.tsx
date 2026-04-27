@@ -1,7 +1,7 @@
-import { memo, useCallback, useMemo, useState } from "react"
-import { ChevronRight, Loader2, Minus, Plus, Undo2 } from "lucide-react"
-import { Button } from "@/shared/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
+import { memo, useCallback, useState } from "react"
+import { ChevronRight, Minus, Plus, Undo2 } from "lucide-react"
+import { LoadingSpinner } from "@/shared/ui/loading-spinner"
+import { IconButtonWithTooltip } from "@/shared/ui/icon-button-with-tooltip"
 import { DiffView, type DiffMode } from "./diff-view"
 import { StatusBadge, type ChangedFile } from "./status-badge"
 import { DiffStat, parseDiffCounts } from "./diff-stat"
@@ -31,10 +31,8 @@ export const FileAccordionItem = memo(function FileAccordionItem({
     true
   )
 
-  const counts = useMemo(
-    () => (diff != null ? parseDiffCounts(diff) : null),
-    [diff]
-  )
+  // Compute diff counts once when diff changes
+  const counts = diff != null ? parseDiffCounts(diff) : null
 
   const handleToggle = useCallback(
     async (e: React.MouseEvent) => {
@@ -100,55 +98,22 @@ export const FileAccordionItem = memo(function FileAccordionItem({
 
         <div className="flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden transition-all duration-150 group-hover/file:max-w-20 group-hover/file:pr-1">
           {!file.isUntracked && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="h-6 w-6 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
-                    disabled={reverting}
-                    onClick={handleRevert}
-                  >
-                    {reverting ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Undo2 className="h-3 w-3" />
-                    )}
-                    <span className="sr-only">Revert changes</span>
-                  </Button>
-                }
-              />
-              <TooltipContent>Revert changes</TooltipContent>
-            </Tooltip>
-          )}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
-                  disabled={toggling}
-                  onClick={handleToggle}
-                >
-                  {toggling ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : file.isStaged ? (
-                    <Minus className="h-3 w-3" />
-                  ) : (
-                    <Plus className="h-3 w-3" />
-                  )}
-                  <span className="sr-only">
-                    {file.isStaged ? "Unstage" : "Stage"}
-                  </span>
-                </Button>
-              }
+            <IconButtonWithTooltip
+              icon={Undo2}
+              label="Revert changes"
+              onClick={handleRevert}
+              variant="destructive"
+              size="icon-sm"
+              disabled={reverting}
             />
-            <TooltipContent>
-              {file.isStaged ? "Unstage file" : "Stage file"}
-            </TooltipContent>
-          </Tooltip>
+          )}
+          <IconButtonWithTooltip
+            icon={toggling ? Minus : file.isStaged ? Minus : Plus}
+            label={file.isStaged ? "Unstage file" : "Stage file"}
+            onClick={handleToggle}
+            size="icon-sm"
+            disabled={toggling}
+          />
         </div>
       </div>
 
@@ -156,7 +121,7 @@ export const FileAccordionItem = memo(function FileAccordionItem({
         <div className="animate-in border-t border-border/30 bg-muted/10 px-3 pb-3 duration-150 fade-in-0 slide-in-from-top-1">
           {diffLoading ? (
             <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
-              <Loader2 className="size-3 animate-spin" />
+              <LoadingSpinner size="sm" />
               Loading diff…
             </div>
           ) : diff != null ? (

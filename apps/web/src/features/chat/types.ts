@@ -185,7 +185,7 @@ export function blockToMessage(block: MessageBlock): Message {
         createdAt: block.createdAt,
       }
 
-    case "tool":
+    case "tool": {
       let result: unknown = undefined
       if (block.toolResult) {
         try {
@@ -214,6 +214,7 @@ export function blockToMessage(block: MessageBlock): Message {
         duration: block.toolDuration ?? undefined,
         startTime: block.toolStartTime ?? undefined,
       }
+    }
 
     case "abort":
       return {

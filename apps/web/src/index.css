@@ -152,7 +152,6 @@
     user-select: none;
   }
 
-
   /* Allow text selection in code blocks */
   pre code,
   pre span,
@@ -181,8 +180,16 @@
     border-radius: var(--radius) !important;
   }
   .sonner-toast[data-type="error"] {
-    border-color: color-mix(in srgb, var(--destructive) 25%, var(--border)) !important;
-    background: color-mix(in srgb, var(--destructive) 6%, var(--popover)) !important;
+    border-color: color-mix(
+      in srgb,
+      var(--destructive) 25%,
+      var(--border)
+    ) !important;
+    background: color-mix(
+      in srgb,
+      var(--destructive) 6%,
+      var(--popover)
+    ) !important;
   }
 
   .sonner-toast-title {
@@ -311,7 +318,11 @@
   .prose pre,
   .syntax-highlighter,
   .syntax-highlighter * {
-    font-feature-settings: "calt" 1, "liga" 1, "zero" 1, "ss02" 1;
+    font-feature-settings:
+      "calt" 1,
+      "liga" 1,
+      "zero" 1,
+      "ss02" 1;
     font-variant-ligatures: contextual;
   }
 

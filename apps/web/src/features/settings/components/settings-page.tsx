@@ -1265,9 +1265,12 @@ function RetrySettingsCard() {
     }
   }, [settings])
 
-  const [localSettings, setLocalSettings] = useState<RetrySettings>(persistedValue)
+  // Use persistedValue directly as the source of truth, but allow local edits.
+  // Initialize local state from persistedValue to avoid hydration mismatch.
+  const [localSettings, setLocalSettings] = useState<RetrySettings>(() => persistedValue)
   const [saved, setSaved] = useState(false)
 
+  // Sync local state when persisted value changes (e.g., user resets from another tab)
   React.useEffect(() => {
     setLocalSettings(persistedValue)
   }, [persistedValue])

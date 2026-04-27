@@ -39,10 +39,18 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
   const updateSetting = useUpdateAppSetting()
 
   const stored = parseStoredShortcuts(settings?.[APP_SETTINGS_KEYS.KEYBOARD_SHORTCUTS])
-  const shortcuts: Shortcuts = { ...DEFAULT_SHORTCUTS, ...stored }
 
-  // Stable ref so the keydown handler always sees the latest shortcuts without re-registering
+  // Memoize shortcuts to prevent creating a new object on every render.
+  // This prevents the context value from changing unnecessarily.
+  const shortcuts = React.useMemo<Shortcuts>(
+    () => ({ ...DEFAULT_SHORTCUTS, ...stored }),
+    [stored]
+  )
+
+  // Stable ref so the keydown handler always sees the latest shortcuts without re-registering.
+  // Initialized with shortcuts; updated below render so keydown handler never sees stale shortcuts.
   const shortcutsRef = React.useRef(shortcuts)
+  // eslint-disable-next-line react-hooks/refs -- intentional: keydown handler fires outside render
   shortcutsRef.current = shortcuts
 
   // Map of action → latest handler function
@@ -109,8 +117,7 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
 
   const value = React.useMemo<KbContextValue>(
     () => ({ shortcuts, registerHandler, updateShortcut, resetShortcuts }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(shortcuts), registerHandler, updateShortcut, resetShortcuts]
+    [shortcuts, registerHandler, updateShortcut, resetShortcuts]
   )
 
   return (

@@ -8,6 +8,7 @@ export function useGlobalThreadStatusWatcher(activeThreadId?: string) {
   const setStatus = useSetThreadStatus()
   const queryClient = useQueryClient()
   const activeThreadIdRef = useRef(activeThreadId)
+  // eslint-disable-next-line react-hooks/refs -- intentional: effect uses ref to track latest value
   activeThreadIdRef.current = activeThreadId
 
   useEffect(() => {

@@ -109,12 +109,6 @@ function TreeItem({
     }
   }, [node.isDirectory, node.relativePath, onToggleDir, onSelectFile])
 
-  const Icon = node.isDirectory
-    ? isExpanded
-      ? FolderOpen
-      : Folder
-    : getFileIcon(node.name)
-
   return (
     <div>
       <button
@@ -132,7 +126,18 @@ function TreeItem({
         ) : (
           <span className="size-3 shrink-0" />
         )}
-        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+        {node.isDirectory ? (
+          isExpanded ? (
+            <FolderOpen className="size-3.5 shrink-0 text-muted-foreground" />
+          ) : (
+            <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+          )
+        ) : (
+          <>{(() => {
+            const Icon = getFileIcon(node.name)
+            return <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+          })()}</>
+        )}
         <span className="truncate">{node.name}</span>
       </button>
       {isExpanded && node.children.length > 0 && (

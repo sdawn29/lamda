@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import type { ErrorMessage, Message } from "../types"
 import {
@@ -82,23 +82,17 @@ export function ChatView({
   })
 
   // Separate error messages (show as toasts) from other messages
-  const { errors: apiErrors, messages: chatMessages } = useMemo(() => {
-    const errors: ErrorMessage[] = []
-    const messages: Message[] = []
-    for (const msg of visibleMessages) {
-      if (msg.role === "error") {
-        errors.push(msg as ErrorMessage)
-      } else {
-        messages.push(msg)
-      }
+  const apiErrors: ErrorMessage[] = []
+  const chatMessages: Message[] = []
+  for (const msg of visibleMessages) {
+    if (msg.role === "error") {
+      apiErrors.push(msg as ErrorMessage)
+    } else {
+      chatMessages.push(msg)
     }
-    return { errors, messages }
-  }, [visibleMessages])
+  }
 
-  const apiErrorIds = useMemo(
-    () => new Set(apiErrors.map((e) => e.id)),
-    [apiErrors]
-  )
+  const apiErrorIds = new Set(apiErrors.map((e) => e.id))
   useApiErrorToasts({ visibleErrorIds: apiErrorIds, errors: apiErrors })
 
   const [gitError, setGitError] = useState<string | null>(null)
@@ -141,11 +135,7 @@ export function ChatView({
   // which can flip pinnedRef to false and stop further scrolls entirely.
   // Fix: use instant scrollTop assignment while loading so every update reliably
   // lands at the bottom; only use smooth scroll once the stream is stable.
-  const commandsByName = useMemo(
-    () =>
-      new Map((commandsData ?? []).map((command) => [command.name, command])),
-    [commandsData]
-  )
+  const commandsByName = new Map((commandsData ?? []).map((command) => [command.name, command]))
 
   // ── Scroll position persistence via query cache & localStorage ──────────────────
   // Scroll positions are stored in both TanStack Query cache and localStorage.

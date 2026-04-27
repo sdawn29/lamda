@@ -11,8 +11,8 @@ export function resetServerUrl(): void {
 export class ServerUnreachableError extends Error {
   readonly isServerUnreachable = true
 
-  constructor(message: string) {
-    super(message)
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options)
     this.name = "ServerUnreachableError"
   }
 }
@@ -90,13 +90,14 @@ export async function apiFetch<T>(
       }
       // Check if it's a timeout error
       if (err.message?.includes("abort") || err.message?.includes("timeout")) {
-        throw new Error(`Request timeout (${DEFAULT_REQUEST_TIMEOUT_MS / 1000}s)`)
+        throw new Error(`Request timeout (${DEFAULT_REQUEST_TIMEOUT_MS / 1000}s)`, { cause: err })
       }
     }
     throw new ServerUnreachableError(
       err instanceof Error
         ? `Server unreachable: ${err.message}`
-        : "Server unreachable"
+        : "Server unreachable",
+      { cause: err }
     )
   }
   

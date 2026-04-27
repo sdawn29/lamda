@@ -23,8 +23,9 @@ interface UsePrefetchThreadsMessagesOptions {
  * restarting prefetches on every render. It handles workspace switches gracefully.
  */
 export function usePrefetchThreadsMessages({
-  activeThreadId: _activeThreadId,
+  activeThreadId: _unusedActiveThreadId,
 }: UsePrefetchThreadsMessagesOptions = {}) {
+  void _unusedActiveThreadId
   const { data: workspaces = [] } = useWorkspaces()
   const queryClient = useQueryClient()
   const syncEngine = getChatSyncEngine()

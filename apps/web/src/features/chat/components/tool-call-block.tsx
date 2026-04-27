@@ -18,20 +18,13 @@ import {
 import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 
 import { cn } from "@/shared/lib/utils"
+import { formatDuration } from "@/shared/lib/formatters"
 import { LivePre } from "./live-pre"
 import { DiffView, detectLanguage } from "@/features/git"
 import { useTheme } from "@/shared/components/theme-provider"
 import type { ToolMessage } from "../types"
 
 const PrismCode = lazy(() => import("./prism-code"))
-
-// ── Formatting helpers ─────────────────────────────────────────────────────────
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
-  return `${Math.floor(ms / 1000)}s`
-}
 
 // ── Tool glyph icons ────────────────────────────────────────────────────────────
 

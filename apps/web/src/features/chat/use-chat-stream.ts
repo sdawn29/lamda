@@ -46,7 +46,10 @@ export function useChatStream({
   const [isStopped, setIsStopped] = useState(initialIsStopped)
   const [isCompacting, setIsCompacting] = useState(false)
   const [pendingError, setPendingError] = useState<ReturnType<typeof createErrorMessage> | null>(null)
-  const [isLoadingInternal, setIsLoadingInternal] = useState(false)
+  // Track loading state per session to avoid stale cross-thread contamination.
+  // Using a Map means old thread's loading state doesn't leak into new thread.
+  const [loadingForSessionId, setLoadingForSessionId] = useState<string | null>(null)
+  const isLoadingInternal = loadingForSessionId === sessionId
 
   const { messages, isLoading } = useVisibleMessages({
     sessionId,
@@ -64,18 +67,16 @@ export function useChatStream({
   // Connect to SSE stream
   useSessionStream({
     sessionId,
-    onIsLoadingChange: setIsLoadingInternal,
+    onIsLoadingChange: (loading) => {
+      if (loading) {
+        setLoadingForSessionId(sessionId)
+      } else if (loadingForSessionId === sessionId) {
+        setLoadingForSessionId(null)
+      }
+    },
     onIsCompactingChange: setIsCompacting,
     onPendingErrorChange: handlePendingErrorChange,
   })
-
-  // Reset loading state when sessionId changes (i.e., when switching threads)
-  // This ensures that stale loading states don't persist across threads
-  useEffect(() => {
-    startTransition(() => {
-      setIsLoadingInternal(false)
-    })
-  }, [sessionId])
 
   const hasLoadedMessages = messages.length > 0 || isLoading
 
@@ -86,8 +87,10 @@ export function useChatStream({
   // Add user message immediately to cache (optimistic update)
   const startUserPrompt = useCallback(
     (text: string, _thinkingLevel?: string) => {
+      // NOTE: thinkingLevel is reserved for future streaming thinking display
+      void _thinkingLevel
       setIsStopped(false)
-      setIsLoadingInternal(true) // Immediately show loading state
+      setLoadingForSessionId(sessionId)
 
       // Optimistically add user message to cache immediately
       const userMessage: Message = { role: "user", content: text }
