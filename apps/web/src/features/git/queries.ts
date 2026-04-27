@@ -27,12 +27,17 @@ export const gitKeys = {
 
 export const gitStatusKey = (sessionId: string) => gitKeys.status(sessionId)
 
+const isPageVisible = () =>
+  typeof document === "undefined" || document.visibilityState === "visible"
+
 export function useGitStatus(sessionId: string) {
   return useQuery({
     queryKey: gitStatusKey(sessionId),
     queryFn: () => gitStatus(sessionId),
     enabled: !!sessionId,
     staleTime: 0,
+    refetchInterval: () => (isPageVisible() ? 3000 : false),
+    refetchIntervalInBackground: false,
   })
 }
 
@@ -55,7 +60,9 @@ export function useGitFileDiff(
     queryFn: () => gitFileDiff(sessionId, filePath, statusCode),
     enabled: enabled && !!sessionId && !!filePath,
     gcTime: 60 * 1000,
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchInterval: () => (enabled && isPageVisible() ? 5000 : false),
+    refetchIntervalInBackground: false,
   })
 }
 
@@ -70,10 +77,7 @@ export function useGitDiffStat(sessionId: string) {
     enabled: !!sessionId,
     gcTime: 30 * 1000,
     staleTime: 0,
-    refetchInterval: () =>
-      typeof document === "undefined" || document.visibilityState !== "visible"
-        ? false
-        : 5000,
+    refetchInterval: () => (isPageVisible() ? 5000 : false),
     refetchIntervalInBackground: false,
   })
 }
