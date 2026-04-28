@@ -17,6 +17,7 @@ import {
   useInstallUpdate,
 } from "@/features/electron"
 import { SettingsModal, ConfigureProviderModal } from "@/features/settings"
+import { CommandPalette } from "@/features/command-palette"
 import { ErrorBoundary } from "@/shared/components/error-boundary"
 import { Toaster } from "@/shared/ui/sonner"
 
@@ -45,6 +46,7 @@ function RootLayoutInner() {
             <Outlet />
           </SidebarInset>
         </div>
+        <CommandPalette />
       </SidebarProvider>
       {/* <TanStackRouterDevtools /> */}
     </TooltipProvider>

@@ -16,6 +16,7 @@ export const SHORTCUT_ACTIONS = {
   OPEN_IN_EDITOR: "open_in_editor",
   SCROLL_TO_BOTTOM: "scroll_to_bottom",
   OPEN_COMMIT_DIALOG: "open_commit_dialog",
+  OPEN_COMMAND_PALETTE: "open_command_palette",
 } as const
 
 export type ShortcutAction = (typeof SHORTCUT_ACTIONS)[keyof typeof SHORTCUT_ACTIONS]
@@ -38,10 +39,12 @@ export const SHORTCUT_LABELS: Record<ShortcutAction, string> = {
   open_in_editor: "Open in Editor",
   scroll_to_bottom: "Scroll to Bottom",
   open_commit_dialog: "Open Commit Dialog",
+  open_command_palette: "Open Command Palette",
 }
 
 // Order for display in settings
 export const SHORTCUT_ACTION_ORDER: ShortcutAction[] = [
+  "open_command_palette",
   "toggle_sidebar",
   "toggle_diff_panel",
   "toggle_terminal",
@@ -80,6 +83,7 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutAction, string> = {
   open_in_editor: "mod+shift+e",
   scroll_to_bottom: "mod+arrowdown",
   open_commit_dialog: "mod+shift+c",
+  open_command_palette: "mod+k",
 }
 
 // Actions that fire even when focus is in an editable element

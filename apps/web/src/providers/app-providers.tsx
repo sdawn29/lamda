@@ -16,6 +16,7 @@ import {
   useConfigureProvider,
   type ConfigureProviderTab,
 } from "@/features/settings"
+import { CommandPaletteProvider, useCommandPalette } from "@/features/command-palette"
 
 // ============================================================================
 // AppProviders - Consolidated Global Provider Component
@@ -44,7 +45,9 @@ export function AppProviders({ children }: AppProvidersProps) {
       <ErrorToastProvider>
         <SettingsModalProvider>
           <ConfigureProviderProvider>
-            {children}
+            <CommandPaletteProvider>
+              {children}
+            </CommandPaletteProvider>
           </ConfigureProviderProvider>
         </SettingsModalProvider>
       </ErrorToastProvider>
@@ -55,6 +58,7 @@ export function AppProviders({ children }: AppProvidersProps) {
 // Re-export hooks for convenience
 export { useThreadStatus, useSetThreadStatus, useErrorToast }
 export { useSettingsModal, useConfigureProvider }
+export { useCommandPalette }
 
 // Re-export types
 export type { ThreadStatus, ErrorMessage }
