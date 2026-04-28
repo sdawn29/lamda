@@ -51,75 +51,131 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* ── Linear Light — neutral cool greys with indigo accent ─────────────── */
+/* ════════════════════════════════════════════════════════════════════
+   COLOR HIERARCHY — 5 LEVELS
+   ─────────────────────────────────────────────────────────────────────
+   Base         Page background / root
+   Surface 1    Cards, elevated containers
+   Surface 2    Inputs, nested panels (secondary)
+   Surface 3    Muted / disabled areas
+   Overlay      Popovers, dropdowns (on top of cards)
+
+   Each level is ~1.5–2 stops darker than the one above it.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Jellybeans Light ─────────────────────────────────────────────── */
 :root {
-  --background: #f6f7f9;
-  --foreground: #0a0b0d;
-  --card: #ffffff;
-  --card-foreground: #0a0b0d;
-  --popover: #ffffff;
-  --popover-foreground: #0a0b0d;
-  --primary: #5856d6;
-  --primary-foreground: #ffffff;
-  --secondary: #e8e9ee;
-  --secondary-foreground: #0a0b0d;
-  --muted: #ebecf0;
-  --muted-foreground: #3d4249;
-  --accent: #e2e4e8;
-  --accent-foreground: #0a0b0d;
-  --destructive: #e5484d;
-  --border: #e4e6ea;
-  --input: #e4e6ea;
-  --ring: #5856d6;
-  --chart-1: #5856d6;
-  --chart-2: #26a69a;
-  --chart-3: #f2994a;
-  --chart-4: #eb5757;
-  --chart-5: #a78bfa;
+  /* ── Base: warm off-white page background ── */
+  --background: #f3efe8;
+  --foreground: #1a1815;
+
+  /* ── Card: near-white — floats above base without a heavy border ── */
+  --card: #fdfbf8;
+  --card-foreground: #1a1815;
+
+  /* ── Popover: same as base ── */
+  --popover: #f3efe8;
+  --popover-foreground: #1a1815;
+
+  /* ── Secondary: recessed inputs / nested panels ── */
+  --secondary: #ebe7df;
+  --secondary-foreground: #1a1815;
+
+  /* ── Muted: disabled / faded areas ── */
+  --muted: #dedad2;
+  --muted-foreground: #6a6560;
+
+  /* ── Accent: hover / selection highlight ── */
+  --accent: #d3cfc7;
+  --accent-foreground: #1a1815;
+
+  /* ── Primary (jellybeans steel blue) ── */
+  --primary: #4a6a9f;
+  --primary-foreground: #f3efe8;
+
+  /* ── Destructive (jellybeans error red) ── */
+  --destructive: #902020;
+
+  /* ── Border: barely-there separators · Input: form field outlines ── */
+  --border: #e6e1d9;
+  --input:  #d4cfc7;
+  --ring: #4a6a9f;
+
+  /* ── Charts (jellybeans syntax colors, darkened for light bg) ── */
+  --chart-1: #4a6a9f;
+  --chart-2: #5a7842;
+  --chart-3: #c4870a;
+  --chart-4: #9f4e32;
+  --chart-5: #a06820;
+
+  /* ── Radius ── */
   --radius: 0.5rem;
-  --sidebar: #fbfbfc;
-  --sidebar-foreground: #0a0b0d;
-  --sidebar-primary: #5856d6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ebecf0;
-  --sidebar-accent-foreground: #0a0b0d;
-  --sidebar-border: #e4e6ea;
-  --sidebar-ring: #5856d6;
+
+  /* ── Sidebar: clearly distinct from base, no hard border needed ── */
+  --sidebar: #e8e4dd;
+  --sidebar-foreground: #1a1815;
+  --sidebar-primary: #4a6a9f;
+  --sidebar-primary-foreground: #f3efe8;
+  --sidebar-accent: #dedad3;
+  --sidebar-accent-foreground: #1a1815;
+  --sidebar-border: #e0dbd4;
+  --sidebar-ring: #4a6a9f;
 }
 
-/* ── Linear Dark — near-black charcoal with indigo accent ─────────────── */
+/* ── Jellybeans Dark ──────────────────────────────────────────────── */
 .dark {
-  --background: #0c0d0f;
-  --foreground: #f0f2f5;
-  --card: #18191c;
-  --card-foreground: #f0f2f5;
-  --popover: #1e1f23;
-  --popover-foreground: #f0f2f5;
-  --primary: #5e5ce6;
-  --primary-foreground: #ffffff;
-  --secondary: #25272b;
-  --secondary-foreground: #f0f2f5;
-  --muted: #1e1f23;
-  --muted-foreground: #b5bac4;
-  --accent: #2d2f33;
-  --accent-foreground: #f0f2f5;
-  --destructive: #f2555a;
-  --border: #1a1c1f;
-  --input: #1a1c1f;
-  --ring: #5e5ce6;
-  --chart-1: #5e5ce6;
-  --chart-2: #4cc38a;
-  --chart-3: #f2994a;
-  --chart-4: #f2555a;
-  --chart-5: #b794f6;
-  --sidebar: #08090a;
-  --sidebar-foreground: #f0f2f5;
-  --sidebar-primary: #5e5ce6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #25272b;
-  --sidebar-accent-foreground: #f0f2f5;
-  --sidebar-border: #1a1c1f;
-  --sidebar-ring: #5e5ce6;
+  /* ── Base ── */
+  --background: #121212;
+  --foreground: #e8e8d3;
+
+  /* ── Surface 1 · card: +6 above base, heavier/darker feel ── */
+  --card: #181818;
+  --card-foreground: #e8e8d3;
+
+  /* ── Overlay · popover: same as main background ── */
+  --popover: #121212;
+  --popover-foreground: #e8e8d3;
+
+  /* ── Surface 2 · secondary: recessed inputs/panels ── */
+  --secondary: #1d1d1d;
+  --secondary-foreground: #e8e8d3;
+
+  /* ── Surface 3 · muted: disabled / faded areas ── */
+  --muted: #242424;
+  --muted-foreground: #888888;
+
+  /* ── Accent · hover / selection highlight ── */
+  --accent: #303030;
+  --accent-foreground: #e8e8d3;
+
+  /* ── Primary (jellybeans keyword steel blue) ── */
+  --primary: #8197bf;
+  --primary-foreground: #e8e8d3;
+
+  /* ── Destructive (jellybeans error red) ── */
+  --destructive: #cc3333;
+
+  /* ── Borders: subtle separators · Input: border of form fields ── */
+  --border: #212121;
+  --input:  #1f1f1f;
+  --ring: #8197bf;
+
+  /* ── Charts (jellybeans full syntax palette) ── */
+  --chart-1: #8197bf;
+  --chart-2: #99ad6a;
+  --chart-3: #fad07a;
+  --chart-4: #cf6a4c;
+  --chart-5: #ffb964;
+
+  /* ── Sidebar: deeper than base · accent jumps to card level for contrast ── */
+  --sidebar: #0c0c0c;
+  --sidebar-foreground: #e8e8d3;
+  --sidebar-primary: #8197bf;
+  --sidebar-primary-foreground: #e8e8d3;
+  --sidebar-accent: #181818;
+  --sidebar-accent-foreground: #e8e8d3;
+  --sidebar-border: #161616;
+  --sidebar-ring: #8197bf;
 }
 
 /* ── Thinking shimmer animation ────────────────────────────────────────── */
