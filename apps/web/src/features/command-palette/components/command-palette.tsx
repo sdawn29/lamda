@@ -203,9 +203,7 @@ export function CommandPalette() {
                       {thread.title || "Untitled thread"}
                     </span>
                     {workspaces.length > 1 && (
-                      <span className="ml-auto shrink-0 text-[0.625rem] text-muted-foreground">
-                        {thread.workspaceName}
-                      </span>
+                      <CommandShortcut>{thread.workspaceName}</CommandShortcut>
                     )}
                   </CommandItem>
                 ))}

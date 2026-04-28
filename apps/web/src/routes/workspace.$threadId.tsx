@@ -42,7 +42,11 @@ function WorkspaceThreadRoute() {
   const { threadId } = Route.useParams()
   const { workspaces, isLoading } = useWorkspace()
   const navigate = useNavigate()
-  const { isOpen: diffOpen, isFullscreen: diffFullscreen, setCurrentWorkspace } = useDiffPanel()
+  const {
+    isOpen: diffOpen,
+    isFullscreen: diffFullscreen,
+    setCurrentWorkspace,
+  } = useDiffPanel()
   const { isOpen: terminalOpen } = useTerminal()
   const { isOpen: fileTreeOpen } = useFileTree()
   const { mutate: updateSetting } = useUpdateAppSetting()
@@ -69,7 +73,6 @@ function WorkspaceThreadRoute() {
     }
   }, [foundWorkspace?.path, setCurrentWorkspace])
 
-
   useEffect(() => {
     updateSetting({
       key: APP_SETTINGS_KEYS.ACTIVE_THREAD_ID,
@@ -91,14 +94,16 @@ function WorkspaceThreadRoute() {
 
   return (
     <ResizablePanelGroup orientation="vertical" className="h-full border-t">
-      <ResizablePanel defaultSize={diffFullscreen ? 100 : 50} minSize={diffFullscreen ? 100 : 50} className={cn(diffFullscreen && "h-full")}>
+      <ResizablePanel
+        defaultSize={diffFullscreen ? 100 : 50}
+        minSize={diffFullscreen ? 100 : 50}
+        className={cn(diffFullscreen && "h-full")}
+      >
         {diffFullscreen ? (
           <div className="flex h-full">
             <div className="flex min-w-0 flex-1">
               <Suspense
-                fallback={
-                  <div className="h-full flex-1 bg-muted/10" />
-                }
+                fallback={<div className="h-full flex-1 bg-muted/10" />}
               >
                 <DiffPanel
                   sessionId={foundThread.sessionId}
@@ -131,7 +136,7 @@ function WorkspaceThreadRoute() {
               {diffOpen && (
                 <>
                   <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={35} minSize={35}>
+                  <ResizablePanel defaultSize={45} minSize={40}>
                     <Suspense
                       fallback={
                         <div className="h-full border-l border-border/60 bg-muted/10" />
