@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react"
-import { FileIcon, FolderIcon } from "lucide-react"
+import { Icon } from "@iconify/react"
 
 import { cn } from "@/shared/lib/utils"
-import { getFileTypeColor } from "@/shared/lib/file-type-color"
+import { getFileIcon } from "@/shared/ui/file-icon"
 import type { WorkspaceEntry } from "../queries"
 
 export function FileMentionDropdown({
@@ -55,20 +55,18 @@ export function FileMentionDropdown({
             )}
           >
             {entry.type === "dir" ? (
-              <FolderIcon
-                width={12}
-                height={12}
-                className="shrink-0 text-blue-400"
-                aria-hidden
-              />
-            ) : (
-              <FileIcon
+              <Icon
+                icon="catppuccin:folder"
                 width={12}
                 height={12}
                 className="shrink-0"
-                style={{ color: getFileTypeColor(entry.path) }}
                 aria-hidden
               />
+            ) : (
+              (() => {
+                const FileIcon = getFileIcon(entry.path)
+                return <FileIcon className="size-3 shrink-0" aria-hidden />
+              })()
             )}
             <span className="flex min-w-0 items-baseline gap-1.5">
               <span className="shrink-0 font-mono font-medium">

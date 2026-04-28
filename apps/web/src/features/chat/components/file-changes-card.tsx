@@ -4,29 +4,16 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
-  Minus,
-  FileEditIcon,
-  FilePlusIcon,
-  FileIcon,
-  type LucideIcon,
 } from "lucide-react"
 import { useGitStatus, useGitDiffStat, useGitFileDiff, parseDiffCounts } from "@/features/git"
 import { useDiffPanel } from "@/features/git/context"
 import { Button } from "@/shared/ui/button"
 import { parseStatusLine, type ChangedFile, statusLabel } from "@/features/git/components/status-badge"
 import { cn } from "@/shared/lib/utils"
+import { getFileIcon } from "@/shared/ui/file-icon"
 
 interface FileChangesCardProps {
   sessionId: string
-}
-
-// Icon mapping defined as a constant
-const FILE_ICON_MAP: Record<string, LucideIcon> = {
-  A: FilePlusIcon,
-  D: Minus,
-  M: FileEditIcon,
-  "M*": FileEditIcon,
-  U: FileIcon,
 }
 
 interface FileRowProps {
@@ -36,7 +23,6 @@ interface FileRowProps {
 }
 
 function FileRow({ file, sessionId, onOpenDiff }: FileRowProps) {
-  const FileIconComponent = FILE_ICON_MAP[statusLabel(file)] ?? FileIcon
   const pathParts = file.filePath.split("/")
   const fileName = pathParts[pathParts.length - 1] ?? file.filePath
   const dirPath = pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : null
@@ -75,7 +61,7 @@ function FileRow({ file, sessionId, onOpenDiff }: FileRowProps) {
         {statusLabel(file)}
       </span>
       
-      <FileIconComponent className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+      {(() => { const FileIconComponent = getFileIcon(fileName); return <FileIconComponent className="h-3.5 w-3.5 shrink-0" /> })()}
       
       <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
         <span className="shrink-0 font-mono text-xs font-medium text-foreground/85">
