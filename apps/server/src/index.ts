@@ -9,6 +9,7 @@ import { handleTerminalConnection } from "./services/terminal-service.js";
 import { handleSessionEventsWs } from "./routes/sessions.js";
 import { handleGlobalEventsWs } from "./routes/health.js";
 import { handleOAuthEventsWs } from "./routes/auth.js";
+import { handleSessionCommands } from "./websocket/session-commands.js";
 
 const port = resolvePort();
 
@@ -40,6 +41,7 @@ bootstrapSessions()
           pathname === "/terminal" ||
           pathname === "/ws/events" ||
           /^\/ws\/session\/[^/]+\/events$/.test(pathname) ||
+          /^\/ws\/session\/[^/]+\/commands$/.test(pathname) ||
           /^\/ws\/auth\/oauth\/[^/]+\/events$/.test(pathname);
 
         if (isKnownWsPath) {
@@ -70,6 +72,12 @@ bootstrapSessions()
       if (sessionMatch) {
         const lastEventId = url.searchParams.get("lastEventId") ?? undefined;
         handleSessionEventsWs(ws, sessionMatch[1], lastEventId);
+        return;
+      }
+
+      const sessionCmdMatch = pathname.match(/^\/ws\/session\/([^/]+)\/commands$/);
+      if (sessionCmdMatch) {
+        handleSessionCommands(ws, sessionCmdMatch[1]);
         return;
       }
 

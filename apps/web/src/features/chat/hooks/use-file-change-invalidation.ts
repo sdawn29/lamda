@@ -56,8 +56,9 @@ export function useFileChangeInvalidation(sessionId: string | null) {
 
     openSessionWebSocket(sessionId)
       .then((socket) => {
-        if (!active) {
-          socket.close()
+        // socket is null if all retries failed
+        if (!socket || !active) {
+          if (socket) socket.close()
           return
         }
         ws = socket
@@ -132,7 +133,7 @@ export function useFileChangeInvalidation(sessionId: string | null) {
         })
       })
       .catch((e) => {
-        console.warn("[useFileChangeInvalidation] Failed to open event source:", e)
+        // Silently handle - server may not be available
       })
 
     return () => {

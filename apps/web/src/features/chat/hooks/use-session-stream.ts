@@ -282,8 +282,9 @@ export function useSessionStream({
 
     openSessionWebSocket(sessionId)
       .then((socket) => {
-        if (!active) {
-          socket.close()
+        // socket is null if all retries failed
+        if (!socket || !active) {
+          if (socket) socket.close()
           return
         }
         ws = socket
@@ -556,7 +557,7 @@ export function useSessionStream({
         })
       })
       .catch((err) => {
-        if (active) console.error("[session-stream]", err)
+        if (active) console.debug("[session-stream] WebSocket unavailable:", err)
       })
 
     return () => {

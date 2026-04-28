@@ -1,5 +1,73 @@
 import { apiFetch, getServerWsUrl } from "@/shared/lib/client"
-import type { MessageBlock, StoredMessageDto } from "./types"
+import type { MessageBlock } from "./types"
+
+// ── WebSocket helpers ──────────────────────────────────────────────────────────
+
+interface WebSocketOpenOptions {
+  retries?: number
+  baseDelay?: number
+  maxDelay?: number
+}
+
+const DEFAULT_WS_OPTIONS: Required<WebSocketOpenOptions> = {
+  retries: 3,
+  baseDelay: 100,
+  maxDelay: 1000,
+}
+
+/**
+ * Attempt to open a WebSocket with retry logic and exponential backoff.
+ * Returns null if all retries fail.
+ */
+async function openWebSocketWithRetry(
+  url: string,
+  options: WebSocketOpenOptions = {}
+): Promise<WebSocket | null> {
+  const { retries, baseDelay, maxDelay } = { ...DEFAULT_WS_OPTIONS, ...options }
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const ws = new WebSocket(url)
+
+      // Wait for connection or failure with a timeout
+      const result = await new Promise<WebSocket>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.close()
+          reject(new Error("Connection timeout"))
+        }, 5000)
+
+        ws.addEventListener("open", () => {
+          clearTimeout(timeout)
+          resolve(ws)
+        }, { once: true })
+
+        ws.addEventListener("error", () => {
+          clearTimeout(timeout)
+          reject(new Error("WebSocket error"))
+        }, { once: true })
+
+        ws.addEventListener("close", () => {
+          clearTimeout(timeout)
+          reject(new Error("WebSocket closed"))
+        }, { once: true })
+      })
+
+      return result
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+
+      // Don't retry if this was the last attempt
+      if (attempt >= retries) break
+
+      // Calculate delay with exponential backoff
+      const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay)
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+
+  return null
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -54,17 +122,17 @@ export function abortSession(id: string): Promise<void> {
   return apiFetch<void>(`/session/${id}/abort`, { method: "POST" })
 }
 
-export async function openSessionWebSocket(id: string, lastEventId?: string): Promise<WebSocket> {
+export async function openSessionWebSocket(id: string, lastEventId?: string): Promise<WebSocket | null> {
   const base = await getServerWsUrl()
   const url = lastEventId
     ? `${base}/ws/session/${id}/events?lastEventId=${encodeURIComponent(lastEventId)}`
     : `${base}/ws/session/${id}/events`
-  return new WebSocket(url)
+  return openWebSocketWithRetry(url)
 }
 
-export async function openGlobalWebSocket(): Promise<WebSocket> {
+export async function openGlobalWebSocket(): Promise<WebSocket | null> {
   const base = await getServerWsUrl()
-  return new WebSocket(`${base}/ws/events`)
+  return openWebSocketWithRetry(`${base}/ws/events`)
 }
 
 export interface SendPromptParams {
@@ -164,18 +232,6 @@ export function listRunningTools(
 ): Promise<RunningToolsResponse> {
   return apiFetch<RunningToolsResponse>(
     `/session/${sessionId}/running-tools`
-  )
-}
-
-/**
- * Legacy message list endpoint for backward compatibility.
- * @deprecated Use listMessages instead.
- */
-export function listLegacyMessages(
-  sessionId: string
-): Promise<{ messages: StoredMessageDto[] }> {
-  return apiFetch<{ messages: StoredMessageDto[] }>(
-    `/session/${sessionId}/messages`
   )
 }
 

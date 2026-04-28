@@ -15,34 +15,47 @@ export function useGlobalThreadStatusWatcher(activeThreadId?: string) {
     let active = true
     let ws: WebSocket | null = null
 
-    openGlobalWebSocket().then((socket) => {
-      if (!active) {
-        socket.close()
-        return
-      }
-      ws = socket
+    openGlobalWebSocket()
+      .then((socket) => {
+        // socket is null if all retries failed
+        if (!socket || !active) {
+          if (socket) socket.close()
+          return
+        }
+        ws = socket
 
-      ws.addEventListener("message", (e: MessageEvent) => {
-        if (!active) return
-        try {
-          const data = JSON.parse(e.data as string) as { type: string } & Record<string, unknown>
+        ws.addEventListener("message", (e: MessageEvent) => {
+          if (!active) return
+          try {
+            const data = JSON.parse(e.data as string) as { type: string } & Record<string, unknown>
 
-          if (data.type === "thread_status") {
-            const { threadId, status } = data as { threadId: string; status: "running" | "idle" }
-            if (status === "idle" && threadId !== activeThreadIdRef.current) {
-              setStatus(threadId, "completed")
-            } else {
-              setStatus(threadId, status)
+            if (data.type === "thread_status") {
+              const { threadId, status } = data as { threadId: string; status: "running" | "idle" }
+              if (status === "idle" && threadId !== activeThreadIdRef.current) {
+                setStatus(threadId, "completed")
+              } else {
+                setStatus(threadId, status)
+              }
+            } else if (data.type === "workspace_files_updated") {
+              const { workspaceId } = data as { workspaceId: string }
+              queryClient.invalidateQueries({ queryKey: workspaceKeys.files(workspaceId) })
             }
-          } else if (data.type === "workspace_files_updated") {
-            const { workspaceId } = data as { workspaceId: string }
-            queryClient.invalidateQueries({ queryKey: workspaceKeys.files(workspaceId) })
+          } catch (error) {
+            console.error("[thread-status]", error)
           }
-        } catch (error) {
-          console.error("[thread-status]", error)
+        })
+
+        // Track if an error occurred to suppress duplicate browser warnings
+        let hadError = false
+        ws.addEventListener("error", () => {
+          hadError = true
+        })
+      })
+      .catch((error) => {
+        if (active) {
+          console.debug("[thread-status] WebSocket unavailable:", error)
         }
       })
-    })
 
     return () => {
       active = false

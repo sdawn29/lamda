@@ -6,8 +6,6 @@ import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
 
 const health = new Hono();
 
-health.get("/health", (c) => c.json({ status: "ok", uptime: process.uptime() }));
-
 health.get("/models", (c) => c.json({ models: getAvailableModels() }));
 
 export function handleGlobalEventsWs(ws: WebSocket) {
