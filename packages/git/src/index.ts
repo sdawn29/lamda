@@ -122,6 +122,16 @@ export async function isGitRepo(cwd: string): Promise<boolean> {
   return root !== null;
 }
 
+/** Clones a repository to the specified directory. Returns the clone output. */
+export async function gitClone(url: string, cwd: string): Promise<string> {
+  const { stdout } = await execFileAsync(
+    "git",
+    ["clone", url, cwd],
+    { cwd, timeout: 60000 },
+  );
+  return stdout;
+}
+
 export async function initGitRepo(cwd: string): Promise<void> {
   await execFileAsync("git", ["init"], { cwd, timeout: 10000 });
 }

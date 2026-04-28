@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
   getCurrentBranch,
   initGitRepo,
+  gitClone,
   listBranches,
   checkoutBranch,
   createBranch,
@@ -37,6 +38,20 @@ function parseGitError(err: unknown, fallback: string): string {
     fallback
   );
 }
+
+// ── Clone repository ────────────────────────────────────────────────────────────
+
+git.post("/git/clone", async (c) => {
+  const body = await c.req.json<{ url?: string; path?: string }>();
+  if (!body.url || !body.path)
+    return c.json({ error: "url and path are required" }, 400);
+  try {
+    await gitClone(body.url, body.path);
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ error: parseGitError(err, "Clone failed") }, 500);
+  }
+});
 
 // ── Branch management ─────────────────────────────────────────────────────────
 

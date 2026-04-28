@@ -22,6 +22,7 @@ import {
   type WorkspaceDto,
 } from "./api"
 import { workspacesQueryKey } from "./queries"
+import { gitClone } from "@/features/git/api"
 import {
   createSession,
   deleteSession,
@@ -73,6 +74,15 @@ export function useCreateWorkspace() {
         upsertWorkspace(current, workspace)
       )
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function useCloneRepository() {
+  return useMutation({
+    mutationFn: async ({ url, path }: { url: string; path: string }) => {
+      await gitClone(url, path)
+      return path
     },
   })
 }

@@ -49,6 +49,7 @@ import { useThreadStatus } from "@/features/chat"
 import type { Thread } from "../context"
 import { useSettingsModal } from "@/features/settings"
 import { ArchivedThreadsDialog } from "./archived-threads-dialog"
+import { CreateWorkspaceDialog } from "./create-workspace-dialog"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -183,11 +184,12 @@ function ThreadRow({
 
 export function AppSidebar() {
   const { workspaces, createThread, deleteWorkspace } = useWorkspace()
-  const handleCreateWorkspace = useCreateWorkspaceAction()
+  const { handleCreateLocal, handleCreateRemote } = useCreateWorkspaceAction()
   const openPathMutation = useOpenPath()
   const openWithAppMutation = useOpenWorkspaceWithApp()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [archivedOpen, setArchivedOpen] = useState(false)
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false)
   const [deletingWorkspace, setDeletingWorkspace] = useState<typeof workspaces[0] | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -216,7 +218,10 @@ export function AppSidebar() {
     ws.threads.some((t) => t.id === activeThreadId)
   ) ?? workspaces[0]
 
-  useShortcutHandler(SHORTCUT_ACTIONS.NEW_WORKSPACE, handleCreateWorkspace)
+  useShortcutHandler(
+    SHORTCUT_ACTIONS.NEW_WORKSPACE,
+    () => setCreateWorkspaceOpen(true)
+  )
   useShortcutHandler(
     SHORTCUT_ACTIONS.NEW_THREAD,
     activeWorkspace
@@ -270,7 +275,7 @@ export function AppSidebar() {
           <Tooltip>
             <TooltipTrigger
               render={
-                <SidebarGroupAction onClick={handleCreateWorkspace}>
+                <SidebarGroupAction onClick={() => setCreateWorkspaceOpen(true)}>
                   <Plus />
                   <span className="sr-only">New workspace</span>
                 </SidebarGroupAction>
@@ -288,7 +293,7 @@ export function AppSidebar() {
                     <FolderOpen className="size-4 text-muted-foreground/60" />
                   </div>
                   <p className="text-xs text-muted-foreground/70">No workspaces yet</p>
-                  <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={handleCreateWorkspace}>
+                  <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => setCreateWorkspaceOpen(true)}>
                     <Plus className="h-3 w-3" />
                     Add workspace
                   </Button>
@@ -435,6 +440,13 @@ export function AppSidebar() {
         </Tooltip>
       </SidebarFooter>
       <ArchivedThreadsDialog open={archivedOpen} onOpenChange={setArchivedOpen} />
+
+      <CreateWorkspaceDialog
+        open={createWorkspaceOpen}
+        onOpenChange={setCreateWorkspaceOpen}
+        onCreateLocal={handleCreateLocal}
+        onCreateRemote={handleCreateRemote}
+      />
 
       <AlertDialog
         open={!!deletingWorkspace}
