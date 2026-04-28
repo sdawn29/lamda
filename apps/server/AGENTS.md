@@ -1,6 +1,6 @@
 # AGENTS.md — server
 
-> Auto-generated context for coding agents. Last updated: 2026-04-26
+> Auto-generated context for coding agents. Last updated: 2026-04-28
 
 ## Purpose
 
@@ -26,6 +26,7 @@ Hono server (default port 3001) with three layers:
 ### Directory Structure
 
 - `src/routes/` — Hono route handlers (workspaces, threads, sessions, git, auth, settings, health, directory, file)
+- `src/routes/AGENTS.md` — Detailed endpoint documentation
 - `src/services/` — Business logic layer (session-service, terminal-service, auth-service)
 - `src/index.ts` — Entry point; writes `{ready: true, port: N}` to stdout for Electron parent process
 - `src/app.ts` — Hono app setup with all routes registered
@@ -111,6 +112,7 @@ Hono server (default port 3001) with three layers:
 
 ## Related
 
+- [apps/server/src/routes/AGENTS.md](apps/server/src/routes/AGENTS.md) — REST API endpoint details
 - [apps/desktop](../desktop/AGENTS.md) — Electron parent that spawns this server
 - [apps/web](../web/AGENTS.md) — Web UI that consumes this API
 - [packages/pi-sdk](../../packages/pi-sdk/AGENTS.md) — Pi agent session SDK

@@ -1,6 +1,6 @@
 # AGENTS.md — web/src/features/git
 
-> Auto-generated context for coding agents. Last updated: 2026-04-27
+> Auto-generated context for coding agents. Last updated: 2026-04-28
 
 ## Purpose
 
@@ -217,7 +217,7 @@ The git module provides a complete git workflow UI (26 files, ~2400 lines). It m
 ## Related
 
 - [apps/web](../../AGENTS.md) — Parent web app; git module is a feature
-- [apps/server/routes](../../../server/src/routes/AGENTS.md) — `/session/:id/git/*` endpoints
+- [apps/server/src/routes/AGENTS.md](../../../../apps/server/src/routes/AGENTS.md) — `/session/:id/git/*` REST endpoints
 - [packages/git](../../../../packages/git/AGENTS.md) — Git CLI wrappers (`getCurrentBranch`, `checkoutBranch`, etc.)
 - [features/chat](./chat/AGENTS.md) — Chat module; can reference current branch context
 

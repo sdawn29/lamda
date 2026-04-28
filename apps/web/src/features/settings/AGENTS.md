@@ -1,6 +1,6 @@
 # AGENTS.md — web/src/features/settings
 
-> Auto-generated context for coding agents. Last updated: 2026-04-27
+> Auto-generated context for coding agents. Last updated: 2026-04-28
 
 ## Purpose
 

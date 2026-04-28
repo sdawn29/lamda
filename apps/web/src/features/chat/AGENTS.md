@@ -1,6 +1,6 @@
 # AGENTS.md — web/src/features/chat
 
-> Auto-generated context for coding agents. Last updated: 2026-04-27
+> Auto-generated context for coding agents. Last updated: 2026-04-28
 
 ## Purpose
 
@@ -209,5 +209,5 @@ The chat module is the largest feature in the web app (34 files, ~5000 lines of 
 ## Related
 
 - [apps/web](../../AGENTS.md) — Parent web app; contains routing, layouts, other features
-- [apps/server/routes](../../../server/src/routes/AGENTS.md) — `/session/:id/events` and `/session/:id/prompt` endpoints
+- [apps/server/src/routes/AGENTS.md](../../../../apps/server/src/routes/AGENTS.md) — `/session/:id/events` and `/session/:id/prompt` endpoints
 - [packages/pi-sdk](../../../../packages/pi-sdk/AGENTS.md) — Underlying agent SDK; session event types originate here

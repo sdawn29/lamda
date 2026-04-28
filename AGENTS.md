@@ -1,6 +1,6 @@
 # AGENTS.md — lamda (root)
 
-> Auto-generated context for coding agents. Last updated: 2026-04-27
+> Auto-generated context for coding agents. Last updated: 2026-04-28
 
 ## Purpose
 
@@ -65,7 +65,7 @@ lamda/
 
 - [apps/web](apps/web/AGENTS.md) — React UI layer with features: chat, git, terminal, settings, workspace
 - [apps/desktop](apps/desktop/AGENTS.md) — Electron shell that loads the web app
-- [apps/server](apps/server/AGENTS.md) — Hono API server for Pi agent sessions
+- [apps/server/src/routes](apps/server/src/routes/AGENTS.md) — REST endpoints for sessions, threads, git, settings
 - [packages/db](packages/db/AGENTS.md) — Drizzle ORM + SQLite persistence
 - [packages/git](packages/git/AGENTS.md) — Git CLI wrappers
 - [packages/pi-sdk](packages/pi-sdk/AGENTS.md) — Wrapper around @mariozechner/pi-coding-agent
@@ -78,5 +78,6 @@ Detailed AGENTS.md files for complex web feature modules:
 |---------|------|-------------|
 | [Chat](apps/web/src/features/chat/AGENTS.md) | `web/src/features/chat/` | 34 files, streaming architecture |
 | [Git](apps/web/src/features/git/AGENTS.md) | `web/src/features/git/` | 26 files, diff + staging workflow |
+| [Routes (server)](apps/server/src/routes/AGENTS.md) | `server/src/routes/` | REST endpoints: sessions, threads, git, files |
 | [Terminal](apps/web/src/features/terminal/AGENTS.md) | `web/src/features/terminal/` | xterm.js + WebSocket PTY |
 | [Settings](apps/web/src/features/settings/AGENTS.md) | `web/src/features/settings/` | Provider config, API keys |
