@@ -8,6 +8,11 @@ import {
 } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { Skeleton } from "@/shared/ui/skeleton"
+import {
+  SidebarContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+} from "@/shared/ui/sidebar"
 import { getFileIcon } from "@/shared/ui/file-icon"
 import { useDiffPanel } from "@/features/git"
 import {
@@ -114,28 +119,28 @@ function TreeItem({
       <button
         type="button"
         onClick={handleClick}
-        className="flex w-full items-center gap-1 rounded-sm px-2 py-0.5 text-left text-xs hover:bg-accent"
+        className="flex w-full items-center gap-1 rounded-sm px-2 py-0.5 text-left text-xs text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
         {node.isDirectory ? (
           isExpanded ? (
-            <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+            <ChevronDown className="size-3 shrink-0 text-sidebar-foreground/50" />
           ) : (
-            <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
+            <ChevronRight className="size-3 shrink-0 text-sidebar-foreground/50" />
           )
         ) : (
           <span className="size-3 shrink-0" />
         )}
         {node.isDirectory ? (
           isExpanded ? (
-            <FolderOpen className="size-3.5 shrink-0 text-muted-foreground" />
+            <FolderOpen className="size-3.5 shrink-0 text-sidebar-foreground/50" />
           ) : (
-            <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+            <Folder className="size-3.5 shrink-0 text-sidebar-foreground/50" />
           )
         ) : (
           <>{(() => {
             const Icon = getFileIcon(node.name)
-            return <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+            return <Icon className="size-3.5 shrink-0 text-sidebar-foreground/50" />
           })()}</>
         )}
         <span className="truncate">{node.name}</span>
@@ -238,24 +243,27 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
   const showSpinner = refreshing || isFetching
 
   return (
-    <div className="flex h-full w-full flex-col">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/60 px-2">
-        <span className="text-[10px] font-medium text-muted-foreground">FILES</span>
+    <div className="flex h-full w-full flex-col bg-background text-sidebar-foreground">
+      <SidebarHeader className="h-8 flex-row items-center justify-between border-b border-sidebar-border px-2 py-0">
+        <SidebarGroupLabel className="h-8 px-0 text-[10px] font-medium tracking-wider text-sidebar-foreground/60">
+          FILES
+        </SidebarGroupLabel>
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={handleRefresh}
           disabled={showSpinner}
+          className="text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
           <RefreshCw className={`size-3 ${showSpinner ? "animate-spin" : ""}`} />
           <span className="sr-only">Refresh</span>
         </Button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto p-1">
+      </SidebarHeader>
+      <SidebarContent className="p-1">
         {showSkeleton ? (
           <FileTreeSkeleton />
         ) : isEmpty ? (
-          <div className="p-2 text-[10px] text-muted-foreground">No files indexed</div>
+          <div className="p-2 text-[10px] text-sidebar-foreground/50">No files indexed</div>
         ) : (
           <div className="animate-in fade-in duration-150">
             {tree.map((node) => (
@@ -270,7 +278,7 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
             ))}
           </div>
         )}
-      </div>
+      </SidebarContent>
     </div>
   )
 }
