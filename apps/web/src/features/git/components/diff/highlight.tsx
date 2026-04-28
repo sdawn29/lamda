@@ -17,6 +17,7 @@ import python from "refractor/python"
 import ruby from "refractor/ruby"
 import rust from "refractor/rust"
 import sql from "refractor/sql"
+import jsx from "refractor/jsx"
 import tsx from "refractor/tsx"
 import typescript from "refractor/typescript"
 import yaml from "refractor/yaml"
@@ -38,6 +39,7 @@ import type {
   java,
   javascript,
   json,
+  jsx,
   kotlin,
   markdown,
   php,
@@ -53,12 +55,18 @@ import type {
 })
 
 const EXT_TO_LANG: Record<string, string> = {
+  // TypeScript
   ts: "typescript",
-  tsx: "typescript",
+  tsx: "tsx",
+  mts: "typescript",
+  cts: "typescript",
+  // JavaScript
   js: "javascript",
-  jsx: "javascript",
+  jsx: "jsx",
   mjs: "javascript",
   cjs: "javascript",
+  mjsx: "jsx",
+  cjsx: "jsx",
   py: "python",
   rs: "rust",
   go: "go",
