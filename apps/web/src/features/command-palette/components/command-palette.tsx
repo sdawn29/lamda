@@ -1,5 +1,5 @@
-import { useCallback } from "react"
-import { useNavigate } from "@tanstack/react-router"
+import { useCallback, useState } from "react"
+import { useNavigate, useParams } from "@tanstack/react-router"
 import {
   TerminalSquare,
   PanelLeftIcon,
@@ -11,6 +11,7 @@ import {
   MoonIcon,
   GitCommitHorizontalIcon,
   MessageSquareIcon,
+  Loader2,
 } from "lucide-react"
 import {
   Command,
@@ -33,12 +34,14 @@ import {
   formatBindingParts,
 } from "@/shared/lib/keyboard-shortcuts"
 import { useWorkspace } from "@/features/workspace"
+import { useWorkspaceIndex } from "@/features/workspace/queries"
 import { useTerminal } from "@/features/terminal/context"
 import { useDiffPanel } from "@/features/git/context"
 import { useFileTree } from "@/features/file-tree/context"
 import { useSidebar } from "@/shared/ui/sidebar"
 import { useSettingsModal } from "@/features/settings"
 import { useTheme } from "@/shared/components/theme-provider"
+import { getFileIcon } from "@/shared/ui/file-icon"
 
 function ShortcutHint({ binding }: { binding: string }) {
   const parts = formatBindingParts(binding)
@@ -53,6 +56,7 @@ function ShortcutHint({ binding }: { binding: string }) {
 export function CommandPalette() {
   const { open, openPalette, closePalette } = useCommandPalette()
   const navigate = useNavigate()
+  const { threadId: activeThreadId } = useParams({ strict: false }) as { threadId?: string }
   const { workspaces, createThread } = useWorkspace()
   const terminal = useTerminal()
   const diffPanel = useDiffPanel()
@@ -60,6 +64,22 @@ export function CommandPalette() {
   const { toggleSidebar } = useSidebar()
   const { openSettings } = useSettingsModal()
   const { theme, setTheme } = useTheme()
+
+  const activeWorkspace =
+    workspaces.find((ws) => ws.threads.some((t) => t.id === activeThreadId)) ??
+    workspaces[0]
+
+  const { data: fileEntries = [], isLoading: filesLoading } = useWorkspaceIndex(
+    activeWorkspace?.id,
+    open
+  )
+  const allFiles = fileEntries.filter((e) => !e.isDirectory)
+  const [search, setSearch] = useState("")
+  const files = (
+    search
+      ? allFiles.filter((f) => f.relativePath.toLowerCase().includes(search.toLowerCase()))
+      : allFiles
+  ).slice(0, 5)
 
   const toggleSidebarBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_SIDEBAR)
   const toggleTerminalBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_TERMINAL)
@@ -74,7 +94,6 @@ export function CommandPalette() {
   const run = useCallback(
     (fn: () => void) => {
       closePalette()
-      // Defer action so the dialog has time to close first
       setTimeout(fn, 50)
     },
     [closePalette]
@@ -90,16 +109,30 @@ export function CommandPalette() {
   )
 
   const handleNewThread = useCallback(async () => {
-    const activeWorkspace = workspaces[0]
-    if (!activeWorkspace) return
+    const ws = workspaces[0]
+    if (!ws) return
     closePalette()
-    const thread = await createThread(activeWorkspace.id)
+    const thread = await createThread(ws.id)
     navigate({ to: "/workspace/$threadId", params: { threadId: thread.id } })
   }, [workspaces, closePalette, createThread, navigate])
 
   const handleToggleTheme = useCallback(() => {
     run(() => setTheme(theme === "dark" ? "light" : "dark"))
   }, [run, theme, setTheme])
+
+  const handleOpenFile = useCallback(
+    (relativePath: string) => {
+      run(() => {
+        const workspacePath = activeWorkspace?.path
+        if (!workspacePath) return
+        const fileName = relativePath.split(/[/\\]/).pop() || relativePath
+        const filePath = `${workspacePath}/${relativePath}`
+        diffPanel.open()
+        diffPanel.addTab({ title: fileName, type: "file", filePath })
+      })
+    },
+    [run, activeWorkspace, diffPanel]
+  )
 
   const allThreads = workspaces.flatMap((ws) =>
     ws.threads.map((t) => ({ ...t, workspaceName: ws.name }))
@@ -109,16 +142,51 @@ export function CommandPalette() {
     <CommandDialog
       open={open}
       onOpenChange={(o) => {
-        if (!o) closePalette()
+        if (!o) { closePalette(); setSearch("") }
       }}
       title="Command Palette"
       description="Search commands and navigate"
       className="sm:max-w-lg"
     >
       <Command>
-        <CommandInput placeholder="Search commands…" autoFocus />
+        <CommandInput placeholder="Search commands…" autoFocus onValueChange={setSearch} />
         <CommandList className="max-h-[22rem]">
           <CommandEmpty>No results found.</CommandEmpty>
+
+          {files.length > 0 && (
+            <>
+              <CommandGroup heading={activeWorkspace ? `Files — ${activeWorkspace.name}` : "Files"}>
+                {filesLoading ? (
+                  <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
+                    <Loader2 className="size-3 animate-spin" />
+                    Indexing workspace…
+                  </div>
+                ) : (
+                  files.map((file) => {
+                    const dir = file.relativePath.split(/[/\\]/).slice(0, -1).join("/")
+                    return (
+                      <CommandItem
+                        key={file.relativePath}
+                        value={`file ${file.relativePath}`}
+                        onSelect={() => handleOpenFile(file.relativePath)}
+                      >
+                        {getFileIcon(file.name)({ className: "size-3.5 shrink-0 text-muted-foreground" })}
+                        <span className="min-w-0 flex-1 truncate">
+                          <span>{file.name}</span>
+                          {dir && (
+                            <span className="ml-1 text-muted-foreground/50 text-[0.7rem]">
+                              {dir}
+                            </span>
+                          )}
+                        </span>
+                      </CommandItem>
+                    )
+                  })
+                )}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          )}
 
           {allThreads.length > 0 && (
             <>
