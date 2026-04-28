@@ -568,6 +568,8 @@ export function useSessionStream({
       pendingDeltasRef.current = []
       pendingToolUpdatesRef.current = []
       ws?.close()
+      // Reset loading state on cleanup so returning threads don't show stale status
+      onIsLoadingChange?.(false)
     }
   }, [
     sessionId,
