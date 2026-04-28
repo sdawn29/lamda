@@ -9,11 +9,15 @@ import {
   MoreHorizontal,
   Pin,
   Plus,
+  Search,
   Settings,
   Trash2,
 } from "lucide-react"
 import { useNavigate, useParams } from "@tanstack/react-router"
-import { useShortcutHandler, useShortcutBinding } from "@/shared/components/keyboard-shortcuts-provider"
+import {
+  useShortcutHandler,
+  useShortcutBinding,
+} from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 import { IconButtonWithTooltip } from "@/shared/ui/icon-button-with-tooltip"
@@ -27,6 +31,7 @@ import {
   SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuButton,
@@ -44,6 +49,7 @@ import {
 import { useOpenPath, useOpenWorkspaceWithApp } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
 import { useWorkspace, useCreateWorkspaceAction } from "../context"
+import { useCommandPalette } from "@/features/command-palette"
 import { useThreadStatus } from "@/features/chat"
 import type { Thread } from "../context"
 import { useSettingsModal } from "@/features/settings"
@@ -94,19 +100,22 @@ function ThreadRow({
   const now = useNow()
   const { archiveThread, pinThread, unpinThread } = useWorkspace()
 
-  const handlePinToggle = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
-    try {
-      if (thread.isPinned) {
-        await unpinThread(workspaceId, thread.id)
-      } else {
-        await pinThread(workspaceId, thread.id)
+  const handlePinToggle = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      e.preventDefault()
+      try {
+        if (thread.isPinned) {
+          await unpinThread(workspaceId, thread.id)
+        } else {
+          await pinThread(workspaceId, thread.id)
+        }
+      } catch (err) {
+        console.error("Failed to toggle pin:", err)
       }
-    } catch (err) {
-      console.error("Failed to toggle pin:", err)
-    }
-  }, [thread.isPinned, thread.id, workspaceId, unpinThread, pinThread])
+    },
+    [thread.isPinned, thread.id, workspaceId, unpinThread, pinThread]
+  )
 
   const handleArchiveClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -133,7 +142,8 @@ function ThreadRow({
               onClick={handlePinToggle}
               className={cn(
                 "absolute inset-0 size-auto transition-colors",
-                !thread.isPinned && "invisible text-muted-foreground/30 group-hover/thread:visible"
+                !thread.isPinned &&
+                  "invisible text-muted-foreground/30 group-hover/thread:visible"
               )}
             />
           </span>
@@ -147,7 +157,7 @@ function ThreadRow({
               label="Archive thread"
               onClick={handleArchiveClick}
               tooltipSide="right"
-              className="col-start-1 row-start-1 invisible size-auto p-0.5 text-muted-foreground/50 group-hover/thread:visible"
+              className="invisible col-start-1 row-start-1 size-auto p-0.5 text-muted-foreground/50 group-hover/thread:visible"
             />
           </div>
         </SidebarMenuSubButton>
@@ -158,7 +168,8 @@ function ThreadRow({
           <AlertDialogHeader>
             <AlertDialogTitle>Archive thread?</AlertDialogTitle>
             <AlertDialogDescription>
-              "{thread.title}" will be hidden from the sidebar. You can restore it anytime from Archived.
+              "{thread.title}" will be hidden from the sidebar. You can restore
+              it anytime from Archived.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -188,11 +199,17 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false)
-  const [deletingWorkspace, setDeletingWorkspace] = useState<typeof workspaces[0] | null>(null)
+  const [deletingWorkspace, setDeletingWorkspace] = useState<
+    (typeof workspaces)[0] | null
+  >(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const navigate = useNavigate()
   const { openSettings } = useSettingsModal()
+  const { openPalette } = useCommandPalette()
+  const openCommandPaletteBinding = useShortcutBinding(
+    SHORTCUT_ACTIONS.OPEN_COMMAND_PALETTE
+  )
 
   async function handleConfirmDelete() {
     if (!deletingWorkspace) return
@@ -202,7 +219,9 @@ export function AppSidebar() {
       await deleteWorkspace(deletingWorkspace)
       setDeletingWorkspace(null)
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Failed to delete workspace")
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete workspace"
+      )
     } finally {
       setIsDeleting(false)
     }
@@ -212,20 +231,22 @@ export function AppSidebar() {
     threadId?: string
   }
 
-  const activeWorkspace = workspaces.find((ws) =>
-    ws.threads.some((t) => t.id === activeThreadId)
-  ) ?? workspaces[0]
+  const activeWorkspace =
+    workspaces.find((ws) => ws.threads.some((t) => t.id === activeThreadId)) ??
+    workspaces[0]
 
-  useShortcutHandler(
-    SHORTCUT_ACTIONS.NEW_WORKSPACE,
-    () => setCreateWorkspaceOpen(true)
+  useShortcutHandler(SHORTCUT_ACTIONS.NEW_WORKSPACE, () =>
+    setCreateWorkspaceOpen(true)
   )
   useShortcutHandler(
     SHORTCUT_ACTIONS.NEW_THREAD,
     activeWorkspace
       ? async () => {
           const thread = await createThread(activeWorkspace.id)
-          navigate({ to: "/workspace/$threadId", params: { threadId: thread.id } })
+          navigate({
+            to: "/workspace/$threadId",
+            params: { threadId: thread.id },
+          })
         }
       : null
   )
@@ -237,12 +258,24 @@ export function AppSidebar() {
 
   // Collect all pinned threads across all workspaces
   const pinnedThreads = workspaces.flatMap((ws) =>
-    ws.threads.filter((t) => t.isPinned).map((t) => ({ ...t, workspaceId: ws.id, workspaceName: ws.name }))
+    ws.threads
+      .filter((t) => t.isPinned)
+      .map((t) => ({ ...t, workspaceId: ws.id, workspaceName: ws.name }))
   )
 
   return (
     <Sidebar collapsible="offcanvas">
-      <SidebarContent className="mt-10">
+      <SidebarHeader className="mt-10 px-4 pb-0">
+        <button
+          onClick={openPalette}
+          className="flex h-8 w-full items-center gap-2 rounded-md border border-input bg-muted/20 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/40 dark:bg-muted/30 dark:hover:bg-muted/50"
+        >
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1 truncate text-left">Search</span>
+          <ShortcutKbd binding={openCommandPaletteBinding} />
+        </button>
+      </SidebarHeader>
+      <SidebarContent>
         {/* Pinned threads section */}
         {pinnedThreads.length > 0 && (
           <SidebarGroup>
@@ -273,14 +306,17 @@ export function AppSidebar() {
           <Tooltip>
             <TooltipTrigger
               render={
-                <SidebarGroupAction onClick={() => setCreateWorkspaceOpen(true)}>
+                <SidebarGroupAction
+                  onClick={() => setCreateWorkspaceOpen(true)}
+                >
                   <Plus />
                   <span className="sr-only">New workspace</span>
                 </SidebarGroupAction>
               }
             />
             <TooltipContent side="right">
-              New workspace <ShortcutKbd binding={newWorkspaceBinding} className="ml-1" />
+              New workspace{" "}
+              <ShortcutKbd binding={newWorkspaceBinding} className="ml-1" />
             </TooltipContent>
           </Tooltip>
           <SidebarGroupContent>
@@ -290,8 +326,15 @@ export function AppSidebar() {
                   <div className="flex size-9 items-center justify-center rounded-xl border border-border/50 bg-muted/50">
                     <FolderOpen className="size-4 text-muted-foreground/60" />
                   </div>
-                  <p className="text-xs text-muted-foreground/70">No workspaces yet</p>
-                  <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => setCreateWorkspaceOpen(true)}>
+                  <p className="text-xs text-muted-foreground/70">
+                    No workspaces yet
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => setCreateWorkspaceOpen(true)}
+                  >
                     <Plus className="h-3 w-3" />
                     Add workspace
                   </Button>
@@ -338,7 +381,11 @@ export function AppSidebar() {
                         }
                       />
                       <TooltipContent side="right">
-                        New thread <ShortcutKbd binding={newThreadBinding} className="ml-1" />
+                        New thread{" "}
+                        <ShortcutKbd
+                          binding={newThreadBinding}
+                          className="ml-1"
+                        />
                       </TooltipContent>
                     </Tooltip>
 
@@ -381,26 +428,27 @@ export function AppSidebar() {
                       </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {!collapsed[ws.id] && ws.threads.filter((t) => !t.isPinned).length > 0 && (
-                      <SidebarMenuSub className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
-                        {ws.threads
-                          .filter((t) => !t.isPinned)
-                          .map((thread) => (
-                          <ThreadRow
-                            key={thread.id}
-                            thread={thread}
-                            workspaceId={ws.id}
-                            isActive={activeThreadId === thread.id}
-                            onClick={() =>
-                              navigate({
-                                to: "/workspace/$threadId",
-                                params: { threadId: thread.id },
-                              })
-                            }
-                          />
-                        ))}
-                      </SidebarMenuSub>
-                    )}
+                    {!collapsed[ws.id] &&
+                      ws.threads.filter((t) => !t.isPinned).length > 0 && (
+                        <SidebarMenuSub className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
+                          {ws.threads
+                            .filter((t) => !t.isPinned)
+                            .map((thread) => (
+                              <ThreadRow
+                                key={thread.id}
+                                thread={thread}
+                                workspaceId={ws.id}
+                                isActive={activeThreadId === thread.id}
+                                onClick={() =>
+                                  navigate({
+                                    to: "/workspace/$threadId",
+                                    params: { threadId: thread.id },
+                                  })
+                                }
+                              />
+                            ))}
+                        </SidebarMenuSub>
+                      )}
                   </SidebarMenuItem>
                 ))
               )}
@@ -433,11 +481,15 @@ export function AppSidebar() {
             }
           />
           <TooltipContent side="right">
-            Settings <ShortcutKbd binding={openSettingsBinding} className="ml-1" />
+            Settings{" "}
+            <ShortcutKbd binding={openSettingsBinding} className="ml-1" />
           </TooltipContent>
         </Tooltip>
       </SidebarFooter>
-      <ArchivedThreadsDialog open={archivedOpen} onOpenChange={setArchivedOpen} />
+      <ArchivedThreadsDialog
+        open={archivedOpen}
+        onOpenChange={setArchivedOpen}
+      />
 
       <CreateWorkspaceDialog
         open={createWorkspaceOpen}
@@ -456,17 +508,24 @@ export function AppSidebar() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete workspace?</AlertDialogTitle>
             <AlertDialogDescription>
-              "{deletingWorkspace?.name}" and all its threads will be permanently deleted.
+              "{deletingWorkspace?.name}" and all its threads will be
+              permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && (
-            <p className="text-xs text-destructive px-1">{deleteError}</p>
+            <p className="px-1 text-xs text-destructive">{deleteError}</p>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeletingWorkspace(null)} disabled={isDeleting}>
+            <AlertDialogCancel
+              onClick={() => setDeletingWorkspace(null)}
+              disabled={isDeleting}
+            >
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting}>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
               {isDeleting ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>

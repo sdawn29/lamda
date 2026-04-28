@@ -203,7 +203,7 @@ export function TitleBar() {
       <div
         ref={navRef}
         className={`absolute inset-y-0 left-0 flex items-center gap-1 transition-[padding-left] duration-500 ease-in-out ${
-          isMac && !isFullscreen ? "pl-20" : "pl-2"
+          isMac && !isFullscreen ? "pl-20" : "pl-4"
         }`}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
