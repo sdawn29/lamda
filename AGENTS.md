@@ -79,6 +79,7 @@ Detailed AGENTS.md files for complex web feature modules:
 | [Chat](apps/web/src/features/chat/AGENTS.md) | `web/src/features/chat/` | 34 files, streaming architecture |
 | [Git](apps/web/src/features/git/AGENTS.md) | `web/src/features/git/` | 26 files, diff + staging workflow |
 | [Routes (server)](apps/server/src/routes/AGENTS.md) | `server/src/routes/` | REST endpoints: sessions, threads, git, files |
+| [Layout](apps/web/src/features/layout/AGENTS.md) | `web/src/features/layout/` | Title bar, navigation, panel toggles, editor integration |
 | [Terminal](apps/web/src/features/terminal/AGENTS.md) | `web/src/features/terminal/` | xterm.js + WebSocket PTY |
 | [Settings](apps/web/src/features/settings/AGENTS.md) | `web/src/features/settings/` | Provider config, API keys |
 | [Workspace](apps/web/src/features/workspace/AGENTS.md) | `web/src/features/workspace/` | 9 files, workspace/thread lifecycle |

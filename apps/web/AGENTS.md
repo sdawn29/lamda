@@ -37,7 +37,7 @@ Each feature module follows a consistent structure with `api.ts`, `queries.ts`, 
 - `features/workspace/` — Workspace/sidebar management, thread creation, app sidebar
 - `features/settings/` — Settings modal, provider configuration
 - `features/terminal/` — xterm.js terminal panel
-- `features/layout/` — Title bar, open-with button
+- `features/layout/` — Title bar, navigation, panel toggles, editor integration
 - `features/electron/` — Electron-specific APIs (server port discovery)
 - `features/file-tree/` — File browser with directory listing via server API
 - `features/file-opening/` — File opening helper with editor discovery and open-with functionality (macOS)
@@ -128,6 +128,7 @@ For complex feature modules with significant internal structure:
 - [**Terminal Feature**](src/features/terminal/AGENTS.md) — xterm.js terminal with WebSocket PTY
 - [**Settings Feature**](src/features/settings/AGENTS.md) — Provider config, API keys, preferences
 - [**Electron Feature**](src/features/electron/AGENTS.md) — Desktop integration, server lifecycle, updates
+- [**Layout Feature**](src/features/layout/AGENTS.md) — Title bar, navigation, panel toggles, editor integration
 - [**Shared Utilities**](src/shared/AGENTS.md) — UI components, hooks, utilities (54+ files)
 
 ## Related
