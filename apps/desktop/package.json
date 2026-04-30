@@ -21,7 +21,6 @@
     "electron-updater": "^6.3.9"
   },
   "devDependencies": {
-    "@electron/rebuild": "^4.0.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.5.0",
     "electron": "41.1.1",

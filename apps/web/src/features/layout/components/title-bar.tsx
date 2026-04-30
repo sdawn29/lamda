@@ -32,7 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
 import { useWorkspace } from "@/features/workspace"
-import { useTerminal } from "@/features/terminal"
+import { useTerminalForWorkspace } from "@/features/terminal"
 import { useDiffPanel } from "@/features/git"
 import { useFileTree } from "@/features/file-tree"
 import { useElectronFullscreen, useElectronPlatform } from "@/features/electron"
@@ -57,7 +57,6 @@ export function TitleBar() {
   const isSettings = pathname === "/settings"
   const { isMobile, state, toggleSidebar } = useSidebar()
   const { workspaces, setThreadTitle, deleteThread } = useWorkspace()
-  const { isOpen: terminalOpen, toggle: toggleTerminal } = useTerminal()
   const { isOpen: diffOpen, toggle: toggleDiff } = useDiffPanel()
   const { isOpen: fileTreeOpen, toggle: toggleFileTree } = useFileTree()
   const { threadId } = useParams({ strict: false }) as { threadId?: string }
@@ -67,6 +66,10 @@ export function TitleBar() {
   const activeWorkspace = activeThread
     ? workspaces.find((w) => w.threads.some((t) => t.id === activeThread.id))
     : undefined
+  const { isOpen: terminalOpen, toggle: toggleTerminal } = useTerminalForWorkspace(
+    activeWorkspace?.id ?? "",
+    activeWorkspace?.path ?? ""
+  )
   const activeSessionId = activeThread?.sessionId ?? ""
   const { data: platform } = useElectronPlatform()
   const { data: isFullscreen = false } = useElectronFullscreen()

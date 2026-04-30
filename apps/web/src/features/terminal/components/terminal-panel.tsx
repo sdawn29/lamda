@@ -83,20 +83,17 @@ const TerminalInstance = memo(function TerminalInstance({
   const terminalTheme =
     resolvedTheme === "dark" ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME
 
-  // Mount xterm + WebSocket once
+  // Mount xterm + WebSocket once — cwd is fixed at tab creation time and never changes
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
-
-    // Capture cwd in a stable ref so the async callback has the correct value
-    const cwdRef = { current: cwd }
 
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 12,
       fontFamily:
         '"JetBrains Mono", "Menlo", "Monaco", "Courier New", monospace',
-      scrollback: 100,
+      scrollback: 5000,
       theme: document.documentElement.classList.contains("dark")
         ? DARK_TERMINAL_THEME
         : LIGHT_TERMINAL_THEME,
@@ -135,6 +132,8 @@ const TerminalInstance = memo(function TerminalInstance({
     }
 
     const resizeObserver = new ResizeObserver(() => {
+      // Skip fit when container is hidden/collapsed to 0 size
+      if (!container.offsetWidth || !container.offsetHeight) return
       fitAddon.fit()
       const dims = fitAddon.proposeDimensions()
       if (dims && ws?.readyState === WebSocket.OPEN) {
@@ -148,7 +147,7 @@ const TerminalInstance = memo(function TerminalInstance({
     getServerUrl().then((serverUrl) => {
       if (cancelled) return
       const wsBase = serverUrl.replace(/^http/, "ws")
-      const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwdRef.current)}`
+      const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwd)}`
       ws = new WebSocket(url)
       wsRef.current = ws
 
@@ -194,9 +193,11 @@ const TerminalInstance = memo(function TerminalInstance({
       fitAddonRef.current = null
       wsRef.current = null
     }
-  }, [cwd])
+  // cwd is intentionally excluded — it's fixed at tab creation time and must not trigger re-mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Refit when this tab becomes active (container was hidden)
+  // Refit when this instance becomes active (was hidden)
   useEffect(() => {
     if (!isActive) return
     const fit = fitAddonRef.current
@@ -236,25 +237,24 @@ const TerminalInstance = memo(function TerminalInstance({
 // ─── Panel with tab bar ───────────────────────────────────────────────────────
 
 interface TerminalPanelProps {
+  activeWorkspaceId: string
   cwd: string
 }
 
 export const TerminalPanel = memo(function TerminalPanel({
+  activeWorkspaceId,
   cwd,
 }: TerminalPanelProps) {
-  const {
-    tabs,
-    activeTabId,
-    addTab,
-    closeTab,
-    setActiveTab,
-    renameTab,
-    killAll,
-  } = useTerminal()
+  const ctx = useTerminal()
+  const allStates = ctx.getAllStates()
+
+  const activeState = allStates.get(activeWorkspaceId)
+  const tabs = activeState?.tabs ?? []
+  const activeTabId = activeState?.activeTabId ?? null
 
   return (
     <div className="flex h-full shrink-0 flex-col border-t bg-background">
-      {/* Tab bar */}
+      {/* Tab bar — shows only the active workspace's tabs */}
       <div className="flex h-8 shrink-0 items-stretch border-b">
         {/* Scrollable tab list */}
         <div className="scrollbar-none flex min-w-0 flex-1 items-stretch overflow-x-auto">
@@ -264,7 +264,7 @@ export const TerminalPanel = memo(function TerminalPanel({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => ctx.setActiveTab(activeWorkspaceId, tab.id)}
                 className={cn(
                   "group relative flex shrink-0 items-center gap-1.5 border-r px-3 font-mono text-xs transition-colors",
                   isActive
@@ -280,12 +280,12 @@ export const TerminalPanel = memo(function TerminalPanel({
                   aria-label={`Close ${tab.title}`}
                   onClick={(e) => {
                     e.stopPropagation()
-                    closeTab(tab.id)
+                    ctx.closeTab(activeWorkspaceId, tab.id)
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.stopPropagation()
-                      closeTab(tab.id)
+                      ctx.closeTab(activeWorkspaceId, tab.id)
                     }
                   }}
                   className={cn(
@@ -304,7 +304,7 @@ export const TerminalPanel = memo(function TerminalPanel({
           {/* New tab */}
           <button
             type="button"
-            onClick={addTab}
+            onClick={() => ctx.addTab(activeWorkspaceId, cwd)}
             aria-label="New terminal tab"
             className="flex items-center px-2 text-muted-foreground hover:text-foreground"
           >
@@ -318,7 +318,7 @@ export const TerminalPanel = memo(function TerminalPanel({
             variant="ghost"
             size="icon-sm"
             className="h-5 w-5 text-muted-foreground hover:text-destructive"
-            onClick={killAll}
+            onClick={() => ctx.killAll(activeWorkspaceId)}
             title="Kill all terminals"
           >
             <Trash2 className="h-3 w-3" />
@@ -327,17 +327,20 @@ export const TerminalPanel = memo(function TerminalPanel({
         </div>
       </div>
 
-      {/* Terminal instances — all mounted, inactive ones are hidden */}
+      {/* Terminal instances — ALL workspace instances are mounted here.
+          Inactive workspace/tab instances are CSS-hidden so their PTY connections stay alive. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {tabs.map((tab) => (
-          <TerminalInstance
-            key={tab.id}
-            id={tab.id}
-            cwd={cwd}
-            isActive={tab.id === activeTabId}
-            onTitleChange={renameTab}
-          />
-        ))}
+        {Array.from(allStates.entries()).flatMap(([wsId, state]) =>
+          state.tabs.map((tab) => (
+            <TerminalInstance
+              key={tab.id}
+              id={tab.id}
+              cwd={tab.cwd}
+              isActive={wsId === activeWorkspaceId && tab.id === state.activeTabId}
+              onTitleChange={(id, title) => ctx.renameTab(wsId, id, title)}
+            />
+          ))
+        )}
       </div>
     </div>
   )

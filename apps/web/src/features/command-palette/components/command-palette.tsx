@@ -35,7 +35,7 @@ import {
 } from "@/shared/lib/keyboard-shortcuts"
 import { useWorkspace } from "@/features/workspace"
 import { useWorkspaceIndex } from "@/features/workspace/queries"
-import { useTerminal } from "@/features/terminal/context"
+import { useTerminalForWorkspace } from "@/features/terminal/context"
 import { useDiffPanel } from "@/features/git/context"
 import { useFileTree } from "@/features/file-tree/context"
 import { useSidebar } from "@/shared/ui/sidebar"
@@ -59,7 +59,6 @@ export function CommandPalette() {
   const navigate = useNavigate()
   const { threadId: activeThreadId } = useParams({ strict: false }) as { threadId?: string }
   const { workspaces, createThread } = useWorkspace()
-  const terminal = useTerminal()
   const diffPanel = useDiffPanel()
   const fileTree = useFileTree()
   const { toggleSidebar } = useSidebar()
@@ -69,6 +68,11 @@ export function CommandPalette() {
   const activeWorkspace =
     workspaces.find((ws) => ws.threads.some((t) => t.id === activeThreadId)) ??
     workspaces[0]
+
+  const terminal = useTerminalForWorkspace(
+    activeWorkspace?.id ?? "",
+    activeWorkspace?.path ?? ""
+  )
 
   const { data: fileEntries = [], isLoading: filesLoading } = useWorkspaceIndex(
     activeWorkspace?.id,

@@ -4,7 +4,6 @@ import { lazy, Suspense, useEffect, useRef } from "react"
 import { ChatView, useSetThreadStatus } from "@/features/chat"
 import { useWorkspace } from "@/features/workspace"
 import { useDiffPanel } from "@/features/git"
-import { useTerminal } from "@/features/terminal"
 import { useFileTree } from "@/features/file-tree"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
 import { useUpdateThreadLastAccessed } from "@/features/workspace/mutations"
@@ -19,12 +18,6 @@ import { cn } from "@/shared/lib/utils"
 const DiffPanel = lazy(() =>
   import("@/features/git").then((module) => ({
     default: module.DiffPanel,
-  }))
-)
-
-const TerminalPanel = lazy(() =>
-  import("@/features/terminal").then((module) => ({
-    default: module.TerminalPanel,
   }))
 )
 
@@ -47,7 +40,6 @@ function WorkspaceThreadRoute() {
     isFullscreen: diffFullscreen,
     setCurrentWorkspace,
   } = useDiffPanel()
-  const { isOpen: terminalOpen } = useTerminal()
   const { isOpen: fileTreeOpen } = useFileTree()
   const { mutate: updateSetting } = useUpdateAppSetting()
   const { mutate: updateLastAccessed } = useUpdateThreadLastAccessed()
@@ -60,7 +52,6 @@ function WorkspaceThreadRoute() {
   const foundThread = foundWorkspace?.threads.find((t) => t.id === threadId)
 
   // Set workspace path in diff panel context for breadcrumb navigation
-  // Use ref to track the current path and avoid infinite loops from effect re-runs
   const currentPathRef = useRef<string | null>(null)
   useEffect(() => {
     const newPath = foundWorkspace?.path ?? null
@@ -92,90 +83,68 @@ function WorkspaceThreadRoute() {
     return null
   }
 
+  if (diffFullscreen) {
+    return (
+      <div className="flex h-full border-t">
+        <div className="flex min-w-0 flex-1">
+          <Suspense fallback={<div className="h-full flex-1 bg-muted/10" />}>
+            <DiffPanel
+              sessionId={foundThread.sessionId}
+              openWithAppId={foundWorkspace.openWithAppId}
+            />
+          </Suspense>
+        </div>
+        {fileTreeOpen && (
+          <div className="h-full w-56 shrink-0 border-l border-sidebar-border">
+            <FileTree
+              workspaceId={foundWorkspace.id}
+              workspacePath={foundWorkspace.path}
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <ResizablePanelGroup orientation="vertical" className="h-full border-t">
-      <ResizablePanel
-        defaultSize={diffFullscreen ? 100 : 50}
-        minSize={diffFullscreen ? 100 : 50}
-        className={cn(diffFullscreen && "h-full")}
-      >
-        {diffFullscreen ? (
-          <div className="flex h-full">
-            <div className="flex min-w-0 flex-1">
+    <div className={cn("flex h-full border-t", diffFullscreen && "h-full")}>
+      <ResizablePanelGroup orientation="horizontal" className="flex-1">
+        <ResizablePanel defaultSize={diffOpen ? "50" : "100"} minSize="50">
+          <ChatView
+            sessionId={foundThread.sessionId}
+            workspaceId={foundWorkspace.id}
+            threadId={foundThread.id}
+            initialModelId={foundThread.modelId}
+            initialIsStopped={foundThread.isStopped}
+          />
+        </ResizablePanel>
+        {diffOpen && (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize="45" minSize="40">
               <Suspense
-                fallback={<div className="h-full flex-1 bg-muted/10" />}
+                fallback={
+                  <div className="h-full border-l border-border/60 bg-muted/10" />
+                }
               >
                 <DiffPanel
                   sessionId={foundThread.sessionId}
                   openWithAppId={foundWorkspace.openWithAppId}
                 />
               </Suspense>
-            </div>
-            {fileTreeOpen && (
-              <div className="h-full w-56 shrink-0 border-l border-sidebar-border">
-                <FileTree
-                  workspaceId={foundWorkspace.id}
-                  workspacePath={foundWorkspace.path}
-                />
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex h-full">
-            {/* Left: Chat + Diff panels in resizable group */}
-            <ResizablePanelGroup orientation="horizontal" className="flex-1">
-              <ResizablePanel defaultSize={diffOpen ? 50 : 100} minSize={50}>
-                <ChatView
-                  sessionId={foundThread.sessionId}
-                  workspaceId={foundWorkspace.id}
-                  threadId={foundThread.id}
-                  initialModelId={foundThread.modelId}
-                  initialIsStopped={foundThread.isStopped}
-                />
-              </ResizablePanel>
-              {diffOpen && (
-                <>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={45} minSize={40}>
-                    <Suspense
-                      fallback={
-                        <div className="h-full border-l border-border/60 bg-muted/10" />
-                      }
-                    >
-                      <DiffPanel
-                        sessionId={foundThread.sessionId}
-                        openWithAppId={foundWorkspace.openWithAppId}
-                      />
-                    </Suspense>
-                  </ResizablePanel>
-                </>
-              )}
-            </ResizablePanelGroup>
-
-            {/* Right: File Tree panel (flex, not resizable) */}
-            {fileTreeOpen && (
-              <div className="h-full w-56 shrink-0 border-l border-sidebar-border">
-                <FileTree
-                  workspaceId={foundWorkspace.id}
-                  workspacePath={foundWorkspace.path}
-                />
-              </div>
-            )}
-          </div>
+            </ResizablePanel>
+          </>
         )}
-      </ResizablePanel>
-      {terminalOpen && (
-        <>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={33.33} minSize={33.33}>
-            <Suspense
-              fallback={<div className="h-full border-t bg-background" />}
-            >
-              <TerminalPanel cwd={foundWorkspace.path} />
-            </Suspense>
-          </ResizablePanel>
-        </>
+      </ResizablePanelGroup>
+
+      {fileTreeOpen && (
+        <div className="h-full w-56 shrink-0 border-l border-sidebar-border">
+          <FileTree
+            workspaceId={foundWorkspace.id}
+            workspacePath={foundWorkspace.path}
+          />
+        </div>
       )}
-    </ResizablePanelGroup>
+    </div>
   )
 }
