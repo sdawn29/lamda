@@ -62,6 +62,7 @@ import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { ShortcutKbd } from "@/shared/ui/kbd"
 import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 import { getServerUrl } from "@/shared/lib/client"
+import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -418,6 +419,18 @@ const FileContent = memo(function FileContent({
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
+  // Get available apps for default editor selection
+  const { data: platform } = useElectronPlatform()
+  const isMac = platform === "darwin"
+  const { data: apps = [] } = useOpenWithApps(isMac)
+
+  // Determine the effective editor to use (same logic as OpenWithButton)
+  const effectiveAppId = useMemo(() => {
+    if (!isMac || apps.length === 0) return undefined
+    // Use user-selected app, or fall back to first app (default)
+    return openWithAppId ?? apps[0].id
+  }, [isMac, apps, openWithAppId])
+
   // Extract relative path from workspace
   const relativePath = workspacePath
     ? filePath.startsWith(workspacePath)
@@ -431,6 +444,8 @@ const FileContent = memo(function FileContent({
   const isImage = /^(png|jpe?g|gif|svg|webp|bmp|ico|tiff?|avif)$/.test(
     fileExtension
   )
+  const isHtml = fileExtension === "html" || fileExtension === "htm"
+  const isPdf = fileExtension === "pdf"
 
   const markdownLinkComponents = useMemo(
     () => ({
@@ -542,7 +557,7 @@ const FileContent = memo(function FileContent({
           <FileHeader
             pathParts={pathParts}
             filePath={filePath}
-            openWithAppId={openWithAppId}
+            openWithAppId={effectiveAppId}
           />
         </div>
         <div className="flex flex-1 items-center justify-center">
@@ -562,7 +577,7 @@ const FileContent = memo(function FileContent({
           <FileHeader
             pathParts={pathParts}
             filePath={filePath}
-            openWithAppId={openWithAppId}
+            openWithAppId={effectiveAppId}
           />
         </div>
         <div className="flex flex-1 items-center justify-center p-4">
@@ -580,12 +595,14 @@ const FileContent = memo(function FileContent({
         <FileHeader
           pathParts={pathParts}
           filePath={filePath}
-          openWithAppId={openWithAppId}
+          openWithAppId={effectiveAppId}
           isMarkdown={isMarkdown}
           markdownPreview={markdownPreview}
           onToggleMarkdownPreview={
             isMarkdown ? () => setMarkdownPreview(!markdownPreview) : undefined
           }
+          isHtml={isHtml}
+          isPdf={isPdf}
         />
       </div>
       <div

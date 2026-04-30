@@ -1,8 +1,8 @@
 // ─── File Header ───────────────────────────────────────────────────────────────
 
 import { useCallback } from "react"
-import { ExternalLink, FileText } from "lucide-react"
-import { openFileWithApp } from "@/features/electron/api"
+import { ExternalLink, FileText, Globe } from "lucide-react"
+import { openFileWithApp, openExternal } from "@/features/electron/api"
 import { Button } from "@/shared/ui/button"
 
 interface FileHeaderProps {
@@ -12,6 +12,8 @@ interface FileHeaderProps {
   isMarkdown?: boolean
   markdownPreview?: boolean
   onToggleMarkdownPreview?: () => void
+  isHtml?: boolean
+  isPdf?: boolean
 }
 
 export function FileHeader({
@@ -21,11 +23,19 @@ export function FileHeader({
   isMarkdown,
   markdownPreview,
   onToggleMarkdownPreview,
+  isHtml,
+  isPdf,
 }: FileHeaderProps) {
   const handleOpenClick = useCallback(() => {
     // Open with the selected editor (or default if none selected)
     openFileWithApp(filePath, openWithAppId ?? undefined)
   }, [filePath, openWithAppId])
+
+  const handleOpenInBrowser = useCallback(async () => {
+    // For HTML and PDF files, open in browser using the file:// protocol
+    const url = `file://${filePath}`
+    await openExternal(url)
+  }, [filePath])
 
   return (
     <div className="scrollbar-none flex min-w-0 items-center gap-2 px-2 py-1 text-xs">
@@ -55,6 +65,18 @@ export function FileHeader({
           title={markdownPreview ? "Show raw markdown" : "Preview markdown"}
         >
           <FileText data-icon="inline-start" />
+        </Button>
+      )}
+
+      {(isHtml || isPdf) && (
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleOpenInBrowser}
+          className="h-6 gap-1 text-[10px]"
+          title={isHtml ? "Open in browser" : "Open in default PDF viewer"}
+        >
+          <Globe data-icon="inline-start" />
         </Button>
       )}
 
