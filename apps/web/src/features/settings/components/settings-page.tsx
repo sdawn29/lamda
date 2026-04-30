@@ -1099,7 +1099,7 @@ function UpdateStatusRow({
       return (
         <Progress value={status.percent} className="flex-col gap-1.5">
           <ProgressLabel>Downloading update…</ProgressLabel>
-          <ProgressValue>{Math.round(status.percent)}%</ProgressValue>
+          <ProgressValue>{() => `${Math.round(status.percent)}%`}</ProgressValue>
         </Progress>
       )
     case "ready":

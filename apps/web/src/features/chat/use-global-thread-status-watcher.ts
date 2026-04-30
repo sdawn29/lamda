@@ -30,14 +30,14 @@ export function useGlobalThreadStatusWatcher(activeThreadId?: string) {
             const data = JSON.parse(e.data as string) as { type: string } & Record<string, unknown>
 
             if (data.type === "thread_status") {
-              const { threadId, status } = data as { threadId: string; status: "running" | "idle" }
+              const { threadId, status } = data as unknown as { threadId: string; status: "running" | "idle" }
               if (status === "idle" && threadId !== activeThreadIdRef.current) {
                 setStatus(threadId, "completed")
               } else {
                 setStatus(threadId, status)
               }
             } else if (data.type === "workspace_files_updated") {
-              const { workspaceId } = data as { workspaceId: string }
+              const { workspaceId } = data as unknown as { workspaceId: string }
               queryClient.invalidateQueries({ queryKey: workspaceKeys.files(workspaceId) })
             }
           } catch (error) {
@@ -45,11 +45,7 @@ export function useGlobalThreadStatusWatcher(activeThreadId?: string) {
           }
         })
 
-        // Track if an error occurred to suppress duplicate browser warnings
-        let hadError = false
-        ws.addEventListener("error", () => {
-          hadError = true
-        })
+        ws.addEventListener("error", () => {})
       })
       .catch((error) => {
         if (active) {

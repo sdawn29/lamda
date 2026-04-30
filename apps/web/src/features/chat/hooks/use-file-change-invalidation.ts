@@ -132,7 +132,7 @@ export function useFileChangeInvalidation(sessionId: string | null) {
           onServerError: () => {},
         })
       })
-      .catch((e) => {
+      .catch(() => {
         // Silently handle - server may not be available
       })
 

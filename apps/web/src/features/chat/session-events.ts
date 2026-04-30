@@ -129,43 +129,43 @@ export function subscribeToSessionEvents(
           handlers.onMessageUpdate(data as SessionMessageUpdateEvent)
           break
         case "message_end":
-          handlers.onMessageEnd(data as SessionMessageEndEvent)
+          handlers.onMessageEnd(data as unknown as SessionMessageEndEvent)
           break
         case "tool_execution_start":
-          handlers.onToolExecutionStart(data as SessionToolExecutionStartEvent)
+          handlers.onToolExecutionStart(data as unknown as SessionToolExecutionStartEvent)
           break
         case "tool_execution_update":
-          handlers.onToolExecutionUpdate(data as SessionToolExecutionUpdateEvent)
+          handlers.onToolExecutionUpdate(data as unknown as SessionToolExecutionUpdateEvent)
           break
         case "tool_execution_end":
-          handlers.onToolExecutionEnd(data as SessionToolExecutionEndEvent)
+          handlers.onToolExecutionEnd(data as unknown as SessionToolExecutionEndEvent)
           break
         case "turn_start":
-          handlers.onTurnStart(data as SessionTurnStartEvent)
+          handlers.onTurnStart(data as unknown as SessionTurnStartEvent)
           break
         case "turn_end":
-          handlers.onTurnEnd(data as SessionTurnEndEvent)
+          handlers.onTurnEnd(data as unknown as SessionTurnEndEvent)
           break
         case "agent_start":
-          handlers.onAgentStart(data as SessionAgentStartEvent)
+          handlers.onAgentStart(data as unknown as SessionAgentStartEvent)
           break
         case "agent_end":
-          handlers.onAgentEnd(data as SessionAgentEndEvent)
+          handlers.onAgentEnd(data as unknown as SessionAgentEndEvent)
           break
         case "queue_update":
-          handlers.onQueueUpdate(data as SessionQueueUpdateEvent)
+          handlers.onQueueUpdate(data as unknown as SessionQueueUpdateEvent)
           break
         case "auto_retry_start":
-          handlers.onAutoRetryStart(data as SessionAutoRetryStartEvent)
+          handlers.onAutoRetryStart(data as unknown as SessionAutoRetryStartEvent)
           break
         case "auto_retry_end":
-          handlers.onAutoRetryEnd(data as SessionAutoRetryEndEvent)
+          handlers.onAutoRetryEnd(data as unknown as SessionAutoRetryEndEvent)
           break
         case "compaction_start":
-          handlers.onCompactionStart(data as { reason: "manual" | "threshold" | "overflow" })
+          handlers.onCompactionStart(data as unknown as { reason: "manual" | "threshold" | "overflow" })
           break
         case "compaction_end":
-          handlers.onCompactionEnd(data as {
+          handlers.onCompactionEnd(data as unknown as {
             reason: "manual" | "threshold" | "overflow"
             aborted: boolean
             willRetry: boolean
@@ -173,7 +173,7 @@ export function subscribeToSessionEvents(
           })
           break
         case "server_error":
-          handlers.onServerError(data as SessionServerErrorEvent)
+          handlers.onServerError(data as unknown as SessionServerErrorEvent)
           break
       }
     } catch (error) {

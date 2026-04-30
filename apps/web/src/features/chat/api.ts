@@ -24,7 +24,6 @@ async function openWebSocketWithRetry(
   options: WebSocketOpenOptions = {}
 ): Promise<WebSocket | null> {
   const { retries, baseDelay, maxDelay } = { ...DEFAULT_WS_OPTIONS, ...options }
-  let lastError: Error | null = null
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -54,9 +53,7 @@ async function openWebSocketWithRetry(
       })
 
       return result
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error))
-
+    } catch {
       // Don't retry if this was the last attempt
       if (attempt >= retries) break
 

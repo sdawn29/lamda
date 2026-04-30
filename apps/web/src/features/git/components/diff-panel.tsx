@@ -469,7 +469,7 @@ const FileContent = memo(function FileContent({
           </button>
         )
       },
-      img: ({ src, alt }) => {
+      img: ({ src, alt }: { src?: string; alt?: string }) => {
         if (!src) return null
         const resolvedSrc = /^https?:/.test(src)
           ? src
@@ -692,7 +692,7 @@ export const DiffPanel = memo(function DiffPanel({
   )?.id
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [fileSearchOpen, setFileSearchOpen] = useState(false)
-  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const tabRefs = useRef<Map<string, HTMLElement>>(new Map())
 
   useShortcutHandler(SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF, toggleFullscreen)
   const fullscreenBinding = useShortcutBinding(
@@ -759,7 +759,7 @@ export const DiffPanel = memo(function DiffPanel({
                   aria-selected={isActive}
                   ref={(el) => {
                     if (el) {
-                      tabRefs.current.set(tab.id, el as HTMLButtonElement)
+                      tabRefs.current.set(tab.id, el)
                     } else {
                       tabRefs.current.delete(tab.id)
                     }

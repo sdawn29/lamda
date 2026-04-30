@@ -33,7 +33,7 @@ export function handleTerminalConnection(
 
   let ptyProcess: ReturnType<typeof pty.spawn> | null = null;
   try {
-    ptyProcess = pty.spawn(shell, [], {
+    ptyProcess = pty.spawn(shell, ["-l"], {
       name: "xterm-256color",
       cols: 80,
       rows: 24,
