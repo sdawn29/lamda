@@ -302,6 +302,189 @@ const PROVIDER_META: Record<string, { label: string; icon: React.ReactNode }> =
         </svg>
       ),
     },
+    ollama: {
+      label: "Ollama",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>
+      ),
+    },
+    sglang: {
+      label: "SGLang",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M4 4h16v4H4z"/>
+          <path d="M4 12h16v4H4z"/>
+          <path d="M4 20h16v0"/>
+        </svg>
+      ),
+    },
+    lmstudio: {
+      label: "LM Studio",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      ),
+    },
+    vllm: {
+      label: "vLLM",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+          <path d="M12 2l10 18H2L12 2zm0 5l-6 11h12l-6-11z"/>
+        </svg>
+      ),
+    },
+    perplexity: {
+      label: "Perplexity",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 8v4l3 3"/>
+          <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+        </svg>
+      ),
+    },
+    together: {
+      label: "Together AI",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+      ),
+    },
+    cohere: {
+      label: "Cohere",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+        </svg>
+      ),
+    },
+    novita: {
+      label: "Novita AI",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+      ),
+    },
+    "cloudflare-workers": {
+      label: "Cloudflare Workers",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+          <path d="M12 2L2 12l10 10 10-10L12 2zm0 3.5L18.5 12 12 18.5 5.5 12 12 5.5z"/>
+          <path d="M12 7l-3 3h2v3h2v-3h2l-3-3z"/>
+        </svg>
+      ),
+    },
+    cloudflare: {
+      label: "Cloudflare",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+          <path d="M12 2L2 12l10 10 10-10L12 2zm0 3.5L18.5 12 12 18.5 5.5 12 12 5.5z"/>
+          <path d="M12 7l-3 3h2v3h2v-3h2l-3-3z"/>
+        </svg>
+      ),
+    },
+    replicate: {
+      label: "Replicate",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <rect x="3" y="3" width="18" height="18" rx="3"/>
+          <path d="M8 12h8M12 8v8"/>
+        </svg>
+      ),
+    },
+    hyperbolic: {
+      label: "Hyperbolic",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M4 12c0-4.42 3.58-8 8-8s8 3.58 8 8-3.58 8-8 8"/>
+          <path d="M12 4v16"/>
+        </svg>
+      ),
+    },
+    tensorzero: {
+      label: "TensorZero",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+          <path d="M12 2L4 6v12l8 4 8-4V6l-8-4zm0 2.5L18 8l-6 3-6-3 6-3.5zm-6 6l6 3v6l-6-3v-6zm6 9v-6l6 3v6l-6-3z"/>
+        </svg>
+      ),
+    },
+    voyage: {
+      label: "Voyage AI",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+        </svg>
+      ),
+    },
+    codestral: {
+      label: "Codestral",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+          <path d="M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2M8 3a3 3 0 0 0-3 3v14a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3V6a3 3 0 0 0-3-3H8z"/>
+          <path d="M9 9l3 3-3 3M12 15h3"/>
+        </svg>
+      ),
+    },
+    "wings-gpu": {
+      label: "Wings GPU",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M12 2L4 7v10l8 5 8-5V7l-8-5z"/>
+          <path d="M12 22V12M4 7l8 5 8-5"/>
+        </svg>
+      ),
+    },
+    windsurf: {
+      label: "Windsurf",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M12 2v8M8 6l4-4 4 4"/>
+          <path d="M4 14c0 4.42 3.58 8 8 8s8-3.58 8-8"/>
+          <path d="M16 10c-2 2-4.5 3-6 3s-4-1-6-3"/>
+        </svg>
+      ),
+    },
+    "fireworks-inference": {
+      label: "Fireworks Inference",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_CLASS} aria-hidden>
+          <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+        </svg>
+      ),
+    },
+    binarybottle: {
+      label: "BinaryBottle",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M8 22h8M12 2v4M7 4l5 2M17 4l-5 2M7 22l5-2M17 22l-5-2"/>
+          <rect x="9" y="6" width="6" height="12" rx="1"/>
+        </svg>
+      ),
+    },
+    infercast: {
+      label: "Infercast",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v4M12 18v4M2 12h4M18 12h4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+      ),
+    },
+    lepton: {
+      label: "Lepton",
+      icon: (
+        <svg viewBox="0 0 24 24" className={ICON_STROKE_CLASS} fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M8 12h8M12 8v8"/>
+        </svg>
+      ),
+    },
   }
 
 export function getProviderMeta(providerId: string) {
