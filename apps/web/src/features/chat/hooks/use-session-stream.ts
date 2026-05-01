@@ -190,6 +190,7 @@ export interface UseSessionStreamOptions {
   onIsLoadingChange?: (loading: boolean) => void
   onIsCompactingChange?: (compacting: boolean) => void
   onPendingErrorChange?: (error: ReturnType<typeof createErrorMessage> | null) => void
+  onError?: () => void
 }
 
 export function useSessionStream({
@@ -199,6 +200,7 @@ export function useSessionStream({
   onIsLoadingChange,
   onIsCompactingChange,
   onPendingErrorChange,
+  onError,
 }: UseSessionStreamOptions) {
   const queryClient = useQueryClient()
   const rafRef = useRef<number | null>(null)
@@ -211,10 +213,10 @@ export function useSessionStream({
 
   // Stable ref to the current callbacks — stored in a ref so event handlers
   // (which are recreated each effect run) always call the latest callbacks.
-  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onPendingErrorChange })
+  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onPendingErrorChange, onError })
   useEffect(() => {
-    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onPendingErrorChange }
-  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onPendingErrorChange])
+    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onPendingErrorChange, onError }
+  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onPendingErrorChange, onError])
 
   const flushPendingUpdates = useCallback(() => {
     rafRef.current = null
@@ -393,10 +395,19 @@ export function useSessionStream({
                 )
 
               if (assistantError?.errorMessage) {
-                finalized = [
-                  ...finalized,
-                  createErrorMessage("Error", parseErrorMessage(assistantError.errorMessage)),
-                ]
+                const errorText = parseErrorMessage(assistantError.errorMessage)
+                const lastIdx = findLastAssistantIndex(finalized)
+                if (lastIdx !== -1) {
+                  const last = finalized[lastIdx] as AssistantMessage
+                  finalized = [
+                    ...finalized.slice(0, lastIdx),
+                    { ...last, errorMessage: errorText },
+                    ...finalized.slice(lastIdx + 1),
+                  ]
+                } else {
+                  finalized = [...finalized, createAssistantMessage({ errorMessage: errorText })]
+                }
+                callbacksRef.current.onError?.()
               }
 
               return finalized
@@ -437,6 +448,7 @@ export function useSessionStream({
                     : { type: "dismiss" },
                 })
               )
+              callbacksRef.current.onError?.()
             } else {
               callbacksRef.current.onPendingErrorChange?.(null)
             }
@@ -450,11 +462,14 @@ export function useSessionStream({
           onCompactionEnd: ({ errorMessage, aborted }) => {
             if (doneFlag.current) return
             callbacksRef.current.onIsCompactingChange?.(false)
-            callbacksRef.current.onPendingErrorChange?.(
-              errorMessage && !aborted
-                ? createErrorMessage("Compaction Failed", errorMessage)
-                : null
-            )
+            if (errorMessage && !aborted) {
+              callbacksRef.current.onPendingErrorChange?.(
+                createErrorMessage("Compaction Failed", errorMessage)
+              )
+              callbacksRef.current.onError?.()
+            } else {
+              callbacksRef.current.onPendingErrorChange?.(null)
+            }
           },
 
           onServerError: ({ message }) => {
@@ -469,6 +484,7 @@ export function useSessionStream({
                   : { type: "dismiss" },
               })
             )
+            callbacksRef.current.onError?.()
             callbacksRef.current.onIsLoadingChange?.(false)
           },
 
@@ -487,6 +503,7 @@ export function useSessionStream({
                 }
               )
             )
+            callbacksRef.current.onError?.()
             callbacksRef.current.onIsLoadingChange?.(false)
             void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
           },

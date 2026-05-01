@@ -61,19 +61,17 @@ function TimeStamp({ timestamp }: TimeStampProps) {
 interface AssistantMessageBlockProps {
   message: AssistantMessage
   showThinking: boolean
-  /** Render with destructive text color (for role="error" messages) */
-  isError?: boolean
 }
 
 function AssistantMessageBlock({
   message,
   showThinking,
-  isError = false,
 }: AssistantMessageBlockProps) {
   const hasThinking = showThinking && message.thinking.trim().length > 0
   const hasContent = message.content.length > 0
+  const hasError = !!message.errorMessage
 
-  if (!hasThinking && !hasContent) return null
+  if (!hasThinking && !hasContent && !hasError) return null
 
   const providerMeta = message.provider
     ? getProviderMeta(message.provider)
@@ -89,10 +87,7 @@ function AssistantMessageBlock({
     : null
   const hasMeta = !!(message.model ?? message.responseTime != null)
 
-  // Apply destructive text color when rendered as an error
-  const proseClass = isError
-    ? "prose prose-sm max-w-none dark:prose-invert text-destructive [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-destructive [&_a]:underline [&_a]:underline-offset-4"
-    : "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
+  const proseClass = "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
 
   return (
     <div className="group flex animate-in flex-col gap-2 duration-300 fade-in-0 slide-in-from-bottom-1">
@@ -106,15 +101,16 @@ function AssistantMessageBlock({
         </div>
       )}
 
+      {hasError && (
+        <div className="flex items-center gap-1.5 text-xs text-destructive/70">
+          <AlertCircleIcon className="h-3.5 w-3.5 shrink-0" />
+          <span>{message.errorMessage}</span>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         {hasMeta && (
-          <div
-            className={
-              isError
-                ? "flex items-center gap-1.5 text-xs text-destructive/60"
-                : "flex items-center gap-1.5 text-xs text-muted-foreground"
-            }
-          >
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             {providerMeta && (
               <span className="flex shrink-0 items-center">
                 {providerMeta.icon}

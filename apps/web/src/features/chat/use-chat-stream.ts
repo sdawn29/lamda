@@ -19,6 +19,7 @@ import { useVisibleMessages } from "./hooks/use-visible-messages"
 import { messagesQueryKey } from "./queries"
 import { createErrorMessage } from "./types"
 import type { ErrorMessage, Message } from "./types"
+import { useSetThreadStatus } from "./thread-status-context"
 
 interface UseChatStreamOptions {
   sessionId: string
@@ -44,8 +45,7 @@ export function useChatStream({
   threadId,
   initialIsStopped,
 }: UseChatStreamOptions): UseChatStreamResult {
-  void threadId
-
+  const setThreadStatus = useSetThreadStatus()
   const queryClient = useQueryClient()
   const [isStopped, setIsStopped] = useState(initialIsStopped)
   const [isCompacting, setIsCompacting] = useState(false)
@@ -54,12 +54,17 @@ export function useChatStream({
 
   const { messages } = useVisibleMessages({ sessionId, pendingError })
 
+  const handleError = useCallback(() => {
+    setThreadStatus(threadId, "error")
+  }, [setThreadStatus, threadId])
+
   // Connect to WebSocket stream
   const { lastPromptRef, pendingThinkingLevelRef } = useSessionStream({
     sessionId,
     onIsLoadingChange: setIsLoading,
     onIsCompactingChange: setIsCompacting,
     onPendingErrorChange: setPendingError,
+    onError: handleError,
   })
 
   const hasLoadedMessages = messages.length > 0 || isLoading

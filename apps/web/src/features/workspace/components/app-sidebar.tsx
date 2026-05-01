@@ -126,25 +126,23 @@ function ThreadRow({
     <>
       <SidebarMenuSubItem className="group/thread">
         <SidebarMenuSubButton isActive={isActive} onClick={onClick}>
-          <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">
-            <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+            <span className="flex h-4 w-4 items-center justify-center group-hover/thread:hidden">
               {status === "streaming" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/60" />
               ) : status === "completed" ? (
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              ) : (
-                <span className="h-1.5 w-1.5 rounded-full bg-transparent" />
-              )}
+              ) : status === "error" ? (
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+              ) : thread.isPinned ? (
+                <Pin className="h-3 w-3 text-muted-foreground/40" />
+              ) : null}
             </span>
             <IconButtonWithTooltip
               icon={Pin}
               label={thread.isPinned ? "Unpin thread" : "Pin thread"}
               onClick={handlePinToggle}
-              className={cn(
-                "absolute inset-0 size-auto transition-colors",
-                !thread.isPinned &&
-                  "invisible text-muted-foreground/30 group-hover/thread:visible"
-              )}
+              className="hidden size-auto text-muted-foreground/40 transition-colors group-hover/thread:flex"
             />
           </span>
           <span className="truncate">{thread.title}</span>

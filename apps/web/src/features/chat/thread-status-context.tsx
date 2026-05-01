@@ -17,8 +17,9 @@ import { openGlobalWebSocket } from "./api"
  * - "streaming": agent is actively processing (isStreaming: true)
  * - "completed": was streaming, now done - shows green dot (turns to idle after 5s when viewing)
  * - "idle": agent has never streamed or has settled after completion
+ * - "error": agent ended with an error - shows red dot, cleared only when streaming resumes
  */
-export type ThreadStatus = "streaming" | "completed" | "idle"
+export type ThreadStatus = "streaming" | "completed" | "idle" | "error"
 
 // ── External store ────────────────────────────────────────────────────────────
 //
@@ -126,6 +127,9 @@ export function ThreadStatusProvider({ children }: { children: ReactNode }) {
 
   const setStatus = useCallback(
     (threadId: string, status: ThreadStatus) => {
+      // Error state persists until a new stream starts — ignore idle/completed overrides.
+      if (status !== "streaming" && statusStore.getStatus(threadId) === "error") return
+
       if (status === "streaming") markThreadStreamed(threadId)
 
       statusStore.set(threadId, status)

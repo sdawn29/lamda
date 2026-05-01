@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import type { ErrorAction, Message } from "../types"
+import type { ErrorAction } from "../types"
 import {
   SparklesIcon,
   ArrowDownIcon,
@@ -114,7 +114,10 @@ export function ChatView({
       } else if (action.type === "retry" && action.prompt) {
         dismissError(id)
         startUserPrompt(action.prompt)
-        sendPromptMutation.mutate({ text: action.prompt }, { onError: markSendFailed })
+        sendPromptMutation.mutate(
+          { text: action.prompt },
+          { onError: markSendFailed }
+        )
       }
     },
     [dismissError, startUserPrompt, sendPromptMutation, markSendFailed]
@@ -134,7 +137,9 @@ export function ChatView({
   // which can flip pinnedRef to false and stop further scrolls entirely.
   // Fix: use instant scrollTop assignment while loading so every update reliably
   // lands at the bottom; only use smooth scroll once the stream is stable.
-  const commandsByName = new Map((commandsData ?? []).map((command) => [command.name, command]))
+  const commandsByName = new Map(
+    (commandsData ?? []).map((command) => [command.name, command])
+  )
 
   // ── Scroll position persistence via query cache & localStorage ──────────────────
   // Scroll positions are stored in both TanStack Query cache and localStorage.
@@ -170,9 +175,11 @@ export function ChatView({
 
       // Check if this thread has been visited before
       // First check query cache, then localStorage
-      let savedMeta = queryClient.getQueryData<{ scrollTop: number; isPinned: boolean; visited?: boolean }>(
-        chatKeys.scroll(sessionId)
-      )
+      let savedMeta = queryClient.getQueryData<{
+        scrollTop: number
+        isPinned: boolean
+        visited?: boolean
+      }>(chatKeys.scroll(sessionId))
 
       // If not in cache, check localStorage (persisted across sessions)
       if (!savedMeta?.visited) {
@@ -298,13 +305,13 @@ export function ChatView({
       pinnedRef.current = true
       updateThreadStopped.mutate({ threadId, stopped: false })
       startUserPrompt(text, thinkingLevel)
-      
+
       // Scroll immediately when sending
       const el = scrollContainerRef.current
       if (el) {
         el.scrollTop = el.scrollHeight
       }
-      
+
       const model = modelId && provider ? { provider, modelId } : undefined
       sendPromptMutation.mutate(
         { text, model, thinkingLevel },
