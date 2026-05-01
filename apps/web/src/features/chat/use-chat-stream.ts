@@ -17,8 +17,10 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useSessionStream } from "./hooks/use-session-stream"
 import { useVisibleMessages } from "./hooks/use-visible-messages"
 import { messagesQueryKey } from "./queries"
+import { dismissSessionError } from "./api"
 import { createErrorMessage } from "./types"
-import type { Message } from "./types"
+import type { ErrorMessage, Message } from "./types"
+import { useSetThreadStatus } from "./thread-status-context"
 
 interface UseChatStreamOptions {
   sessionId: string
@@ -36,6 +38,7 @@ interface UseChatStreamResult {
   startUserPrompt: (text: string, thinkingLevel?: string) => void
   markStopped: () => void
   markSendFailed: () => void
+  dismissError: (id: string) => void
 }
 
 export function useChatStream({
@@ -43,8 +46,7 @@ export function useChatStream({
   threadId,
   initialIsStopped,
 }: UseChatStreamOptions): UseChatStreamResult {
-  void threadId
-
+  const setThreadStatus = useSetThreadStatus()
   const queryClient = useQueryClient()
   const [isStopped, setIsStopped] = useState(initialIsStopped)
   const [isCompacting, setIsCompacting] = useState(false)
@@ -53,12 +55,17 @@ export function useChatStream({
 
   const { messages } = useVisibleMessages({ sessionId, pendingError })
 
+  const handleError = useCallback(() => {
+    setThreadStatus(threadId, "error")
+  }, [setThreadStatus, threadId])
+
   // Connect to WebSocket stream
   const { lastPromptRef, pendingThinkingLevelRef } = useSessionStream({
     sessionId,
     onIsLoadingChange: setIsLoading,
     onIsCompactingChange: setIsCompacting,
     onPendingErrorChange: setPendingError,
+    onError: handleError,
   })
 
   const hasLoadedMessages = messages.length > 0 || isLoading
@@ -96,6 +103,21 @@ export function useChatStream({
     // Error handling is managed by the stream hook
   }, [])
 
+  const dismissError = useCallback(
+    (id: string) => {
+      queryClient.setQueryData<Message[]>(messagesQueryKey(sessionId), (prev) =>
+        (prev ?? []).filter(
+          (m): boolean => !(m.role === "error" && (m as ErrorMessage).id === id)
+        )
+      )
+      setPendingError((prev) => (prev?.id === id ? null : prev))
+      // Tell the server to drop error events from its replay buffer so they
+      // don't reappear when the WebSocket reconnects after a page refresh.
+      dismissSessionError(sessionId).catch(() => { /* best-effort */ })
+    },
+    [queryClient, sessionId]
+  )
+
   return {
     visibleMessages,
     hasConversationHistory: visibleMessages.length > 0,
@@ -106,5 +128,6 @@ export function useChatStream({
     startUserPrompt,
     markStopped,
     markSendFailed,
+    dismissError,
   }
 }

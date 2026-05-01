@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import type { ErrorMessage, Message } from "../types"
+import type { ErrorAction } from "../types"
 import {
   SparklesIcon,
   ArrowDownIcon,
@@ -40,7 +40,6 @@ import {
   useUpdateThreadStopped,
 } from "@/features/workspace/mutations"
 import { useChatStream } from "../use-chat-stream"
-import { useApiErrorToasts } from "../hooks/use-api-error-toasts"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
 import { useFileChangeInvalidation } from "../hooks/use-file-change-invalidation"
 import { FileChangesCard } from "./file-changes-card"
@@ -75,25 +74,12 @@ export function ChatView({
     startUserPrompt,
     markStopped,
     markSendFailed,
+    dismissError,
   } = useChatStream({
     sessionId,
     threadId,
     initialIsStopped,
   })
-
-  // Separate error messages (show as toasts) from other messages
-  const apiErrors: ErrorMessage[] = []
-  const chatMessages: Message[] = []
-  for (const msg of visibleMessages) {
-    if (msg.role === "error") {
-      apiErrors.push(msg as ErrorMessage)
-    } else {
-      chatMessages.push(msg)
-    }
-  }
-
-  const apiErrorIds = new Set(apiErrors.map((e) => e.id))
-  useApiErrorToasts({ visibleErrorIds: apiErrorIds, errors: apiErrors })
 
   const [gitError, setGitError] = useState<string | null>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -121,6 +107,22 @@ export function ChatView({
   const generateTitleMutation = useGenerateTitle()
   const sendPromptMutation = useSendPrompt(sessionId)
 
+  const handleErrorAction = useCallback(
+    (action: ErrorAction, id: string) => {
+      if (action.type === "dismiss") {
+        dismissError(id)
+      } else if (action.type === "retry" && action.prompt) {
+        dismissError(id)
+        startUserPrompt(action.prompt)
+        sendPromptMutation.mutate(
+          { text: action.prompt },
+          { onError: markSendFailed }
+        )
+      }
+    },
+    [dismissError, startUserPrompt, sendPromptMutation, markSendFailed]
+  )
+
   // ── Session stats ─────────────────────────────────────────────────────────────
   // Fetch detailed token stats from the server
   const { data: sessionStats } = useSessionStats(sessionId)
@@ -135,7 +137,9 @@ export function ChatView({
   // which can flip pinnedRef to false and stop further scrolls entirely.
   // Fix: use instant scrollTop assignment while loading so every update reliably
   // lands at the bottom; only use smooth scroll once the stream is stable.
-  const commandsByName = new Map((commandsData ?? []).map((command) => [command.name, command]))
+  const commandsByName = new Map(
+    (commandsData ?? []).map((command) => [command.name, command])
+  )
 
   // ── Scroll position persistence via query cache & localStorage ──────────────────
   // Scroll positions are stored in both TanStack Query cache and localStorage.
@@ -171,9 +175,11 @@ export function ChatView({
 
       // Check if this thread has been visited before
       // First check query cache, then localStorage
-      let savedMeta = queryClient.getQueryData<{ scrollTop: number; isPinned: boolean; visited?: boolean }>(
-        chatKeys.scroll(sessionId)
-      )
+      let savedMeta = queryClient.getQueryData<{
+        scrollTop: number
+        isPinned: boolean
+        visited?: boolean
+      }>(chatKeys.scroll(sessionId))
 
       // If not in cache, check localStorage (persisted across sessions)
       if (!savedMeta?.visited) {
@@ -299,13 +305,13 @@ export function ChatView({
       pinnedRef.current = true
       updateThreadStopped.mutate({ threadId, stopped: false })
       startUserPrompt(text, thinkingLevel)
-      
+
       // Scroll immediately when sending
       const el = scrollContainerRef.current
       if (el) {
         el.scrollTop = el.scrollHeight
       }
-      
+
       const model = modelId && provider ? { provider, modelId } : undefined
       sendPromptMutation.mutate(
         { text, model, thinkingLevel },
@@ -415,9 +421,9 @@ export function ChatView({
               </div>
             </div>
           )}
-          {chatMessages.length > 0 && (
+          {visibleMessages.length > 0 && (
             <div className="mx-auto w-full max-w-3xl px-6">
-              {chatMessages.map((message, index) => {
+              {visibleMessages.map((message, index) => {
                 if (
                   message.role === "assistant" &&
                   !message.content.trim() &&
@@ -431,6 +437,7 @@ export function ChatView({
                       message={message}
                       commandsByName={commandsByName}
                       showThinking={showThinkingSetting}
+                      onAction={handleErrorAction}
                     />
                   </div>
                 )
@@ -450,7 +457,7 @@ export function ChatView({
           </div>
 
           {/* File changes card - shown after chat completion */}
-          {!isLoading && chatMessages.length > 0 && (
+          {!isLoading && visibleMessages.some((m) => m.role !== "error") && (
             <FileChangesCard sessionId={sessionId} />
           )}
         </div>

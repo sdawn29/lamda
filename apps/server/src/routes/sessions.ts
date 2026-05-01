@@ -48,12 +48,18 @@ sessions.post("/session/:id/abort", async (c) => {
   const id = c.req.param("id");
   const entry = store.get(id);
   if (!entry) return c.json({ error: "Not found" }, 404);
-  
+
   // Insert abort block before calling abort
   insertAbortBlock(entry.threadId);
-  
+
   await entry.handle.abort();
   return c.json({ aborted: true });
+});
+
+sessions.post("/session/:id/dismiss-error", (c) => {
+  const id = c.req.param("id");
+  sessionEvents.dismissPendingErrors(id);
+  return c.json({ ok: true });
 });
 
 interface PromptRequestBody {

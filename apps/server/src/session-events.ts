@@ -92,6 +92,19 @@ class SessionEventHub {
     this.emit(event);
   }
 
+  dismissPendingErrors(): void {
+    const errorTypes = new Set([
+      "server_error",
+      "auto_retry_start",
+      "auto_retry_end",
+      "compaction_start",
+      "compaction_end",
+    ]);
+    this.recentEvents = this.recentEvents.filter(
+      (record) => !errorTypes.has(record.event.type),
+    );
+  }
+
   ensureStarted() {
     if (this.disposed || this.consumeTask) return;
 
@@ -416,6 +429,10 @@ class SessionEventRegistry {
 
   emitError(sessionId: string, message: string) {
     this.hubs.get(sessionId)?.emitError(message);
+  }
+
+  dismissPendingErrors(sessionId: string): void {
+    this.hubs.get(sessionId)?.dismissPendingErrors();
   }
 
   async dispose(sessionId: string) {

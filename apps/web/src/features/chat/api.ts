@@ -119,6 +119,10 @@ export function abortSession(id: string): Promise<void> {
   return apiFetch<void>(`/session/${id}/abort`, { method: "POST" })
 }
 
+export function dismissSessionError(id: string): Promise<void> {
+  return apiFetch<void>(`/session/${id}/dismiss-error`, { method: "POST" })
+}
+
 export async function openSessionWebSocket(id: string, lastEventId?: string): Promise<WebSocket | null> {
   const base = await getServerWsUrl()
   const url = lastEventId
