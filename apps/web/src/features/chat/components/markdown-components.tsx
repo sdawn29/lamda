@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react"
+import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 import type { Components } from "react-markdown"
 import { useTheme } from "@/shared/components/theme-provider"
@@ -10,11 +10,19 @@ const PrismCode = lazy(() => import("./prism-code"))
 
 function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
 
   function handleCopy() {
     navigator.clipboard.writeText(code).then(() => {
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 2000)
     })
   }
 

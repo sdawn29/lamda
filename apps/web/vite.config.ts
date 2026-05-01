@@ -32,6 +32,14 @@ export default defineConfig({
           if (id.includes("react-markdown") || id.includes("remark-gfm")) {
             return "markdown"
           }
+
+          if (
+            id.includes("react-syntax-highlighter") ||
+            id.includes("highlight.js") ||
+            id.includes("prismjs")
+          ) {
+            return "syntax"
+          }
         },
       },
     },

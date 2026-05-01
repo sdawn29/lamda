@@ -53,6 +53,7 @@ export function useFileChangeInvalidation(sessionId: string | null) {
 
     let active = true
     let ws: WebSocket | null = null
+    let unsubscribe: (() => void) | undefined
 
     openSessionWebSocket(sessionId)
       .then((socket) => {
@@ -63,7 +64,7 @@ export function useFileChangeInvalidation(sessionId: string | null) {
         }
         ws = socket
 
-        return subscribeToSessionEvents(socket, {
+        unsubscribe = subscribeToSessionEvents(socket, {
           onToolExecutionEnd: (data) => {
             const toolName = data.toolName
             if (!toolName) return
@@ -138,6 +139,7 @@ export function useFileChangeInvalidation(sessionId: string | null) {
 
     return () => {
       active = false
+      unsubscribe?.()
       ws?.close()
     }
   }, [sessionId, queryClient])

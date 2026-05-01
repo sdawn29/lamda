@@ -12,6 +12,7 @@
  * - Size management
  */
 
+import { useEffect } from "react"
 import type { Message, MessageBlock, ErrorMessage } from "../types"
 import { blocksToMessages } from "../types"
 
@@ -524,5 +525,13 @@ export function getChatSyncEngine(): ChatSyncEngine {
 }
 
 export function useChatSyncEngine(): ChatSyncEngine {
-  return getChatSyncEngine()
+  const engine = getChatSyncEngine()
+
+  useEffect(() => {
+    const onUnload = () => engine.destroy()
+    window.addEventListener("beforeunload", onUnload)
+    return () => window.removeEventListener("beforeunload", onUnload)
+  }, [engine])
+
+  return engine
 }

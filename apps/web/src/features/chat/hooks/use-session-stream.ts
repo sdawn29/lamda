@@ -264,6 +264,7 @@ export function useSessionStream({
     const doneFlag = getSessionDoneFlag(sessionId)
     doneFlag.current = false
     let ws: WebSocket | null = null
+    let unsubscribe: (() => void) | undefined
 
     openSessionWebSocket(sessionId)
       .then((socket) => {
@@ -279,7 +280,7 @@ export function useSessionStream({
 
         ws = socket
 
-        return subscribeToSessionEvents(ws, {
+        unsubscribe = subscribeToSessionEvents(ws, {
           onAgentStart: () => {
             if (doneFlag.current) return
             void (async () => {
@@ -504,6 +505,7 @@ export function useSessionStream({
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
       pendingDeltasRef.current = []
       pendingToolUpdatesRef.current = []
+      unsubscribe?.()
       ws?.close()
     }
   }, [sessionId, queryClient, scheduleUpdate])

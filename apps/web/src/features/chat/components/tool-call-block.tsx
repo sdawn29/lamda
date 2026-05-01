@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useState } from "react"
+import { lazy, memo, Suspense, useEffect, useRef, useState } from "react"
 import {
   AlertCircleIcon,
   BookOpenTextIcon,
@@ -196,6 +196,13 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   // All tools start collapsed; edit tools are expanded
   const [expanded, setExpanded] = useState(isEdit)
   const [copied, setCopied] = useState(false)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    }
+  }, [])
 
   function toggle(e: React.MouseEvent) {
     e.stopPropagation()
@@ -208,7 +215,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     if (!text) return
     void navigator.clipboard.writeText(text)
     setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    copyTimerRef.current = setTimeout(() => setCopied(false), 1500)
   }
 
   const resultText = getResultText(msg)

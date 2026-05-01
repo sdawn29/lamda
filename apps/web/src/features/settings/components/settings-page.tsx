@@ -742,6 +742,13 @@ function ChatPreferencesCard() {
     DEFAULT_THINKING_PHRASES.join("\n")
   const [phrasesValue, setPhrasesValue] = useState(persistedPhrasesRaw)
   const [phrasesSaved, setPhrasesSaved] = useState(false)
+  const phrasesSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (phrasesSavedTimerRef.current) clearTimeout(phrasesSavedTimerRef.current)
+    }
+  }, [])
 
   const prevPersistedPhrasesRef = React.useRef(persistedPhrasesRaw)
   React.useEffect(() => {
@@ -768,7 +775,8 @@ function ChatPreferencesCard() {
       value: trimmed,
     })
     setPhrasesSaved(true)
-    setTimeout(() => setPhrasesSaved(false), 1500)
+    if (phrasesSavedTimerRef.current) clearTimeout(phrasesSavedTimerRef.current)
+    phrasesSavedTimerRef.current = setTimeout(() => setPhrasesSaved(false), 1500)
   }
 
   function handleResetPhrases() {
@@ -1137,6 +1145,13 @@ function CommitPromptCard() {
     settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? DEFAULT_COMMIT_PROMPT
   const [value, setValue] = useState(persistedValue)
   const [saved, setSaved] = useState(false)
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    }
+  }, [])
 
   const prevPersistedRef = React.useRef(persistedValue)
   React.useEffect(() => {
@@ -1155,7 +1170,8 @@ function CommitPromptCard() {
       value: value.trim(),
     })
     setSaved(true)
-    setTimeout(() => setSaved(false), 1500)
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    savedTimerRef.current = setTimeout(() => setSaved(false), 1500)
   }
 
   function handleReset() {
@@ -1282,6 +1298,13 @@ function RetrySettingsCard() {
   // Initialize local state from persistedValue to avoid hydration mismatch.
   const [localSettings, setLocalSettings] = useState<RetrySettings>(() => persistedValue)
   const [saved, setSaved] = useState(false)
+  const retrySavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (retrySavedTimerRef.current) clearTimeout(retrySavedTimerRef.current)
+    }
+  }, [])
 
   // Sync local state when persisted value changes (e.g., user resets from another tab)
   React.useEffect(() => {
@@ -1294,7 +1317,8 @@ function RetrySettingsCard() {
       value: JSON.stringify(localSettings),
     })
     setSaved(true)
-    setTimeout(() => setSaved(false), 1500)
+    if (retrySavedTimerRef.current) clearTimeout(retrySavedTimerRef.current)
+    retrySavedTimerRef.current = setTimeout(() => setSaved(false), 1500)
   }
 
   function handleReset() {

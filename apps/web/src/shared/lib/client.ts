@@ -128,7 +128,9 @@ function anySignal(signals: AbortSignal[]): AbortSignal {
       controller.abort(signal.reason)
       break
     }
-    signal.addEventListener("abort", () => controller.abort(signal.reason))
+    signal.addEventListener("abort", () => controller.abort(signal.reason), {
+      signal: controller.signal,
+    })
   }
   return controller.signal
 }

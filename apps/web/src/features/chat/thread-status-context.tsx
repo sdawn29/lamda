@@ -4,6 +4,8 @@ import {
   useContext,
   useState,
   useEffect,
+  useRef,
+  useSyncExternalStore,
   type ReactNode,
 } from "react"
 
@@ -18,18 +20,46 @@ import { openGlobalWebSocket } from "./api"
  */
 export type ThreadStatus = "streaming" | "completed" | "idle"
 
-interface ThreadStatusContextValue {
-  getStatus: (threadId: string) => ThreadStatus
-  setStatus: (threadId: string, status: ThreadStatus) => void
-  setActiveThreadId: (threadId: string | null) => void
+// ── External store ────────────────────────────────────────────────────────────
+//
+// Keeping statuses outside React state means each useThreadStatus() subscriber
+// only re-renders when *its own* thread changes — not every thread in the
+// sidebar at once. This fixes the bug where one streaming thread caused every
+// sidebar row to repaint, producing inconsistent reads under React 18's
+// concurrent renderer (some rows briefly showing "streaming" when they shouldn't).
+
+class ThreadStatusStore {
+  private statuses = new Map<string, ThreadStatus>()
+  private listeners = new Map<string, Set<() => void>>()
+
+  getStatus(threadId: string): ThreadStatus {
+    return this.statuses.get(threadId) ?? "idle"
+  }
+
+  set(threadId: string, status: ThreadStatus): void {
+    if (this.statuses.get(threadId) === status) return
+    this.statuses.set(threadId, status)
+    this.listeners.get(threadId)?.forEach((fn) => fn())
+  }
+
+  subscribe(threadId: string, callback: () => void): () => void {
+    let set = this.listeners.get(threadId)
+    if (!set) {
+      set = new Set()
+      this.listeners.set(threadId, set)
+    }
+    set.add(callback)
+    return () => {
+      this.listeners.get(threadId)?.delete(callback)
+    }
+  }
 }
 
-const ThreadStatusContext = createContext<ThreadStatusContextValue | null>(null)
+const statusStore = new ThreadStatusStore()
 
-// Track threads that have ever streamed (for completed state)
+// ── localStorage helpers ──────────────────────────────────────────────────────
+
 const STREAMED_THREADS_KEY = "lamda:streamed-threads"
-
-// Time in ms before completed transitions to idle (when user is viewing the thread)
 const COMPLETED_VIEW_TIMEOUT_MS = 5000
 
 function getStreamedThreads(): Set<string> {
@@ -51,75 +81,92 @@ function markThreadStreamed(threadId: string): void {
   }
 }
 
+// ── Context (command surface only) ────────────────────────────────────────────
+
+interface ThreadStatusContextValue {
+  setStatus: (threadId: string, status: ThreadStatus) => void
+  setActiveThreadId: (threadId: string | null) => void
+}
+
+const ThreadStatusContext = createContext<ThreadStatusContextValue | null>(null)
+
+// ── Provider ─────────────────────────────────────────────────────────────────
+
 export function ThreadStatusProvider({ children }: { children: ReactNode }) {
-  const [statuses, setStatuses] = useState<Record<string, ThreadStatus>>({})
-  // Track timeouts for auto-transitioning completed -> idle
-  const [timeouts, setTimeouts] = useState<Record<string, ReturnType<typeof setTimeout>>>({})
-  // Track which thread is currently active (user is viewing)
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
 
-  const getStatus = useCallback(
-    (threadId: string): ThreadStatus => statuses[threadId] ?? "idle",
-    [statuses]
-  )
+  // Keep a ref so setStatus / handleSetActiveThreadId (both useCallback with
+  // empty deps) can always read the latest activeThreadId without capturing it.
+  const activeThreadIdRef = useRef<string | null>(null)
+
+  // Timeout IDs for completed → idle transitions, stored in a ref to avoid
+  // triggering React renders when timers are created/cleared.
+  const timeoutsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+
+  // Start the completed→idle timer for a thread (no-op if already running).
+  const startTimer = useCallback((threadId: string) => {
+    if (timeoutsRef.current.has(threadId)) return
+    const id = setTimeout(() => {
+      timeoutsRef.current.delete(threadId)
+      if (statusStore.getStatus(threadId) === "completed") {
+        statusStore.set(threadId, "idle")
+      }
+    }, COMPLETED_VIEW_TIMEOUT_MS)
+    timeoutsRef.current.set(threadId, id)
+  }, [])
+
+  // Cancel the timer for a thread (no-op if none running).
+  const cancelTimer = useCallback((threadId: string) => {
+    const id = timeoutsRef.current.get(threadId)
+    if (id !== undefined) {
+      clearTimeout(id)
+      timeoutsRef.current.delete(threadId)
+    }
+  }, [])
 
   const setStatus = useCallback(
     (threadId: string, status: ThreadStatus) => {
-      // Track which threads have ever streamed
-      if (status === "streaming") {
-        markThreadStreamed(threadId)
-      }
+      if (status === "streaming") markThreadStreamed(threadId)
 
-      setStatuses((prev) => ({ ...prev, [threadId]: status }))
+      statusStore.set(threadId, status)
+
+      if (status === "completed" && activeThreadIdRef.current === threadId) {
+        // Thread finished while user is viewing it — start countdown to idle.
+        startTimer(threadId)
+      } else if (status !== "completed") {
+        // Thread is no longer in completed state — cancel any pending timer.
+        cancelTimer(threadId)
+      }
     },
-    []
+    [startTimer, cancelTimer],
   )
 
-  // When user views a completed thread, start 5 second timer to transition to idle
-  useEffect(() => {
-    if (!activeThreadId) return
+  const handleSetActiveThreadId = useCallback(
+    (threadId: string | null) => {
+      // Cancel the outgoing thread's timer — user is navigating away.
+      if (activeThreadIdRef.current) cancelTimer(activeThreadIdRef.current)
 
-    const threadId = activeThreadId
-    const currentStatus = statuses[threadId]
+      activeThreadIdRef.current = threadId
+      setActiveThreadId(threadId)
 
-    // If user is viewing a completed thread, start timer
-    if (currentStatus === "completed" && !timeouts[threadId]) {
-      const timeoutId = setTimeout(() => {
-        setTimeouts((prev) => {
-          const next = { ...prev }
-          delete next[threadId]
-          return next
-        })
-        setStatuses((prev) => {
-          // Only transition if still completed
-          if (prev[threadId] === "completed") {
-            return { ...prev, [threadId]: "idle" }
-          }
-          return prev
-        })
-      }, COMPLETED_VIEW_TIMEOUT_MS)
-
-      setTimeouts((prev) => ({ ...prev, [threadId]: timeoutId }))
-    }
-  }, [activeThreadId, statuses, timeouts])
-
-  // Cleanup timeouts when thread is no longer completed or active
-  useEffect(() => {
-    return () => {
-      for (const [threadId, timeoutId] of Object.entries(timeouts)) {
-        if (statuses[threadId] !== "completed" || threadId !== activeThreadId) {
-          clearTimeout(timeoutId)
-          setTimeouts((prev) => {
-            const next = { ...prev }
-            delete next[threadId]
-            return next
-          })
-        }
+      // If the incoming thread is already completed, start the countdown.
+      if (threadId && statusStore.getStatus(threadId) === "completed") {
+        startTimer(threadId)
       }
-    }
-  }, [statuses, timeouts, activeThreadId])
+    },
+    [startTimer, cancelTimer],
+  )
 
-  // Real-time updates from server via global WebSocket
+  // Cleanup all pending timers on unmount.
+  useEffect(() => {
+    const timers = timeoutsRef.current
+    return () => {
+      timers.forEach((id) => clearTimeout(id))
+      timers.clear()
+    }
+  }, [])
+
+  // Real-time updates from server via global WebSocket.
   useEffect(() => {
     let active = true
     let ws: WebSocket | null = null
@@ -146,13 +193,11 @@ export function ThreadStatusProvider({ children }: { children: ReactNode }) {
               data.threadId &&
               data.status
             ) {
-              // When server says "idle", check if thread ever streamed
-              // If so, show "completed" (green dot) instead of "idle" (transparent)
               if (data.status === "idle") {
                 const streamed = getStreamedThreads()
                 setStatus(
                   data.threadId,
-                  streamed.has(data.threadId) ? "completed" : "idle"
+                  streamed.has(data.threadId) ? "completed" : "idle",
                 )
               } else {
                 setStatus(data.threadId, data.status)
@@ -177,27 +222,38 @@ export function ThreadStatusProvider({ children }: { children: ReactNode }) {
     }
   }, [setStatus])
 
+  // activeThreadId is only used to satisfy the context type — the real work is
+  // done imperatively via activeThreadIdRef + handleSetActiveThreadId above.
+  void activeThreadId
+
   return (
-    <ThreadStatusContext.Provider value={{ getStatus, setStatus, setActiveThreadId }}>
+    <ThreadStatusContext.Provider
+      value={{ setStatus, setActiveThreadId: handleSetActiveThreadId }}
+    >
       {children}
     </ThreadStatusContext.Provider>
   )
 }
 
+// ── Public hooks ──────────────────────────────────────────────────────────────
+
+/**
+ * Returns the live status for a single thread. Only re-renders when *this*
+ * thread's status changes — other threads' changes are invisible to this hook.
+ */
 export function useThreadStatus(threadId: string): ThreadStatus {
-  const ctx = useContext(ThreadStatusContext)
-  if (!ctx)
-    throw new Error(
-      "useThreadStatus must be used within ThreadStatusProvider"
-    )
-  return ctx.getStatus(threadId)
+  return useSyncExternalStore(
+    (callback) => statusStore.subscribe(threadId, callback),
+    () => statusStore.getStatus(threadId),
+    () => "idle" as ThreadStatus,
+  )
 }
 
 export function useSetThreadStatus() {
   const ctx = useContext(ThreadStatusContext)
   if (!ctx)
     throw new Error(
-      "useSetThreadStatus must be used within ThreadStatusProvider"
+      "useSetThreadStatus must be used within ThreadStatusProvider",
     )
   return ctx.setStatus
 }
@@ -206,7 +262,7 @@ export function useSetActiveThreadId() {
   const ctx = useContext(ThreadStatusContext)
   if (!ctx)
     throw new Error(
-      "useSetActiveThreadId must be used within ThreadStatusProvider"
+      "useSetActiveThreadId must be used within ThreadStatusProvider",
     )
   return ctx.setActiveThreadId
 }
