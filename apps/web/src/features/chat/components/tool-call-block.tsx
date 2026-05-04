@@ -93,6 +93,19 @@ function getEditDiff(result: unknown): string | null {
   return typeof diff === "string" ? diff : null
 }
 
+// ── Write tool detection ───────────────────────────────────────────────────────
+
+interface WriteArgs {
+  path: string
+  content: string
+}
+
+function isWriteArgs(args: unknown): args is WriteArgs {
+  if (typeof args !== "object" || args === null) return false
+  const a = args as Record<string, unknown>
+  return typeof a.path === "string" && typeof a.content === "string"
+}
+
 // ── Generic result ─────────────────────────────────────────────────────────────
 
 function getResultText(msg: ToolMessage): string | null {
@@ -180,6 +193,46 @@ function ReadView({
   )
 }
 
+// ── WriteView ─────────────────────────────────────────────────────────────────
+
+function WriteView({
+  content,
+  filePath,
+  live,
+}: {
+  content: string
+  filePath: string
+  live: boolean
+}) {
+  const { theme } = useTheme()
+  const isDark =
+    theme === "dark" ||
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches)
+  const language = detectLanguage(filePath) ?? "text"
+
+  return (
+    <div className="overflow-auto rounded border border-border/30 text-xs max-h-72">
+      <Suspense
+        fallback={
+          <pre className="overflow-auto px-3 py-2 text-xs text-muted-foreground/60">
+            {content}
+          </pre>
+        }
+      >
+        <PrismCode
+          code={content}
+          language={language}
+          style={isDark ? jellybeansdark : jellybeanslight}
+          fontSize="0.75rem"
+          showLineNumbers={true}
+          opacity={live ? 0.6 : 0.85}
+        />
+      </Suspense>
+    </div>
+  )
+}
+
 // ── ToolCallBlock ──────────────────────────────────────────────────────────────
 
 export const ToolCallBlock = memo(function ToolCallBlock({
@@ -192,9 +245,11 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const diff = isEdit ? getEditDiff(msg.result) : null
   const isRead = isReadTool(normalizedToolName, msg.args)
   const readFilePath = isRead ? getReadFilePath(msg.args) : null
+  const isWrite = normalizedToolName === "write" && isWriteArgs(msg.args)
+  const writeArgs = isWrite ? (msg.args as WriteArgs) : null
 
-  // All tools start collapsed; edit tools are expanded
-  const [expanded, setExpanded] = useState(isEdit)
+  // Edit and write tools auto-expand; everything else starts collapsed
+  const [expanded, setExpanded] = useState(isEdit || isWrite)
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -221,16 +276,17 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
   const resultText = getResultText(msg)
   const summary = argsSummary(msg.args)
-  
-  // For edit tools, always show diff when available, otherwise show args/edits info
-  const showEditContent = isEdit && (diff !== null || msg.status !== 'running')
-  // For read tools, show content when we have text or are running
-  const showReadContent = isRead && (resultText !== null || msg.status === 'running')
-  // For other tools, show when we have result or are running
-  const showOtherContent = !isEdit && !isRead && (resultText !== null || msg.status === 'running')
-  
-  // Content is visible when expanded and we have something to show
-  const hasBody = showEditContent || showReadContent || showOtherContent
+
+  // Body is shown when there is something to render at any status.
+  // "running" and "error" must always open the body so their respective
+  // placeholder / error block is reachable inside the collapsed grid.
+  const showEditContent = isEdit && (msg.status === "running" || diff !== null || msg.status === "error")
+  const showReadContent = isRead && (resultText !== null || msg.status === "running" || msg.status === "error")
+  // Write: content is in args from tool_start, always available
+  const showWriteContent = isWrite && writeArgs !== null
+  const showOtherContent = !isEdit && !isRead && !isWrite && (resultText !== null || msg.status === "running" || msg.status === "error")
+
+  const hasBody = showEditContent || showReadContent || showWriteContent || showOtherContent
 
   return (
     <div
@@ -291,15 +347,26 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       >
         <div className="overflow-hidden">
           <div className="border-t border-border/30 px-3 py-2">
-            {/* Running state: show appropriate placeholder */}
-            {msg.status === "running" && (
+
+            {/* Write tool: show content from args immediately — available at tool_start */}
+            {isWrite && writeArgs && msg.status !== "error" && (
+              <WriteView
+                content={writeArgs.content}
+                filePath={writeArgs.path}
+                live={msg.status === "running"}
+              />
+            )}
+
+            {/* Running placeholder — always for edit (no partial results), only
+                when there is no content yet for read/other tools */}
+            {msg.status === "running" && !isWrite && (isEdit || !resultText) && (
               <span className="text-muted-foreground/40">
                 {isEdit ? "Editing…" : isRead ? "Reading…" : "Running…"}
               </span>
             )}
 
-            {/* Running state: show partial result if available */}
-            {msg.status === "running" && resultText && (
+            {/* Running: partial result for read / other tools */}
+            {msg.status === "running" && !isWrite && resultText && (
               <>
                 {isRead && readFilePath && (
                   <ReadView text={resultText} filePath={readFilePath} live={true} />
@@ -310,10 +377,9 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               </>
             )}
 
-            {/* Done state: show content */}
+            {/* Done state */}
             {msg.status === "done" && (
               <>
-                {/* Edit: show pre-computed diff from SDK */}
                 {isEdit && diff !== null && (
                   <DiffView
                     diff={diff}
@@ -321,17 +387,11 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                   />
                 )}
 
-                {/* Read tool: syntax-highlighted file content */}
                 {isRead && readFilePath && resultText && (
-                  <ReadView
-                    text={resultText}
-                    filePath={readFilePath}
-                    live={false}
-                  />
+                  <ReadView text={resultText} filePath={readFilePath} live={false} />
                 )}
 
-                {/* Other tools: show result */}
-                {!isEdit && !isRead && resultText && (
+                {!isEdit && !isRead && !isWrite && resultText && (
                   <div className="group/copy relative">
                     <LivePre text={resultText} live={false} />
                     <button
@@ -354,7 +414,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               </>
             )}
 
-            {/* Error state: show error message */}
+            {/* Error state */}
             {msg.status === "error" && (
               <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
                 <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/80" />
