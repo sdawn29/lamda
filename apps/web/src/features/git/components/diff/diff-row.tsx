@@ -98,7 +98,7 @@ export function DiffRow({
         {line.kind === "skipped" ? (
           "⋯"
         ) : wordDiffRanges && wordDiffRanges.length > 0 ? (
-          renderWithWordDiff(line.content, wordDiffRanges, isAdded).map((part, i) =>
+          renderWithWordDiff(line.content, wordDiffRanges).map((part, i) =>
             part.highlighted ? (
               <span
                 key={i}

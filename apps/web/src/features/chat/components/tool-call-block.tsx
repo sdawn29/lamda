@@ -5,6 +5,7 @@ import {
   ChevronRightIcon,
   CopyIcon,
 } from "lucide-react"
+import { FileIcon } from "@/shared/ui/file-icon"
 import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 
 import { cn } from "@/shared/lib/utils"
@@ -80,6 +81,10 @@ function toRelativePath(p: string, rootPath?: string): string {
   if (!rootPath) return p
   const root = rootPath.endsWith("/") ? rootPath : rootPath + "/"
   return p.startsWith(root) ? p.slice(root.length) : p
+}
+
+function fileBasename(filePath: string): string {
+  return filePath.split("/").pop() ?? filePath
 }
 
 function argsSummary(args: unknown, rootPath?: string): string {
@@ -204,6 +209,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const readFilePath = isRead ? getReadFilePath(msg.args) : null
   const isWrite = normalizedToolName === "write" && isWriteArgs(msg.args)
   const writeArgs = isWrite ? (msg.args as WriteArgs) : null
+  const filePath = (isEdit || isWrite) ? getReadFilePath(msg.args) : null
 
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -282,11 +288,14 @@ export const ToolCallBlock = memo(function ToolCallBlock({
           {msg.toolName}
         </span>
 
-        {summary && (
-          <span className="truncate text-sm text-muted-foreground/35">
-            {summary}
+        {filePath ? (
+          <span className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground/35">
+            <FileIcon filename={filePath} className="h-3.5 w-3.5 shrink-0 opacity-50" />
+            <span className="truncate">{fileBasename(filePath)}</span>
           </span>
-        )}
+        ) : summary ? (
+          <span className="truncate text-sm text-muted-foreground/35">{summary}</span>
+        ) : null}
 
         {editCounts && (editCounts.added > 0 || editCounts.removed > 0) && (
           <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-xs tabular-nums">
@@ -330,9 +339,11 @@ export const ToolCallBlock = memo(function ToolCallBlock({
           <div className="group/copy mt-2 overflow-hidden rounded-lg border border-border/40 bg-black/5 dark:bg-white/[0.03]">
             {/* Header: summary + copy */}
             <div className="flex items-start gap-2 border-b border-border/30 px-3 py-1.5">
-              {normalizedToolName === "bash" && (
+              {normalizedToolName === "bash" ? (
                 <span className="mt-px font-mono text-[11px] font-bold text-foreground/60">$</span>
-              )}
+              ) : (isEdit || isWrite) && filePath ? (
+                <FileIcon filename={filePath} className="mt-px h-3.5 w-3.5 shrink-0 opacity-50" />
+              ) : null}
               <span className={cn(
                 "flex-1 font-mono text-[11px] text-foreground/60",
                 normalizedToolName === "bash" ? "break-all whitespace-pre-wrap" : "truncate"

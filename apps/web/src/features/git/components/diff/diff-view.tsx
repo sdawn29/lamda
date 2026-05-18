@@ -130,8 +130,6 @@ export function DiffView({
     [endIndex, sideBySideRows, startIndex]
   )
 
-  const added = lines.filter((l) => l.kind === "added").length
-  const removed = lines.filter((l) => l.kind === "removed").length
   const highlightingDisabled =
     highlightLanguage === null &&
     language !== null &&
@@ -202,23 +200,11 @@ export function DiffView({
         )}
       </div>
 
-      {(added > 0 || removed > 0) && (
-        <div className="flex items-center gap-1.5 border-t border-border/60 bg-muted/20 px-3 py-1 font-sans">
-          {removed > 0 && (
-            <span className="inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-red-500 dark:bg-red-500/15 dark:text-red-400">
-              −{removed}
-            </span>
-          )}
-          {added > 0 && (
-            <span className="inline-flex items-center rounded-full bg-green-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-green-600 dark:bg-green-500/15 dark:text-green-400">
-              +{added}
-            </span>
-          )}
-          {highlightingDisabled && (
-            <span className="ml-auto text-[10px] text-muted-foreground/50">
-              Syntax highlighting disabled for large diff
-            </span>
-          )}
+      {highlightingDisabled && (
+        <div className="flex items-center border-t border-border/60 bg-muted/20 px-3 py-1 font-sans">
+          <span className="ml-auto text-[10px] text-muted-foreground/50">
+            Syntax highlighting disabled for large diff
+          </span>
         </div>
       )}
     </div>

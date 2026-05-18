@@ -1,4 +1,4 @@
-import { diff_match_patch, DIFF_DELETE, DIFF_INSERT, DIFF_EQUAL } from "diff-match-patch"
+import { diff_match_patch, DIFF_DELETE, DIFF_INSERT } from "diff-match-patch"
 import type { DiffLine, CharRange, WordDiffMap } from "./types"
 
 function computeCharDiff(
@@ -90,7 +90,6 @@ export function buildWordDiffMap(lines: DiffLine[]): WordDiffMap {
 export function renderWithWordDiff(
   text: string,
   ranges: CharRange[],
-  isAdded: boolean,
 ): Array<{ text: string; highlighted: boolean }> {
   if (ranges.length === 0) return [{ text, highlighted: false }]
 

@@ -316,7 +316,6 @@ export function useSessionStream({
   onIsLoadingChange,
   onIsCompactingChange,
   onCompactionReasonChange,
-  onCompactionEnd,
   onPendingErrorChange,
   onError,
   onToolExecutionEnd,

@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } fr
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
-import type { AssistantMessage, ErrorAction, ErrorMessage, Message, ToolMessage } from "../types"
+import type { AssistantMessage, ErrorAction, Message, ToolMessage } from "../types"
 import { WorkingBlock, type WorkingMessage } from "./working-block"
 import {
   ArrowDownIcon,
@@ -301,11 +301,6 @@ export function ChatView({
     () => groupChatMessages(visibleMessages),
     [visibleMessages]
   )
-
-  const hasActiveWorkingGroup =
-    isLoading &&
-    groupedMessages.length > 0 &&
-    groupedMessages[groupedMessages.length - 1].type === "working"
 
   // ── Scroll position persistence via query cache & localStorage ──────────────────
   // Scroll positions are stored in both TanStack Query cache and localStorage.
