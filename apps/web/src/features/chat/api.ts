@@ -422,6 +422,25 @@ export function fetchSessionStats(
   return apiFetch<SessionStatsResponse>(`/session/${sessionId}/stats`)
 }
 
+// ── Fork ──────────────────────────────────────────────────────────────────
+
+export interface ForkSessionResponse {
+  threadId: string
+  sessionId: string
+  initialInput: string
+}
+
+export function forkSession(
+  sessionId: string,
+  blockId: string
+): Promise<ForkSessionResponse> {
+  return apiFetch<ForkSessionResponse>(`/session/${sessionId}/fork`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ blockId }),
+  })
+}
+
 // ── Workspace files ────────────────────────────────────────────────────────
 
 export type WorkspaceEntry = { path: string; type: "file" | "dir" }

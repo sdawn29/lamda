@@ -157,4 +157,36 @@ export interface ManagedSessionHandle {
    * Takes effect on the next agent turn.
    */
   setCustomTools(tools: ToolDefinition[]): void
+  /**
+   * Branch the conversation at the Nth user message (0-indexed among user messages).
+   * Returns the path of the new session JSONL file.
+   * The caller is responsible for creating a new thread and opening the forked session.
+   */
+  fork(userMessageIndex: number): Promise<string>
 }
+
+/**
+ * A normalized message block extracted from a JSONL session file.
+ * Used to seed a new thread's DB records after a fork.
+ */
+export type HistoryBlock =
+  | { role: "user"; content: string; createdAt: number }
+  | {
+      role: "assistant"
+      content: string
+      thinking: string
+      model: string
+      provider: string
+      errorMessage?: string
+      createdAt: number
+    }
+  | {
+      role: "tool"
+      toolCallId: string
+      toolName: string
+      toolArgs: string
+      toolResult: string
+      isError: boolean
+      createdAt: number
+    }
+  | { role: "compaction"; createdAt: number }

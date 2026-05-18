@@ -1,5 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react"
 import { useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import type { AssistantMessage, ErrorAction, ErrorMessage, Message, ToolMessage } from "../types"
 import { WorkingBlock, type WorkingMessage } from "./working-block"
@@ -28,7 +29,7 @@ import {
   AlertDialogAction,
 } from "@/shared/ui/alert-dialog"
 import { Button } from "@/shared/ui/button"
-import { useSlashCommands, useSessionStats, chatKeys } from "../queries"
+import { useSlashCommands, useSessionStats, chatKeys, messagesQueryKey } from "../queries"
 import { useBranch } from "@/features/git/queries"
 import { useBranches } from "@/features/git/queries"
 import { useCheckoutBranch } from "@/features/git/mutations"
@@ -49,6 +50,9 @@ import { useChatStream } from "../use-chat-stream"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
 import { FileChangesCard } from "./file-changes-card"
 import { useMainTabs } from "@/features/main-tabs"
+import { forkSession, listMessages } from "../api"
+import { blocksToMessages, type MessageBlock } from "../types"
+import { workspaceKeys } from "@/features/workspace/queries"
 
 const PROMPT_SUGGESTIONS = [
   { icon: Code2Icon, text: "Explain this codebase", description: "Walk me through the project structure and key patterns" },
@@ -120,6 +124,10 @@ function groupChatMessages(messages: Message[]): MessageGroup[] {
   return groups
 }
 
+// Pending initial inputs keyed by threadId — used to pre-fill the textbox
+// after a fork without threading state through route params.
+const pendingInitialInputs = new Map<string, string>()
+
 interface ChatViewProps {
   sessionId: string
   workspaceId: string
@@ -136,6 +144,7 @@ export function ChatView({
   initialIsStopped,
 }: ChatViewProps) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const syncEngine = getChatSyncEngine()
   const showThinkingSetting = useShowThinkingSetting()
   const { workspaces } = useWorkspace()
@@ -183,7 +192,7 @@ export function ChatView({
   const [localSessionId, setLocalSessionId] = useState(sessionId)
   const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const updateTitleMutation = useUpdateThreadTitle()
-  const { confirmThread } = useMainTabs()
+  const { confirmThread, addThreadTab } = useMainTabs()
 
   // React's "adjusting state while rendering" pattern — reset all session-local
   // state in one batched pass when the active session changes, avoiding the
@@ -211,6 +220,15 @@ export function ChatView({
   useEffect(() => {
     chatTextboxRef.current?.focus()
   }, [sessionId])
+
+  // Pre-fill input with forked user message (set by handleFork before navigation).
+  useEffect(() => {
+    const pending = pendingInitialInputs.get(threadId)
+    if (pending) {
+      pendingInitialInputs.delete(threadId)
+      chatTextboxRef.current?.setValue(pending)
+    }
+  }, [threadId])
 
   // Flush any pending scroll-to-localStorage write on unmount.
   useEffect(() => {
@@ -507,6 +525,33 @@ export function ChatView({
     ]
   )
 
+  const handleFork = useCallback(
+    async (blockId: string) => {
+      try {
+        const { threadId: newThreadId, sessionId: newSessionId, initialInput } = await forkSession(sessionId, blockId)
+        addThreadTab(newThreadId, "New Thread")
+        // Store the forked user message so the new ChatView can pre-fill the textbox
+        if (initialInput) pendingInitialInputs.set(newThreadId, initialInput)
+        // Pre-populate the messages cache so the forked thread renders immediately
+        try {
+          const { blocks } = await listMessages(newSessionId)
+          const seededMessages = blocksToMessages(blocks as MessageBlock[])
+          queryClient.setQueryData(messagesQueryKey(newSessionId), seededMessages)
+        } catch {
+          // Non-fatal — the query will fetch on mount
+        }
+        // Fire-and-forget — the route guards against premature redirect via isTabKnown
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
+        navigate({ to: "/workspace/$threadId", params: { threadId: newThreadId } })
+      } catch (err) {
+        toast.error("Fork failed", {
+          description: err instanceof Error ? err.message : "Could not fork conversation",
+        })
+      }
+    },
+    [sessionId, queryClient, navigate, addThreadTab]
+  )
+
   return (
     <>
       <AlertDialog
@@ -672,6 +717,7 @@ export function ChatView({
                       isLastInTurn={isLastInTurn}
                       turnMessages={turnMessages}
                       rootPath={rootPath}
+                      onFork={handleFork}
                     />
                   </div>
                 )

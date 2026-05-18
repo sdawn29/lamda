@@ -7,6 +7,8 @@
 
 export interface UserMessage {
   role: "user"
+  /** DB block id — present on persisted messages, absent on optimistic placeholders */
+  id?: string
   content: string
   createdAt?: number
 }
@@ -196,6 +198,7 @@ export function blockToMessage(block: MessageBlock): Message {
     case "user":
       return {
         role: "user",
+        id: block.id,
         content: block.content ?? "",
         createdAt: block.createdAt,
       }

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react"
 import { ChatView, useSetActiveThreadId } from "@/features/chat"
 import { useWorkspace, useWorkspaces } from "@/features/workspace"
 import { useDiffPanel } from "@/features/git"
-import { useMainTabs } from "@/features/main-tabs"
+import { useMainTabs, useMainTabsStore } from "@/features/main-tabs"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
 import { useUpdateThreadLastAccessed } from "@/features/workspace/mutations"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
@@ -78,11 +78,17 @@ function WorkspaceThreadRoute() {
     }
   }, [foundThread, updateThreadTitle])
 
+  // Check if the thread is already registered in the tab store (e.g. just forked).
+  // This prevents a premature redirect when workspace data hasn't propagated yet.
+  const isTabKnown = useMainTabsStore((s) =>
+    s.tabs.some((t) => t.type === "thread" && t.threadId === threadId)
+  )
+
   useEffect(() => {
-    if (!isLoading && !isFetching && !foundThread) {
+    if (!isLoading && !isFetching && !foundThread && !isTabKnown) {
       navigate({ to: "/" })
     }
-  }, [isLoading, isFetching, foundThread, navigate])
+  }, [isLoading, isFetching, foundThread, isTabKnown, navigate])
 
   const isContentReady =
     !!foundWorkspace && !!foundThread && !!foundThread.sessionId

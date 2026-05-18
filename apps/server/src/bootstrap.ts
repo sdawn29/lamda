@@ -17,7 +17,7 @@ export async function bootstrapSessions(): Promise<void> {
       const handle = thread.sessionFile
         ? await openManagedSession(thread.sessionFile, { cwd: ws.path })
         : await createManagedSession({ cwd: ws.path });
-      store.create(handle, ws.path, thread.id);
+      store.create(handle, ws.path, thread.id, ws.id);
     }),
   );
 

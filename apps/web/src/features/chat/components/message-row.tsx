@@ -1,7 +1,7 @@
-import { memo } from "react"
+import { memo, useState } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { AlertCircleIcon, SparklesIcon } from "lucide-react"
+import { AlertCircleIcon, GitForkIcon, SparklesIcon } from "lucide-react"
 
 import { ToolCallBlock } from "./tool-call-block"
 import { markdownComponents } from "./markdown-components"
@@ -194,6 +194,7 @@ export interface MessageRowProps {
   isLastInTurn?: boolean
   turnMessages?: AssistantMessage[]
   rootPath?: string
+  onFork?: (blockId: string) => Promise<void>
 }
 
 function AbortBlock({ message: _ }: { message: AbortMessage }) {
@@ -236,7 +237,10 @@ export const MessageRow = memo(function MessageRow({
   isLastInTurn = true,
   turnMessages,
   rootPath,
+  onFork,
 }: MessageRowProps) {
+  const [isForking, setIsForking] = useState(false)
+
   if (message.role === "tool") {
     return <ToolCallBlock msg={message} isNew={isNewMessage} rootPath={rootPath} />
   }
@@ -250,6 +254,19 @@ export const MessageRow = memo(function MessageRow({
   }
 
   if (message.role === "user") {
+    const userMsg = message as UserMessage
+    const canFork = !!onFork && !!userMsg.id
+
+    const handleFork = async () => {
+      if (!canFork || isForking) return
+      setIsForking(true)
+      try {
+        await onFork(userMsg.id!)
+      } finally {
+        setIsForking(false)
+      }
+    }
+
     return (
       <div
         className={cn(
@@ -268,14 +285,31 @@ export const MessageRow = memo(function MessageRow({
           />
         </div>
         <div className="flex items-center gap-2">
+          {canFork && (
+            <button
+              onClick={handleFork}
+              disabled={isForking}
+              className={cn(
+                "flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100",
+                "hover:bg-muted hover:text-foreground/70",
+                isForking && "cursor-not-allowed opacity-50"
+              )}
+              title="Fork conversation from here"
+            >
+              <GitForkIcon className="h-3 w-3" />
+              {isForking ? "Forking…" : "Fork"}
+            </button>
+          )}
           <CopyButton text={message.content} />
-          {(message as UserMessage).createdAt != null && (
-            <TimeStamp timestamp={(message as UserMessage).createdAt!} />
+          {userMsg.createdAt != null && (
+            <TimeStamp timestamp={userMsg.createdAt} />
           )}
         </div>
       </div>
     )
   }
+
+  if (message.role === "error") return null
 
   return (
     <AssistantMessageBlock

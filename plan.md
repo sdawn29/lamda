@@ -1,343 +1,205 @@
-# Plan: Replace React Context with Zustand
+# Plan: Migrate to createAgentSessionRuntime (Desktop Pattern)
 
 ## Context
 
-The web app manages all UI state through React Context, leading to coarse re-render boundaries and boilerplate Provider nesting. Zustand v5 offers module-level stores with granular subscriptions, no Provider required, and cleaner TypeScript ergonomics — making it a direct improvement for UI/client state management.
+The SDK exports two session creation paths:
+- `createAgentSession()` — simple single-session factory, minimal setup
+- `createAgentSessionRuntime()` — desktop-appropriate factory using `createAgentSessionServices` + `createAgentSessionFromServices`, enables session replacement (new, fork, switch) and gives proper cwd-bound service lifecycle
 
-**8 of 13 contexts** will be migrated. The remaining 5 are kept as React Context because they are either tightly coupled to React Query mutations (WorkspaceContext), manage DOM side effects that require component lifecycle (ThemeContext, KeyboardShortcutsContext), wrap third-party libraries with no actual state (ErrorToastContext), or are WIP placeholders (McpContext). UI library contexts (SidebarContext, ToggleGroupContext) are untouched.
+This codebase is a desktop Electron app. The current pi-sdk uses `createAgentSession` (the server/CLI pattern). The refactoring migrates to `createAgentSessionRuntime` as the underlying mechanism in all three packages.
+
+**Why this matters:**
+- Aligns with the SDK's desktop architectural contract
+- `createAgentSessionServices` sets up cwd-bound services (resource loader, settings, auth, model registry) in the correct layer — the runtime factory owns this boundary
+- Unlocks session tree operations (fork, switch, new) that are the foundation of conversation branching in a desktop coding agent
+- `SessionManager.createBranchedSession()` enables conversation fork UI (new thread from a message point)
 
 ---
 
-## Step 0 — Install Zustand
+## Changes
 
-```bash
-npm install zustand -w web
+### 1. `packages/pi-sdk/src/session.ts` — Core migration
+
+Replace `createAgentSession` with `createAgentSessionRuntime` + factory in both `createManagedSession` and `openManagedSession`. External function signatures stay identical.
+
+**New imports:**
+```typescript
+import {
+  type CreateAgentSessionRuntimeFactory,
+  createAgentSessionFromServices,
+  createAgentSessionRuntime,
+  createAgentSessionServices,
+  createReadOnlyTools,
+  getAgentDir,
+  type AgentSessionRuntime,
+  ModelRegistry,
+  SessionManager,
+} from "@earendil-works/pi-coding-agent"
 ```
 
----
+**`buildHandle(session)` → `buildRuntimeHandle(runtime: AgentSessionRuntime)`:**
 
-## Phase 1 — Simple Boolean/Modal Stores (4 contexts)
+All `session.X` calls become `runtime.session.X`. The `getCommands()` method already uses the public `session.resourceLoader` getter (confirmed at line 391 of `agent-session.d.ts`). The `setCustomTools` hack stays as-is using `runtime.session as any`. The `events()` method passes `runtime.session` at call time: `sessionEventGenerator(runtime.session)`.
 
-Each follows the same pattern: create `store.ts`, update `index.ts` barrel exports, remove the Provider from `app-providers.tsx` or `__root.tsx`. Consumer import paths change; call sites do not (hook names are preserved).
-
-### 1. SettingsModalContext → `settings/store.ts`
-
-**Current file:** `src/features/settings/context.tsx`  
-**Delete:** `SettingsModalProvider` from `src/providers/app-providers.tsx`  
-**~4 consumers:** settings-modal, settings-page, title-bar, etc.
-
-```ts
-import { create } from 'zustand'
-interface SettingsModalStore {
-  open: boolean
-  openSettings: () => void
-  closeSettings: () => void
+Add `fork` to `buildRuntimeHandle`:
+```typescript
+fork: async (entryId: string): Promise<string> => {
+  const sf = runtime.session.sessionFile
+  if (!sf) throw new Error("Cannot fork an in-memory session")
+  const sm = SessionManager.open(sf)
+  const newFile = sm.createBranchedSession(entryId)
+  if (!newFile) throw new Error("No branch created for entryId: " + entryId)
+  return newFile
 }
-export const useSettingsModal = create<SettingsModalStore>()((set) => ({
-  open: false,
-  openSettings: () => set({ open: true }),
-  closeSettings: () => set({ open: false }),
-}))
 ```
 
-### 2. ConfigureProviderContext → `settings/configure-provider-store.ts`
+**`createManagedSession`** — build factory inline, close over config:
+```typescript
+export async function createManagedSession(config: SdkConfig): Promise<ManagedSessionHandle> {
+  const cwd = config.cwd ?? process.cwd()
+  const authStorage = config.authStorage ?? buildAuthStorage(config)
+  const modelRegistry = config.modelRegistry ?? ModelRegistry.create(authStorage)
+  const model = config.provider && config.model ? modelRegistry.find(config.provider, config.model) : undefined
 
-**Current file:** `src/features/settings/configure-provider-context.tsx`  
-**Delete:** `ConfigureProviderProvider` from `src/providers/app-providers.tsx`  
-**~3 consumers**
-
-```ts
-import { create } from 'zustand'
-type ConfigureProviderTab = 'subscriptions' | 'api-keys'
-interface ConfigureProviderStore {
-  open: boolean
-  tab: ConfigureProviderTab
-  openConfigure: (tab?: ConfigureProviderTab) => void
-  closeConfigure: () => void
-  setTab: (tab: ConfigureProviderTab) => void
-}
-export const useConfigureProvider = create<ConfigureProviderStore>()((set) => ({
-  open: false,
-  tab: 'subscriptions',
-  openConfigure: (tab = 'subscriptions') => set({ open: true, tab }),
-  closeConfigure: () => set({ open: false }),
-  setTab: (tab) => set({ tab }),
-}))
-```
-
-### 3. CommandPaletteContext → `command-palette/store.ts`
-
-**Current file:** `src/features/command-palette/context.tsx`  
-**Delete:** `CommandPaletteProvider` from `src/providers/app-providers.tsx`  
-**~2 consumers**
-
-```ts
-export const useCommandPalette = create<{
-  open: boolean
-  openPalette: () => void
-  closePalette: () => void
-}>()((set) => ({
-  open: false,
-  openPalette: () => set({ open: true }),
-  closePalette: () => set({ open: false }),
-}))
-```
-
-### 4. FileTreeContext → `file-tree/store.ts`
-
-**Current file:** `src/features/file-tree/context.tsx`  
-**Delete:** `<FileTreeProvider>` from `src/routes/__root.tsx` (inside `RootLayoutGate`)  
-**~3 consumers**
-
-```ts
-export const useFileTree = create<{
-  isOpen: boolean
-  toggle: () => void
-  open: () => void
-  close: () => void
-}>()((set) => ({
-  isOpen: false,
-  toggle: () => set((s) => ({ isOpen: !s.isOpen })),
-  open: () => set({ isOpen: true }),
-  close: () => set({ isOpen: false }),
-}))
-```
-
----
-
-## Phase 2 — Reducer-Based Tab Stores (2 contexts)
-
-### 5. MainTabsContext → `main-tabs/store.ts`
-
-**Current file:** `src/features/main-tabs/context.tsx` (uses `useReducer`)  
-**Delete:** `<MainTabsProvider>` from `src/routes/__root.tsx`  
-**~6 consumers:** main-tab-bar, file-content-view, tabs-empty-state, root layout, etc.
-
-Keep type definitions (`MainTab`, `ThreadMainTab`, `FileMainTab`) in `context.tsx` or a `types.ts`. Move all reducer logic into Zustand actions. Preserve the `activeTab` derived value as a getter using `get()`:
-
-```ts
-import { create } from 'zustand'
-
-export const useMainTabsStore = create<MainTabsStore>()((set, get) => ({
-  tabs: [],
-  activeTabId: null,
-  get activeTab() {
-    const { tabs, activeTabId } = get()
-    return tabs.find((t) => t.id === activeTabId) ?? null
-  },
-  addThreadTab: (threadId, title) => set((s) => {
-    const existing = s.tabs.find((t) => t.type === 'thread' && t.threadId === threadId)
-    if (existing) return { activeTabId: existing.id }
-    const id = `thread-${threadId}`
-    return { tabs: [...s.tabs, { id, type: 'thread', threadId, title }], activeTabId: id }
-  }),
-  // closeTab: smart next-active logic (pick prev tab, or next, or null)
-  // setActiveTab, updateThreadTitle, reorderTabs, addFileTab — port from reducer cases
-}))
-
-// Backward-compatible hook
-export function useMainTabs() { return useMainTabsStore() }
-```
-
-### 6. DiffPanelContext → `git/store.ts`
-
-**Current file:** `src/features/git/context.tsx` (uses `useReducer`)  
-**Delete:** `<DiffPanelProvider>` from `src/routes/__root.tsx`  
-**~3 consumers**
-
-Port all 10 reducer action types to Zustand methods. Preserve:
-- `SOURCE_CONTROL_TAB` constant (cannot be closed)
-- `addTab` deduplication by `filePath`
-- `workspaceTabs` per-workspace file tab memory (in-memory only, no localStorage)
-
-```ts
-export const useDiffPanelStore = create<DiffPanelStore>()((set, get) => ({
-  isOpen: false,
-  isFullscreen: false,
-  tabs: [SOURCE_CONTROL_TAB],
-  activeTabId: 'tab-source-control',
-  pendingTabId: null,
-  currentWorkspacePath: null,
-  workspaceTabs: {},
-  // ... all actions as methods using set()/get()
-}))
-
-export function useDiffPanel() { return useDiffPanelStore() }
-```
-
----
-
-## Phase 3A — Per-Workspace Terminal Store
-
-### 7. TerminalContext → `terminal/store.ts`
-
-**Current file:** `src/features/terminal/context.tsx` (uses `useState(new Map())` + `useRef` for counters)  
-**Delete:** `<TerminalProvider>` from `src/routes/__root.tsx`  
-**~3 consumers**
-
-Replace `Map<string, WorkspaceTerminalState>` with `Record<string, WorkspaceTerminalState>` (Zustand-friendly). Move tab counters to a module-level variable (they never drive re-renders):
-
-```ts
-const tabCounters: Record<string, number> = {}
-
-export const useTerminalStore = create<TerminalStore>()((set, get) => ({
-  states: {},
-  getState: (workspaceId) => get().states[workspaceId] ?? makeDefaultState(),
-  toggle: (workspaceId, cwd) => {
-    const current = get().states[workspaceId] ?? makeDefaultState()
-    // open/close/create-first-tab logic using get() — no stale closure issue
-  },
-  // addTab, closeTab, setActiveTab, renameTab, killAll — all keyed by workspaceId
-}))
-
-export function useTerminal() { return useTerminalStore() }
-
-export function useTerminalForWorkspace(workspaceId: string, cwd: string) {
-  const state = useTerminalStore((s) => s.states[workspaceId] ?? makeDefaultState())
-  return {
-    ...state,
-    toggle: () => useTerminalStore.getState().toggle(workspaceId, cwd),
-    open: () => useTerminalStore.getState().open(workspaceId, cwd),
-    addTab: () => useTerminalStore.getState().addTab(workspaceId, cwd),
-    // remaining actions bound to workspaceId
+  const createRuntime: CreateAgentSessionRuntimeFactory = async ({ cwd: effectiveCwd, agentDir, sessionManager, sessionStartEvent }) => {
+    const services = await createAgentSessionServices({ cwd: effectiveCwd, agentDir, authStorage, modelRegistry })
+    const baseTools = createReadOnlyTools(effectiveCwd)
+    const customTools = config.customTools ? [...baseTools, ...config.customTools] : baseTools
+    return {
+      ...(await createAgentSessionFromServices({
+        services, sessionManager, sessionStartEvent,
+        model, thinkingLevel: config.thinkingLevel as any, customTools,
+      })),
+      services,
+      diagnostics: services.diagnostics,
+    }
   }
+
+  const runtime = await createAgentSessionRuntime(createRuntime, {
+    cwd, agentDir: getAgentDir(), sessionManager: SessionManager.create(cwd),
+  })
+  return buildRuntimeHandle(runtime)
+}
+```
+
+**`openManagedSession`** — same factory, different `sessionManager`:
+```typescript
+export async function openManagedSession(sessionFilePath: string, config: SdkConfig = {}): Promise<ManagedSessionHandle> {
+  // identical factory construction ...
+  const runtime = await createAgentSessionRuntime(createRuntime, {
+    cwd, agentDir: getAgentDir(), sessionManager: SessionManager.open(sessionFilePath),
+  })
+  return buildRuntimeHandle(runtime)
 }
 ```
 
 ---
 
-## Phase 3B — ThreadStatus Store (most impactful)
+### 2. `packages/pi-sdk/src/types.ts` — Add `fork` to interface
 
-### 8. ThreadStatusContext → `chat/thread-status-store.ts`
+```typescript
+export interface ManagedSessionHandle {
+  // ... existing ...
 
-**Current file:** `src/features/chat/thread-status-context.tsx`  
-Uses: custom `ThreadStatusStore` class + `useSyncExternalStore` + `useEffect` WebSocket setup  
-**Delete:** `<ThreadStatusProvider>` from `src/providers/app-providers.tsx`  
-**~15 consumers** — most-used context in the app
-
-The custom external store class is replaced by Zustand with `subscribeWithSelector` middleware. The WebSocket init moves out of a React component into a module-level function called once from `main.tsx`:
-
-```ts
-import { create } from 'zustand'
-import { subscribeWithSelector } from 'zustand/middleware'
-
-// Module-level timer registry — not React state, not subscribed to
-const timers: Record<string, ReturnType<typeof setTimeout>> = {}
-
-export const useThreadStatusStore = create<ThreadStatusStore>()(
-  subscribeWithSelector((set, get) => ({
-    statuses: {} as Record<string, ThreadStatus>,
-    activeThreadId: null as string | null,
-    setStatus: (threadId, status) => {
-      // preserve: ignore non-streaming updates when status is 'error'
-      // preserve: mark thread as streamed in localStorage
-      // preserve: completed→idle timer only fires for the active thread
-      set((s) => ({ statuses: { ...s.statuses, [threadId]: status } }))
-      if (status === 'completed' && get().activeThreadId === threadId) {
-        startIdleTimer(threadId) // 5s then sets status to 'idle'
-      } else {
-        cancelTimer(threadId)
-      }
-    },
-    setActiveThreadId: (threadId) => {
-      const prev = get().activeThreadId
-      if (prev) cancelTimer(prev)
-      set({ activeThreadId: threadId })
-      if (threadId && (get().statuses[threadId] ?? 'idle') === 'completed') {
-        startIdleTimer(threadId)
-      }
-    },
-  }))
-)
-
-// Called once from main.tsx — WebSocket lives outside React entirely
-export function initThreadStatusWebSocket() {
-  // subscribe to WS events → call useThreadStatusStore.getState().setStatus(...)
-}
-
-// Granular per-thread selector — re-renders only when that thread's status changes
-export function useThreadStatus(threadId: string): ThreadStatus {
-  return useThreadStatusStore((s) => s.statuses[threadId] ?? 'idle')
-}
-export function useSetThreadStatus() {
-  return useThreadStatusStore.getState().setStatus
-}
-export function useSetActiveThreadId() {
-  return useThreadStatusStore.getState().setActiveThreadId
+  /**
+   * Branch the conversation at a specific session entry.
+   * Returns the new session file path. Caller creates a new thread and opens it.
+   */
+  fork(entryId: string): Promise<string>
 }
 ```
 
-In `src/main.tsx`, call `initThreadStatusWebSocket()` before rendering.
+---
+
+### 3. `apps/server/src/routes/sessions.ts` — Fork endpoint
+
+Add `POST /session/:id/fork` at the bottom of the sessions router:
+
+```typescript
+// Body: { entryId: string }
+// Returns: { threadId: string, sessionId: string }
+sessionsRoute.post("/:id/fork", async (c) => {
+  const sessionId = c.req.param("id")
+  const { entryId } = await c.req.json<{ entryId: string }>()
+  const entry = store.get(sessionId)
+  if (!entry) return c.json({ error: "session not found" }, 404)
+  if (!entry.workspaceId) return c.json({ error: "session has no workspace" }, 400)
+
+  const newSessionFile = await entry.handle.fork(entryId)
+
+  const newThreadId = insertThread(entry.workspaceId)
+  updateThreadSessionFile(newThreadId, newSessionFile)
+
+  const forkedHandle = await openManagedSession(newSessionFile, { cwd: entry.cwd })
+  const newSessionId = store.create(forkedHandle, entry.cwd, newThreadId, entry.workspaceId)
+  sessionEvents.ensure(newSessionId, newThreadId, forkedHandle, entry.cwd)
+
+  return c.json({ threadId: newThreadId, sessionId: newSessionId })
+})
+```
+
+Imports needed: `openManagedSession` from `@lamda/pi-sdk`, `insertThread` + `updateThreadSessionFile` from `@lamda/db`.
 
 ---
 
-## Phase 4 — Cleanup
+### 4. `apps/web/src/features/chat/api.ts` — Fork API call
 
-After all phases:
-
-1. If `AppProviders` only wraps `ErrorToastProvider`, delete `src/providers/app-providers.tsx` and inline `<ErrorToastProvider>` directly in `main.tsx`.
-2. Delete all old `context.tsx` files for migrated contexts (or keep as type-only re-export stubs if needed for a single-pass import update).
-3. Remove unused imports (`createContext`, `useContext`, `useReducer`, `useMemo`, `useCallback`) from migrated files.
-
----
-
-## Contexts Kept Unchanged
-
-| Context | File | Reason |
-|---|---|---|
-| WorkspaceContext | `workspace/context.tsx` | Wraps React Query mutations — not migratable |
-| ThemeContext | `shared/components/theme-provider.tsx` | DOM side effects + React Query coupling |
-| KeyboardShortcutsContext | `shared/components/keyboard-shortcuts-provider.tsx` | Global event listener + handler ref registry |
-| ErrorToastContext | `chat/contexts/error-toast-context.tsx` | Zero React state; thin wrapper over `sonner` |
-| McpContext | `mcp/context.tsx` | WIP placeholder |
+```typescript
+export async function forkSession(
+  sessionId: string,
+  entryId: string,
+): Promise<{ threadId: string; sessionId: string }> {
+  const res = await apiFetch(`/session/${sessionId}/fork`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ entryId }),
+  })
+  if (!res.ok) throw new Error("Fork failed")
+  return res.json()
+}
+```
 
 ---
 
-## React Compiler Note
+### 5. `apps/web/src/features/chat/` — Fork button on user messages
 
-`babel-plugin-react-compiler` is enabled. This means:
-- No need to add `useMemo`/`useCallback` in new store files (they are plain TS modules outside React).
-- No need for `useShallow` on most consumers — the Compiler handles granular re-renders from destructuring.
-- Zustand action functions in `create()` are already stable references (close over `set`/`get`) — fully compatible.
+Add a fork action button (small icon, visible on hover) to user message bubbles in the chat component that renders user messages. On click:
+1. Call `forkSession(sessionId, message.id)` where `message.id` is the session entry ID stored in the DB message block
+2. On success, navigate to `workspace.$threadId` with the returned `threadId`
+3. Invalidate the workspace list query so the sidebar shows the new thread
+
+The session entry ID (`entryId`) needs to come from the message block. Check `apps/server/src/session-events.ts` to confirm how message IDs are stored (they come from `AgentMessage.id` during the `message_start` event). Verify the DB stores this as a queryable field in the message block.
 
 ---
 
-## Critical Files
+## Files to Modify
 
 | File | Change |
 |---|---|
-| `apps/web/package.json` | Add `zustand` dependency |
-| `apps/web/src/main.tsx` | Add `initThreadStatusWebSocket()` call; later inline `ErrorToastProvider` |
-| `apps/web/src/providers/app-providers.tsx` | Remove 4 providers across phases; delete in cleanup |
-| `apps/web/src/routes/__root.tsx` | Remove 4 providers from `RootLayoutGate` across phases |
-| `apps/web/src/features/settings/context.tsx` | Replace with `store.ts` |
-| `apps/web/src/features/settings/configure-provider-context.tsx` | Replace with `configure-provider-store.ts` |
-| `apps/web/src/features/command-palette/context.tsx` | Replace with `store.ts` |
-| `apps/web/src/features/file-tree/context.tsx` | Replace with `store.ts` |
-| `apps/web/src/features/main-tabs/context.tsx` | Split: types stay, logic moves to `store.ts` |
-| `apps/web/src/features/git/context.tsx` | Split: types stay, logic moves to `store.ts` |
-| `apps/web/src/features/terminal/context.tsx` | Replace with `store.ts` |
-| `apps/web/src/features/chat/thread-status-context.tsx` | Replace with `thread-status-store.ts` |
+| `packages/pi-sdk/src/session.ts` | Replace `createAgentSession` → `createAgentSessionRuntime`; add `fork` to `buildRuntimeHandle` |
+| `packages/pi-sdk/src/types.ts` | Add `fork(entryId): Promise<string>` to `ManagedSessionHandle` |
+| `apps/server/src/routes/sessions.ts` | Add `POST /:id/fork` endpoint |
+| `apps/web/src/features/chat/api.ts` | Add `forkSession()` |
+| `apps/web/src/features/chat/components/` | Add fork button to user message bubble |
+
+**No changes needed:**
+- `apps/server/src/services/session-service.ts` — calls `createManagedSession` (same signature)
+- `apps/server/src/bootstrap.ts` — calls `openManagedSession` (same signature)
+- `apps/server/src/store.ts` — type `ManagedSessionHandle` gains `fork` method automatically
+- `packages/pi-sdk/src/stream.ts` — takes `AgentSession` directly, no change
+- `packages/pi-sdk/src/auth.ts`, `models.ts`, `title.ts`, `commit-message.ts`
 
 ---
 
 ## Verification
 
-After each phase:
-
-```bash
-npm run typecheck -w web
-```
-
-Dev server smoke tests by phase:
-- **Phase 1:** Open/close Settings modal, Configure Provider modal, Command Palette, File Tree
-- **Phase 2:** Open tabs, close tabs (verify smart focus), drag-reorder, diff panel workspace switching
-- **Phase 3A:** Open terminal, add/close/rename tabs, switch workspaces (PTY stays alive)
-- **Phase 3B:** Open a thread, observe streaming → completed → idle transition (5s), navigate away/back
-
-Post-migration grep checks:
-```bash
-# Should return 0 results in src/ (except deleted files)
-grep -r "ThreadStatusProvider\|SettingsModalProvider\|CommandPaletteProvider\|FileTreeProvider\|MainTabsProvider\|DiffPanelProvider\|TerminalProvider\|ConfigureProviderProvider" apps/web/src/
-grep -r "useContext" apps/web/src/features/{settings,command-palette,file-tree,main-tabs,git,terminal,chat}/
-```
+1. **Type-check pi-sdk:** `pnpm --filter @lamda/pi-sdk exec tsc --noEmit`
+2. **Server start:** `pnpm --filter server dev` — confirm `{ready: true}` first-line output; confirm existing threads bootstrap without error
+3. **Basic chat:** Send a message in any thread — confirm streaming and tool events flow correctly
+4. **Fork flow:**
+   - Send 3+ messages in a thread
+   - Click fork on message #2's user bubble
+   - Confirm a new thread appears in the sidebar
+   - Confirm the new thread has messages up to and including message #2
+   - Confirm both threads accept new prompts independently
+5. **Full typecheck:** `pnpm typecheck` across all packages — zero new errors

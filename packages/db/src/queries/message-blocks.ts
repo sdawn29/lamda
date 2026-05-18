@@ -65,7 +65,8 @@ function getNextBlockIndex(threadId: string): number {
  */
 export function insertUserBlock(
   threadId: string,
-  content: string
+  content: string,
+  createdAt?: number
 ): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);
@@ -76,7 +77,7 @@ export function insertUserBlock(
       blockIndex,
       role: "user",
       content,
-      createdAt: Date.now(),
+      createdAt: createdAt ?? Date.now(),
     })
     .run();
   return id;
@@ -85,7 +86,7 @@ export function insertUserBlock(
 /**
  * Insert an assistant message block (starts the streaming block)
  */
-export function insertAssistantStartBlock(threadId: string): string {
+export function insertAssistantStartBlock(threadId: string, createdAt?: number): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);
   db.insert(messageBlocks)
@@ -94,7 +95,7 @@ export function insertAssistantStartBlock(threadId: string): string {
       threadId,
       blockIndex,
       role: "assistant",
-      createdAt: Date.now(),
+      createdAt: createdAt ?? Date.now(),
     })
     .run();
   return id;
@@ -107,10 +108,12 @@ export function insertToolBlock(
   threadId: string,
   toolCallId: string,
   toolName: string,
-  toolArgs: string
+  toolArgs: string,
+  createdAt?: number
 ): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);
+  const now = createdAt ?? Date.now();
   db.insert(messageBlocks)
     .values({
       id,
@@ -121,8 +124,8 @@ export function insertToolBlock(
       toolName,
       toolArgs,
       toolStatus: "running",
-      toolStartTime: Date.now(),
-      createdAt: Date.now(),
+      toolStartTime: now,
+      createdAt: now,
     })
     .run();
   return id;
@@ -310,7 +313,8 @@ export function listRunningToolBlocks(threadId: string): MessageBlock[] {
  */
 export function insertCompactionBlock(
   threadId: string,
-  reason: "manual" | "threshold" | "overflow"
+  reason: "manual" | "threshold" | "overflow",
+  createdAt?: number
 ): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);
@@ -321,7 +325,7 @@ export function insertCompactionBlock(
       blockIndex,
       role: "compaction",
       content: reason,
-      createdAt: Date.now(),
+      createdAt: createdAt ?? Date.now(),
     })
     .run();
   return id;

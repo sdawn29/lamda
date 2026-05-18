@@ -2,13 +2,28 @@ import { Hono } from "hono";
 import { join, relative } from "path";
 import { readdir } from "fs/promises";
 import type { WebSocket } from "ws";
-import { insertWorkspace, insertThread, insertUserBlock, insertAbortBlock, listMessageBlocks, listRunningToolBlocks } from "@lamda/db";
+import {
+  insertWorkspace,
+  insertThread,
+  insertUserBlock,
+  insertAssistantStartBlock,
+  insertToolBlock,
+  insertCompactionBlock,
+  insertAbortBlock,
+  listMessageBlocks,
+  listRunningToolBlocks,
+  updateThreadSessionFile,
+  updateAssistantBlockContent,
+  finalizeAssistantBlock,
+  updateToolBlockResult,
+} from "@lamda/db";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import {
   createSessionForThread,
   ensureSessionEventHub,
 } from "../services/session-service.js";
+import { openManagedSession, readSessionHistory } from "@lamda/pi-sdk";
 import type { PromptOptions, SdkConfig } from "@lamda/pi-sdk";
 
 const EXCLUDED_DIRS = new Set([
@@ -268,6 +283,90 @@ sessions.get("/session/:id/workspace-files", async (c) => {
   } catch {
     return c.json({ entries: [] });
   }
+});
+
+/**
+ * Fork a conversation at a specific user message.
+ * Creates a new thread branched from that point, returns the new threadId and sessionId.
+ */
+sessions.post("/session/:id/fork", async (c) => {
+  const sessionId = c.req.param("id");
+  const body = await c.req.json<{ blockId?: string }>().catch((): { blockId?: string } => ({}));
+  if (!body.blockId) return c.json({ error: "blockId is required" }, 400);
+
+  const entry = store.get(sessionId);
+  if (!entry) return c.json({ error: "Session not found" }, 404);
+  if (!entry.workspaceId) return c.json({ error: "Session has no workspace" }, 400);
+
+  // Map blockId → position among user messages in this thread
+  const allBlocks = listMessageBlocks(entry.threadId);
+  const userBlocks = allBlocks.filter((b) => b.role === "user");
+  const userMessageIndex = userBlocks.findIndex((b) => b.id === body.blockId);
+  if (userMessageIndex === -1) return c.json({ error: "Block not found in thread" }, 404);
+
+  // The forked user message goes to the input field — capture its text before forking
+  const initialInput = userBlocks[userMessageIndex]?.content ?? "";
+
+  let newSessionFile: string;
+  try {
+    newSessionFile = await entry.handle.fork(userMessageIndex);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
+
+  const newThreadId = insertThread(entry.workspaceId);
+  updateThreadSessionFile(newThreadId, newSessionFile);
+
+  // Seed message blocks from the branched JSONL so history appears immediately.
+  // The last user message is intentionally skipped — it goes to the input field.
+  try {
+    const history = readSessionHistory(newSessionFile);
+    let lastUserIdx = -1;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].role === "user") { lastUserIdx = i; break; }
+    }
+    for (let i = 0; i < history.length; i++) {
+      const block = history[i];
+      if (i === lastUserIdx) continue;
+      if (block.role === "user") {
+        insertUserBlock(newThreadId, block.content, block.createdAt);
+      } else if (block.role === "assistant") {
+        const blockId = insertAssistantStartBlock(newThreadId, block.createdAt);
+        updateAssistantBlockContent(
+          blockId,
+          block.content,
+          block.thinking || undefined,
+          block.model || undefined,
+          block.provider || undefined,
+        );
+        if (block.errorMessage) {
+          finalizeAssistantBlock(blockId, { errorMessage: block.errorMessage });
+        }
+      } else if (block.role === "tool") {
+        const toolBlockId = insertToolBlock(
+          newThreadId,
+          block.toolCallId,
+          block.toolName,
+          block.toolArgs,
+          block.createdAt,
+        );
+        updateToolBlockResult(toolBlockId, {
+          status: block.isError ? "error" : "done",
+          result: block.toolResult,
+        });
+      } else if (block.role === "compaction") {
+        insertCompactionBlock(newThreadId, "manual", block.createdAt);
+      }
+    }
+  } catch (err) {
+    console.error("[fork] history seeding failed (non-fatal):", err);
+  }
+
+  const forkedHandle = await openManagedSession(newSessionFile, { cwd: entry.cwd });
+  const newSessionId = store.create(forkedHandle, entry.cwd, newThreadId, entry.workspaceId);
+  sessionEvents.ensure(newSessionId, newThreadId, forkedHandle, entry.cwd);
+
+  return c.json({ threadId: newThreadId, sessionId: newSessionId, initialInput }, 201);
 });
 
 export function handleSessionEventsWs(ws: WebSocket, id: string, lastEventId?: string) {
