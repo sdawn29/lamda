@@ -181,6 +181,19 @@ export function ChatView({
   const updateThreadStopped = useUpdateThreadStopped()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(false)
+  const messagesResizeObserverRef = useRef<ResizeObserver | null>(null)
+  const messagesContainerRef = useCallback((el: HTMLDivElement | null) => {
+    messagesResizeObserverRef.current?.disconnect()
+    messagesResizeObserverRef.current = null
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      if (!pinnedRef.current) return
+      const scroll = scrollContainerRef.current
+      if (scroll) scroll.scrollTop = scroll.scrollHeight
+    })
+    ro.observe(el)
+    messagesResizeObserverRef.current = ro
+  }, [])
   const isScrollingToBottomRef = useRef(false)
   const lastScrollTopRef = useRef(0)
   const chatTextboxRef = useRef<ChatTextboxHandle>(null)
@@ -639,7 +652,7 @@ export function ChatView({
             </div>
           )}
           {groupedMessages.length > 0 && (
-            <div className="mx-auto w-full max-w-3xl px-6">
+            <div ref={messagesContainerRef} className="mx-auto w-full max-w-3xl px-6">
               {groupedMessages.map((group, groupIndex) => {
                 if (group.type === "working") {
                   const isGroupActive =
@@ -728,7 +741,7 @@ export function ChatView({
           <div className="mx-auto w-full max-w-3xl px-6">
             {isCompacting
               ? <CompactingIndicator reason={compactionReason} />
-              : isLoading && !hasActiveWorkingGroup && <ThinkingIndicator className="py-0.5" />
+              : isLoading && <ThinkingIndicator className="py-0.5" />
             }
           </div>
 

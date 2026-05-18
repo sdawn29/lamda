@@ -181,7 +181,7 @@ export const WorkingBlock = memo(function WorkingBlock({
               if (msg.role === "assistant") {
                 const a = msg as AssistantMessage
                 if (!showThinking || !a.thinking.trim()) return null
-                return <ThinkingBlock key={i} thinking={a.thinking} />
+                return <ThinkingBlock key={i} thinking={a.thinking} isNew={isNew} />
               }
               if (msg.role === "tool") {
                 const t = msg as ToolMessage
@@ -190,7 +190,7 @@ export const WorkingBlock = memo(function WorkingBlock({
               return null
             })}
             {hasFinalThinking && finalThinking && (
-              <ThinkingBlock thinking={finalThinking} />
+              <ThinkingBlock thinking={finalThinking} isNew={isNew} />
             )}
           </div>
         </div>

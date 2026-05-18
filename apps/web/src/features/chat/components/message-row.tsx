@@ -18,6 +18,7 @@ import {
   type AbortMessage,
 } from "../types"
 import { cn } from "@/shared/lib/utils"
+import { useWordReveal } from "../hooks/use-word-reveal"
 
 function assistantCopyText(
   message: AssistantMessage,
@@ -69,6 +70,7 @@ function AssistantMessageBlock({
 }: AssistantMessageBlockProps) {
   const hasContent = message.content.length > 0
   const hasError = !!message.errorMessage
+  const displayContent = useWordReveal(message.content, isNew)
 
   if (!hasContent && !hasError) return null
 
@@ -90,16 +92,11 @@ function AssistantMessageBlock({
     "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.75] prose-headings:my-0 prose-p:leading-[1.75] prose-p:mt-0 prose-p:mb-[1.25em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.75] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-2 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
 
   return (
-    <div
-      className={cn(
-        "group flex flex-col gap-2",
-        isNew && "animate-in duration-300 fade-in-0 slide-in-from-bottom-1"
-      )}
-    >
+    <div className="group flex flex-col gap-2">
       {hasContent && (
         <div className={proseClass}>
           <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {message.content}
+            {displayContent}
           </Markdown>
         </div>
       )}
