@@ -23,7 +23,7 @@ export { type WorkspaceFileEntry }
 
 export function useWorkspaceIndex(workspaceId: string | undefined, enabled = true) {
   return useQuery({
-    queryKey: workspaceId ? workspaceKeys.files(workspaceId) : workspaceKeys.all,
+    queryKey: workspaceId ? workspaceKeys.files(workspaceId) : (["workspace-files-none"] as const),
     queryFn: async (): Promise<WorkspaceFileEntry[]> => {
       const { files } = await listWorkspaceIndexFiles(workspaceId!)
       return files

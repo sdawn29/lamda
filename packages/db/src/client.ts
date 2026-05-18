@@ -152,6 +152,16 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS agent_turn_files_turn_idx ON agent_turn_files(turn_id);
   `);
 
+  // Migration: Add forked_from_id column to threads table.
+  try {
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!threadCols.some((col) => col.name === "forked_from_id")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN forked_from_id TEXT`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
   // Migration: Update message_blocks CHECK constraint to include 'abort' and 'compaction' roles.
   // SQLite doesn't support ALTER TABLE for CHECK constraints, so we recreate the table when needed.
   try {

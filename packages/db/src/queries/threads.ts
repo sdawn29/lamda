@@ -3,10 +3,19 @@ import { eq, and, ne } from "drizzle-orm"
 import { db } from "../client.js"
 import { threads, workspaces } from "../schema.js"
 
-export function insertThread(workspaceId: string): string {
+export function insertThread(
+  workspaceId: string,
+  options?: { title?: string; forkedFromId?: string },
+): string {
   const id = randomUUID()
   db.insert(threads)
-    .values({ id, workspaceId, title: "New Thread", createdAt: Date.now() })
+    .values({
+      id,
+      workspaceId,
+      title: options?.title ?? "New Thread",
+      forkedFromId: options?.forkedFromId ?? null,
+      createdAt: Date.now(),
+    })
     .run()
   return id
 }

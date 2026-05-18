@@ -100,6 +100,10 @@ export function useDeleteWorkspace() {
         queryClient,
         workspace.threads.map((thread) => thread.sessionId)
       )
+      useMainTabsStore.getState().closeWorkspaceTabs(
+        workspace.path,
+        workspace.threads.map((t) => t.id)
+      )
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
   })

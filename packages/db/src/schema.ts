@@ -26,6 +26,7 @@ export const threads = sqliteTable("threads", {
   isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
   lastAccessedAt: integer("last_accessed_at"),
   createdAt: integer("created_at").notNull(),
+  forkedFromId: text("forked_from_id"),
 })
 
 /**

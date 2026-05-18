@@ -5,6 +5,7 @@ import type { WebSocket } from "ws";
 import {
   insertWorkspace,
   insertThread,
+  getThread,
   insertUserBlock,
   insertAssistantStartBlock,
   insertToolBlock,
@@ -314,7 +315,10 @@ sessions.post("/session/:id/fork", async (c) => {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 
-  const newThreadId = insertThread(entry.workspaceId);
+  const parentThread = getThread(entry.threadId);
+  const parentTitle = parentThread?.title ?? "Thread";
+  const forkTitle = `Fork of ${parentTitle}`;
+  const newThreadId = insertThread(entry.workspaceId, { title: forkTitle, forkedFromId: entry.threadId });
   updateThreadSessionFile(newThreadId, newSessionFile);
 
   // Seed message blocks from the branched JSONL so history appears immediately.

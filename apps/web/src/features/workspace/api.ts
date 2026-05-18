@@ -16,6 +16,7 @@ export interface ThreadDto {
   createdAt: number
   sessionId: string | null
   isPinned?: boolean
+  forkedFromId?: string | null
 }
 
 export interface WorkspaceDto {

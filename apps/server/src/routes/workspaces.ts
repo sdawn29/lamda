@@ -17,7 +17,7 @@ import { workspaceIndexer } from "../services/workspace-indexer.js";
 const workspaces = new Hono();
 
 function mapThread(
-  t: { id: string; title: string | null; modelId: string | null; isStopped: boolean; createdAt: number; isPinned: boolean },
+  t: { id: string; title: string | null; modelId: string | null; isStopped: boolean; createdAt: number; isPinned: boolean; forkedFromId?: string | null },
   workspaceId: string,
 ) {
   const session = store.getByThreadId(t.id);
@@ -28,6 +28,7 @@ function mapThread(
     modelId: t.modelId ?? null,
     isStopped: t.isStopped,
     isPinned: t.isPinned,
+    forkedFromId: t.forkedFromId ?? null,
     createdAt: t.createdAt,
     sessionId: session?.sessionId ?? null,
   };

@@ -25,6 +25,7 @@ interface MainTabsStore {
   addThreadTab: (threadId: string, title: string, pending?: boolean) => void
   addFileTab: (tab: Omit<FileMainTab, "id" | "type">) => void
   closeTab: (id: string) => void
+  closeWorkspaceTabs: (workspacePath: string, threadIds: string[]) => void
   setActiveTab: (id: string) => void
   updateThreadTitle: (threadId: string, title: string) => void
   confirmThread: (threadId: string) => void
@@ -69,6 +70,22 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
             : null
           : s.activeTabId
       return { tabs: newTabs, activeTabId: newActiveTabId }
+    }),
+
+  closeWorkspaceTabs: (workspacePath, threadIds) =>
+    set((s) => {
+      const threadIdSet = new Set(threadIds)
+      const newTabs = s.tabs.filter(
+        (t) =>
+          !(t.type === "thread" && threadIdSet.has(t.threadId)) &&
+          !(t.type === "file" && t.workspacePath === workspacePath)
+      )
+      if (newTabs.length === s.tabs.length) return s
+      const activeStillExists = newTabs.some((t) => t.id === s.activeTabId)
+      return {
+        tabs: newTabs,
+        activeTabId: activeStillExists ? s.activeTabId : (newTabs[newTabs.length - 1]?.id ?? null),
+      }
     }),
 
   setActiveTab: (id) => set({ activeTabId: id }),

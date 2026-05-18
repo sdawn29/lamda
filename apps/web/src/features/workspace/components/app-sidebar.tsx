@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect, useRef, memo } from "react"
+import React, { useState, useCallback, useEffect, useRef, memo } from "react"
 import {
   Archive,
   ExternalLink,
   Folder,
   FolderOpen,
+  GitFork,
   Loader2,
   MessageSquare,
   MoreHorizontal,
@@ -86,11 +87,13 @@ const ThreadRow = memo(function ThreadRow({
   thread,
   workspaceId,
   isActive,
+  depth = 0,
   onClick,
 }: {
   thread: Thread
   workspaceId: string
   isActive: boolean
+  depth?: number
   onClick: () => void
 }) {
   const now = useNow()
@@ -127,13 +130,21 @@ const ThreadRow = memo(function ThreadRow({
     setConfirming(true)
   }, [])
 
+  const isForked = depth > 0
+
   return (
     <>
-      <SidebarMenuSubItem ref={rowRef} className="group/thread">
+      <SidebarMenuSubItem
+        ref={rowRef}
+        className="group/thread"
+        style={isForked ? { marginLeft: `${depth * 12}px`, borderLeft: "1px solid hsl(var(--border) / 0.4)", paddingLeft: "4px" } : undefined}
+      >
         <SidebarMenuSubButton isActive={isActive} onClick={onClick}>
           <span className="flex h-4 w-4 shrink-0 items-center justify-center">
             <span className="flex h-4 w-4 items-center justify-center group-hover/thread:hidden">
-              {status === "streaming" ? (
+              {isForked && status !== "streaming" && status !== "completed" && status !== "error" ? (
+                <GitFork className="h-3 w-3 text-muted-foreground/40" />
+              ) : status === "streaming" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/60" />
               ) : status === "completed" ? (
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
@@ -433,23 +444,43 @@ export function AppSidebar() {
                     {!collapsed[ws.id] && (
                       ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id)).length > 0 ? (
                         <SidebarMenuSub className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
-                          {ws.threads
-                            .filter((t) => !t.isPinned && !pendingThreadIds.has(t.id))
-                            .map((thread) => (
-                              <ThreadRow
-                                key={thread.id}
-                                thread={thread}
-                                workspaceId={ws.id}
-                                isActive={activeThreadId === thread.id}
-                                onClick={() => {
-                                  addThreadTab(thread.id, thread.title)
-                                  navigate({
-                                    to: "/workspace/$threadId",
-                                    params: { threadId: thread.id },
-                                  })
-                                }}
-                              />
-                            ))}
+                          {(() => {
+                            const visibleThreads = ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id))
+                            const visibleIds = new Set(visibleThreads.map((t) => t.id))
+                            const childrenMap = new Map<string, Thread[]>()
+                            const rootThreads: Thread[] = []
+                            for (const t of visibleThreads) {
+                              if (t.forkedFromId && visibleIds.has(t.forkedFromId)) {
+                                const siblings = childrenMap.get(t.forkedFromId) ?? []
+                                siblings.push(t)
+                                childrenMap.set(t.forkedFromId, siblings)
+                              } else {
+                                rootThreads.push(t)
+                              }
+                            }
+                            rootThreads.sort((a, b) => a.createdAt - b.createdAt)
+                            const renderThread = (thread: Thread, depth: number): React.ReactNode[] => {
+                              const children = (childrenMap.get(thread.id) ?? []).slice().sort((a, b) => a.createdAt - b.createdAt)
+                              return [
+                                <ThreadRow
+                                  key={thread.id}
+                                  thread={thread}
+                                  workspaceId={ws.id}
+                                  isActive={activeThreadId === thread.id}
+                                  depth={depth}
+                                  onClick={() => {
+                                    addThreadTab(thread.id, thread.title)
+                                    navigate({
+                                      to: "/workspace/$threadId",
+                                      params: { threadId: thread.id },
+                                    })
+                                  }}
+                                />,
+                                ...children.flatMap((child) => renderThread(child, depth + 1)),
+                              ]
+                            }
+                            return rootThreads.flatMap((thread) => renderThread(thread, 0))
+                          })()}
                         </SidebarMenuSub>
                       ) : (
                         <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150 mx-2 my-1.5 flex flex-col items-center gap-3 rounded-xl bg-muted/30 px-4 py-4 text-center">

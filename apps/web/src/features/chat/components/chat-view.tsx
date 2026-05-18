@@ -529,7 +529,8 @@ export function ChatView({
     async (blockId: string) => {
       try {
         const { threadId: newThreadId, sessionId: newSessionId, initialInput } = await forkSession(sessionId, blockId)
-        addThreadTab(newThreadId, "New Thread")
+        const parentTitle = activeWorkspace?.threads.find((t) => t.id === threadId)?.title ?? "Thread"
+        addThreadTab(newThreadId, `Fork of ${parentTitle}`)
         // Store the forked user message so the new ChatView can pre-fill the textbox
         if (initialInput) pendingInitialInputs.set(newThreadId, initialInput)
         // Pre-populate the messages cache so the forked thread renders immediately
@@ -549,7 +550,7 @@ export function ChatView({
         })
       }
     },
-    [sessionId, queryClient, navigate, addThreadTab]
+    [sessionId, queryClient, navigate, addThreadTab, activeWorkspace, threadId]
   )
 
   return (
