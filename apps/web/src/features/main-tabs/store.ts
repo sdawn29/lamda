@@ -27,6 +27,7 @@ interface MainTabsStore {
   closeTab: (id: string) => void
   closeWorkspaceTabs: (workspacePath: string, threadIds: string[]) => void
   setActiveTab: (id: string) => void
+  clearActiveTab: () => void
   updateThreadTitle: (threadId: string, title: string) => void
   confirmThread: (threadId: string) => void
   reorderTabs: (draggedId: string, targetId: string, before: boolean) => void
@@ -89,6 +90,7 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
     }),
 
   setActiveTab: (id) => set({ activeTabId: id }),
+  clearActiveTab: () => set({ activeTabId: null }),
 
   confirmThread: (threadId) =>
     set((s) => {

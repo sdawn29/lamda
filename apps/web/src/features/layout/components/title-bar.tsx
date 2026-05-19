@@ -4,8 +4,6 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-  FileDiff,
-  FolderTree,
   Server,
   Play,
 } from "lucide-react"
@@ -29,10 +27,8 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { useWorkspace } from "@/features/workspace"
 import { useTerminalForWorkspace } from "@/features/terminal"
-import { useDiffPanel } from "@/features/git"
-import { useFileTree } from "@/features/file-tree/store"
+import { useRightSidebar } from "../store/right-sidebar"
 import { useElectronFullscreen, useElectronPlatform } from "@/features/electron"
-import { useGitDiffStat } from "@/features/git/queries"
 import { OpenWithButton } from "./open-with-button"
 import {
   useShortcutHandler,
@@ -53,9 +49,9 @@ export function TitleBar() {
   const isSettings = pathname === "/settings"
   const { workspaces, setThreadTitle, deleteThread } = useWorkspace()
   const { toggleSidebar, state: sidebarState } = useSidebar()
-  const { isOpen: diffOpen, toggle: toggleDiff } = useDiffPanel()
-  const { isOpen: fileTreeOpen, toggle: toggleFileTree } = useFileTree()
-  const { activeTab, tabs, closeTab } = useMainTabs()
+  const { isOpen: rightSidebarOpen, togglePanel } = useRightSidebar()
+  const toggleDiff = () => togglePanel("changes")
+  const { activeTab } = useMainTabs()
 
   // URL-based thread/workspace — used for right-side session controls
   // (git, terminal, MCP stay tied to the navigated thread even when a file tab is shown)
@@ -124,19 +120,8 @@ export function TitleBar() {
     urlActiveWorkspace?.id ?? "",
     urlActiveWorkspace?.path ?? ""
   )
-  // Stable sessionId for diffStat — only refreshes when the workspace changes,
-  // not when the user switches threads within the same workspace.
-  const prevDiffWorkspaceIdRef = useRef<string | undefined>(undefined)
-  const stableDiffSessionIdRef = useRef<string>("")
-  if (urlActiveWorkspace?.id !== prevDiffWorkspaceIdRef.current) {
-    prevDiffWorkspaceIdRef.current = urlActiveWorkspace?.id
-    stableDiffSessionIdRef.current = urlActiveThread?.sessionId ?? ""
-  }
-  const activeSessionId = stableDiffSessionIdRef.current
-
   const { data: platform } = useElectronPlatform()
   const { data: isFullscreen = false } = useElectronFullscreen()
-  const { data: diffStat } = useGitDiffStat(activeSessionId)
   const isMac = platform === "darwin"
 
   const [isRenaming, setIsRenaming] = useState(false)
@@ -169,24 +154,8 @@ export function TitleBar() {
 
   const handleDeleteThread = async () => {
     if (!activeTabWorkspace || !activeTabThread) return
-    const tabId = `thread-${activeTabThread.id}`
-    const tabIdx = tabs.findIndex((t) => t.id === tabId)
-    const remaining = tabs.filter((t) => t.id !== tabId)
-
     await deleteThread(activeTabWorkspace.id, activeTabThread.id)
-    closeTab(tabId)
-
-    if (remaining.length === 0) {
-      navigate({ to: "/" })
-    } else {
-      const next = remaining[Math.max(0, tabIdx - 1)]
-      if (next.type === "thread") {
-        navigate({
-          to: "/workspace/$threadId",
-          params: { threadId: next.threadId },
-        })
-      }
-    }
+    navigate({ to: "/" })
   }
 
   const { subscribe, getSnapshot } = useMemo(() => {
@@ -227,19 +196,12 @@ export function TitleBar() {
     SHORTCUT_ACTIONS.NAVIGATE_FORWARD,
     canGoForward ? () => router.history.forward() : null
   )
-  useShortcutHandler(
-    SHORTCUT_ACTIONS.TOGGLE_FILE_TREE,
-    effectiveWorkspacePath ? toggleFileTree : null
-  )
-
-  const diffBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_DIFF_PANEL)
   const terminalBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_TERMINAL)
   const renameBinding = useShortcutBinding(SHORTCUT_ACTIONS.RENAME_THREAD)
-  const fileTreeBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE)
 
   return (
     <div
-      className="sticky top-0 z-20 flex h-11 shrink-0 items-center border-b bg-background pl-2"
+      className="sticky top-0 z-20 flex h-11 shrink-0 items-center bg-background pl-2"
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
       {/* Breadcrumb — search + separator + context / primary */}
@@ -351,7 +313,10 @@ export function TitleBar() {
 
       {/* Right — session actions */}
       <div
-        className="flex shrink-0 items-center gap-1.5 px-2"
+        className={cn(
+          "flex shrink-0 items-center gap-1.5 px-2 transition-[padding-right] duration-200 ease-linear",
+          !rightSidebarOpen && "pr-9"
+        )}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
         <Tooltip>
@@ -399,81 +364,27 @@ export function TitleBar() {
           workspacePath={urlActiveWorkspace?.path}
           openWithAppId={urlActiveWorkspace?.openWithAppId}
         />
-        <div className="mx-1 h-3.5 w-px shrink-0 bg-border" />
 
-        {/* Panel toggles — segmented control; active buttons lift above the tray */}
-        <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/30 p-0.5">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Toggle
-                  pressed={terminalOpen}
-                  onPressedChange={() => toggleTerminal()}
-                  disabled={!effectiveWorkspacePath}
-                  className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
-                >
-                  <TerminalSquare className="size-4" />
-                  <span className="sr-only">Toggle terminal</span>
-                </Toggle>
-              }
-            />
-            <TooltipContent>
-              Toggle terminal{" "}
-              <ShortcutKbd binding={terminalBinding} className="ml-1" />
-            </TooltipContent>
-          </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Toggle
+                pressed={terminalOpen}
+                onPressedChange={() => toggleTerminal()}
+                disabled={!effectiveWorkspacePath}
+                className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
+              >
+                <TerminalSquare className="size-4" />
+                <span className="sr-only">Toggle terminal</span>
+              </Toggle>
+            }
+          />
+          <TooltipContent>
+            Toggle terminal{" "}
+            <ShortcutKbd binding={terminalBinding} className="ml-1" />
+          </TooltipContent>
+        </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Toggle
-                  pressed={diffOpen}
-                  onPressedChange={() => toggleDiff()}
-                  disabled={!effectiveWorkspacePath}
-                  className="h-7 gap-1.5 px-1.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
-                >
-                  <FileDiff className="size-4 shrink-0" />
-                  {diffStat &&
-                    (diffStat.additions > 0 || diffStat.deletions > 0) && (
-                      <span className="flex animate-in items-center gap-1 font-mono text-[11px] leading-none duration-200 fade-in-0 zoom-in-90">
-                        <span className="text-green-500">
-                          +{diffStat.additions}
-                        </span>
-                        <span className="text-red-500">
-                          -{diffStat.deletions}
-                        </span>
-                      </span>
-                    )}
-                  <span className="sr-only">Toggle diff panel</span>
-                </Toggle>
-              }
-            />
-            <TooltipContent>
-              Toggle diff panel{" "}
-              <ShortcutKbd binding={diffBinding} className="ml-1" />
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Toggle
-                  pressed={fileTreeOpen}
-                  onPressedChange={() => toggleFileTree()}
-                  disabled={!effectiveWorkspacePath}
-                  className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
-                >
-                  <FolderTree className="size-4" />
-                  <span className="sr-only">Toggle file tree</span>
-                </Toggle>
-              }
-            />
-            <TooltipContent>
-              Toggle file tree{" "}
-              <ShortcutKbd binding={fileTreeBinding} className="ml-1" />
-            </TooltipContent>
-          </Tooltip>
-        </div>
       </div>
 
       <McpDialog

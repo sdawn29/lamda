@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef } from "react"
 import { ChatView, useSetActiveThreadId } from "@/features/chat"
 import { useWorkspace, useWorkspaces } from "@/features/workspace"
 import { useDiffPanel } from "@/features/git"
-import { useMainTabs, useMainTabsStore } from "@/features/main-tabs"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
 import { useUpdateThreadLastAccessed } from "@/features/workspace/mutations"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
@@ -19,12 +18,10 @@ function WorkspaceThreadRoute() {
   const { workspaces, isLoading } = useWorkspace()
   const { isFetching } = useWorkspaces()
   const navigate = useNavigate()
-  const { isFullscreen: diffFullscreen, setCurrentWorkspace } = useDiffPanel()
+  const { setCurrentWorkspace } = useDiffPanel()
   const { mutate: updateSetting } = useUpdateAppSetting()
   const { mutate: updateLastAccessed } = useUpdateThreadLastAccessed()
   const setActiveThreadId = useSetActiveThreadId()
-  const { addThreadTab, updateThreadTitle } = useMainTabs()
-
   // Set active thread when viewing this thread
   useEffect(() => {
     setActiveThreadId(threadId)
@@ -51,9 +48,9 @@ function WorkspaceThreadRoute() {
       currentPathRef.current = newPath
       setCurrentWorkspace(newPath ?? "")
     }
-    return () => {
-      currentPathRef.current = null
-    }
+    // Do not reset currentPathRef on cleanup — the same component instance is reused
+    // when switching threads, so resetting would cause setCurrentWorkspace to fire
+    // again even when the workspace hasn't changed.
   }, [foundWorkspace?.path, setCurrentWorkspace])
 
   useEffect(() => {
@@ -64,38 +61,14 @@ function WorkspaceThreadRoute() {
     updateLastAccessed(threadId)
   }, [threadId, updateSetting, updateLastAccessed])
 
-  // Register thread tab when this route mounts (handles initial URL load)
   useEffect(() => {
-    if (foundThread) {
-      addThreadTab(foundThread.id, foundThread.title)
-    }
-  }, [foundThread, addThreadTab])
-
-  // Keep tab title in sync when thread is renamed
-  useEffect(() => {
-    if (foundThread) {
-      updateThreadTitle(foundThread.id, foundThread.title)
-    }
-  }, [foundThread, updateThreadTitle])
-
-  // Check if the thread is already registered in the tab store (e.g. just forked).
-  // This prevents a premature redirect when workspace data hasn't propagated yet.
-  const isTabKnown = useMainTabsStore((s) =>
-    s.tabs.some((t) => t.type === "thread" && t.threadId === threadId)
-  )
-
-  useEffect(() => {
-    if (!isLoading && !isFetching && !foundThread && !isTabKnown) {
+    if (!isLoading && !isFetching && !foundThread) {
       navigate({ to: "/" })
     }
-  }, [isLoading, isFetching, foundThread, isTabKnown, navigate])
+  }, [isLoading, isFetching, foundThread, navigate])
 
   const isContentReady =
     !!foundWorkspace && !!foundThread && !!foundThread.sessionId
-
-  // In fullscreen mode MainContentArea owns the layout; return null so this
-  // component stays mounted (keeping effects alive) without rendering content.
-  if (diffFullscreen) return null
 
   return isContentReady ? (
     <ChatView

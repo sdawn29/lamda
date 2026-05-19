@@ -4,7 +4,7 @@ import { openFileWithApp } from "@/features/electron/api"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
 import { useLastTurnChanges, useRevertLastTurn, useGitFileDiff, DiffView, DiffStat, parseDiffCounts } from "@/features/git"
-import { useDiffPanel } from "@/features/git"
+import { useRightSidebar } from "@/features/layout"
 import { useMainTabs } from "@/features/main-tabs"
 import { useGitRevertFile } from "@/features/git/mutations"
 import { type ChangedFile, parseStatusLine } from "@/features/git/components/status-badge"
@@ -192,7 +192,7 @@ export const FileChangesCard = memo(function FileChangesCard({
   openWithAppId,
 }: FileChangesCardProps) {
   const { data: rawChanges } = useLastTurnChanges(sessionId)
-  const { open: openDiffPanel } = useDiffPanel()
+  const { open: openRightSidebar } = useRightSidebar()
   const revertLastTurn = useRevertLastTurn(sessionId)
   const revertFile = useGitRevertFile(sessionId)
 
@@ -259,7 +259,7 @@ export const FileChangesCard = memo(function FileChangesCard({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={openDiffPanel}
+                onClick={() => openRightSidebar()}
                 className="h-7 gap-1.5 px-2.5 text-[11px] text-muted-foreground hover:text-foreground"
               >
                 <GitCompare className="h-3 w-3" />

@@ -30,8 +30,6 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
-import { Icon } from "@iconify/react"
-import { getIconName } from "@/shared/ui/file-icon"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import {
@@ -43,9 +41,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
-import { useDiffPanel, type DiffPanelTab } from "../store"
-import { useMainTabs } from "@/features/main-tabs"
-import { useGitStatus, useLastTurn, useRevertLastTurn } from "../queries"
+import { useDiffPanel } from "../store"
+import { useMainTabs, useMainTabsStore } from "@/features/main-tabs"
+import { useGitDiffStat, useGitStatus, useLastTurn, useRevertLastTurn } from "../queries"
 import {
   useGitStage,
   useGitStageAll,
@@ -88,7 +86,10 @@ const PrismCode = lazy(() =>
 
 interface DiffPanelProps {
   sessionId: string
+  workspaceSessionId?: string
   openWithAppId?: string | null
+  isEmbedded?: boolean
+  onClose?: () => void
 }
 
 const LANGUAGE_MAP: Record<string, string> = {
@@ -174,6 +175,7 @@ const LastTurnView = memo(function LastTurnView({
 
 const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
   sessionId,
+  workspaceSessionId,
   view,
   mode,
   setMode,
@@ -182,6 +184,7 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
   setStashInputOpen,
 }: {
   sessionId: string
+  workspaceSessionId: string
   view: ContentView
   mode: DiffMode
   setMode: (m: DiffMode) => void
@@ -193,7 +196,7 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
   const hasLastTurnFiles = lastTurnData.length > 0
   const revertLastTurn = useRevertLastTurn(sessionId)
 
-  const { data: statusData } = useGitStatus(sessionId)
+  const { data: statusData } = useGitStatus(workspaceSessionId)
   const { hasStaged, hasUnstaged, hasChanges } = useMemo(() => {
     const all = (statusData?.raw ?? "")
       .split("\n")
@@ -207,10 +210,10 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
     }
   }, [statusData])
 
-  const { stageAll, unstageAll } = useGitStageAll(sessionId)
+  const { stageAll, unstageAll } = useGitStageAll(workspaceSessionId)
   const bulkWorking = stageAll.isPending || unstageAll.isPending
-  const fetch = useGitFetch(sessionId)
-  const pull = useGitPull(sessionId)
+  const fetch = useGitFetch(workspaceSessionId)
+  const pull = useGitPull(workspaceSessionId)
   const remoteWorking = fetch.isPending || pull.isPending
 
   return (
@@ -380,6 +383,7 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
 
 const SourceControlContent = memo(function SourceControlContent({
   sessionId,
+  workspaceSessionId,
   view,
   mode,
   sortMode,
@@ -387,6 +391,7 @@ const SourceControlContent = memo(function SourceControlContent({
   setStashInputOpen,
 }: {
   sessionId: string
+  workspaceSessionId: string
   view: ContentView
   mode: DiffMode
   sortMode: SortMode
@@ -403,7 +408,7 @@ const SourceControlContent = memo(function SourceControlContent({
     data: statusData,
     isLoading: loading,
     error: statusError,
-  } = useGitStatus(sessionId)
+  } = useGitStatus(workspaceSessionId)
 
   const isGitRepo = statusData?.isGitRepo !== false
   const statusRaw = statusData?.raw ?? ""
@@ -428,11 +433,11 @@ const SourceControlContent = memo(function SourceControlContent({
 
   const error = statusError instanceof Error ? statusError.message : null
 
-  const initRepo = useInitializeGitRepository(sessionId)
+  const initRepo = useInitializeGitRepository(workspaceSessionId)
 
-  const { stage, unstage } = useGitStage(sessionId)
-  const { stash } = useGitStashMutations(sessionId)
-  const revertFile = useGitRevertFile(sessionId)
+  const { stage, unstage } = useGitStage(workspaceSessionId)
+  const { stash } = useGitStashMutations(workspaceSessionId)
+  const revertFile = useGitRevertFile(workspaceSessionId)
 
   const handleStageToggle = useCallback(
     async (file: ChangedFile) => {
@@ -470,10 +475,10 @@ const SourceControlContent = memo(function SourceControlContent({
         {view === "turn" ? (
           <LastTurnView sessionId={sessionId} mode={mode} files={lastTurnFiles} isLoading={lastTurnLoading} />
         ) : view === "history" ? (
-          <HistoryView sessionId={sessionId} />
+          <HistoryView sessionId={workspaceSessionId} />
         ) : (
           <>
-            <CommitInputSection sessionId={sessionId} />
+            <CommitInputSection sessionId={workspaceSessionId} />
             <div className="min-h-0 flex-1 overflow-y-auto">
               {stashInputOpen && (
                 <StashInputBar
@@ -541,7 +546,7 @@ const SourceControlContent = memo(function SourceControlContent({
                 <FilesSection
                   label="Staged"
                   files={staged}
-                  sessionId={sessionId}
+                  sessionId={workspaceSessionId}
                   mode={mode}
                   onStageToggle={handleStageToggle}
                   onRevert={handleRevert}
@@ -553,7 +558,7 @@ const SourceControlContent = memo(function SourceControlContent({
                 <FilesSection
                   label="Changes"
                   files={unstaged}
-                  sessionId={sessionId}
+                  sessionId={workspaceSessionId}
                   mode={mode}
                   onStageToggle={handleStageToggle}
                   onRevert={handleRevert}
@@ -563,7 +568,7 @@ const SourceControlContent = memo(function SourceControlContent({
               )}
             </div>
 
-            <StashSection sessionId={sessionId} />
+            <StashSection sessionId={workspaceSessionId} />
           </>
         )}
       </div>
@@ -736,7 +741,7 @@ const FileContent = memo(function FileContent({
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border/50 bg-muted/20">
+        <div className="bg-transparent">
           <FileHeader
             pathParts={pathParts}
             filePath={filePath}
@@ -756,7 +761,7 @@ const FileContent = memo(function FileContent({
   if (error) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border/50 bg-muted/20">
+        <div className="bg-transparent">
           <FileHeader
             pathParts={pathParts}
             filePath={filePath}
@@ -774,7 +779,7 @@ const FileContent = memo(function FileContent({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border/50 bg-muted/20">
+      <div className="bg-transparent">
         <FileHeader
           pathParts={pathParts}
           filePath={filePath}
@@ -856,76 +861,34 @@ const FileContent = memo(function FileContent({
   )
 })
 
-// ─── Tab Content Router ───────────────────────────────────────────────────────
-
-function TabContent({
-  tab,
-  sessionId,
-  openWithAppId,
-  workspacePath,
-  view,
-  mode,
-  sortMode,
-  stashInputOpen,
-  setStashInputOpen,
-}: {
-  tab: DiffPanelTab
-  sessionId: string
-  openWithAppId?: string | null
-  workspacePath?: string
-  view: ContentView
-  mode: DiffMode
-  sortMode: SortMode
-  stashInputOpen: boolean
-  setStashInputOpen: (open: boolean) => void
-}) {
-  if (tab.type === "source-control") {
-    return (
-      <SourceControlContent
-        sessionId={sessionId}
-        view={view}
-        mode={mode}
-        sortMode={sortMode}
-        stashInputOpen={stashInputOpen}
-        setStashInputOpen={setStashInputOpen}
-      />
-    )
-  }
-  if (tab.type === "file" && tab.filePath) {
-    return (
-      <FileContent
-        filePath={tab.filePath}
-        openWithAppId={openWithAppId}
-        workspacePath={workspacePath}
-      />
-    )
-  }
-  return (
-    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-      Unknown tab type
-    </div>
-  )
-}
-
 // ─── Main DiffPanel ────────────────────────────────────────────────────────────
 
 export const DiffPanel = memo(function DiffPanel({
   sessionId,
+  workspaceSessionId: workspaceSessionIdProp,
   openWithAppId,
+  isEmbedded = false,
+  onClose,
 }: DiffPanelProps) {
+  const workspaceSessionId = workspaceSessionIdProp ?? sessionId
+
   const {
-    close,
+    close: closeDiffPanel,
     toggleFullscreen,
     isFullscreen,
-    tabs,
-    activeTabId,
-    pendingTabId,
-    closeTab,
-    setActiveTab,
-    clearPendingTab,
     currentWorkspacePath,
   } = useDiffPanel()
-  const tabRefs = useRef<Map<string, HTMLElement>>(new Map())
+
+  const activeFileTab = useMainTabsStore((s) => {
+    if (!s.activeTabId) return null
+    const tab = s.tabs.find((t) => t.id === s.activeTabId)
+    return tab?.type === "file" ? tab : null
+  })
+  const clearActiveTab = useMainTabsStore((s) => s.clearActiveTab)
+
+  const close = onClose ?? closeDiffPanel
+
+  const { data: diffStat } = useGitDiffStat(workspaceSessionId)
 
   // Source-control tab state (lifted so toolbar and content share it)
   const [scView, setScView] = useState<ContentView>("turn")
@@ -938,217 +901,160 @@ export const DiffPanel = memo(function DiffPanel({
     SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF
   )
 
-  const activeTab = useMemo(
-    () => tabs.find((t) => t.id === activeTabId),
-    [tabs, activeTabId]
-  )
-
-  const isSourceControl = activeTab?.type === "source-control"
-
-  // Focus the active tab whenever activeTabId changes
-  useEffect(() => {
-    if (activeTabId) {
-      const tabEl = tabRefs.current.get(activeTabId)
-      if (tabEl) {
-        tabEl.scrollIntoView({ block: "nearest", inline: "nearest" })
-        tabEl.focus()
-      }
-      if (pendingTabId === activeTabId) {
-        clearPendingTab()
-      }
-    }
-  }, [activeTabId, pendingTabId, clearPendingTab])
+  const selectScView = (view: ContentView) => {
+    clearActiveTab()
+    setScView(view)
+  }
 
   return (
     <>
-      <div className="flex h-full w-full flex-col bg-background">
-        {/* Tab bar */}
-        <div className="flex h-9 shrink-0 items-center gap-1 border-b bg-background px-2">
-          {/* View selector — always on the left; clicking also activates SC content */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 shrink-0 gap-1.5 px-2 text-xs font-medium text-muted-foreground/80 hover:text-foreground"
-                >
-                  {scView === "turn" ? (
-                    <History className="h-3 w-3" />
-                  ) : scView === "history" ? (
-                    <GitCommit className="h-3 w-3" />
-                  ) : (
-                    <GitCompare className="h-3 w-3" />
-                  )}
-                  {scView === "turn" ? "This Turn" : scView === "history" ? "History" : "All Changes"}
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="start" className="w-40">
-              <DropdownMenuItem
-                onClick={() => { setScView("turn"); setActiveTab("tab-source-control") }}
-                className="flex items-center gap-2"
-              >
-                <History className="h-3.5 w-3.5" />
-                This Turn
-                {scView === "turn" && (
-                  <Check className="ml-auto h-3 w-3 text-muted-foreground" />
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => { setScView("all"); setActiveTab("tab-source-control") }}
-                className="flex items-center gap-2"
-              >
-                <GitCompare className="h-3.5 w-3.5" />
-                All Changes
-                {scView === "all" && (
-                  <Check className="ml-auto h-3 w-3 text-muted-foreground" />
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => { setScView("history"); setActiveTab("tab-source-control") }}
-                className="flex items-center gap-2"
-              >
-                <GitCommit className="h-3.5 w-3.5" />
-                History
-                {scView === "history" && (
-                  <Check className="ml-auto h-3 w-3 text-muted-foreground" />
-                )}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <div className="mx-1 h-4 w-px bg-border/50" />
-
-          {/* File tabs only — source-control tab is implicit */}
-          <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1">
-            {tabs.filter((t) => t.type !== "source-control").map((tab) => {
-              const isActive = tab.id === activeTabId
-              return (
-                <div
-                  key={tab.id}
-                  role="tab"
-                  aria-selected={isActive}
-                  ref={(el) => {
-                    if (el) {
-                      tabRefs.current.set(tab.id, el)
-                    } else {
-                      tabRefs.current.delete(tab.id)
-                    }
-                  }}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    "group relative flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md pl-3 pr-1.5 text-xs select-none transition-all duration-150",
-                    isActive
-                      ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground/70"
-                  )}
-                >
-                  <Icon
-                    icon={`catppuccin:${getIconName(tab.title)}`}
-                    className="size-3.5 shrink-0"
-                    aria-hidden
-                  />
-                  <span className="max-w-30 truncate">{tab.title}</span>
+      <div className="flex h-full w-full flex-col bg-transparent">
+        {/* Tab bar — only shown when viewing source control */}
+        {!activeFileTab && (
+          <div className="flex h-9 shrink-0 items-center gap-1 bg-transparent px-2">
+            {/* View selector for source-control content */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
                   <Button
                     variant="ghost"
-                    size="icon-xs"
-                    aria-label={`Close ${tab.title}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      closeTab(tab.id)
-                    }}
-                    className={cn(
-                      "ml-auto shrink-0",
-                      isActive
-                        ? "opacity-60 hover:opacity-100"
-                        : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100"
+                    size="sm"
+                    className="h-7 shrink-0 gap-1.5 px-2 text-xs font-medium text-muted-foreground/80 hover:text-foreground"
+                  >
+                    {scView === "turn" ? (
+                      <History className="h-3 w-3" />
+                    ) : scView === "history" ? (
+                      <GitCommit className="h-3 w-3" />
+                    ) : (
+                      <GitCompare className="h-3 w-3" />
                     )}
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </Button>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Git actions + diff mode — only when SC content is active and not in history view */}
-          {isSourceControl && scView !== "history" && (
-            <SourceControlToolbarSection
-              sessionId={sessionId}
-              view={scView}
-              mode={scMode}
-              setMode={setScMode}
-              sortMode={scSortMode}
-              setSortMode={setScSortMode}
-              setStashInputOpen={setScStashInputOpen}
-            />
-          )}
-
-          {/* Right side buttons */}
-          <div className="flex shrink-0 items-center gap-0.5 px-1">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={toggleFullscreen}
-                    className="text-muted-foreground/60 hover:text-foreground"
-                  >
-                    {isFullscreen ? <Minimize2 /> : <Maximize2 />}
-                    <span className="sr-only">
-                      {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-                    </span>
+                    {scView === "turn" ? "This Turn" : scView === "history" ? "History" : "All Changes"}
+                    <ChevronDown className="h-3 w-3 opacity-60" />
                   </Button>
                 }
               />
-              <TooltipContent>
-                {isFullscreen ? "Exit fullscreen" : "Fullscreen"}{" "}
-                <ShortcutKbd binding={fullscreenBinding} className="ml-1" />
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={close}
-                    className="text-muted-foreground/60 hover:text-foreground"
-                  >
-                    <X />
-                    <span className="sr-only">Close panel</span>
-                  </Button>
-                }
-              />
-              <TooltipContent>Close panel</TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
+              <DropdownMenuContent align="start" className="w-40">
+                <DropdownMenuItem
+                  onClick={() => selectScView("turn")}
+                  className="flex items-center gap-2"
+                >
+                  <History className="h-3.5 w-3.5" />
+                  This Turn
+                  {scView === "turn" && (
+                    <Check className="ml-auto h-3 w-3 text-muted-foreground" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => selectScView("all")}
+                  className="flex items-center gap-2"
+                >
+                  <GitCompare className="h-3.5 w-3.5" />
+                  All Changes
+                  {scView === "all" && (
+                    <Check className="ml-auto h-3 w-3 text-muted-foreground" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => selectScView("history")}
+                  className="flex items-center gap-2"
+                >
+                  <GitCommit className="h-3.5 w-3.5" />
+                  History
+                  {scView === "history" && (
+                    <Check className="ml-auto h-3 w-3 text-muted-foreground" />
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-        {/* Tab content */}
+            {diffStat && (diffStat.additions > 0 || diffStat.deletions > 0) && (
+              <span className="flex animate-in items-center gap-1 font-mono text-[11px] leading-none duration-200 fade-in-0 zoom-in-90">
+                <span className="text-green-500">+{diffStat.additions}</span>
+                <span className="text-red-500">-{diffStat.deletions}</span>
+              </span>
+            )}
+
+            <div className="flex-1" />
+
+            {/* Git actions + diff mode — not in history view */}
+            {scView !== "history" && (
+              <SourceControlToolbarSection
+                sessionId={sessionId}
+                workspaceSessionId={workspaceSessionId}
+                view={scView}
+                mode={scMode}
+                setMode={setScMode}
+                sortMode={scSortMode}
+                setSortMode={setScSortMode}
+                setStashInputOpen={setScStashInputOpen}
+              />
+            )}
+
+            {/* Right side buttons */}
+            <div className="flex shrink-0 items-center gap-0.5 px-1">
+              {!isEmbedded && (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={toggleFullscreen}
+                        className="text-muted-foreground/60 hover:text-foreground"
+                      >
+                        {isFullscreen ? <Minimize2 /> : <Maximize2 />}
+                        <span className="sr-only">
+                          {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                        </span>
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>
+                    {isFullscreen ? "Exit fullscreen" : "Fullscreen"}{" "}
+                    <ShortcutKbd binding={fullscreenBinding} className="ml-1" />
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {!isEmbedded && (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={close}
+                        className="text-muted-foreground/60 hover:text-foreground"
+                      >
+                        <X />
+                        <span className="sr-only">Close panel</span>
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>Close panel</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
         <div className="min-h-0 flex-1 overflow-hidden">
-          {activeTab ? (
-            <TabContent
-              tab={activeTab}
-              sessionId={sessionId}
+          {activeFileTab ? (
+            <FileContent
+              filePath={activeFileTab.filePath}
               openWithAppId={openWithAppId}
-              workspacePath={currentWorkspacePath ?? undefined}
+              workspacePath={currentWorkspacePath ?? activeFileTab.workspacePath}
+            />
+          ) : (
+            <SourceControlContent
+              sessionId={sessionId}
+              workspaceSessionId={workspaceSessionId}
               view={scView}
               mode={scMode}
               sortMode={scSortMode}
               stashInputOpen={scStashInputOpen}
               setStashInputOpen={setScStashInputOpen}
             />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                <GitCompare className="h-5 w-5 text-muted-foreground/50" />
-              </div>
-              <p className="text-xs">Select or add a tab to view content</p>
-            </div>
           )}
         </div>
       </div>
