@@ -273,7 +273,7 @@ export const TerminalPanel = memo(function TerminalPanel({
   const activeTabId = activeState?.activeTabId ?? null
 
   return (
-    <div className="flex h-full shrink-0 flex-col border-t bg-background">
+    <div className="flex h-full shrink-0 flex-col bg-background">
       {/* Tab bar — shows only the active workspace's tabs */}
       <div className="flex h-10 shrink-0 items-center gap-1 bg-background px-1">
         {/* Scrollable tab list */}

@@ -239,6 +239,11 @@ export function WorkspaceLayout() {
   const dragStartX = useRef(0)
   const dragStartWidth = useRef(0)
 
+  const [terminalHeight, setTerminalHeight] = useState(256)
+  const isTerminalDragging = useRef(false)
+  const terminalDragStartY = useRef(0)
+  const terminalDragStartHeight = useRef(0)
+
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
@@ -270,6 +275,36 @@ export function WorkspaceLayout() {
       document.addEventListener("mouseup", onUp)
     },
     [rightSidebarWidth, setRightSidebarWidth]
+  )
+
+  const handleTerminalResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      isTerminalDragging.current = true
+      terminalDragStartY.current = e.clientY
+      terminalDragStartHeight.current = terminalHeight
+
+      const onMove = (ev: MouseEvent) => {
+        if (!isTerminalDragging.current) return
+        const delta = terminalDragStartY.current - ev.clientY
+        const next = Math.max(80, Math.min(800, terminalDragStartHeight.current + delta))
+        setTerminalHeight(next)
+      }
+
+      const onUp = () => {
+        isTerminalDragging.current = false
+        document.removeEventListener("mousemove", onMove)
+        document.removeEventListener("mouseup", onUp)
+        document.body.style.cursor = ""
+        document.body.style.userSelect = ""
+      }
+
+      document.body.style.cursor = "row-resize"
+      document.body.style.userSelect = "none"
+      document.addEventListener("mousemove", onMove)
+      document.addEventListener("mouseup", onUp)
+    },
+    [terminalHeight]
   )
 
   const isEmptyState = !activeThreadId
@@ -345,7 +380,11 @@ export function WorkspaceLayout() {
                     <MainContentArea />
                   </div>
                   {activeTerminalOpen && terminalHost && (
-                    <div className="h-64 shrink-0 border-t">
+                    <div
+                      onMouseDown={handleTerminalResizeStart}
+                      className="shrink-0 cursor-row-resize border-t"
+                      style={{ height: terminalHeight }}
+                    >
                       <Suspense
                         fallback={<div className="h-full bg-background" />}
                       >

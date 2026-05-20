@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { cn } from "@/shared/lib/utils"
 import type { CharRange, DiffLine, HighlightMap, ThemeStyle, WordDiffMap } from "./types"
 import { getLineTokens, renderTokens } from "./highlight"
@@ -42,7 +43,7 @@ export function buildSideBySideRows(lines: DiffLine[]): SideBySideRow[] {
   return rows
 }
 
-function SideBySideCell({
+const SideBySideCell = memo(function SideBySideCell({
   entry,
   map,
   themeStyle,
@@ -151,7 +152,7 @@ function SideBySideCell({
       </span>
     </div>
   )
-}
+})
 
 function SideBySideColumn({
   entries,

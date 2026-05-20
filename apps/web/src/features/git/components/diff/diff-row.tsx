@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { cn } from "@/shared/lib/utils"
 import type { CharRange, DiffLine, HighlightMap, ThemeStyle } from "./types"
 import { getLineTokens, renderTokens } from "./highlight"
@@ -11,7 +12,7 @@ interface DiffRowProps {
   wordDiffRanges?: CharRange[]
 }
 
-export function DiffRow({
+export const DiffRow = memo(function DiffRow({
   line,
   diffIndex,
   map,
@@ -121,4 +122,4 @@ export function DiffRow({
       </span>
     </div>
   )
-}
+})
