@@ -1,7 +1,13 @@
 import { memo, useState } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import type { PluggableList } from "unified"
 import { AlertCircleIcon, GitForkIcon, SparklesIcon } from "lucide-react"
+
+const remarkPlugins: PluggableList = [remarkGfm]
+
+const proseClass =
+  "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.75] prose-headings:my-0 prose-p:leading-[1.75] prose-p:mt-0 prose-p:mb-[1.25em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.75] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-2 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
 
 import { ToolCallBlock } from "./tool-call-block"
 import { markdownComponents } from "./markdown-components"
@@ -61,7 +67,14 @@ interface AssistantMessageBlockProps {
   turnMessages?: AssistantMessage[]
 }
 
-function AssistantMessageBlock({
+const THINKING_LEVEL_LABELS: Record<string, string> = {
+  low: "Low",
+  medium: "Med",
+  high: "High",
+  xhigh: "Max",
+}
+
+const AssistantMessageBlock = memo(function AssistantMessageBlock({
   message,
   showThinking,
   isNew = true,
@@ -77,25 +90,16 @@ function AssistantMessageBlock({
   const providerMeta = message.provider
     ? getProviderMeta(message.provider)
     : null
-  const THINKING_LEVEL_LABELS: Record<string, string> = {
-    low: "Low",
-    medium: "Med",
-    high: "High",
-    xhigh: "Max",
-  }
   const thinkingLabel = message.thinkingLevel
     ? (THINKING_LEVEL_LABELS[message.thinkingLevel] ?? message.thinkingLevel)
     : null
   const hasMeta = !!(message.model || thinkingLabel || message.responseTime != null)
 
-  const proseClass =
-    "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.75] prose-headings:my-0 prose-p:leading-[1.75] prose-p:mt-0 prose-p:mb-[1.25em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.75] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-2 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
-
   return (
     <div className="group flex flex-col gap-2">
       {hasContent && (
         <div className={proseClass}>
-          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          <Markdown remarkPlugins={remarkPlugins} components={markdownComponents}>
             {displayContent}
           </Markdown>
         </div>
@@ -156,7 +160,7 @@ function AssistantMessageBlock({
       )}
     </div>
   )
-}
+})
 
 export function getMessageKey(message: Message, index: number): string {
   if (message.role === "error" || message.role === "abort" || message.role === "compaction") return message.id

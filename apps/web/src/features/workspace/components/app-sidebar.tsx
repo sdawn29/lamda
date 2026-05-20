@@ -220,7 +220,7 @@ export function AppSidebar() {
   const [isDeleting, setIsDeleting] = useState(false)
   const navigate = useNavigate()
   const { openSettings } = useSettingsModal()
-  const { addThreadTab, pendingThreadIds } = useMainTabs()
+  const { pendingThreadIds } = useMainTabs()
 
 
   async function handleConfirmDelete() {
@@ -256,7 +256,6 @@ export function AppSidebar() {
       ? async () => {
           const thread = await createThread(activeWorkspace.id)
           setCollapsed((prev) => ({ ...prev, [activeWorkspace.id]: false }))
-          addThreadTab(thread.id, thread.title, true)
           navigate({
             to: "/workspace/$threadId",
             params: { threadId: thread.id },
@@ -294,7 +293,6 @@ export function AppSidebar() {
                     workspaceId={thread.workspaceId}
                     isActive={activeThreadId === thread.id}
                     onClick={() => {
-                      addThreadTab(thread.id, thread.title)
                       navigate({
                         to: "/workspace/$threadId",
                         params: { threadId: thread.id },
@@ -381,7 +379,6 @@ export function AppSidebar() {
                                 ...prev,
                                 [ws.id]: false,
                               }))
-                              addThreadTab(thread.id, thread.title, true)
                               navigate({
                                 to: "/workspace/$threadId",
                                 params: { threadId: thread.id },
@@ -469,7 +466,6 @@ export function AppSidebar() {
                                   isActive={activeThreadId === thread.id}
                                   depth={depth}
                                   onClick={() => {
-                                    addThreadTab(thread.id, thread.title)
                                     navigate({
                                       to: "/workspace/$threadId",
                                       params: { threadId: thread.id },
@@ -499,7 +495,6 @@ export function AppSidebar() {
                             className="h-6 w-full gap-1 text-[11px]"
                             onClick={async () => {
                               const thread = await createThread(ws.id)
-                              addThreadTab(thread.id, thread.title, true)
                               navigate({
                                 to: "/workspace/$threadId",
                                 params: { threadId: thread.id },

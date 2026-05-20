@@ -4,21 +4,14 @@ import { WorkspaceEmptyState } from "@/features/workspace"
 import { useWorkspace } from "@/features/workspace"
 import { useAppSettings } from "@/features/settings/queries"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
-import { useMainTabs } from "@/features/main-tabs"
 
 export const Route = createFileRoute("/")({
   component: Index,
 })
 
 function Index() {
-  const { tabs } = useMainTabs()
   const { workspaces, isLoading: workspacesLoading } = useWorkspace()
   const { data: settings, isLoading: settingsLoading } = useAppSettings()
-
-  // If tabs are already open we arrived here from an active session (e.g. the
-  // last tab was just closed but the state update hasn't committed yet).
-  // Don't redirect — let the tab state settle and show the empty state.
-  if (tabs.length > 0) return null
 
   if (workspacesLoading || settingsLoading) return null
 

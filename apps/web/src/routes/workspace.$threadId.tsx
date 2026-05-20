@@ -1,13 +1,40 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useEffect, useMemo, useRef } from "react"
 
-import { ChatView, useSetActiveThreadId } from "@/features/chat"
+import { useSetActiveThreadId, ChatView } from "@/features/chat"
 import { useWorkspace, useWorkspaces } from "@/features/workspace"
 import { useDiffPanel } from "@/features/git"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
 import { useUpdateThreadLastAccessed } from "@/features/workspace/mutations"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
 import { Skeleton } from "@/shared/ui/skeleton"
+
+function ChatViewSkeleton() {
+  return (
+    <div className="relative flex h-full flex-col overflow-hidden">
+      <div className="flex w-full flex-1 flex-col overflow-hidden pt-6 pb-4">
+        <div className="mx-auto w-full max-w-3xl space-y-6 px-6">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+          <div className="space-y-2 pl-8">
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-4/6" />
+            <Skeleton className="h-4 w-3/6" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/3" />
+          </div>
+        </div>
+      </div>
+      <div className="mx-auto w-full max-w-3xl shrink-0 px-6 py-2">
+        <Skeleton className="h-20 w-full rounded-xl" />
+      </div>
+    </div>
+  )
+}
 
 export const Route = createFileRoute("/workspace/$threadId")({
   component: WorkspaceThreadRoute,
@@ -22,15 +49,7 @@ function WorkspaceThreadRoute() {
   const { mutate: updateSetting } = useUpdateAppSetting()
   const { mutate: updateLastAccessed } = useUpdateThreadLastAccessed()
   const setActiveThreadId = useSetActiveThreadId()
-  // Set active thread when viewing this thread
-  useEffect(() => {
-    setActiveThreadId(threadId)
-    return () => {
-      setActiveThreadId(null)
-    }
-  }, [threadId, setActiveThreadId])
 
-  // Find current workspace and thread
   const foundWorkspace = useMemo(
     () => workspaces.find((ws) => ws.threads.some((t) => t.id === threadId)),
     [workspaces, threadId]
@@ -40,7 +59,13 @@ function WorkspaceThreadRoute() {
     [foundWorkspace, threadId]
   )
 
-  // Set workspace path in diff panel context for breadcrumb navigation
+  useEffect(() => {
+    setActiveThreadId(threadId)
+    return () => {
+      setActiveThreadId(null)
+    }
+  }, [threadId, setActiveThreadId])
+
   const currentPathRef = useRef<string | null>(null)
   useEffect(() => {
     const newPath = foundWorkspace?.path ?? null
@@ -67,45 +92,17 @@ function WorkspaceThreadRoute() {
     }
   }, [isLoading, isFetching, foundThread, navigate])
 
-  const isContentReady =
-    !!foundWorkspace && !!foundThread && !!foundThread.sessionId
+  if (!foundThread?.sessionId) {
+    return <ChatViewSkeleton />
+  }
 
-  return isContentReady ? (
+  return (
     <ChatView
-      sessionId={foundThread.sessionId!}
-      workspaceId={foundWorkspace.id}
+      sessionId={foundThread.sessionId}
+      workspaceId={foundWorkspace!.id}
       threadId={foundThread.id}
       initialModelId={foundThread.modelId}
       initialIsStopped={foundThread.isStopped}
     />
-  ) : (
-    <ChatViewSkeleton />
-  )
-}
-
-function ChatViewSkeleton() {
-  return (
-    <div className="relative flex h-full flex-col overflow-hidden">
-      <div className="flex w-full flex-1 flex-col overflow-hidden pt-6 pb-4">
-        <div className="mx-auto w-full max-w-3xl space-y-6 px-6">
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-          <div className="space-y-2 pl-8">
-            <Skeleton className="h-4 w-5/6" />
-            <Skeleton className="h-4 w-4/6" />
-            <Skeleton className="h-4 w-3/6" />
-          </div>
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-4 w-1/3" />
-          </div>
-        </div>
-      </div>
-      <div className="mx-auto w-full max-w-3xl shrink-0 px-6 py-2">
-        <Skeleton className="h-20 w-full rounded-xl" />
-      </div>
-    </div>
   )
 }

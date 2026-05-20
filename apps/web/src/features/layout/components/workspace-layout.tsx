@@ -28,7 +28,6 @@ import {
 import { useTerminal } from "@/features/terminal"
 import { useDiffPanel } from "@/features/git"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
-import { TabsEmptyState } from "@/features/main-tabs"
 import { usePrefetchThreadsMessages } from "@/features/chat/hooks"
 import {
   useElectronFullscreen,
@@ -213,14 +212,8 @@ export function UpdateBanner() {
 }
 
 export function MainContentArea() {
-  const { threadId } = useParams({ strict: false }) as { threadId?: string }
-
-  if (!threadId) {
-    return <TabsEmptyState />
-  }
-
   return (
-    <div className="h-full overflow-hidden">
+    <div className="relative h-full overflow-hidden">
       <Outlet />
     </div>
   )

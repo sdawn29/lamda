@@ -185,7 +185,7 @@ export const WorkingBlock = memo(function WorkingBlock({
               }
               if (msg.role === "tool") {
                 const t = msg as ToolMessage
-                return <ToolCallBlock key={t.toolCallId} msg={t} isNew={false} rootPath={rootPath} />
+                return <ToolCallBlock key={`${t.toolCallId}-${i}`} msg={t} isNew={false} rootPath={rootPath} />
               }
               return null
             })}

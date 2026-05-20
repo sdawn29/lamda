@@ -49,7 +49,6 @@ import { useWorkspace } from "@/features/workspace"
 import { useChatStream } from "../use-chat-stream"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
 import { FileChangesCard } from "./file-changes-card"
-import { useMainTabs } from "@/features/main-tabs"
 import { forkSession, listMessages } from "../api"
 import { blocksToMessages, type MessageBlock } from "../types"
 import { workspaceKeys } from "@/features/workspace/queries"
@@ -64,7 +63,7 @@ const PROMPT_SUGGESTIONS = [
 ] as const
 
 type MessageGroup =
-  | { type: "regular"; message: Message; index: number; suppressThinking?: boolean }
+  | { type: "regular"; message: Message; index: number; suppressThinking?: boolean; isLastInTurnStatic: boolean; turnMessages?: AssistantMessage[] }
   | { type: "working"; messages: WorkingMessage[]; startIndex: number; finalThinking?: string }
 
 function groupChatMessages(messages: Message[]): MessageGroup[] {
@@ -113,11 +112,40 @@ function groupChatMessages(messages: Message[]): MessageGroup[] {
         (msg as AssistantMessage).thinking.trim().length > 0
       ) {
         groups.push({ type: "working", messages: [], startIndex: i, finalThinking: (msg as AssistantMessage).thinking })
-        groups.push({ type: "regular", message: msg, index: i, suppressThinking: true })
+        groups.push({ type: "regular", message: msg, index: i, suppressThinking: true, isLastInTurnStatic: false, turnMessages: undefined })
       } else {
-        groups.push({ type: "regular", message: msg, index: i, suppressThinking: suppress })
+        groups.push({ type: "regular", message: msg, index: i, suppressThinking: suppress, isLastInTurnStatic: false, turnMessages: undefined })
       }
       i++
+    }
+  }
+
+  // Post-pass: compute isLastInTurnStatic + turnMessages for assistant groups.
+  // Backward scan to mark which assistant is last in its turn, then a forward
+  // scan to collect the turn's assistant messages for the copy button.
+  // Both passes are O(n) over groups, so this replaces the O(n²) per-render loop.
+  let seenAssistantAfter = false
+  for (let g = groups.length - 1; g >= 0; g--) {
+    const group = groups[g]
+    if (group.type !== "regular") continue
+    if (group.message.role === "user" || group.message.role === "abort") {
+      seenAssistantAfter = false
+    } else if (group.message.role === "assistant") {
+      group.isLastInTurnStatic = !seenAssistantAfter
+      seenAssistantAfter = true
+    }
+  }
+
+  let currentTurnAssistants: AssistantMessage[] = []
+  for (const group of groups) {
+    if (group.type !== "regular") continue
+    if (group.message.role === "user" || group.message.role === "abort") {
+      currentTurnAssistants = []
+    } else if (group.message.role === "assistant") {
+      currentTurnAssistants = [...currentTurnAssistants, group.message as AssistantMessage]
+      if (group.isLastInTurnStatic) {
+        group.turnMessages = currentTurnAssistants
+      }
     }
   }
 
@@ -205,7 +233,6 @@ export function ChatView({
   const [localSessionId, setLocalSessionId] = useState(sessionId)
   const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const updateTitleMutation = useUpdateThreadTitle()
-  const { confirmThread, addThreadTab } = useMainTabs()
 
   // React's "adjusting state while rendering" pattern — reset all session-local
   // state in one batched pass when the active session changes, avoiding the
@@ -377,11 +404,6 @@ export function ChatView({
     setShowScrollButton(distanceFromBottom >= 80)
   }, [threadId, sessionId, queryClient, syncEngine])
 
-  // Scroll to bottom synchronously (before paint) whenever loading state or
-  // messages change, so there is no 1-frame window where a scroll-anchoring
-  // event or other onScroll can flip pinnedRef to false before we act.
-  // This runs after the session-restore useLayoutEffect (which appears earlier
-  // in the file), so pinnedRef already holds the correct restored value.
   useLayoutEffect(() => {
     const el = scrollContainerRef.current
     if (!el || !pinnedRef.current) return
@@ -498,9 +520,7 @@ export function ChatView({
         generateTitleMutation.mutate(text, {
           onSuccess: ({ title }) => {
             updateTitleMutation.mutate({ workspaceId, threadId, title })
-            confirmThread(threadId)
           },
-          onError: () => confirmThread(threadId),
         })
       }
       pinnedRef.current = true
@@ -529,7 +549,6 @@ export function ChatView({
       threadId,
       updateTitleMutation,
       updateThreadStopped,
-      confirmThread,
     ]
   )
 
@@ -537,8 +556,6 @@ export function ChatView({
     async (blockId: string) => {
       try {
         const { threadId: newThreadId, sessionId: newSessionId, initialInput } = await forkSession(sessionId, blockId)
-        const parentTitle = activeWorkspace?.threads.find((t) => t.id === threadId)?.title ?? "Thread"
-        addThreadTab(newThreadId, `Fork of ${parentTitle}`)
         // Store the forked user message so the new ChatView can pre-fill the textbox
         if (initialInput) pendingInitialInputs.set(newThreadId, initialInput)
         // Pre-populate the messages cache so the forked thread renders immediately
@@ -558,7 +575,7 @@ export function ChatView({
         })
       }
     },
-    [sessionId, queryClient, navigate, addThreadTab, activeWorkspace, threadId]
+    [sessionId, queryClient, navigate, activeWorkspace, threadId]
   )
 
   return (
@@ -680,7 +697,7 @@ export function ChatView({
                 }
 
                 // Regular message
-                const { message, index } = group
+                const { message, index, isLastInTurnStatic, turnMessages } = group
                 if (
                   message.role === "assistant" &&
                   !message.content.trim() &&
@@ -693,29 +710,8 @@ export function ChatView({
                   initialSnapshot !== null &&
                   initialSnapshot.sessionId === sessionId &&
                   !initialSnapshot.keys.has(key)
-                // Only show the metadata bar on the last assistant block in a turn.
-                let isLastInTurn = true
-                let turnMessages: AssistantMessage[] | undefined
-                if (message.role === "assistant") {
-                  if (isLoading) {
-                    isLastInTurn = false
-                  } else {
-                    for (let j = index + 1; j < visibleMessages.length; j++) {
-                      if (visibleMessages[j].role !== "tool") {
-                        isLastInTurn = visibleMessages[j].role !== "assistant"
-                        break
-                      }
-                    }
-                  }
-                  if (isLastInTurn) {
-                    turnMessages = []
-                    for (let j = index; j >= 0; j--) {
-                      const m = visibleMessages[j]
-                      if (m.role === "user" || m.role === "abort") break
-                      if (m.role === "assistant") turnMessages.unshift(m as AssistantMessage)
-                    }
-                  }
-                }
+                // isLastInTurn is precomputed in groupChatMessages; only suppress during streaming.
+                const isLastInTurn = !isLoading && isLastInTurnStatic
                 return (
                   <div key={key} className="pb-5">
                     <MessageRow

@@ -53,8 +53,7 @@ export function TitleBar() {
   const toggleDiff = () => togglePanel("changes")
   const { activeTab } = useMainTabs()
 
-  // URL-based thread/workspace — used for right-side session controls
-  // (git, terminal, MCP stay tied to the navigated thread even when a file tab is shown)
+  // URL-based thread — drives center display and thread actions
   const { threadId } = useParams({ strict: false }) as { threadId?: string }
   const urlActiveThread = useMemo(
     () =>
@@ -73,25 +72,7 @@ export function TitleBar() {
     [workspaces, urlActiveThread]
   )
 
-  // Active-tab-based context — used for center display and thread actions
-  const activeTabThread = useMemo(() => {
-    if (activeTab?.type !== "thread") return null
-    return (
-      workspaces
-        .flatMap((w) => w.threads)
-        .find((t) => t.id === activeTab.threadId) ?? null
-    )
-  }, [activeTab, workspaces])
-
-  const activeTabWorkspace = useMemo(() => {
-    if (!activeTabThread) return null
-    return (
-      workspaces.find((w) =>
-        w.threads.some((t) => t.id === activeTabThread.id)
-      ) ?? null
-    )
-  }, [activeTabThread, workspaces])
-
+  // File tab from the right-sidebar store — shown in title bar when a file is open
   const activeTabFile = activeTab?.type === "file" ? activeTab : null
 
   const fileWorkspace = useMemo(() => {
@@ -136,16 +117,16 @@ export function TitleBar() {
     mcpServerStatus?.filter((s) => s.connected).length ?? 0
 
   const startRename = () => {
-    setRenameValue(activeTabThread?.title ?? "")
+    setRenameValue(urlActiveThread?.title ?? "")
     setIsRenaming(true)
     setTimeout(() => renameInputRef.current?.select(), 0)
   }
 
   const commitRename = () => {
-    if (activeTabWorkspace && activeTabThread && renameValue.trim()) {
+    if (urlActiveWorkspace && urlActiveThread && renameValue.trim()) {
       setThreadTitle(
-        activeTabWorkspace.id,
-        activeTabThread.id,
+        urlActiveWorkspace.id,
+        urlActiveThread.id,
         renameValue.trim()
       )
     }
@@ -153,8 +134,8 @@ export function TitleBar() {
   }
 
   const handleDeleteThread = async () => {
-    if (!activeTabWorkspace || !activeTabThread) return
-    await deleteThread(activeTabWorkspace.id, activeTabThread.id)
+    if (!urlActiveWorkspace || !urlActiveThread) return
+    await deleteThread(urlActiveWorkspace.id, urlActiveThread.id)
     navigate({ to: "/" })
   }
 
@@ -186,7 +167,7 @@ export function TitleBar() {
   )
   useShortcutHandler(
     SHORTCUT_ACTIONS.RENAME_THREAD,
-    activeTabThread ? startRename : null
+    urlActiveThread ? startRename : null
   )
   useShortcutHandler(
     SHORTCUT_ACTIONS.NAVIGATE_BACK,
@@ -213,12 +194,36 @@ export function TitleBar() {
         )}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-        {activeTab?.type === "thread" && activeTabThread ? (
+        {activeTabFile ? (
           <div className="flex min-w-0 flex-1 items-center gap-1">
-            {activeTabWorkspace && (
+            {fileWorkspace && (
               <>
                 <span className="shrink truncate text-[11px] font-medium text-muted-foreground/70">
-                  {activeTabWorkspace.name}
+                  {fileWorkspace.name}
+                </span>
+                <span className="mx-0.5 shrink-0 text-[11px] text-muted-foreground/40 select-none">
+                  /
+                </span>
+              </>
+            )}
+            <Icon
+              icon={`catppuccin:${getIconName(activeTabFile.title)}`}
+              className="size-3.5 shrink-0 opacity-70"
+              aria-hidden
+            />
+            <span
+              className="min-w-0 truncate text-sm font-semibold text-foreground"
+              title={fileRelativePath}
+            >
+              {activeTabFile.title}
+            </span>
+          </div>
+        ) : urlActiveThread ? (
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            {urlActiveWorkspace && (
+              <>
+                <span className="shrink truncate text-[11px] font-medium text-muted-foreground/70">
+                  {urlActiveWorkspace.name}
                 </span>
                 <span className="mx-0.5 shrink-0 text-[11px] text-muted-foreground/40 select-none">
                   /
@@ -249,7 +254,7 @@ export function TitleBar() {
               </span>
             ) : (
               <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-                {activeTabThread.title}
+                {urlActiveThread.title}
               </span>
             )}
             <Tooltip>
@@ -283,30 +288,6 @@ export function TitleBar() {
               </DropdownMenu>
               <TooltipContent>Thread options</TooltipContent>
             </Tooltip>
-          </div>
-        ) : activeTab?.type === "file" && activeTabFile ? (
-          <div className="flex min-w-0 flex-1 items-center gap-1">
-            {fileWorkspace && (
-              <>
-                <span className="shrink truncate text-[11px] font-medium text-muted-foreground/70">
-                  {fileWorkspace.name}
-                </span>
-                <span className="mx-0.5 shrink-0 text-[11px] text-muted-foreground/40 select-none">
-                  /
-                </span>
-              </>
-            )}
-            <Icon
-              icon={`catppuccin:${getIconName(activeTabFile.title)}`}
-              className="size-3.5 shrink-0 opacity-70"
-              aria-hidden
-            />
-            <span
-              className="min-w-0 truncate text-sm font-semibold text-foreground"
-              title={fileRelativePath}
-            >
-              {activeTabFile.title}
-            </span>
           </div>
         ) : null}
       </div>
