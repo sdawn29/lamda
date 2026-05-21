@@ -1,3 +1,2 @@
-export { TasksDialog } from "./components/tasks-dialog"
-export { useTasksStore } from "./store"
+export { TasksDropdown } from "./components/tasks-dropdown"
 export type { WorkspaceTask } from "./types"

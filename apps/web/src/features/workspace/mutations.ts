@@ -8,6 +8,7 @@ import {
   type CreateWorkspaceBody,
   deleteWorkspace as apiDeleteWorkspace,
   updateWorkspaceOpenWithApp as apiUpdateWorkspaceOpenWithApp,
+  updateWorkspaceEnv as apiUpdateWorkspaceEnv,
   createThread as apiCreateThread,
   deleteThread as apiDeleteThread,
   archiveThread as apiArchiveThread,
@@ -240,6 +241,24 @@ export function useUpdateWorkspaceOpenWithApp() {
       setWorkspacesData(queryClient, (workspaces) =>
         workspaces.map((ws) =>
           ws.id !== workspaceId ? ws : { ...ws, openWithAppId: appId }
+        )
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function useUpdateWorkspaceEnv() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ workspaceId, env }: { workspaceId: string; env: Record<string, string> }) =>
+      apiUpdateWorkspaceEnv(workspaceId, env),
+    onMutate: ({ workspaceId, env }) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((ws) =>
+          ws.id !== workspaceId ? ws : { ...ws, env }
         )
       )
     },

@@ -2,9 +2,9 @@ import React, { useState, useCallback, useEffect, useRef, memo } from "react"
 import {
   Archive,
   ExternalLink,
-  Folder,
   FolderOpen,
   GitFork,
+  KeyRound,
   Loader2,
   MessageSquare,
   MoreHorizontal,
@@ -55,6 +55,8 @@ import { useSettingsModal } from "@/features/settings"
 import { useMainTabs } from "@/features/main-tabs"
 import { ArchivedThreadsDialog } from "./archived-threads-dialog"
 import { CreateWorkspaceDialog } from "./create-workspace-dialog"
+import { WorkspaceEnvDialog } from "./workspace-env-dialog"
+import type { WorkspaceDto } from "../api"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -216,6 +218,7 @@ export function AppSidebar() {
   const [deletingWorkspace, setDeletingWorkspace] = useState<
     (typeof workspaces)[0] | null
   >(null)
+  const [envWorkspace, setEnvWorkspace] = useState<WorkspaceDto | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const navigate = useNavigate()
@@ -355,14 +358,6 @@ export function AppSidebar() {
                       }}
                       tooltip={ws.name}
                     >
-                      <span className="relative h-4 w-4 shrink-0">
-                        <Folder
-                          className={`absolute inset-0 h-4 w-4 transition-[opacity,transform] duration-150 group-hover/ws:scale-75 ${collapsed[ws.id] ? "opacity-100" : "opacity-0"}`}
-                        />
-                        <FolderOpen
-                          className={`absolute inset-0 h-4 w-4 transition-[opacity,transform] duration-150 ${collapsed[ws.id] ? "opacity-0" : "opacity-100"}`}
-                        />
-                      </span>
                       <span className="text-foreground/80">{ws.name}</span>
                     </SidebarMenuButton>
 
@@ -424,6 +419,10 @@ export function AppSidebar() {
                         >
                           <ExternalLink className="mr-2 h-4 w-4" />
                           Open in Editor
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setEnvWorkspace(ws)}>
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          Environment Variables
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
@@ -589,6 +588,14 @@ export function AppSidebar() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {envWorkspace && (
+        <WorkspaceEnvDialog
+          workspace={envWorkspace}
+          open={!!envWorkspace}
+          onOpenChange={(open) => { if (!open) setEnvWorkspace(null) }}
+        />
+      )}
     </Sidebar>
   )
 }

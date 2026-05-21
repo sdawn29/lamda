@@ -10,6 +10,7 @@ export const workspaces = sqliteTable("workspaces", {
   name: text("name").notNull(),
   path: text("path").notNull(),
   openWithAppId: text("open_with_app_id"),
+  env: text("env"), // JSON object: { KEY: "value" }
   createdAt: integer("created_at").notNull(),
 })
 
@@ -105,6 +106,16 @@ export const agentTurnFiles = sqliteTable("agent_turn_files", {
 })
 
 // ── MCP Servers ───────────────────────────────────────────────────────────────
+
+export const workspaceTasks = sqliteTable("workspace_tasks", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  icon: text("icon"),
+  command: text("command").notNull(),
+  createdAt: integer("created_at").notNull(),
+})
 
 export const mcpServers = sqliteTable("mcp_servers", {
   id: text("id").primaryKey(),

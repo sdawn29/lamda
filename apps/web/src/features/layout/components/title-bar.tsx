@@ -5,7 +5,6 @@ import {
   Pencil,
   Trash2,
   Server,
-  Play,
 } from "lucide-react"
 import { Icon } from "@iconify/react"
 import {
@@ -37,7 +36,7 @@ import {
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { ShortcutKbd } from "@/shared/ui/kbd"
 import { McpDialog, useMcpServerStatus } from "@/features/mcp"
-import { TasksDialog } from "@/features/tasks"
+import { TasksDropdown } from "@/features/tasks"
 import { useMainTabs } from "@/features/main-tabs"
 import { getIconName } from "@/shared/ui/file-icon"
 import { cn } from "@/shared/lib/utils"
@@ -109,7 +108,6 @@ export function TitleBar() {
   const [renameValue, setRenameValue] = useState("")
   const renameInputRef = useRef<HTMLInputElement>(null)
   const [mcpDialogOpen, setMcpDialogOpen] = useState(false)
-  const [tasksDialogOpen, setTasksDialogOpen] = useState(false)
   const { data: mcpServerStatus } = useMcpServerStatus(
     urlActiveWorkspace?.id ?? ""
   )
@@ -300,21 +298,10 @@ export function TitleBar() {
         )}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="outline"
-                onClick={() => setTasksDialogOpen(true)}
-                className="size-7"
-              >
-                <Play className="size-4" />
-                <span className="sr-only">Tasks</span>
-              </Button>
-            }
-          />
-          <TooltipContent>Tasks</TooltipContent>
-        </Tooltip>
+        <TasksDropdown
+          workspaceId={urlActiveWorkspace?.id ?? ""}
+          onRunTask={runTerminalCommand}
+        />
 
         <Tooltip>
           <TooltipTrigger
@@ -372,12 +359,6 @@ export function TitleBar() {
         workspaceId={urlActiveWorkspace?.id}
       />
 
-      <TasksDialog
-        open={tasksDialogOpen}
-        onOpenChange={setTasksDialogOpen}
-        workspaceId={urlActiveWorkspace?.id}
-        onRunTask={runTerminalCommand}
-      />
     </div>
   )
 }

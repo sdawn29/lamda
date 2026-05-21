@@ -8,6 +8,7 @@ import {
   deleteWorkspace,
   deleteAllWorkspaces,
   updateWorkspaceOpenWithApp,
+  updateWorkspaceEnv,
 } from "@lamda/db";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
@@ -34,12 +35,18 @@ function mapThread(
   };
 }
 
+function parseEnv(env: string | null | undefined): Record<string, string> {
+  if (!env) return {}
+  try { return JSON.parse(env) as Record<string, string> } catch { return {} }
+}
+
 workspaces.get("/workspaces", (c) => {
   const result = listWorkspacesWithThreads().map((ws) => ({
     id: ws.id,
     name: ws.name,
     path: ws.path,
     openWithAppId: ws.openWithAppId ?? null,
+    env: parseEnv(ws.env),
     createdAt: ws.createdAt,
     threads: ws.threads.map((t) => mapThread(t, ws.id)),
   }));
@@ -60,7 +67,7 @@ workspaces.post("/workspace", async (c) => {
     return c.json(
       {
         error: "A workspace already exists for this path",
-        workspace: { ...existing, openWithAppId: existing.openWithAppId ?? null, threads },
+        workspace: { ...existing, openWithAppId: existing.openWithAppId ?? null, env: parseEnv(existing.env), threads },
       },
       409,
     );
@@ -82,6 +89,7 @@ workspaces.post("/workspace", async (c) => {
         name: body.name,
         path: body.path,
         openWithAppId: null,
+        env: {},
         threads: [
           {
             id: threadId,
@@ -154,6 +162,17 @@ workspaces.patch("/workspace/:id/open-with-app", async (c) => {
   const ws = getWorkspace(workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
   updateWorkspaceOpenWithApp(workspaceId, body.appId ?? null);
+  return c.json({ ok: true });
+});
+
+workspaces.patch("/workspace/:id/env", async (c) => {
+  const workspaceId = c.req.param("id");
+  const body = await c.req
+    .json<{ env?: Record<string, string> }>()
+    .catch((): { env?: Record<string, string> } => ({}));
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  updateWorkspaceEnv(workspaceId, body.env ?? null);
   return c.json({ ok: true });
 });
 

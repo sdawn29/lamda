@@ -8,7 +8,7 @@
  * - Manages isLoading, isCompacting, pendingError as local state
  * - Provides startUserPrompt() which optimistically adds the user message
  */
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
 import { useSessionStream } from "./hooks/use-session-stream"
@@ -52,6 +52,8 @@ interface UseChatStreamResult {
   hasConversationHistory: boolean
   hasLoadedMessages: boolean
   isLoading: boolean
+  /** True while messages are being fetched from the server (suppress empty state during initial load). */
+  isLoadingMessages: boolean
   isStopped: boolean
   isCompacting: boolean
   compactionReason: "manual" | "threshold" | "overflow" | null
@@ -108,6 +110,7 @@ export function useChatStream({
 
   const {
     messages,
+    isLoading: isLoadingMessages,
     fetchPreviousPage,
     hasPreviousPage,
     isFetchingPreviousPage,
@@ -142,6 +145,22 @@ export function useChatStream({
     onError: handleError,
     onToolExecutionEnd: handleToolExecutionEnd,
   })
+
+  // After the agent finishes, refetch messages so optimistic user message
+  // placeholders (which have no DB id) get replaced with server-persisted
+  // versions that carry an id — required for the fork/revert buttons to appear.
+  // The 750 ms delay lets the server finish its async DB write before we fetch.
+  // The effect cleanup cancels the timer if the user sends another prompt first.
+  const prevIsLoadingRef = useRef(isLoading)
+  useEffect(() => {
+    const wasLoading = prevIsLoadingRef.current
+    prevIsLoadingRef.current = isLoading
+    if (!wasLoading || isLoading) return
+    const timer = setTimeout(() => {
+      void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+    }, 750)
+    return () => clearTimeout(timer)
+  }, [isLoading, queryClient, sessionId])
 
   const hasLoadedMessages = messages.length > 0 || isLoading
 
@@ -206,6 +225,7 @@ export function useChatStream({
     hasConversationHistory: messages.length > 0,
     hasLoadedMessages,
     isLoading,
+    isLoadingMessages,
     isStopped,
     isCompacting,
     compactionReason,

@@ -1,6 +1,5 @@
 export interface WorkspaceTask {
   id: string
-  name: string
+  icon?: string
   command: string
-  description?: string
 }

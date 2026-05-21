@@ -24,6 +24,7 @@ export interface WorkspaceDto {
   name: string
   path: string
   openWithAppId: string | null
+  env: Record<string, string>
   createdAt: number
   threads: ThreadDto[]
 }
@@ -64,6 +65,17 @@ export function updateWorkspaceOpenWithApp(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ appId }),
+  })
+}
+
+export function updateWorkspaceEnv(
+  id: string,
+  env: Record<string, string>
+): Promise<void> {
+  return apiFetch<void>(`/workspace/${id}/env`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ env }),
   })
 }
 

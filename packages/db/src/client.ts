@@ -112,6 +112,14 @@ function createDb() {
       PRIMARY KEY (workspace_id, relative_path)
     );
 
+    CREATE TABLE IF NOT EXISTS workspace_tasks (
+      id           TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      icon         TEXT,
+      command      TEXT NOT NULL,
+      created_at   INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS mcp_servers (
       id           TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -148,10 +156,21 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS threads_workspace_idx ON threads(workspace_id);
     CREATE INDEX IF NOT EXISTS message_blocks_thread_idx ON message_blocks(thread_id, block_index);
     CREATE INDEX IF NOT EXISTS workspace_files_workspace_idx ON workspace_files(workspace_id);
+    CREATE INDEX IF NOT EXISTS workspace_tasks_workspace_idx ON workspace_tasks(workspace_id);
     CREATE INDEX IF NOT EXISTS mcp_servers_workspace_idx ON mcp_servers(workspace_id);
     CREATE INDEX IF NOT EXISTS agent_turns_thread_idx ON agent_turns(thread_id);
     CREATE INDEX IF NOT EXISTS agent_turn_files_turn_idx ON agent_turn_files(turn_id);
   `);
+
+  // Migration: Add env column to workspaces table.
+  try {
+    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+    if (!wsCols.some((col) => col.name === "env")) {
+      sqlite.exec(`ALTER TABLE workspaces ADD COLUMN env TEXT`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
 
   // Migration: Add checkpoint_sha column to agent_turns table.
   try {

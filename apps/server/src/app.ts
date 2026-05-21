@@ -10,6 +10,7 @@ import git from "./routes/git.js";
 import auth from "./routes/auth.js";
 import file from "./routes/file.js";
 import { mcpRouter } from "./routes/mcp.js";
+import { tasksRouter } from "./routes/tasks.js";
 
 const app = new Hono();
 
@@ -25,5 +26,6 @@ app.route("/", git);
 app.route("/", auth);
 app.route("/", file);
 app.route("/mcp", mcpRouter);
+app.route("/tasks", tasksRouter);
 
 export default app;

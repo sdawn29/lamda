@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   lazy,
   memo,
@@ -64,7 +63,6 @@ import { FilesSection } from "./files-section"
 import { HistoryView } from "./history-view"
 import { FileListItem } from "./file-list-item"
 import { FileHeader } from "./file-header"
-import { SectionCard } from "./section-card"
 import { SORT_OPTIONS, type SortMode, applySortMode } from "./sort-utils"
 import { cn } from "@/shared/lib/utils"
 import { useTheme } from "@/shared/components/theme-provider"
@@ -259,16 +257,14 @@ const TurnHistoryView = memo(function TurnHistoryView({
   const [expandedIds, setExpandedIds] = useState<Set<number>>(
     () => new Set(turns[0] ? [turns[0].id] : [])
   )
+  const [prevTopId, setPrevTopId] = useState<number | undefined>(turns[0]?.id)
 
-  // Auto-expand newest turn when turns list changes
-  const prevTopIdRef = useRef<number | undefined>(undefined)
-  useEffect(() => {
-    const topId = turns[0]?.id
-    if (topId !== undefined && topId !== prevTopIdRef.current) {
-      prevTopIdRef.current = topId
-      setExpandedIds((prev) => new Set([...prev, topId]))
-    }
-  }, [turns])
+  // Auto-expand newest turn — derived state during render (React-recommended pattern)
+  const topId = turns[0]?.id
+  if (topId !== undefined && topId !== prevTopId) {
+    setPrevTopId(topId)
+    setExpandedIds((prev) => new Set([...prev, topId]))
+  }
 
   const revertMutation = useRevertToTurn(sessionId)
 

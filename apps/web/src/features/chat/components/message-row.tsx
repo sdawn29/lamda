@@ -2,7 +2,13 @@ import { memo, useState } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { PluggableList } from "unified"
-import { AlertCircleIcon, GitForkIcon, SparklesIcon, Undo2, Loader2 } from "lucide-react"
+import {
+  AlertCircleIcon,
+  GitForkIcon,
+  SparklesIcon,
+  Undo2,
+  Loader2,
+} from "lucide-react"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -107,7 +113,11 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
   const thinkingLabel = message.thinkingLevel
     ? (THINKING_LEVEL_LABELS[message.thinkingLevel] ?? message.thinkingLevel)
     : null
-  const hasMeta = !!(message.model || thinkingLabel || message.responseTime != null)
+  const hasMeta = !!(
+    message.model ||
+    thinkingLabel ||
+    message.responseTime != null
+  )
 
   // Wrapper-only fade — content updates (word reveal) shouldn't restart the
   // entry animation, so we apply the class to a stable outer wrapper that
@@ -126,7 +136,10 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
     >
       {hasContent && (
         <div className={proseClass}>
-          <Markdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+          <Markdown
+            remarkPlugins={remarkPlugins}
+            components={markdownComponents}
+          >
             {displayContent}
           </Markdown>
         </div>
@@ -190,7 +203,12 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
 })
 
 export function getMessageKey(message: Message, index: number): string {
-  if (message.role === "error" || message.role === "abort" || message.role === "compaction") return message.id
+  if (
+    message.role === "error" ||
+    message.role === "abort" ||
+    message.role === "compaction"
+  )
+    return message.id
   if (message.role === "tool") return `tool-${message.toolCallId}`
   // Prefer DB id when present — stable across prepends & remounts.
   if (message.role === "user" && message.id) return `user-${message.id}`
@@ -336,7 +354,7 @@ export const MessageRow = memo(function MessageRow({
           }
         >
           <div
-            className="max-w-3/4 rounded-xl bg-muted px-4 py-2.5 text-sm whitespace-pre-wrap break-words"
+            className="max-w-3/4 rounded-xl bg-muted px-4 py-2.5 text-sm wrap-break-word whitespace-pre-wrap"
             data-selectable
           >
             <UserMessageContent
@@ -353,7 +371,7 @@ export const MessageRow = memo(function MessageRow({
                 onClick={() => setConfirmRevertOpen(true)}
                 disabled={isReverting}
                 aria-label="Revert conversation to before this message"
-                className="opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10"
+                className="opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
               >
                 {isReverting ? <Loader2 className="animate-spin" /> : <Undo2 />}
               </Button>
@@ -368,7 +386,11 @@ export const MessageRow = memo(function MessageRow({
                 aria-label="Fork conversation from here"
                 className="opacity-0 group-hover:opacity-100"
               >
-                {isForking ? <Loader2 className="animate-spin" /> : <GitForkIcon />}
+                {isForking ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <GitForkIcon />
+                )}
               </Button>
             )}
             <CopyButton text={message.content} />
@@ -378,21 +400,30 @@ export const MessageRow = memo(function MessageRow({
           </div>
         </div>
 
-        <AlertDialog open={confirmRevertOpen} onOpenChange={setConfirmRevertOpen}>
+        <AlertDialog
+          open={confirmRevertOpen}
+          onOpenChange={setConfirmRevertOpen}
+        >
           <AlertDialogContent size="sm">
             <AlertDialogHeader>
               <AlertDialogMedia className="bg-destructive/10">
                 <Undo2 className="text-destructive" />
               </AlertDialogMedia>
-              <AlertDialogTitle>Revert to before this message?</AlertDialogTitle>
+              <AlertDialogTitle>
+                Revert to before this message?
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                This message and all subsequent conversation and code changes will
-                be undone. The message text will be restored to your input box.
+                This message and all subsequent conversation and code changes
+                will be undone. The message text will be restored to your input
+                box.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" onClick={handleConfirmRevert}>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={handleConfirmRevert}
+              >
                 Revert
               </AlertDialogAction>
             </AlertDialogFooter>

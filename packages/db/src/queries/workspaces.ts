@@ -40,6 +40,10 @@ export function updateWorkspaceOpenWithApp(id: string, openWithAppId: string | n
   db.update(workspaces).set({ openWithAppId }).where(eq(workspaces.id, id)).run()
 }
 
+export function updateWorkspaceEnv(id: string, env: Record<string, string> | null) {
+  db.update(workspaces).set({ env: env ? JSON.stringify(env) : null }).where(eq(workspaces.id, id)).run()
+}
+
 export function deleteWorkspace(id: string) {
   db.delete(workspaces).where(eq(workspaces.id, id)).run()
 }

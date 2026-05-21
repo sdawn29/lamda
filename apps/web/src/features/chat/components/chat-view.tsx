@@ -200,6 +200,7 @@ export function ChatView({
     visibleMessages,
     hasConversationHistory,
     isLoading,
+    isLoadingMessages,
     isCompacting,
     compactionReason,
     pendingError,
@@ -226,8 +227,10 @@ export function ChatView({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(false)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
-  const isScrollingToBottomRef = useRef(false)
-  const lastScrollTopRef = useRef(0)
+  // Set to true while we triggered a programmatic scroll (instant or smooth).
+  // handleScroll ignores pinned-state changes until scrollend clears this flag,
+  // preventing user-initiated scroll events from cancelling our animation.
+  const programmaticScrollRef = useRef(false)
   const chatTextboxRef = useRef<ChatTextboxHandle>(null)
   // Messages present on the first non-empty render (from cache) skip entry animations.
   // Only messages that arrive after the initial snapshot get animate-in treatment.
@@ -377,7 +380,7 @@ export function ChatView({
   // 2. The useLayoutEffect below handles coarser events (loading state changes, new
   //    message groups) and uses smooth scroll so there is a clear visual cue for
   //    each "something new appeared" moment.
-  // The isScrollingToBottomRef guard prevents handleScroll from flipping pinnedRef
+  // programmaticScrollRef prevents handleScroll from flipping pinnedRef
   // to false mid-animation, which would stop further auto-scroll.
   const commandsByName = useMemo(
     () => new Map((commandsData ?? []).map((command) => [command.name, command])),
@@ -478,7 +481,7 @@ export function ChatView({
   // useLayoutEffect runs before the browser paints, so scroll position is
   // applied atomically with the DOM update — no one-frame flash of wrong position.
   useLayoutEffect(() => {
-    isScrollingToBottomRef.current = false
+    programmaticScrollRef.current = false
     pinnedRef.current = true
 
     const el = scrollContainerRef.current
@@ -529,8 +532,7 @@ export function ChatView({
     if (!el) return
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     if (distanceFromBottom < 5) return
-    isScrollingToBottomRef.current = true
-    lastScrollTopRef.current = el.scrollTop
+    programmaticScrollRef.current = true
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [isLoading, groupedMessages.length])
 
@@ -550,12 +552,21 @@ export function ChatView({
     prevGroupCountRef.current = newCount
   }, [groupedMessages.length])
 
+  // Clear the programmatic-scroll guard once the browser reports the scroll
+  // animation has settled. scrollend fires after both instant (scrollTop=)
+  // and smooth (scrollTo behavior:'smooth') scrolls.
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const onScrollEnd = () => { programmaticScrollRef.current = false }
+    el.addEventListener('scrollend', onScrollEnd)
+    return () => el.removeEventListener('scrollend', onScrollEnd)
+  }, [])
+
   // ResizeObserver: keep the view pinned to the bottom as content grows
-  // incrementally (word-reveal, streaming text deltas). Fires whenever the
-  // messages container changes height; if we're already pinned, snap to bottom.
-  // If a smooth animation is already in progress (from the useLayoutEffect
-  // above), extend its target so the animation continues to the new bottom
-  // instead of being interrupted by an instant jump.
+  // (word-reveal, streaming text deltas). Instant-snap only — incremental
+  // deltas during streaming are small enough that the jump is imperceptible,
+  // and stacking smooth-scroll calls causes jitter.
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
@@ -564,12 +575,9 @@ export function ChatView({
       const el = scrollContainerRef.current
       if (!el) return
       const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-      if (distanceFromBottom < 5) return
-      if (isScrollingToBottomRef.current) {
-        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-      } else {
-        el.scrollTop = el.scrollHeight
-      }
+      if (distanceFromBottom < 1) return
+      programmaticScrollRef.current = true
+      el.scrollTop = el.scrollHeight
     })
     ro.observe(container)
     return () => ro.disconnect()
@@ -591,21 +599,18 @@ export function ChatView({
       fetchPreviousPage()
     }
 
-    if (isScrollingToBottomRef.current) {
-      const scrolledUp = el.scrollTop < lastScrollTopRef.current
-      lastScrollTopRef.current = el.scrollTop
-      if (distanceFromBottom < 10) {
-        isScrollingToBottomRef.current = false
-        saveScrollPosition(el.scrollTop)
-        return
+    // While a programmatic scroll is in progress, don't touch pinnedRef.
+    // If the user clearly dragged away (distance > threshold), treat it as
+    // an intentional interrupt and cancel the programmatic guard immediately.
+    if (programmaticScrollRef.current) {
+      if (distanceFromBottom >= 80) {
+        programmaticScrollRef.current = false
+        pinnedRef.current = false
+        showScrollButtonRef.current = true
+        setShowScrollButton(true)
       }
-      if (!scrolledUp) {
-        saveScrollPosition(el.scrollTop)
-        return
-      }
-      isScrollingToBottomRef.current = false
-    } else {
-      lastScrollTopRef.current = el.scrollTop
+      saveScrollPosition(el.scrollTop)
+      return
     }
 
     pinnedRef.current = distanceFromBottom < 80
@@ -626,12 +631,9 @@ export function ChatView({
     setShowScrollButton(false)
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     if (distanceFromBottom < 10) return
-    if (groupedMessages.length > 0) {
-      isScrollingToBottomRef.current = true
-      lastScrollTopRef.current = el.scrollTop
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
-    }
-  }, [groupedMessages.length])
+    programmaticScrollRef.current = true
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+  }, [])
 
   const handleModelChange = useCallback(
     (id: string) => {
@@ -709,6 +711,7 @@ export function ChatView({
       // Scroll immediately when sending
       const el = scrollContainerRef.current
       if (el) {
+        programmaticScrollRef.current = true
         el.scrollTop = el.scrollHeight
       }
 
@@ -824,9 +827,9 @@ export function ChatView({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex w-full flex-1 flex-col overflow-y-auto pt-4 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [overflow-anchor:none]"
+          className="flex w-full flex-1 flex-col overflow-y-auto pt-4 pb-4 [overflow-anchor:none] [scrollbar-gutter:stable]"
         >
-          {visibleMessages.length === 0 && !isLoading && (
+          {visibleMessages.length === 0 && !isLoading && !isLoadingMessages && (
             <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-8 px-6 text-center select-none">
               <div className="flex flex-col items-center gap-3">
                 <div className="flex size-14 items-center justify-center rounded-2xl bg-[#1c1c1e] ring-1 ring-white/5 shadow-md">
@@ -867,86 +870,84 @@ export function ChatView({
               </div>
             </div>
           )}
-          {groupedMessages.length > 0 && (
-            <div ref={messagesContainerRef}>
-              {/* Spinner while loading older history */}
-              {isFetchingPreviousPage && (
-                <div className="flex justify-center py-3">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-                </div>
-              )}
-              {groupedMessages.map((group, groupIndex) => {
-                const itemKey = groupKeys[groupIndex] ?? groupIndex
-                let content: React.ReactNode
+          <div ref={messagesContainerRef}>
+            {/* Spinner while loading older history */}
+            {isFetchingPreviousPage && (
+              <div className="flex justify-center py-3">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              </div>
+            )}
+            {groupedMessages.map((group, groupIndex) => {
+              const itemKey = groupKeys[groupIndex] ?? groupIndex
+              let content: React.ReactNode
 
-                if (group.type === "working") {
-                  const isGroupActive = isLoading && groupIndex === groupedMessages.length - 1
-                  const firstMsg = group.messages[0] as WorkingMessage | undefined
-                  // Use the same key fn as initialSnapshot to keep isNew lookup consistent.
-                  const firstKey = firstMsg
-                    ? getMessageKey(firstMsg, group.startIndex)
-                    : `working-${group.startIndex}`
-                  const isNewGroup =
+              if (group.type === "working") {
+                const isGroupActive = isLoading && groupIndex === groupedMessages.length - 1
+                const firstMsg = group.messages[0] as WorkingMessage | undefined
+                // Use the same key fn as initialSnapshot to keep isNew lookup consistent.
+                const firstKey = firstMsg
+                  ? getMessageKey(firstMsg, group.startIndex)
+                  : `working-${group.startIndex}`
+                const isNewGroup =
+                  isLoading &&
+                  initialSnapshot !== null &&
+                  initialSnapshot.sessionId === sessionId &&
+                  !initialSnapshot.keys.has(firstKey)
+                const entryDelayMs = isNewGroup ? getEntryDelayMs(firstKey) : 0
+                content = (
+                  <div className="mx-auto w-full max-w-3xl px-6 pb-3">
+                    <WorkingBlock
+                      messages={group.messages}
+                      isActive={isGroupActive}
+                      showThinking={showThinkingSetting}
+                      isNew={isNewGroup}
+                      entryDelayMs={entryDelayMs}
+                      finalThinking={group.finalThinking}
+                      rootPath={rootPath}
+                    />
+                  </div>
+                )
+              } else {
+                const { message, index, isLastInTurnStatic, turnMessages } = group
+                if (
+                  message.role === "assistant" &&
+                  !message.content.trim() &&
+                  !message.thinking.trim() &&
+                  !message.errorMessage
+                ) {
+                  content = null
+                } else {
+                  const key = getMessageKey(message, index)
+                  const isNewMessage =
                     isLoading &&
                     initialSnapshot !== null &&
                     initialSnapshot.sessionId === sessionId &&
-                    !initialSnapshot.keys.has(firstKey)
-                  const entryDelayMs = isNewGroup ? getEntryDelayMs(firstKey) : 0
+                    !initialSnapshot.keys.has(key)
+                  const isLastInTurn = !isLoading && isLastInTurnStatic
+                  const entryDelayMs = isNewMessage ? getEntryDelayMs(key) : 0
                   content = (
                     <div className="mx-auto w-full max-w-3xl px-6 pb-3">
-                      <WorkingBlock
-                        messages={group.messages}
-                        isActive={isGroupActive}
-                        showThinking={showThinkingSetting}
-                        isNew={isNewGroup}
+                      <MessageRow
+                        message={message}
+                        commandsByName={commandsByName}
+                        showThinking={group.suppressThinking ? false : showThinkingSetting}
+                        isNewMessage={isNewMessage}
                         entryDelayMs={entryDelayMs}
-                        finalThinking={group.finalThinking}
+                        isLastInTurn={isLastInTurn}
+                        turnMessages={turnMessages}
                         rootPath={rootPath}
+                        onFork={handleFork}
+                        onRevert={!isLoading ? handleRevert : undefined}
+                        isReverting={revertingBlockId === (message as UserMessage).id}
                       />
                     </div>
                   )
-                } else {
-                  const { message, index, isLastInTurnStatic, turnMessages } = group
-                  if (
-                    message.role === "assistant" &&
-                    !message.content.trim() &&
-                    !message.thinking.trim() &&
-                    !message.errorMessage
-                  ) {
-                    content = null
-                  } else {
-                    const key = getMessageKey(message, index)
-                    const isNewMessage =
-                      isLoading &&
-                      initialSnapshot !== null &&
-                      initialSnapshot.sessionId === sessionId &&
-                      !initialSnapshot.keys.has(key)
-                    const isLastInTurn = !isLoading && isLastInTurnStatic
-                    const entryDelayMs = isNewMessage ? getEntryDelayMs(key) : 0
-                    content = (
-                      <div className="mx-auto w-full max-w-3xl px-6 pb-3">
-                        <MessageRow
-                          message={message}
-                          commandsByName={commandsByName}
-                          showThinking={group.suppressThinking ? false : showThinkingSetting}
-                          isNewMessage={isNewMessage}
-                          entryDelayMs={entryDelayMs}
-                          isLastInTurn={isLastInTurn}
-                          turnMessages={turnMessages}
-                          rootPath={rootPath}
-                          onFork={handleFork}
-                          onRevert={!isLoading ? handleRevert : undefined}
-                          isReverting={revertingBlockId === (message as UserMessage).id}
-                        />
-                      </div>
-                    )
-                  }
                 }
+              }
 
-                return <div key={itemKey}>{content}</div>
-              })}
-            </div>
-          )}
+              return <div key={itemKey}>{content}</div>
+            })}
+          </div>
           <div className="mx-auto w-full max-w-3xl px-6">
             {isCompacting
               ? <CompactingIndicator reason={compactionReason} />

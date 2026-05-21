@@ -67,6 +67,7 @@ const LIGHT_TERMINAL_THEME = {
 interface TerminalInstanceProps {
   id: string
   cwd: string
+  workspaceId: string
   isActive: boolean
   initialCommand?: string
   onTitleChange: (id: string, title: string) => void
@@ -75,6 +76,7 @@ interface TerminalInstanceProps {
 const TerminalInstance = memo(function TerminalInstance({
   id,
   cwd,
+  workspaceId,
   isActive,
   initialCommand,
   onTitleChange,
@@ -156,7 +158,7 @@ const TerminalInstance = memo(function TerminalInstance({
     getServerUrl().then((serverUrl) => {
       if (cancelled) return
       const wsBase = serverUrl.replace(/^http/, "ws")
-      const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwd)}`
+      const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwd)}&workspaceId=${encodeURIComponent(workspaceId)}`
       ws = new WebSocket(url)
       wsRef.current = ws
 
@@ -354,6 +356,7 @@ export const TerminalPanel = memo(function TerminalPanel({
               key={tab.id}
               id={tab.id}
               cwd={tab.cwd}
+              workspaceId={wsId}
               isActive={
                 wsId === activeWorkspaceId && tab.id === state.activeTabId
               }
