@@ -20,7 +20,7 @@ interface RightSidebarStore {
 export const useRightSidebarStore = create<RightSidebarStore>()((set) => ({
   isOpen: false,
   isFileTreeOpen: false,
-  width: 400,
+  width: 560,
 
   open: () => set({ isOpen: true }),
   close: () => set({ isOpen: false, isFileTreeOpen: false }),

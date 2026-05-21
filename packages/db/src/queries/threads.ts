@@ -36,6 +36,10 @@ export function updateThreadModel(id: string, modelId: string | null) {
   db.update(threads).set({ modelId }).where(eq(threads.id, id)).run()
 }
 
+export function updateThreadMode(id: string, mode: "ask" | "plan" | "code") {
+  db.update(threads).set({ mode }).where(eq(threads.id, id)).run()
+}
+
 export function updateThreadStopped(id: string, isStopped: boolean) {
   db.update(threads).set({ isStopped }).where(eq(threads.id, id)).run()
 }

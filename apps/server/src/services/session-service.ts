@@ -1,5 +1,7 @@
-import { createManagedSession, type SdkConfig } from "@lamda/pi-sdk"
-import { updateThreadSessionFile, getWorkspace } from "@lamda/db"
+import { createManagedSession, PLAN_DIR, type SdkConfig } from "@lamda/pi-sdk"
+import { updateThreadSessionFile, getWorkspace, getThread } from "@lamda/db"
+import { mkdir } from "node:fs/promises"
+import { join } from "node:path"
 import { store } from "../store.js"
 import { sessionEvents } from "../session-events.js"
 
@@ -9,6 +11,8 @@ export async function createSessionForThread(
   workspaceId?: string,
   opts: Omit<Partial<SdkConfig>, "cwd"> = {},
 ): Promise<string> {
+  const thread = getThread(threadId)
+  const mode = thread?.mode as SdkConfig["mode"] | undefined
   // Inject workspace-scoped env vars into process.env so they are inherited
   // by any child processes (e.g. bash tool) that Claude spawns during the session.
   if (workspaceId) {
@@ -23,8 +27,12 @@ export async function createSessionForThread(
     }
   }
 
+  // Pre-create the plan dir so the agent's first write in plan mode never fails
+  // on a missing directory. Cheap and safe to run unconditionally.
+  await mkdir(join(cwd, PLAN_DIR), { recursive: true }).catch(() => {})
+
   const customTools = workspaceId ? await collectCustomTools(workspaceId, cwd) : undefined
-  const handle = await createManagedSession({ cwd, customTools, ...opts })
+  const handle = await createManagedSession({ cwd, customTools, mode, ...opts })
   const sessionId = store.create(handle, cwd, threadId, workspaceId)
   
   if (handle.sessionFile) {

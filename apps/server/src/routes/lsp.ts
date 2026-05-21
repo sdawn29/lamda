@@ -18,6 +18,8 @@
  */
 
 import type { WebSocket } from "ws";
+import { Hono } from "hono";
+import { listLanguageRegistry, isCommandOnPath } from "@lamda/lsp";
 import {
   openDocument,
   closeDocument,
@@ -129,3 +131,42 @@ async function handleMessage(
     }
   }
 }
+
+// ─── HTTP router ────────────────────────────────────────────────────────────────
+
+export const lspRouter = new Hono();
+
+/**
+ * GET /lsp/registry
+ *
+ * Returns the built-in language registry with a resolved `installed` flag
+ * for the primary command and each fallback. Used by the settings UI to
+ * show which language servers are configured and which are available on PATH.
+ */
+lspRouter.get("/registry", async (c) => {
+  const entries = listLanguageRegistry();
+  const resolved = await Promise.all(
+    entries.map(async (entry) => {
+      const primaryInstalled = await isCommandOnPath(entry.command);
+      const fallbacks = await Promise.all(
+        entry.fallbacks.map(async (fb) => ({
+          command: fb.command,
+          args: fb.args,
+          installed: await isCommandOnPath(fb.command),
+        })),
+      );
+      const available =
+        primaryInstalled || fallbacks.some((fb) => fb.installed);
+      return {
+        language: entry.language,
+        extensions: entry.extensions,
+        command: entry.command,
+        args: entry.args,
+        installed: primaryInstalled,
+        fallbacks,
+        available,
+      };
+    }),
+  );
+  return c.json({ languages: resolved });
+});

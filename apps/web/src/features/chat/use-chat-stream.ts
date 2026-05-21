@@ -45,6 +45,7 @@ interface UseChatStreamOptions {
   sessionId: string
   threadId: string
   initialIsStopped: boolean
+  onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
 }
 
 interface UseChatStreamResult {
@@ -71,6 +72,7 @@ export function useChatStream({
   sessionId,
   threadId,
   initialIsStopped,
+  onPlanSaved,
 }: UseChatStreamOptions): UseChatStreamResult {
   const setThreadStatus = useSetThreadStatus()
   const queryClient = useQueryClient()
@@ -144,6 +146,7 @@ export function useChatStream({
     onPendingErrorChange: setPendingError,
     onError: handleError,
     onToolExecutionEnd: handleToolExecutionEnd,
+    onPlanSaved,
   })
 
   // After the agent finishes, refetch messages so optimistic user message

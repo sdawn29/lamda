@@ -70,6 +70,13 @@ export interface SessionTurnFileChangedEvent {
   wasCreatedByTurn: boolean;
 }
 
+export interface SessionPlanSavedEvent {
+  /** Absolute path on the server's filesystem. */
+  filePath: string;
+  /** Workspace-relative forward-slash path (always starts with `.agents/plans/`). */
+  relativePath: string;
+}
+
 export interface SessionAgentEndEvent {
   messages?: AgentEndMessage[];
 }
@@ -103,6 +110,7 @@ export interface SessionEventHandlers {
   onAgentStart: (event: SessionAgentStartEvent) => void;
   onAgentEnd: (event: SessionAgentEndEvent) => void;
   onTurnFileChanged?: (event: SessionTurnFileChangedEvent) => void;
+  onPlanSaved?: (event: SessionPlanSavedEvent) => void;
   onQueueUpdate: (event: SessionQueueUpdateEvent) => void;
   onAutoRetryStart: (event: SessionAutoRetryStartEvent) => void;
   onAutoRetryEnd: (event: SessionAutoRetryEndEvent) => void;
@@ -161,6 +169,9 @@ export function subscribeToSessionEvents(
           break
         case "turn_file_changed":
           handlers.onTurnFileChanged?.(data as unknown as SessionTurnFileChangedEvent)
+          break
+        case "plan_saved":
+          handlers.onPlanSaved?.(data as unknown as SessionPlanSavedEvent)
           break
         case "queue_update":
           handlers.onQueueUpdate(data as unknown as SessionQueueUpdateEvent)

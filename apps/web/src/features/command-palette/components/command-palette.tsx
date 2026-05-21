@@ -58,7 +58,7 @@ export function CommandPalette() {
   const { open, openPalette, closePalette } = useCommandPalette()
   const navigate = useNavigate()
   const { threadId: activeThreadId } = useParams({ strict: false }) as { threadId?: string }
-  const { workspaces, createThread } = useWorkspace()
+  const { workspaces } = useWorkspace()
   const { isOpen: rightSidebarOpen, isFileTreeOpen, togglePanel, open: openRightSidebar } = useRightSidebar()
   const { addFileTab } = useMainTabs()
   const { toggleSidebar } = useSidebar()
@@ -114,13 +114,11 @@ export function CommandPalette() {
     [run, navigate]
   )
 
-  const handleNewThread = useCallback(async () => {
+  const handleNewThread = useCallback(() => {
     const ws = activeWorkspace ?? workspaces[0]
-    if (!ws) return
     closePalette()
-    const thread = await createThread(ws.id)
-    navigate({ to: "/workspace/$threadId", params: { threadId: thread.id } })
-  }, [activeWorkspace, workspaces, closePalette, createThread, navigate])
+    navigate({ to: "/new", search: ws ? { ws: ws.id } : {} })
+  }, [activeWorkspace, workspaces, closePalette, navigate])
 
   const handleToggleTheme = useCallback(() => {
     run(() => setTheme(theme === "dark" ? "light" : "dark"))

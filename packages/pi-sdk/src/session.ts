@@ -5,13 +5,13 @@ import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
-  createReadOnlyTools,
   getAgentDir,
   ModelRegistry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent"
 import { buildAuthStorage } from "./auth.js"
 import { sessionEventGenerator } from "./stream.js"
+import { computeActiveToolsForMode, type Mode } from "./modes.js"
 import type { HistoryBlock, ManagedSessionHandle, ManagedSessionStats, SdkConfig, SessionTokenStats } from "./types.js"
 
 // Duck-typed shapes for SDK message content — avoids a direct @earendil-works/pi-ai dependency
@@ -45,6 +45,14 @@ function buildRuntimeHandle(runtime: AgentSessionRuntime): ManagedSessionHandle 
       if (model) await runtime.session.setModel(model)
     },
     setThinkingLevel: (level) => runtime.session.setThinkingLevel(level as any),
+    setMode: (mode: Mode) => {
+      const session = runtime.session as unknown as {
+        getActiveToolNames(): string[]
+        setActiveToolsByName(toolNames: string[]): void
+      }
+      const next = computeActiveToolsForMode(mode, session.getActiveToolNames())
+      session.setActiveToolsByName(next)
+    },
     get sessionFile() { return runtime.session.sessionFile },
     getContextUsage() {
       const usage = (runtime.session as any).getContextUsage()
@@ -111,8 +119,6 @@ function buildRuntimeFactory(
       authStorage,
       modelRegistry,
     })
-    const baseTools = createReadOnlyTools(effectiveCwd)
-    const customTools = config.customTools ? [...baseTools, ...config.customTools] : baseTools
     return {
       ...(await createAgentSessionFromServices({
         services,
@@ -120,12 +126,17 @@ function buildRuntimeFactory(
         sessionStartEvent,
         model,
         thinkingLevel: config.thinkingLevel as any,
-        customTools,
+        customTools: config.customTools,
       })),
       services,
       diagnostics: services.diagnostics,
     }
   }
+}
+
+function applyInitialMode(handle: ManagedSessionHandle, mode: Mode | undefined): ManagedSessionHandle {
+  if (mode) handle.setMode(mode)
+  return handle
 }
 
 /**
@@ -142,7 +153,7 @@ export async function createManagedSession(config: SdkConfig): Promise<ManagedSe
     agentDir: getAgentDir(),
     sessionManager: SessionManager.create(cwd),
   })
-  return buildRuntimeHandle(runtime)
+  return applyInitialMode(buildRuntimeHandle(runtime), config.mode)
 }
 
 /**
@@ -254,5 +265,5 @@ export async function openManagedSession(sessionFilePath: string, config: SdkCon
     agentDir: getAgentDir(),
     sessionManager: SessionManager.open(sessionFilePath),
   })
-  return buildRuntimeHandle(runtime)
+  return applyInitialMode(buildRuntimeHandle(runtime), config.mode)
 }

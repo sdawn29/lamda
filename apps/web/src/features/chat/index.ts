@@ -1,4 +1,5 @@
 export { ChatView } from "./components/chat-view"
+export { NewThreadView } from "./components/new-thread-view"
 export { useChatStream } from "./use-chat-stream"
 export {
   useThreadStatus,

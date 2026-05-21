@@ -17,9 +17,11 @@ import {
   unpinThread as apiUnpinThread,
   updateThreadTitle as apiUpdateThreadTitle,
   updateThreadModel as apiUpdateThreadModel,
+  updateThreadMode as apiUpdateThreadMode,
   updateThreadStopped as apiUpdateThreadStopped,
   updateThreadLastAccessed as apiUpdateThreadLastAccessed,
   resetAllData,
+  type Mode,
   type WorkspaceDto,
 } from "./api"
 import { workspacesQueryKey } from "./queries"
@@ -279,6 +281,27 @@ export function useUpdateThreadModel() {
           ...ws,
           threads: ws.threads.map((t) =>
             t.id !== threadId ? t : { ...t, modelId }
+          ),
+        }))
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function useUpdateThreadMode() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ threadId, mode }: { threadId: string; mode: Mode }) =>
+      apiUpdateThreadMode(threadId, mode),
+    onMutate: ({ threadId, mode }) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((ws) => ({
+          ...ws,
+          threads: ws.threads.map((t) =>
+            t.id !== threadId ? t : { ...t, mode }
           ),
         }))
       )

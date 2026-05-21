@@ -228,7 +228,6 @@ export function WorkspaceLayout() {
   const { isFullscreen: diffFullscreen } = useDiffPanel()
   const {
     isOpen: rightSidebarOpen,
-    isFileTreeOpen,
     toggleFileTree,
     width: rightSidebarWidth,
     setWidth: setRightSidebarWidth,
@@ -414,9 +413,7 @@ export function WorkspaceLayout() {
               <SidebarProvider
                 style={
                   {
-                    "--sidebar-width": isFileTreeOpen
-                      ? `${rightSidebarWidth + 256}px`
-                      : `${rightSidebarWidth}px`,
+                    "--sidebar-width": `${rightSidebarWidth}px`,
                   } as React.CSSProperties
                 }
                 className={cn(

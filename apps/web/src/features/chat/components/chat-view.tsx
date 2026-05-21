@@ -41,13 +41,20 @@ import { CompactingIndicator } from "./compacting-indicator"
 import { ChatErrorAlert } from "./chat-error-alert"
 import { useShowThinkingSetting } from "@/shared/lib/thinking-visibility"
 import {
+  useUpdateThreadMode,
   useUpdateThreadModel,
   useUpdateThreadStopped,
   useUpdateThreadTitle,
 } from "@/features/workspace/mutations"
 import { useWorkspace } from "@/features/workspace"
 import { useChatStream } from "../use-chat-stream"
+import { useMainTabsStore } from "@/features/main-tabs"
+import { ChatActionsProvider, type ChatActions } from "../contexts/chat-actions-context"
+import { useTurns } from "@/features/git"
+import { PlanChangesCard } from "./plan-changes-card"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
+
+const PLAN_DIR_PREFIX = ".agents/plans/"
 import { FileChangesCard } from "./file-changes-card"
 import { forkSession, listMessages } from "../api"
 import { blocksToMessages, type MessageBlock } from "../types"
@@ -174,6 +181,7 @@ interface ChatViewProps {
   workspaceId: string
   threadId: string
   initialModelId: string | null
+  initialMode: "ask" | "plan" | "code"
   initialIsStopped: boolean
 }
 
@@ -182,6 +190,7 @@ export function ChatView({
   workspaceId,
   threadId,
   initialModelId,
+  initialMode,
   initialIsStopped,
 }: ChatViewProps) {
   const queryClient = useQueryClient()
@@ -195,6 +204,91 @@ export function ChatView({
   const { data: models, isLoading: modelsLoading } = useModels()
   const { openConfigure } = useConfigureProvider()
   const noProvider = !modelsLoading && !models?.models?.length
+
+  const [gitError, setGitError] = useState<string | null>(null)
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(
+    initialModelId
+  )
+  const [selectedMode, setSelectedMode] = useState<"ask" | "plan" | "code">(
+    initialMode
+  )
+  const updateThreadModel = useUpdateThreadModel()
+  const updateThreadMode = useUpdateThreadMode()
+  const updateThreadStopped = useUpdateThreadStopped()
+
+  // Dedupe plan-saved announcements by relative path so a buffered/replayed
+  // event after reconnect doesn't re-toast or re-open the tab.
+  const announcedPlansRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    announcedPlansRef.current = new Set()
+  }, [threadId])
+
+  const handlePlanSaved = useCallback(
+    ({ filePath, relativePath }: { filePath: string; relativePath: string }) => {
+      if (announcedPlansRef.current.has(relativePath)) return
+      announcedPlansRef.current.add(relativePath)
+
+      const fileName = relativePath.split("/").pop() ?? relativePath
+      useMainTabsStore.getState().addFileTab({
+        filePath,
+        title: fileName,
+        workspacePath: rootPath,
+      })
+
+      if (selectedMode === "plan") {
+        setSelectedMode("code")
+        updateThreadMode.mutate({ threadId, mode: "code" })
+        toast.success("Plan saved — switched to Code mode", {
+          description: relativePath,
+          action: {
+            label: "Undo",
+            onClick: () => {
+              setSelectedMode("plan")
+              updateThreadMode.mutate({ threadId, mode: "plan" })
+            },
+          },
+        })
+      } else {
+        toast.success("Plan saved", { description: relativePath })
+      }
+    },
+    [rootPath, selectedMode, threadId, updateThreadMode]
+  )
+
+  const { data: latestTurns = [] } = useTurns(sessionId)
+  const isPlanOnlyTurn = useMemo(() => {
+    const latest = latestTurns[0]
+    if (!latest || latest.files.length === 0) return false
+    return latest.files.every(
+      (f) =>
+        f.filePath.replace(/\\/g, "/").startsWith(PLAN_DIR_PREFIX) &&
+        f.filePath.toLowerCase().endsWith(".md"),
+    )
+  }, [latestTurns])
+
+  const chatActions = useMemo<ChatActions>(
+    () => ({
+      openFile: (filePath, title) => {
+        const fileName = title ?? filePath.split("/").pop() ?? filePath
+        useMainTabsStore.getState().addFileTab({
+          filePath,
+          title: fileName,
+          workspacePath: rootPath,
+        })
+      },
+      implementPlan: (relativePath) => {
+        if (selectedMode !== "code") {
+          setSelectedMode("code")
+          updateThreadMode.mutate({ threadId, mode: "code" })
+        }
+        const prompt = `Implement the plan in \`${relativePath}\`.`
+        chatTextboxRef.current?.setValue(prompt)
+        chatTextboxRef.current?.focus()
+      },
+    }),
+    [rootPath, selectedMode, threadId, updateThreadMode]
+  )
 
   const {
     visibleMessages,
@@ -215,15 +309,8 @@ export function ChatView({
     sessionId,
     threadId,
     initialIsStopped,
+    onPlanSaved: handlePlanSaved,
   })
-
-  const [gitError, setGitError] = useState<string | null>(null)
-  const [showScrollButton, setShowScrollButton] = useState(false)
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(
-    initialModelId
-  )
-  const updateThreadModel = useUpdateThreadModel()
-  const updateThreadStopped = useUpdateThreadStopped()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(false)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
@@ -252,6 +339,7 @@ export function ChatView({
     setGitError(null)
     setShowScrollButton(false)
     setSelectedModelId(initialModelId)
+    setSelectedMode(initialMode)
   }
 
   // Capture initial keys for this session as soon as messages are available,
@@ -651,6 +739,14 @@ export function ChatView({
     [threadId, updateThreadModel]
   )
 
+  const handleModeChange = useCallback(
+    (mode: "ask" | "plan" | "code") => {
+      setSelectedMode(mode)
+      updateThreadMode.mutate({ threadId, mode })
+    },
+    [threadId, updateThreadMode]
+  )
+
   const handleGitError = useCallback((message: string) => {
     setGitError(message)
   }, [])
@@ -794,7 +890,7 @@ export function ChatView({
   )
 
   return (
-    <>
+    <ChatActionsProvider value={chatActions}>
       <AlertDialog
         open={gitError !== null}
         onOpenChange={(open) => {
@@ -963,9 +1059,12 @@ export function ChatView({
             }
           </div>
 
-          {/* File changes card - shown after chat completion */}
+          {/* File changes card — swapped for the plan card when the turn
+              only touched plan-mode artifacts under .agents/plans/. */}
           {!isLoading && visibleMessages.some((m) => m.role !== "error") && (
-            <FileChangesCard sessionId={sessionId} rootPath={rootPath} openWithAppId={openWithAppId} />
+            isPlanOnlyTurn
+              ? <PlanChangesCard sessionId={sessionId} rootPath={rootPath} />
+              : <FileChangesCard sessionId={sessionId} rootPath={rootPath} openWithAppId={openWithAppId} />
           )}
         </div>
 
@@ -999,10 +1098,12 @@ export function ChatView({
             workspaceId={workspaceId}
             selectedModelId={selectedModelId}
             onModelChange={handleModelChange}
+            mode={selectedMode}
+            onModeChange={handleModeChange}
             sessionStats={sessionStats}
           />
         </div>
       </div>
-    </>
+    </ChatActionsProvider>
   )
 }

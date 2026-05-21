@@ -1,142 +1,112 @@
-# Plan: Performance & Code Quality Improvements — apps/web
+# Make Plan Mode More Robust
 
 ## Context
-The chat feature is the core of this application. React Compiler (Babel plugin) is already enabled in `vite.config.ts`, so it auto-memoizes most component-level computations. This plan targets what the compiler *cannot* fix: context provider object identity, effect dependency correctness, code duplication, and dead code. All changes are independent and can be applied incrementally.
 
----
+Today, **plan mode** ([`packages/pi-sdk/src/modes.ts`](packages/pi-sdk/src/modes.ts)) tells the agent to investigate read-only and respond with a numbered-list plan inline in chat. That plan is just text in the message stream — once the thread scrolls, it's gone. There's no persistent artifact to review or edit, no way to share or commit it, and switching from plan → code is a manual mode-combobox click followed by retyping "now implement that plan."
 
-## Changes
+Three improvements turn plan mode into a real workflow:
 
-### 1. Memoize ErrorToastProvider context value
-**File:** `src/features/chat/contexts/error-toast-context.tsx`  
-**Problem:** Line 84 — `value={{ showApiError, dismissApiError }}` creates a new object every render. Both callbacks are already `useCallback`-wrapped with stable deps, so the object identity is the only thing causing all `useErrorToast()` consumers to re-render on every parent render.  
-**Fix:**
-- Add `useMemo` to the React import (line 3–9)
-- Wrap the provider value: `value={useMemo(() => ({ showApiError, dismissApiError }), [showApiError, dismissApiError])}`
-- Also remove the `"use client"` directive on line 1 (Next.js only, unused in Vite)
+1. **Persist plans.** Agent saves the plan as a markdown file in `.agents/plans/` so it lives in the repo and can be reviewed/edited.
+2. **Open for review.** The saved plan auto-opens in the file viewer as a focused tab so the user can immediately edit it.
+3. **Auto-transition.** When the plan file is written, the thread auto-switches to `code` mode with a toast + Undo. The user's next message lands as a real coding turn.
 
-### 2. Stabilize auto-dismiss timer in ChatErrorAlert
-**File:** `src/features/chat/components/chat-error-alert.tsx`  
-**Problem:** Line 34 — `onAction` is in the effect dep array. `onAction` maps to `handleErrorAction` in `chat-view.tsx`, which has a TanStack Query mutation object in its deps → new identity on every parent render → 4-second timer restarts during streaming.  
-**Fix:** Use a ref to hold the latest `onAction` without making it a dep:
-```tsx
-const onActionRef = useRef(onAction)
-useLayoutEffect(() => { onActionRef.current = onAction })
+User decisions (confirmed):
+- Agent writes the file (not server-side extraction).
+- Switch happens **on plan-file write**, with a toast announcing the switch and an Undo affordance.
+- New plan tab is opened **focused** in the file viewer.
+- `.agents/plans/` is **not** auto-added to .gitignore — plans are repo artifacts.
 
-useEffect(() => {
-  if (!shouldAutoDismiss || !error) return
-  const id = error.id
-  timerRef.current = setTimeout(() => {
-    onActionRef.current({ type: "dismiss" }, id)
-  }, 4000)
-  return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-}, [error?.id, shouldAutoDismiss])  // onAction removed
-```
-Add `useLayoutEffect` to the React import.
+## Approach
 
-### 3. Fix stale `messages` dep in WorkingBlock start-time effect
-**File:** `src/features/chat/components/working-block.tsx`  
-**Problem:** Lines 77–89 — dep array `[isActive, messages]`. The effect is guarded by `startTimeRef.current === null` and only does meaningful work once; the `messages` dep causes it to re-run on every streamed message for no benefit.  
-**Fix:** Extract timestamp computation into a `useMemo`, then use the stable derived value in the effect:
-```tsx
-const earliestTimestamp = useMemo(() => {
-  const ts: number[] = []
-  for (const m of messages) {
-    if (m.role === "assistant" && (m as AssistantMessage).createdAt != null)
-      ts.push((m as AssistantMessage).createdAt!)
-    else if (m.role === "tool" && (m as ToolMessage).startTime != null)
-      ts.push((m as ToolMessage).startTime!)
-  }
-  return ts.length > 0 ? Math.min(...ts) : null
-}, [messages])
+### 1. Plan mode gets restricted Write access
 
-useEffect(() => {
-  if (isActive && startTimeRef.current === null) {
-    startTimeRef.current = earliestTimestamp ?? Date.now()
-  }
-}, [isActive, earliestTimestamp])
-```
+**File:** `packages/pi-sdk/src/modes.ts`
 
-### 4. Fix stale `messages` dep in WorkingBlock auto-collapse effect
-**File:** `src/features/chat/components/working-block.tsx`  
-**Problem:** Lines 104–117 — dep array `[isActive, messages]`. The `messages` dep only matters in the fallback branch `computeHistoricalDuration(messages)` when `startTimeRef.current === null`. After fix #3, this fallback is only hit for historical (never-active) blocks. The effect fires on every streamed message during active sessions unnecessarily.  
-**Fix:** Remove `messages` from deps, use only `[isActive]`:
-```tsx
-useEffect(() => {
-  const wasActive = prevActiveRef.current
-  prevActiveRef.current = isActive
+- Add `"write"` to `plan.allowedBuiltins`.
+- Export a constant: `export const PLAN_DIR = ".agents/plans"` for reuse on both sides.
+- Update `plan.preamble` to:
+  > Plan mode is active. Investigate the request thoroughly using read tools, then save your plan as a markdown file at `.agents/plans/<short-kebab-slug>.md` (relative to the workspace root). The slug should be 2–5 words describing the task. Use the Write tool **only** for this single plan file — do not edit or create any other files. Bash is read-only inspection (git log, ls, etc.). Once the plan file is written, stop; the user will review it.
 
-  if (wasActive && !isActive) {
-    const duration = startTimeRef.current !== null
-      ? Date.now() - startTimeRef.current
-      : null  // displayDuration useMemo covers historical fallback
-    if (duration !== null) setFinalDuration(duration)
-    setExpanded(false)
-  }
-}, [isActive])
-```
-`displayDuration` (lines 119–122) already calls `computeHistoricalDuration(messages)` via `useMemo`, so historical blocks still show correct durations.
+### 2. New `plan-saved` SessionEvent
 
-### 5. Extract shared dropdown scroll hook
-**New file:** `src/features/chat/hooks/use-dropdown-scroll.ts`  
-**Files to update:** `file-mention-dropdown.tsx` (lines 22–29), `slash-command-dropdown.tsx` (lines 21–28)  
-**Problem:** Identical 6-line `useRef` + `useEffect` pattern duplicated in both files.  
-**Fix:** Create the hook:
-```ts
-import { useEffect, useRef } from "react"
+**File:** `packages/pi-sdk/src/types.ts`
 
-export function useDropdownScroll(selectedIndex: number) {
-  const listRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const list = listRef.current
-    if (!list) return
-    const item = list.children[selectedIndex] as HTMLElement | undefined
-    item?.scrollIntoView({ block: "nearest" })
-  }, [selectedIndex])
-  return listRef
-}
-```
-In both dropdown components, replace the `useRef` + `useEffect` block with a single line:
-```tsx
-const listRef = useDropdownScroll(selectedIndex)
-```
-Remove the `useEffect` and `useRef` imports if no longer needed.  
-Export the new hook from `src/features/chat/hooks/index.ts`.
+- Add to the SessionEvent union:
+  ```ts
+  | { type: "plan-saved"; filePath: string; relativePath: string }
+  ```
+  `filePath` = absolute, `relativePath` = repo-relative for display.
 
-### 6. Remove `"use client"` from non-Next.js files
-**Files:**
-- `src/features/chat/contexts/error-toast-context.tsx` line 1 (covered above in #1)
-- `src/features/chat/hooks/use-api-error-toasts.ts` line 1  
+### 3. Server detects plan write + emits the event
 
-These are Vite-only files. The directive does nothing here but misleads developers. The `shared/ui/` files (shadcn-generated) can remain untouched — those are managed by the shadcn CLI.
+**File:** `apps/server/src/session-events.ts`
 
-### 7. Delete dead file: `thread-status-context.tsx`
-**File:** `src/features/chat/thread-status-context.tsx`  
-**Evidence:** `grep -r "thread-status-context" src/` returns zero matches outside the file itself. All live exports (`useSetThreadStatus`, `useSetActiveThreadId`, `initThreadStatusWebSocket`) come from `thread-status-store.ts` (Zustand). The 279-line React context implementation is unreachable from any route or provider tree.  
-**Fix:** Delete the file. Vite tree-shakes it anyway, but its presence is misleading.
+- In the existing tool-result handler, after a successful `write` (or `edit`-creating-a-new-file) tool call:
+  - Resolve the target path against the session's `cwd`.
+  - If the resolved path is under `<cwd>/.agents/plans/` and ends in `.md`, emit `plan-saved` with absolute + relative paths.
+- Buffer it through `SessionEventHub` like other events so a reconnecting client receives it.
 
----
+**File:** `apps/server/src/services/session-service.ts`
 
-## Files Changed
+- On session bootstrap, `mkdir -p <cwd>/.agents/plans` so the first write never fails on a missing directory.
 
-| File | Change |
-|---|---|
-| `src/features/chat/contexts/error-toast-context.tsx` | Memoize context value; remove `"use client"` |
-| `src/features/chat/components/chat-error-alert.tsx` | Stabilize `onAction` via ref |
-| `src/features/chat/components/working-block.tsx` | Fix 2 effect dep arrays (#3 and #4) |
-| `src/features/chat/hooks/use-dropdown-scroll.ts` | New shared hook (create) |
-| `src/features/chat/components/file-mention-dropdown.tsx` | Use shared hook |
-| `src/features/chat/components/slash-command-dropdown.tsx` | Use shared hook |
-| `src/features/chat/hooks/index.ts` | Export new hook |
-| `src/features/chat/hooks/use-api-error-toasts.ts` | Remove `"use client"` |
-| `src/features/chat/thread-status-context.tsx` | Delete (dead code) |
+### 4. (Optional during impl) Hard path guard
 
----
+Grep where the SDK routes Write tool calls (inside `packages/pi-sdk/`). If there's a clean interception point, reject Write in plan mode when the target falls outside `.agents/plans/`. If the SDK doesn't expose a clean hook, ship preamble-only enforcement and leave a TODO — the user already gets immediate visual feedback (stray files appear in tabs) if the agent strays.
+
+### 5. Frontend: open file + switch mode + toast
+
+**File:** `apps/web/src/features/chat/session-events.ts`
+
+- Add `onPlanSaved?: (e: { filePath: string; relativePath: string }) => void` to `SessionEventHandlers`.
+
+**File:** `apps/web/src/features/chat/hooks/use-session-stream.ts`
+
+- Wire the `plan-saved` event:
+  1. `useMainTabsStore.getState().addFileTab({ filePath, title: basename(relativePath), workspacePath: cwd })` — opens + focuses the plan tab (reuses [`apps/web/src/features/main-tabs/store.ts`](apps/web/src/features/main-tabs/store.ts)).
+  2. `updateThreadMode.mutate({ threadId, mode: "code" })` — reuses [`useUpdateThreadMode` in `apps/web/src/features/workspace/mutations.ts:294`](apps/web/src/features/workspace/mutations.ts).
+  3. `sonner` toast: `"Plan saved → switched to Code mode"` with an **Undo** action that flips mode back to `plan`.
+- Idempotency: dedupe by `relativePath` within the session so a buffered event on reconnection doesn't re-toast or re-open the tab.
+
+### 6. Inline plan card in chat
+
+**File (new):** `apps/web/src/features/chat/components/plan-saved-card.tsx`
+
+- When rendering tool blocks, if a `write` tool target starts with `.agents/plans/`, render this card instead of the generic write block.
+- Card content: filename, "Open" button (calls `addFileTab`), "Implement plan" button that switches to code mode and seeds the input with `Implement the plan in .agents/plans/<basename>`.
+- Hook into the existing tool-block renderer (locate during impl — likely in `markdown-components.tsx` or a tool-blocks component).
+
+## Critical files
+
+- `packages/pi-sdk/src/modes.ts` — add `write` to plan, new preamble, export `PLAN_DIR`
+- `packages/pi-sdk/src/types.ts` — extend SessionEvent with `plan-saved`
+- `apps/server/src/services/session-service.ts` — pre-create `.agents/plans/`
+- `apps/server/src/session-events.ts` — detect tool-result + emit `plan-saved`
+- `apps/web/src/features/chat/session-events.ts` — `onPlanSaved` handler type
+- `apps/web/src/features/chat/hooks/use-session-stream.ts` — file open + mode switch + toast
+- `apps/web/src/features/chat/components/plan-saved-card.tsx` — inline UI (new)
+
+## Reused utilities
+
+- `useMainTabsStore.getState().addFileTab(...)` — `apps/web/src/features/main-tabs/store.ts`
+- `useUpdateThreadMode` mutation — `apps/web/src/features/workspace/mutations.ts:294`
+- `MODE_CONFIG` / `getModePreamble` / `computeActiveToolsForMode` — `packages/pi-sdk/src/modes.ts`
+- Existing tool-event flow through `apps/server/src/session-events.ts`
+- `sonner` toast — already used in the app (confirm with grep during impl)
+- Workspace `cwd` lookup pattern from `chat-view.tsx:196` (`workspaces.find(w => w.id === workspaceId)?.path`)
 
 ## Verification
 
-1. **Type check:** `pnpm --filter web typecheck` — must pass with zero errors
-2. **Build:** `pnpm --filter web build` — must complete successfully
-3. **Dev smoke test (streaming):** Start dev server, send a message and watch it stream — "Working for N.Ns" timer should count correctly, collapse when done, and show the correct elapsed time
-4. **Error banner timer:** Trigger a dismissible error, verify the banner auto-disappears after ~4 seconds and does not restart during streaming
-5. **Dropdown keyboard nav:** Open `@` file mention and `/` command dropdowns with arrow keys — selected item should stay scrolled into view
+1. Start the dev server. Create a new thread, switch to **Plan** in the combobox.
+2. Send: *"Plan how to add a settings checkbox to disable autosave."*
+3. Expect:
+   - Agent investigates with read tools, then issues exactly one `write` to `.agents/plans/<slug>.md`.
+   - A new focused tab opens in the file viewer rendering the plan markdown.
+   - The mode pill flips from amber **Plan** to green **Code**.
+   - Toast: *"Plan saved → switched to Code mode"* with an **Undo** action.
+4. Edit the plan in the file viewer, save.
+5. Send a follow-up: *"Now implement it."* — the agent (now in code mode) reads the plan file and edits source files.
+6. **Negative test:** in a fresh plan-mode thread, ask the agent to "edit `src/index.ts`" — agent should refuse, citing plan mode (preamble), and only write to `.agents/plans/`.
+7. **Undo flow:** click Undo in the toast → mode pill returns to amber Plan; further messages stay in plan mode.
+8. **Reconnection:** refresh the page mid-thread. Buffered `plan-saved` event must not re-toast or re-open the tab (idempotency check). Mode is correct (read from thread DB).
+9. **Directory create:** delete `.agents/plans/` locally, start a new session, confirm bootstrap recreates it before the first write.

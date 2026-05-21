@@ -307,6 +307,7 @@ export interface UseSessionStreamOptions {
   onPendingErrorChange?: (error: ReturnType<typeof createErrorMessage> | null) => void
   onError?: () => void
   onToolExecutionEnd?: (toolName: string) => void
+  onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
 }
 
 export function useSessionStream({
@@ -319,6 +320,7 @@ export function useSessionStream({
   onPendingErrorChange,
   onError,
   onToolExecutionEnd,
+  onPlanSaved,
 }: UseSessionStreamOptions) {
   const queryClient = useQueryClient()
 
@@ -343,10 +345,10 @@ export function useSessionStream({
 
   // Always-current callbacks — stored in a ref so the queue processor (which
   // is stable across renders) always calls the latest versions.
-  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd })
+  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved })
   useEffect(() => {
-    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd }
-  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd])
+    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved }
+  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved])
 
   // ── Queue processor ───────────────────────────────────────────────────────
   //
@@ -701,6 +703,11 @@ export function useSessionStream({
             // Skip if a fetch is already in-flight — the response will reflect the latest state.
             if (queryClient.getQueryState(gitKeys.turns(sessionId))?.fetchStatus === "fetching") return
             void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
+          },
+
+          onPlanSaved: (data) => {
+            if (doneFlag.current) return
+            callbacksRef.current.onPlanSaved?.(data)
           },
 
           onMessageEnd: () => {},

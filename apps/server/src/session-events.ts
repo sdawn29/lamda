@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { insertUserBlock, insertAssistantStartBlock, insertToolBlock, appendAssistantTextDelta, appendAssistantThinkingDelta, finalizeAssistantBlock, updateToolBlockResult, updateToolBlockPartialResult, listRunningToolBlocks, insertAgentTurn, insertCompactionBlock } from "@lamda/db";
 import type { ManagedSessionHandle, SessionEvent } from "@lamda/pi-sdk";
+import { PLAN_DIR } from "@lamda/pi-sdk";
 import { gitStatus, gitStashCreate, gitStashStore } from "@lamda/git";
 import { threadStatusBroadcaster, type ThreadStatus } from "./thread-status-broadcaster.js";
 
@@ -33,7 +34,14 @@ type TurnFileChangedEvent = {
   postStatusCode: string;
   wasCreatedByTurn: boolean;
 };
-type HubEvent = SessionEvent | ServerErrorEvent | TurnFileChangedEvent;
+type PlanSavedEvent = {
+  type: "plan_saved";
+  /** Absolute path to the plan file on disk. */
+  filePath: string;
+  /** Workspace-relative path (always forward-slash, starts with `.agents/plans/`). */
+  relativePath: string;
+};
+type HubEvent = SessionEvent | ServerErrorEvent | TurnFileChangedEvent | PlanSavedEvent;
 
 type SessionEventRecord = {
   id: number;
@@ -209,6 +217,30 @@ class SessionEventHub {
       if (filePath) map.set(filePath, rawStatus);
     }
     return map;
+  }
+
+  private maybeEmitPlanSaved(event: SessionEvent): void {
+    if (!this.cwd || this.disposed) return;
+    if (event.type !== "tool_execution_end") return;
+    const msg = event as { toolCallId: string; toolName?: string; isError?: boolean };
+    if (msg.isError) return;
+
+    // Tool name may arrive on the event or only on the earlier _start.
+    const meta = this.toolMetaMap.get(msg.toolCallId);
+    const toolName = (msg.toolName ?? meta?.toolName ?? "").toLowerCase();
+    if (toolName !== "write") return;
+
+    const args = meta?.args as { path?: unknown } | undefined;
+    const rawPath = typeof args?.path === "string" ? args.path : null;
+    if (!rawPath) return;
+
+    const absPath = isAbsolute(rawPath) ? rawPath : resolve(this.cwd, rawPath);
+    const rel = relative(this.cwd, absPath).replace(/\\/g, "/");
+    // Must be inside <cwd>/.agents/plans and be a markdown file.
+    if (!rel.startsWith(`${PLAN_DIR}/`) || rel.includes("..")) return;
+    if (!rel.toLowerCase().endsWith(".md")) return;
+
+    this.emit({ type: "plan_saved", filePath: absPath, relativePath: rel });
   }
 
   private async checkAndEmitNewFileChanges(): Promise<void> {
@@ -533,6 +565,8 @@ class SessionEventHub {
           // Check for file changes after each tool — non-blocking so it doesn't
           // delay event delivery. Emits turn_file_changed for newly changed files.
           void this.checkAndEmitNewFileChanges();
+          // Detect plan-mode artifact writes; emits plan_saved for client UX.
+          this.maybeEmitPlanSaved(event);
         }
         this.persist(event);
         this.emit(event);

@@ -6,7 +6,12 @@ export function SettingsModal() {
   const { open, closeSettings } = useSettingsModal()
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings() }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) closeSettings()
+      }}
+    >
       <DialogContent
         showCloseButton={true}
         className="h-[85vh] max-h-[760px] w-full gap-0 overflow-hidden bg-background p-0 sm:max-w-[920px]"

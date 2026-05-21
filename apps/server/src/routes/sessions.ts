@@ -30,8 +30,8 @@ import {
   createSessionForThread,
   ensureSessionEventHub,
 } from "../services/session-service.js";
-import { openManagedSession, readSessionHistory } from "@lamda/pi-sdk";
-import type { PromptOptions, SdkConfig } from "@lamda/pi-sdk";
+import { openManagedSession, readSessionHistory, getModePreamble } from "@lamda/pi-sdk";
+import type { Mode, PromptOptions, SdkConfig } from "@lamda/pi-sdk";
 import { promises as fs } from "node:fs";
 import { gitUnstage, gitRevertFile, gitRestoreFileFromRef } from "@lamda/git";
 
@@ -112,11 +112,16 @@ sessions.post("/session/:id/prompt", async (c) => {
 
   ensureSessionEventHub(id, entry);
 
-  // Store user message as a block in the database
+  // Store user message as a block in the database (without the mode preamble)
   insertUserBlock(entry.threadId, body.text);
 
+  // Resolve mode-specific preamble; the SDK sees preamble + user text.
+  const thread = getThread(entry.threadId);
+  const mode = thread?.mode as Mode | undefined;
+  const preamble = mode ? getModePreamble(mode) : "";
+  const text = preamble ? `${preamble}\n\n${body.text}` : body.text;
+
   // Fire and forget — events arrive via GET /session/:id/events
-  const text = body.text;
   const run = async () => {
     if (body.provider && body.model) await entry.handle.setModel(body.provider, body.model);
     if (body.thinkingLevel) {
@@ -160,11 +165,16 @@ sessions.post("/session/:id/steer", async (c) => {
 
   ensureSessionEventHub(id, entry);
 
-  // Store user message as a block in the database
+  // Store user message as a block in the database (without the mode preamble)
   insertUserBlock(entry.threadId, body.text);
 
+  const thread = getThread(entry.threadId);
+  const mode = thread?.mode as Mode | undefined;
+  const preamble = mode ? getModePreamble(mode) : "";
+  const text = preamble ? `${preamble}\n\n${body.text}` : body.text;
+
   // Fire and forget
-  entry.handle.steer(body.text).catch((err: unknown) => {
+  entry.handle.steer(text).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[steer:${id}]`, err);
     sessionEvents.emitError(id, message);
@@ -187,11 +197,16 @@ sessions.post("/session/:id/follow-up", async (c) => {
 
   ensureSessionEventHub(id, entry);
 
-  // Store user message as a block in the database
+  // Store user message as a block in the database (without the mode preamble)
   insertUserBlock(entry.threadId, body.text);
 
+  const thread = getThread(entry.threadId);
+  const mode = thread?.mode as Mode | undefined;
+  const preamble = mode ? getModePreamble(mode) : "";
+  const text = preamble ? `${preamble}\n\n${body.text}` : body.text;
+
   // Fire and forget
-  entry.handle.followUp(body.text).catch((err: unknown) => {
+  entry.handle.followUp(text).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[followUp:${id}]`, err);
     sessionEvents.emitError(id, message);
@@ -342,7 +357,9 @@ sessions.post("/session/:id/revert-to-message", async (c) => {
   try {
     const newSessionFile = await entry.handle.fork(userMessageIndex);
     // Swap the session handle in place — same sessionId, fresh truncated history.
-    store.replaceHandle(sessionId, await openManagedSession(newSessionFile, { cwd }));
+    const thread = getThread(threadId);
+    const mode = thread?.mode as "ask" | "plan" | "code" | undefined;
+    store.replaceHandle(sessionId, await openManagedSession(newSessionFile, { cwd, mode }));
     updateThreadSessionFile(threadId, newSessionFile);
 
     // Re-attach the event hub to the new handle.
@@ -502,7 +519,9 @@ sessions.post("/session/:id/fork", async (c) => {
     console.error("[fork] history seeding failed (non-fatal):", err);
   }
 
-  const forkedHandle = await openManagedSession(newSessionFile, { cwd: entry.cwd });
+  const newThread = getThread(newThreadId);
+  const newMode = newThread?.mode as "ask" | "plan" | "code" | undefined;
+  const forkedHandle = await openManagedSession(newSessionFile, { cwd: entry.cwd, mode: newMode });
   const newSessionId = store.create(forkedHandle, entry.cwd, newThreadId, entry.workspaceId);
   sessionEvents.ensure(newSessionId, newThreadId, forkedHandle, entry.cwd);
 

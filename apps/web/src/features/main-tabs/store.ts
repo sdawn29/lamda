@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { useRightSidebarStore } from "@/features/layout/store/right-sidebar"
 
 export interface ThreadMainTab {
   id: string
@@ -50,14 +51,16 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
       return { tabs: [...s.tabs, newTab], activeTabId: id, pendingThreadIds }
     }),
 
-  addFileTab: (tab) =>
+  addFileTab: (tab) => {
+    useRightSidebarStore.getState().open()
     set((s) => {
       const existing = s.tabs.find((t) => t.type === "file" && t.filePath === tab.filePath)
       if (existing) return { activeTabId: existing.id }
       const id = `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       const newTab: FileMainTab = { id, type: "file", ...tab }
       return { tabs: [...s.tabs, newTab], activeTabId: id }
-    }),
+    })
+  },
 
   closeTab: (id) =>
     set((s) => {

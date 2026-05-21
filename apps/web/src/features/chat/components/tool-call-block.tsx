@@ -13,9 +13,13 @@ import { LivePre } from "./live-pre"
 import { DiffView, detectLanguage, parseDiffCounts } from "@/features/git"
 import { useTheme } from "@/shared/components/theme-provider"
 import { RollingTimerText } from "./working-block"
+import { WriteView } from "./write-view"
+import { PlanSavedCard } from "./plan-saved-card"
 import type { ToolMessage } from "../types"
 
 const PrismCode = lazy(() => import("./prism-code"))
+
+const PLAN_DIR_PREFIX = ".agents/plans/"
 
 
 
@@ -51,6 +55,31 @@ function isWriteArgs(args: unknown): args is WriteArgs {
   if (typeof args !== "object" || args === null) return false
   const a = args as Record<string, unknown>
   return typeof a.path === "string" && typeof a.content === "string"
+}
+
+/**
+ * Detect a plan-mode artifact write (a write into `.agents/plans/*.md`).
+ * Returns workspace-relative + absolute paths, or null if the write doesn't
+ * target the plan dir.
+ */
+function planWriteMeta(
+  rawPath: string,
+  rootPath: string | undefined,
+): { relativePath: string; absolutePath: string } | null {
+  if (!rawPath.toLowerCase().endsWith(".md")) return null
+  const root = rootPath ? (rootPath.endsWith("/") ? rootPath : rootPath + "/") : null
+  let rel = rawPath
+  let abs = rawPath
+  if (rawPath.startsWith("/")) {
+    if (!root || !rawPath.startsWith(root)) return null
+    rel = rawPath.slice(root.length)
+  } else if (root) {
+    abs = root + rawPath
+  }
+  rel = rel.replace(/\\/g, "/")
+  if (!rel.startsWith(PLAN_DIR_PREFIX)) return null
+  if (rel.includes("/../")) return null
+  return { relativePath: rel, absolutePath: abs }
 }
 
 // ── Generic result ─────────────────────────────────────────────────────────────
@@ -151,46 +180,6 @@ function ReadView({
   )
 }
 
-// ── WriteView ─────────────────────────────────────────────────────────────────
-
-function WriteView({
-  content,
-  filePath,
-  live,
-}: {
-  content: string
-  filePath: string
-  live: boolean
-}) {
-  const { theme } = useTheme()
-  const isDark =
-    theme === "dark" ||
-    (theme === "system" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches)
-  const language = detectLanguage(filePath) ?? "text"
-
-  return (
-    <div className="max-h-72 overflow-auto rounded border border-border/30 text-xs">
-      <Suspense
-        fallback={
-          <pre className="overflow-auto px-3 py-2 text-xs text-muted-foreground/60">
-            {content}
-          </pre>
-        }
-      >
-        <PrismCode
-          code={content}
-          language={language}
-          style={isDark ? jellybeansdark : jellybeanslight}
-          fontSize="0.75rem"
-          showLineNumbers={true}
-          opacity={live ? 0.6 : 0.85}
-        />
-      </Suspense>
-    </div>
-  )
-}
-
 // ── ToolCallBlock ──────────────────────────────────────────────────────────────
 
 export const ToolCallBlock = memo(function ToolCallBlock({
@@ -223,6 +212,22 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
     }
   }, [])
+
+  // Plan-mode writes get a custom card with Review + Implement CTAs.
+  // Must come after the hooks above to keep call order stable.
+  const planMeta = isWrite && writeArgs ? planWriteMeta(writeArgs.path, rootPath) : null
+  if (planMeta && writeArgs) {
+    return (
+      <PlanSavedCard
+        msg={msg}
+        relativePath={planMeta.relativePath}
+        absolutePath={planMeta.absolutePath}
+        content={writeArgs.content}
+        isNew={isNew}
+        entryDelayMs={entryDelayMs}
+      />
+    )
+  }
 
   function toggle(e: React.MouseEvent) {
     e.stopPropagation()

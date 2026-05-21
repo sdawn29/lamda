@@ -259,7 +259,15 @@ export function TitleBar() {
               <DropdownMenu>
                 <TooltipTrigger
                   render={
-                    <DropdownMenuTrigger className="ml-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-accent hover:text-foreground focus:ring-0 focus-visible:outline-none">
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          className="ml-0.5 shrink-0 text-muted-foreground/50"
+                        />
+                      }
+                    >
                       <MoreHorizontal className="size-3.5" />
                       <span className="sr-only">Thread options</span>
                     </DropdownMenuTrigger>
@@ -307,7 +315,7 @@ export function TitleBar() {
           <TooltipTrigger
             render={
               <Button
-                variant="outline"
+                variant="ghost"
                 onClick={() => setMcpDialogOpen(true)}
                 className="h-7 gap-1.5 px-2"
               >

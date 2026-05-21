@@ -174,6 +174,8 @@ export function useCreateWorkspaceAction() {
           to: "/workspace/$threadId",
           params: { threadId: firstThread.id },
         })
+      } else {
+        navigate({ to: "/new", search: { ws: workspace.id } })
       }
     },
     [createWorkspace, navigate]
@@ -188,6 +190,8 @@ export function useCreateWorkspaceAction() {
           to: "/workspace/$threadId",
           params: { threadId: firstThread.id },
         })
+      } else {
+        navigate({ to: "/new", search: { ws: workspace.id } })
       }
     },
     [cloneRepository, navigate]

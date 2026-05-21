@@ -12,7 +12,10 @@ export {
   getLanguageConfigForExtension,
   getLanguageConfigForFilePath,
   resolveExecutable,
+  listLanguageRegistry,
+  isCommandOnPath,
 } from "./registry.js";
+export type { LanguageRegistryEntry } from "./registry.js";
 export { buildLspTools } from "./converter.js";
 export type { LspToolHelpers } from "./converter.js";
 export type {

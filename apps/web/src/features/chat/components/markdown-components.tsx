@@ -32,7 +32,7 @@ function CopyButton({ code }: { code: string }) {
       variant="outline"
       size="icon-sm"
       onClick={handleCopy}
-      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100"
+      className="absolute top-2 right-2 opacity-0 group-hover/codeblock:opacity-100"
       aria-label="Copy code"
     >
       {copied ? <Check /> : <Copy />}
@@ -57,7 +57,7 @@ function CodeBlock({
 
   if (match) {
     return (
-      <div className="group relative my-4 overflow-hidden rounded-lg border border-border">
+      <div className="group/codeblock relative my-4 overflow-hidden rounded-lg border border-border">
         <CopyButton code={code} />
         <Suspense
           fallback={
@@ -80,7 +80,7 @@ function CodeBlock({
 
   // Unlabelled code blocks stay unhighlighted to keep the base chat chunk small.
   return (
-    <div className="group relative my-4 overflow-hidden rounded-lg border border-border">
+    <div className="group/codeblock relative my-4 overflow-hidden rounded-lg border border-border">
       <CopyButton code={code} />
       <pre className="overflow-x-auto bg-transparent px-4 py-3 font-mono text-sm leading-4 text-foreground">
         <code className="text-foreground">{code}</code>

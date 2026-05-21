@@ -2,6 +2,7 @@ export { getLspConnection, disposeLspConnection, LspConnection } from "./client"
 export { LspCodeViewer } from "./components/lsp-code-viewer"
 export { ProblemsStrip } from "./components/problems-strip"
 export { OutlinePanel } from "./components/outline-panel"
+export { LspSettingsCard } from "./components/lsp-settings-card"
 export {
   useLspConnection,
   useResolveWorkspaceId,
@@ -26,3 +27,8 @@ export {
   SEVERITY_INFO,
   SEVERITY_HINT,
 } from "./types"
+export { useLspRegistry, lspKeys } from "./queries"
+export type {
+  LspRegistryEntry,
+  LspRegistryFallback,
+} from "./api"

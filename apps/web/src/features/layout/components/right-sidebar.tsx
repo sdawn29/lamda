@@ -188,7 +188,7 @@ export function RightSidebarContent({
           </div>
 
           {isFileTreeOpen && workspaceId && workspacePath && (
-            <div className="w-64 shrink-0 overflow-hidden">
+            <div className="w-72 shrink-0 overflow-hidden p-1 pl-0">
               <Suspense fallback={<div className="h-full bg-sidebar" />}>
                 <FileTree workspaceId={workspaceId} workspacePath={workspacePath} />
               </Suspense>

@@ -7,12 +7,15 @@ export interface CreateWorkspaceBody {
   model?: string
 }
 
+export type Mode = "ask" | "plan" | "code"
+
 export interface ThreadDto {
   id: string
   workspaceId: string
   title: string
   modelId: string | null
   isStopped: boolean
+  mode: Mode
   createdAt: number
   sessionId: string | null
   isPinned?: boolean
@@ -112,6 +115,17 @@ export function updateThreadModel(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ modelId }),
+  })
+}
+
+export function updateThreadMode(
+  threadId: string,
+  mode: Mode
+): Promise<void> {
+  return apiFetch<void>(`/thread/${threadId}/mode`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
   })
 }
 

@@ -102,6 +102,7 @@ function WorkspaceThreadRoute() {
       workspaceId={foundWorkspace!.id}
       threadId={foundThread.id}
       initialModelId={foundThread.modelId}
+      initialMode={foundThread.mode ?? "code"}
       initialIsStopped={foundThread.isStopped}
     />
   )

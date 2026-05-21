@@ -4,6 +4,7 @@ import type {
   ModelRegistry,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import type { Mode } from "./modes.js";
 
 /** A slash command available in the current session. */
 export interface SlashCommand {
@@ -65,6 +66,8 @@ export interface SdkConfig {
   modelRegistry?: ModelRegistry;
   /** Additional custom tools to register with the agent (e.g., MCP tools). */
   customTools?: ToolDefinition[];
+  /** Agent mode — controls base tool set ("code" = full, "plan"/"ask" = read-only). Defaults to "code". */
+  mode?: Mode;
 }
 
 /**
@@ -157,6 +160,11 @@ export interface ManagedSessionHandle {
    * Takes effect on the next agent turn.
    */
   setCustomTools(tools: ToolDefinition[]): void
+  /**
+   * Switch the agent mode. Re-applies the mode's base tool set (merged with any
+   * workspace-supplied custom tools). Takes effect on the next agent turn.
+   */
+  setMode(mode: Mode): void
   /**
    * Branch the conversation at the Nth user message (0-indexed among user messages).
    * Returns the path of the new session JSONL file.

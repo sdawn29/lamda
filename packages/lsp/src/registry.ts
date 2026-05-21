@@ -57,6 +57,44 @@ function typescriptConfig(languageId: string): LspServerConfig {
   };
 }
 
+export interface LanguageRegistryEntry {
+  /** LSP languageId (e.g., "typescript"). */
+  language: string;
+  /** File extensions that map to this language (no leading dot). */
+  extensions: string[];
+  /** Primary binary to spawn. */
+  command: string;
+  /** Args to pass to the primary binary. */
+  args: string[];
+  /** Optional fallbacks tried when the primary is not on PATH. */
+  fallbacks: Array<{ command: string; args: string[] }>;
+}
+
+/**
+ * Snapshot of the built-in language registry, grouped by LSP languageId.
+ * Useful for surfacing the configured set of language servers in the UI.
+ */
+export function listLanguageRegistry(): LanguageRegistryEntry[] {
+  const byLanguage = new Map<string, LanguageRegistryEntry>();
+  for (const [ext, config] of Object.entries(EXTENSION_REGISTRY)) {
+    const existing = byLanguage.get(config.language);
+    if (existing) {
+      existing.extensions.push(ext);
+      continue;
+    }
+    byLanguage.set(config.language, {
+      language: config.language,
+      extensions: [ext],
+      command: config.command,
+      args: config.args,
+      fallbacks: config.fallbacks ?? [],
+    });
+  }
+  return Array.from(byLanguage.values()).sort((a, b) =>
+    a.language.localeCompare(b.language),
+  );
+}
+
 export function getLanguageConfigForExtension(ext: string): LspServerConfig | null {
   const key = ext.toLowerCase().replace(/^\./, "");
   return EXTENSION_REGISTRY[key] ?? null;
@@ -84,6 +122,14 @@ export async function resolveExecutable(
     }
   }
   return null;
+}
+
+/**
+ * Check whether a single command is available on the user's PATH.
+ * Exported so server routes can surface per-language install status.
+ */
+export function isCommandOnPath(command: string): Promise<boolean> {
+  return isOnPath(command);
 }
 
 const isWindows = process.platform === "win32";

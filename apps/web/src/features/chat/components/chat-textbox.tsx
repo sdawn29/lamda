@@ -5,7 +5,23 @@ export interface ChatTextboxHandle {
   setValue: (text: string) => void
   focus: () => void
 }
-import { ArrowUpIcon } from "lucide-react"
+import {
+  ArrowUpIcon,
+  BotIcon,
+  EraserIcon,
+  HelpCircleIcon,
+  ListTodoIcon,
+  MessageCircleQuestionIcon,
+  MinimizeIcon,
+  MoonIcon,
+  PlusIcon,
+  SettingsIcon,
+  StopCircleIcon,
+  SunIcon,
+} from "lucide-react"
+import { useNavigate } from "@tanstack/react-router"
+import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
@@ -14,12 +30,15 @@ import {
   useModels,
   useSlashCommands,
   useContextUsage,
+  chatKeys,
   type WorkspaceEntry,
 } from "../queries"
 import { useWorkspaceIndex } from "@/features/workspace/queries"
 import { BranchSelector } from "@/features/git"
 import { ModelCombobox } from "./model-combobox"
+import { ModeCombobox, getModeOption } from "./mode-combobox"
 import { ThinkingCombobox, type ThinkingLevel } from "./thinking-combobox"
+import type { Mode } from "@/features/workspace/api"
 import {
   RichInput,
   buildMentionChip,
@@ -29,9 +48,33 @@ import {
   type SlashMention,
 } from "./rich-input"
 import { FileMentionDropdown } from "./file-mention-dropdown"
-import { SlashCommandDropdown } from "./slash-command-dropdown"
+import {
+  SlashCommandDropdown,
+  itemValue,
+  type ChatSlashAction,
+  type ChatSlashItem,
+  type ChatSlashGroup,
+} from "./slash-command-dropdown"
 import { ContextChart } from "./context-chart"
-import type { SessionStats, SlashCommand } from "../api"
+import { compactSession, type SessionStats } from "../api"
+import { useCommandPalette } from "@/features/command-palette"
+import { useSettingsModal } from "@/features/settings"
+import { useTheme } from "@/shared/components/theme-provider"
+
+const THINKING_LEVEL_STORAGE_KEY = "chat:thinking_level"
+const THINKING_LEVELS = ["low", "medium", "high", "xhigh"] as const
+
+function readStoredThinkingLevel(): ThinkingLevel {
+  try {
+    const v = window.localStorage.getItem(THINKING_LEVEL_STORAGE_KEY)
+    if (v && (THINKING_LEVELS as readonly string[]).includes(v)) {
+      return v as ThinkingLevel
+    }
+  } catch {
+    // localStorage may be unavailable (SSR / private mode) — fall through.
+  }
+  return "medium"
+}
 
 interface ChatTextboxProps {
   onSend?: (
@@ -54,6 +97,8 @@ interface ChatTextboxProps {
   workspaceId?: string
   selectedModelId?: string | null
   onModelChange?: (modelId: string) => void
+  mode?: Mode
+  onModeChange?: (mode: Mode) => void
   sessionStats?: SessionStats | null
 }
 
@@ -74,6 +119,8 @@ export const ChatTextbox = memo(
       workspaceId,
       selectedModelId: controlledModelId,
       onModelChange,
+      mode = "code",
+      onModeChange,
       sessionStats,
     }: ChatTextboxProps,
     ref
@@ -82,8 +129,18 @@ export const ChatTextbox = memo(
     const [internalModelId, setInternalModelId] = React.useState<string | null>(
       null
     )
-    const [thinkingLevel, setThinkingLevel] =
-      React.useState<ThinkingLevel>("medium")
+    // Hydrate from localStorage so the user's last pick survives navigation
+    // (e.g. new-thread → thread view, or switching between threads).
+    const [thinkingLevel, setThinkingLevelState] =
+      React.useState<ThinkingLevel>(() => readStoredThinkingLevel())
+    const setThinkingLevel = React.useCallback((level: ThinkingLevel) => {
+      setThinkingLevelState(level)
+      try {
+        window.localStorage.setItem(THINKING_LEVEL_STORAGE_KEY, level)
+      } catch {
+        // localStorage may be unavailable (private mode / disabled) — ignore.
+      }
+    }, [])
     const [atMention, setAtMention] = React.useState<
       (AtMention & { selectedIndex: number }) | null
     >(null)
@@ -91,8 +148,14 @@ export const ChatTextbox = memo(
       (SlashMention & { selectedIndex: number }) | null
     >(null)
     const mentionEntries = React.useRef<WorkspaceEntry[]>([])
-    const slashCommandsRef = React.useRef<SlashCommand[]>([])
+    const slashItemsRef = React.useRef<ChatSlashItem[]>([])
     const isControlled = controlledModelId !== undefined
+
+    const navigate = useNavigate()
+    const queryClient = useQueryClient()
+    const openPalette = useCommandPalette((s) => s.openPalette)
+    const openSettings = useSettingsModal((s) => s.openSettings)
+    const { resolvedTheme, setTheme } = useTheme()
     const selectedModelId = isControlled ? controlledModelId : internalModelId
     const richInputRef = React.useRef<RichInputHandle>(null)
 
@@ -184,20 +247,219 @@ export const ChatTextbox = memo(
     }, [fileData, atMention])
     mentionEntries.current = mentionEntries2
 
-    const filteredCommands = React.useMemo(() => {
+    // Built-in action commands. Each runs immediately when selected (no chip
+    // is inserted). Items are conditionally included based on context.
+    const actions = React.useMemo<ChatSlashAction[]>(() => {
+      const list: ChatSlashAction[] = []
+
+      if (onModeChange) {
+        const modeCommands: Array<{
+          mode: Mode
+          name: string
+          description: string
+          icon: ChatSlashAction["icon"]
+        }> = [
+          {
+            mode: "ask",
+            name: "ask",
+            description: "Switch to Ask mode",
+            icon: MessageCircleQuestionIcon,
+          },
+          {
+            mode: "plan",
+            name: "plan",
+            description: "Switch to Plan mode",
+            icon: ListTodoIcon,
+          },
+          {
+            mode: "code",
+            name: "code",
+            description: "Switch to Code mode",
+            icon: BotIcon,
+          },
+        ]
+
+        for (const command of modeCommands) {
+          if (command.mode === mode) continue
+          list.push({
+            kind: "action",
+            name: command.name,
+            description: command.description,
+            icon: command.icon,
+            onSelect: () => onModeChange(command.mode),
+          })
+        }
+      }
+
+      if (workspaceId) {
+        list.push({
+          kind: "action",
+          name: "new",
+          description: "Open a new thread",
+          icon: PlusIcon,
+          onSelect: () => {
+            navigate({ to: "/new", search: { ws: workspaceId } })
+          },
+        })
+      }
+
+      if (sessionId && !isLoading) {
+        list.push({
+          kind: "action",
+          name: "compact",
+          description: "Compact conversation context",
+          icon: MinimizeIcon,
+          onSelect: () => {
+            void (async () => {
+              try {
+                await compactSession(sessionId)
+                void queryClient.invalidateQueries({
+                  queryKey: chatKeys.contextUsage(sessionId),
+                })
+                void queryClient.invalidateQueries({
+                  queryKey: chatKeys.sessionStats(sessionId),
+                })
+              } catch (err) {
+                toast.error("Compaction failed", {
+                  description:
+                    err instanceof Error
+                      ? err.message
+                      : "Could not compact context.",
+                })
+              }
+            })()
+          },
+        })
+      }
+
+      if (isLoading && onStop) {
+        list.push({
+          kind: "action",
+          name: "stop",
+          description: "Stop generation",
+          icon: StopCircleIcon,
+          onSelect: onStop,
+        })
+      }
+
+      if (!isEmpty) {
+        list.push({
+          kind: "action",
+          name: "clear",
+          description: "Clear the input",
+          icon: EraserIcon,
+          onSelect: () => {
+            richInputRef.current?.clear()
+            setIsEmpty(true)
+          },
+        })
+      }
+
+      list.push({
+        kind: "action",
+        name: "help",
+        description: "Open command palette",
+        icon: HelpCircleIcon,
+        onSelect: openPalette,
+      })
+
+      list.push({
+        kind: "action",
+        name: "settings",
+        description: "Open settings",
+        icon: SettingsIcon,
+        onSelect: openSettings,
+      })
+
+      list.push({
+        kind: "action",
+        name: "theme",
+        description:
+          resolvedTheme === "dark"
+            ? "Switch to light mode"
+            : "Switch to dark mode",
+        icon: resolvedTheme === "dark" ? SunIcon : MoonIcon,
+        onSelect: () => {
+          setTheme(resolvedTheme === "dark" ? "light" : "dark")
+        },
+      })
+
+      return list
+    }, [
+      workspaceId,
+      sessionId,
+      isLoading,
+      isEmpty,
+      onStop,
+      mode,
+      onModeChange,
+      navigate,
+      queryClient,
+      openPalette,
+      openSettings,
+      resolvedTheme,
+      setTheme,
+    ])
+
+    const slashFilter = slashMention?.filter.toLowerCase() ?? ""
+
+    const filteredActions = React.useMemo(() => {
+      if (!slashFilter) return actions
+      return actions.filter(
+        (a) =>
+          a.name.toLowerCase().includes(slashFilter) ||
+          a.description?.toLowerCase().includes(slashFilter)
+      )
+    }, [actions, slashFilter])
+
+    const filteredServerCommands = React.useMemo(() => {
       const commands = commandsData ?? []
-      if (!slashMention) return commands.slice(0, 12)
-      const f = slashMention.filter.toLowerCase()
-      if (!f) return commands.slice(0, 12)
+      if (!slashFilter) return commands.slice(0, 20)
       return commands
         .filter(
           (c) =>
-            c.name.toLowerCase().includes(f) ||
-            c.description?.toLowerCase().includes(f)
+            c.name.toLowerCase().includes(slashFilter) ||
+            c.description?.toLowerCase().includes(slashFilter)
         )
-        .slice(0, 12)
-    }, [commandsData, slashMention])
-    slashCommandsRef.current = filteredCommands
+        .slice(0, 20)
+    }, [commandsData, slashFilter])
+
+    const slashGroups = React.useMemo<ChatSlashGroup[]>(() => {
+      const skills = filteredServerCommands.filter(
+        (c) => c.source === "skill"
+      )
+      const prompts = filteredServerCommands.filter(
+        (c) => c.source === "prompt"
+      )
+      return [
+        {
+          heading: "Actions",
+          items: filteredActions as ChatSlashItem[],
+        },
+        {
+          heading: "Skills",
+          items: skills.map(
+            (command): ChatSlashItem => ({ kind: "command", command })
+          ),
+        },
+        {
+          heading: "Prompts",
+          items: prompts.map(
+            (command): ChatSlashItem => ({ kind: "command", command })
+          ),
+        },
+      ]
+    }, [filteredActions, filteredServerCommands])
+
+    const slashItems = React.useMemo(
+      () => slashGroups.flatMap((g) => g.items),
+      [slashGroups]
+    )
+    slashItemsRef.current = slashItems
+
+    // Server returned no skills/prompts at all (not just filtered to zero).
+    const noSkillsAvailable =
+      !commandsLoading && (commandsData?.length ?? 0) === 0
 
     const canSend = !isEmpty && !isLoading
 
@@ -254,16 +516,36 @@ export const ChatTextbox = memo(
       }))
     }
 
-    function handleSelectCommand(cmd: SlashCommand) {
+    function deleteSlashTrigger() {
       const current = slashMention
-      if (!current?.textNode) return
+      if (!current?.textNode) return null
       const { textNode, startOffset, filter } = current
       const range = document.createRange()
       range.setStart(textNode, startOffset)
       range.setEnd(textNode, startOffset + 1 + filter.length)
       range.deleteContents()
+      return range
+    }
 
-      const chip = buildSlashCommandChip(cmd)
+    function handleSelectItem(item: ChatSlashItem) {
+      if (item.kind === "action") {
+        const range = deleteSlashTrigger()
+        if (range) {
+          range.collapse(true)
+          window.getSelection()?.removeAllRanges()
+          window.getSelection()?.addRange(range)
+        }
+        setSlashMention(null)
+        const text = richInputRef.current?.getValue() ?? ""
+        setIsEmpty(text.trim().length === 0)
+        item.onSelect()
+        return
+      }
+
+      const range = deleteSlashTrigger()
+      if (!range) return
+
+      const chip = buildSlashCommandChip(item.command)
       range.insertNode(chip)
 
       const space = document.createTextNode(" ")
@@ -305,18 +587,35 @@ export const ChatTextbox = memo(
       richInputRef.current?.focus()
     }
 
+    const modeStyles = getModeOption(mode)
+    const modeSendButton = modeStyles.sendButton
+
     return (
       <div className={cn("flex w-full flex-col gap-1", className)}>
-        <div className="relative flex w-full flex-col rounded-2xl border border-input bg-card shadow-sm transition-all focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
+        <div
+          className="relative flex w-full flex-col rounded-2xl border border-input bg-card shadow-sm transition-colors"
+        >
           <SlashCommandDropdown
-            commands={filteredCommands}
+            groups={slashGroups}
             open={
               slashCommandOpen &&
-              (filteredCommands.length > 0 || commandsLoading)
+              (slashItems.length > 0 || commandsLoading)
             }
             isLoading={commandsLoading}
-            selectedIndex={slashMention?.selectedIndex ?? 0}
-            onSelect={handleSelectCommand}
+            selectedValue={
+              slashItems.length > 0
+                ? itemValue(
+                    slashItems[
+                      Math.min(
+                        Math.max(slashMention?.selectedIndex ?? 0, 0),
+                        slashItems.length - 1
+                      )
+                    ]!
+                  )
+                : undefined
+            }
+            noSkillsHint={noSkillsAvailable && filteredActions.length === 0}
+            onSelect={handleSelectItem}
           />
 
           <FileMentionDropdown
@@ -329,14 +628,14 @@ export const ChatTextbox = memo(
             onSelect={handleSelectFile}
           />
 
-          <div className="px-3 pt-2 pb-1">
+          <div className="px-2 pt-2 pb-1">
             <RichInput
               ref={richInputRef}
               placeholder={placeholder}
               mentionActive={atMention !== null && mentionEntries2.length > 0}
               slashActive={
                 slashMention !== null &&
-                (filteredCommands.length > 0 || commandsLoading)
+                (slashItems.length > 0 || commandsLoading)
               }
               onAtMentionChange={handleAtMentionChange}
               onSlashMentionChange={handleSlashMentionChange}
@@ -349,23 +648,20 @@ export const ChatTextbox = memo(
               }}
               onSlashEnter={() => {
                 const idx = slashMention?.selectedIndex ?? 0
-                const cmd = slashCommandsRef.current[idx]
-                if (cmd) handleSelectCommand(cmd)
+                const item = slashItemsRef.current[idx]
+                if (item) handleSelectItem(item)
               }}
               onArrowUp={() => {
                 if (slashMention !== null) {
-                  setSlashMention((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          selectedIndex:
-                            (prev.selectedIndex -
-                              1 +
-                              slashCommandsRef.current.length) %
-                            slashCommandsRef.current.length,
-                        }
-                      : prev
-                  )
+                  setSlashMention((prev) => {
+                    if (!prev) return prev
+                    const n = slashItemsRef.current.length
+                    if (n === 0) return prev
+                    return {
+                      ...prev,
+                      selectedIndex: (prev.selectedIndex - 1 + n) % n,
+                    }
+                  })
                 } else {
                   setAtMention((prev) =>
                     prev
@@ -383,16 +679,15 @@ export const ChatTextbox = memo(
               }}
               onArrowDown={() => {
                 if (slashMention !== null) {
-                  setSlashMention((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          selectedIndex:
-                            (prev.selectedIndex + 1) %
-                            slashCommandsRef.current.length,
-                        }
-                      : prev
-                  )
+                  setSlashMention((prev) => {
+                    if (!prev) return prev
+                    const n = slashItemsRef.current.length
+                    if (n === 0) return prev
+                    return {
+                      ...prev,
+                      selectedIndex: (prev.selectedIndex + 1) % n,
+                    }
+                  })
                 } else {
                   setAtMention((prev) =>
                     prev
@@ -413,10 +708,13 @@ export const ChatTextbox = memo(
             />
           </div>
 
-          <div className="mx-3 border-t border-border/50" />
+          <div className="mx-2 border-t border-border/50" />
 
-          <div className="flex items-center justify-between px-2 py-1.5">
+          <div className="flex items-center justify-between px-1.5 py-1.5">
             <div className="flex items-center gap-0.5">
+              {onModeChange && (
+                <ModeCombobox selected={mode} onSelect={onModeChange} />
+              )}
               <ModelCombobox
                 groups={grouped}
                 selected={selectedModel}
@@ -464,7 +762,10 @@ export const ChatTextbox = memo(
                         onClick={handleSend}
                         disabled={!canSend}
                         aria-label="Send message"
-                        className="rounded-full animate-in duration-150 fade-in-0 zoom-in-90 aspect-square"
+                        className={cn(
+                          "rounded-full animate-in duration-150 fade-in-0 zoom-in-90 aspect-square transition-colors",
+                          modeSendButton,
+                        )}
                       >
                         <ArrowUpIcon />
                       </Button>

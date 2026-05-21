@@ -70,6 +70,7 @@ function createDb() {
       is_stopped       INTEGER NOT NULL DEFAULT 0,
       is_archived      INTEGER NOT NULL DEFAULT 0,
       is_pinned        INTEGER NOT NULL DEFAULT 0,
+      mode             TEXT NOT NULL DEFAULT 'code',
       last_accessed_at INTEGER,
       created_at       INTEGER NOT NULL
     );
@@ -187,6 +188,16 @@ function createDb() {
     const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
     if (!threadCols.some((col) => col.name === "forked_from_id")) {
       sqlite.exec(`ALTER TABLE threads ADD COLUMN forked_from_id TEXT`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
+  // Migration: Add mode column to threads table.
+  try {
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!threadCols.some((col) => col.name === "mode")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'code'`);
     }
   } catch {
     // Safe to ignore — column may already exist.

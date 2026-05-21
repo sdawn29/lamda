@@ -1,18 +1,17 @@
-import { memo, useCallback, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import {
   ChevronDown,
   ChevronRight,
   Folder,
   FolderOpen,
   RefreshCw,
+  Search,
+  X,
 } from "lucide-react"
 import { Button } from "@/shared/ui/button"
+import { Input } from "@/shared/ui/input"
 import { Skeleton } from "@/shared/ui/skeleton"
-import {
-  SidebarContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-} from "@/shared/ui/sidebar"
+import { SidebarContent, SidebarHeader } from "@/shared/ui/sidebar"
 import { getFileIcon } from "@/shared/ui/file-icon"
 import { useMainTabs } from "@/features/main-tabs"
 import {
@@ -20,6 +19,7 @@ import {
   type WorkspaceFileEntry,
 } from "@/features/workspace/queries"
 import { triggerWorkspaceReindex } from "@/features/workspace/api"
+import { cn } from "@/shared/lib/utils"
 
 interface FileTreeProps {
   workspaceId: string
@@ -91,20 +91,72 @@ function buildTree(entries: WorkspaceFileEntry[]): TreeNode[] {
   return root.children
 }
 
+function fuzzyMatch(value: string, query: string): boolean {
+  const target = value.toLowerCase()
+  const needle = query.toLowerCase()
+  let targetIndex = 0
+
+  for (let needleIndex = 0; needleIndex < needle.length; needleIndex++) {
+    const char = needle[needleIndex]
+    if (char === " ") continue
+    targetIndex = target.indexOf(char, targetIndex)
+    if (targetIndex === -1) return false
+    targetIndex++
+  }
+
+  return true
+}
+
+function matchesFilter(node: TreeNode, filter: string): boolean {
+  const terms = filter.trim().split(/\s+/).filter(Boolean)
+  if (terms.length === 0) return true
+  return terms.every((term) => fuzzyMatch(node.relativePath || node.name, term))
+}
+
+function filterTree(nodes: TreeNode[], filter: string): TreeNode[] {
+  if (!filter.trim()) return nodes
+
+  return nodes.flatMap((node) => {
+    const childMatches = filterTree(node.children, filter)
+    if (matchesFilter(node, filter)) {
+      return [{ ...node, children: node.children }]
+    }
+    if (childMatches.length > 0) {
+      return [{ ...node, children: childMatches }]
+    }
+    return []
+  })
+}
+
+function countFiles(nodes: TreeNode[]): number {
+  return nodes.reduce(
+    (total, node) =>
+      total + (node.isDirectory ? countFiles(node.children) : 1),
+    0
+  )
+}
+
 const TreeItem = memo(function TreeItem({
   node,
   depth,
   expanded,
+  forceExpanded,
+  forceCollapsed,
   onToggleDir,
   onSelectFile,
 }: {
   node: TreeNode
   depth: number
   expanded: Set<string>
+  forceExpanded: boolean
+  forceCollapsed: Set<string>
   onToggleDir: (relativePath: string) => void
   onSelectFile: (relativePath: string) => void
 }) {
-  const isExpanded = node.isDirectory && expanded.has(node.relativePath)
+  const isExpanded =
+    node.isDirectory &&
+    !forceCollapsed.has(node.relativePath) &&
+    (forceExpanded || expanded.has(node.relativePath))
 
   const handleClick = useCallback(() => {
     if (node.isDirectory) {
@@ -119,31 +171,44 @@ const TreeItem = memo(function TreeItem({
       <button
         type="button"
         onClick={handleClick}
-        className="flex w-full items-center gap-1 rounded-sm px-2 py-0.5 text-left text-xs text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        title={node.relativePath}
+        aria-expanded={node.isDirectory ? isExpanded : undefined}
+        className={cn(
+          "group flex h-7 w-full items-center gap-1.5 rounded-md pr-2 text-left text-xs text-sidebar-foreground/80 transition-colors",
+          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          "focus-visible:bg-sidebar-accent focus-visible:text-sidebar-accent-foreground focus-visible:outline-none"
+        )}
+        style={{ paddingLeft: `${depth * 12 + 6}px` }}
       >
         {node.isDirectory ? (
           isExpanded ? (
-            <ChevronDown className="size-3 shrink-0 text-sidebar-foreground/50" />
+            <ChevronDown className="size-3 shrink-0 text-sidebar-foreground/45 transition-colors group-hover:text-sidebar-foreground/70" />
           ) : (
-            <ChevronRight className="size-3 shrink-0 text-sidebar-foreground/50" />
+            <ChevronRight className="size-3 shrink-0 text-sidebar-foreground/45 transition-colors group-hover:text-sidebar-foreground/70" />
           )
         ) : (
           <span className="size-3 shrink-0" />
         )}
         {node.isDirectory ? (
           isExpanded ? (
-            <FolderOpen className="size-3.5 shrink-0 text-sidebar-foreground/50" />
+            <FolderOpen className="size-3.5 shrink-0 text-sidebar-foreground/55 transition-colors group-hover:text-sidebar-foreground/80" />
           ) : (
-            <Folder className="size-3.5 shrink-0 text-sidebar-foreground/50" />
+            <Folder className="size-3.5 shrink-0 text-sidebar-foreground/55 transition-colors group-hover:text-sidebar-foreground/80" />
           )
         ) : (
           <>{(() => {
             const Icon = getFileIcon(node.name)
-            return <Icon className="size-3.5 shrink-0 text-sidebar-foreground/50" />
+            return <Icon className="size-3.5 shrink-0 text-sidebar-foreground/60 transition-colors group-hover:text-sidebar-foreground/85" />
           })()}</>
         )}
-        <span className="truncate">{node.name}</span>
+        <span
+          className={cn(
+            "min-w-0 truncate",
+            node.isDirectory && "font-medium text-sidebar-foreground/85"
+          )}
+        >
+          {node.name}
+        </span>
       </button>
       {isExpanded && node.children.length > 0 && (
         <div>
@@ -153,6 +218,8 @@ const TreeItem = memo(function TreeItem({
               node={child}
               depth={depth + 1}
               expanded={expanded}
+              forceExpanded={forceExpanded}
+              forceCollapsed={forceCollapsed}
               onToggleDir={onToggleDir}
               onSelectFile={onSelectFile}
             />
@@ -200,21 +267,49 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
   const { data: entries = [], isLoading, isFetching } = useWorkspaceIndex(workspaceId)
   const { addFileTab } = useMainTabs()
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const [filterCollapsed, setFilterCollapsed] = useState<Set<string>>(
+    () => new Set()
+  )
   const [refreshing, setRefreshing] = useState(false)
+  const [filter, setFilter] = useState("")
 
   const tree = useMemo(() => buildTree(entries), [entries])
+  const filteredTree = useMemo(() => filterTree(tree, filter), [filter, tree])
+  const isFiltering = filter.trim().length > 0
+  const totalFiles = useMemo(() => countFiles(tree), [tree])
+  const visibleFiles = useMemo(() => countFiles(filteredTree), [filteredTree])
 
-  const handleToggleDir = useCallback((relativePath: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(relativePath)) {
-        next.delete(relativePath)
-      } else {
-        next.add(relativePath)
+  useEffect(() => {
+    setFilterCollapsed(new Set())
+  }, [filter])
+
+  const handleToggleDir = useCallback(
+    (relativePath: string) => {
+      if (isFiltering) {
+        setFilterCollapsed((prev) => {
+          const next = new Set(prev)
+          if (next.has(relativePath)) {
+            next.delete(relativePath)
+          } else {
+            next.add(relativePath)
+          }
+          return next
+        })
+        return
       }
-      return next
-    })
-  }, [])
+
+      setExpanded((prev) => {
+        const next = new Set(prev)
+        if (next.has(relativePath)) {
+          next.delete(relativePath)
+        } else {
+          next.add(relativePath)
+        }
+        return next
+      })
+    },
+    [isFiltering]
+  )
 
   const handleSelectFile = useCallback(
     (relativePath: string) => {
@@ -242,35 +337,69 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
   const showSpinner = refreshing || isFetching
 
   return (
-    <div className="flex h-full w-full flex-col bg-background text-sidebar-foreground">
-      <SidebarHeader className="h-9 flex-row items-center justify-between border-b bg-background px-2 py-0">
-        <SidebarGroupLabel className="h-9 px-0 text-[10px] font-medium tracking-wider text-sidebar-foreground/60">
-          FILES
-        </SidebarGroupLabel>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={handleRefresh}
-          disabled={showSpinner}
-          className="text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        >
-          <RefreshCw className={`size-3 ${showSpinner ? "animate-spin" : ""}`} />
-          <span className="sr-only">Refresh</span>
-        </Button>
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-sidebar-border/80 bg-sidebar text-sidebar-foreground shadow-sm">
+      <SidebarHeader className="gap-1.5 border-b bg-sidebar/95 px-2 py-2">
+        <div className="flex items-center gap-1.5">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-sidebar-foreground/40" />
+            <Input
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              placeholder="Filter files"
+              aria-label="Filter files"
+              className="h-7 border-sidebar-border/70 bg-sidebar-accent/35 pl-7 pr-7 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-foreground/40 focus-visible:border-sidebar-border focus-visible:ring-0"
+            />
+            {filter && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => setFilter("")}
+                aria-label="Clear file filter"
+                className="absolute right-1 top-1/2 size-5 -translate-y-1/2 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              >
+                <X className="size-3" />
+              </Button>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleRefresh}
+            disabled={showSpinner}
+            className="size-7 shrink-0 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <RefreshCw className={`size-3.5 ${showSpinner ? "animate-spin" : ""}`} />
+            <span className="sr-only">Refresh</span>
+          </Button>
+        </div>
+        {!showSkeleton && !isEmpty && (
+          <div className="flex h-4 items-center justify-between px-0.5 text-[10px] leading-none text-sidebar-foreground/45">
+            <span>
+              {isFiltering
+                ? `${visibleFiles} of ${totalFiles} files`
+                : `${totalFiles} files`}
+            </span>
+            {showSpinner && <span>Indexing</span>}
+          </div>
+        )}
       </SidebarHeader>
-      <SidebarContent className="p-1">
+      <SidebarContent className="p-1.5">
         {showSkeleton ? (
           <FileTreeSkeleton />
         ) : isEmpty ? (
           <div className="p-2 text-[10px] text-sidebar-foreground/50">No files indexed</div>
+        ) : isFiltering && filteredTree.length === 0 ? (
+          <div className="p-2 text-[10px] text-sidebar-foreground/50">No matching files</div>
         ) : (
           <div className="animate-in fade-in duration-150">
-            {tree.map((node) => (
+            {filteredTree.map((node) => (
               <TreeItem
                 key={node.relativePath}
                 node={node}
                 depth={0}
                 expanded={expanded}
+                forceExpanded={isFiltering}
+                forceCollapsed={filterCollapsed}
                 onToggleDir={handleToggleDir}
                 onSelectFile={handleSelectFile}
               />

@@ -6,7 +6,7 @@ import {
   GitFork,
   KeyRound,
   Loader2,
-  MessageSquare,
+  MessageSquarePlus,
   MoreHorizontal,
   Pin,
   Plus,
@@ -208,7 +208,7 @@ const ThreadRow = memo(function ThreadRow({
 })
 
 export function AppSidebar() {
-  const { workspaces, createThread, deleteWorkspace } = useWorkspace()
+  const { workspaces, deleteWorkspace } = useWorkspace()
   const { handleCreateLocal, handleCreateRemote } = useCreateWorkspaceAction()
   const openPathMutation = useOpenPath()
   const openWithAppMutation = useOpenWorkspaceWithApp()
@@ -256,15 +256,12 @@ export function AppSidebar() {
   useShortcutHandler(
     SHORTCUT_ACTIONS.NEW_THREAD,
     activeWorkspace
-      ? async () => {
-          const thread = await createThread(activeWorkspace.id)
-          setCollapsed((prev) => ({ ...prev, [activeWorkspace.id]: false }))
-          navigate({
-            to: "/workspace/$threadId",
-            params: { threadId: thread.id },
-          })
+      ? () => {
+          navigate({ to: "/new", search: { ws: activeWorkspace.id } })
         }
-      : null
+      : () => {
+          navigate({ to: "/new", search: {} })
+        }
   )
   useShortcutHandler(SHORTCUT_ACTIONS.OPEN_SETTINGS, openSettings)
 
@@ -306,6 +303,26 @@ export function AppSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+        )}
+
+        {workspaces.length > 0 && (
+          <div className="px-2 pb-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-full gap-2 text-xs"
+              onClick={() =>
+                navigate({
+                  to: "/new",
+                  search: activeWorkspace ? { ws: activeWorkspace.id } : {},
+                })
+              }
+            >
+              <MessageSquarePlus className="size-3.5" />
+              New Thread
+              <ShortcutKbd binding={newThreadBinding} className="ml-auto" />
+            </Button>
+          </div>
         )}
 
         <SidebarGroup>
@@ -368,15 +385,14 @@ export function AppSidebar() {
                           <SidebarMenuAction
                             showOnHover
                             className="right-7"
-                            onClick={async () => {
-                              const thread = await createThread(ws.id)
+                            onClick={() => {
                               setCollapsed((prev) => ({
                                 ...prev,
                                 [ws.id]: false,
                               }))
                               navigate({
-                                to: "/workspace/$threadId",
-                                params: { threadId: thread.id },
+                                to: "/new",
+                                search: { ws: ws.id },
                               })
                             }}
                           >
@@ -478,31 +494,10 @@ export function AppSidebar() {
                           })()}
                         </SidebarMenuSub>
                       ) : (
-                        <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150 mx-2 my-1.5 flex flex-col items-center gap-3 rounded-xl bg-muted/30 px-4 py-4 text-center">
-                          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                            <MessageSquare className="size-3.5 text-primary/60" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[11px] font-medium text-foreground/70">No threads yet</p>
-                            <p className="text-[10px] leading-snug text-muted-foreground/60">
-                              Start a conversation with your AI agent
-                            </p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 w-full gap-1 text-[11px]"
-                            onClick={async () => {
-                              const thread = await createThread(ws.id)
-                              navigate({
-                                to: "/workspace/$threadId",
-                                params: { threadId: thread.id },
-                              })
-                            }}
-                          >
-                            <Plus className="size-3" />
-                            New thread
-                          </Button>
+                        <div className="animate-in mx-2 my-1 rounded-md px-2 py-1.5 text-center duration-150 fade-in-0 slide-in-from-top-1">
+                          <span className="text-[11px] text-muted-foreground/60">
+                            No threads
+                          </span>
                         </div>
                       )
                     )}

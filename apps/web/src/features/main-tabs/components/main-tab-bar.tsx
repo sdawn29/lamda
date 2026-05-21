@@ -18,10 +18,10 @@ function ThreadTabIcon({ threadId }: { threadId: string }) {
 }
 
 export function MainTabBar() {
-  const { tabs, activeTabId, activeTab, closeTab, setActiveTab, addThreadTab, reorderTabs, pendingThreadIds } = useMainTabs()
+  const { tabs, activeTabId, activeTab, closeTab, setActiveTab, reorderTabs, pendingThreadIds } = useMainTabs()
   const navigate = useNavigate()
   const { threadId: activeThreadId } = useParams({ strict: false }) as { threadId?: string }
-  const { workspaces, createThread, deleteThread } = useWorkspace()
+  const { workspaces, deleteThread } = useWorkspace()
   const draggedTabId = useRef<string | null>(null)
   const [draggingTabId, setDraggingTabId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<{ id: string; before: boolean } | null>(null)
@@ -31,12 +31,9 @@ export function MainTabBar() {
       ? workspaces.find((ws) => ws.path === activeTab.workspacePath)
       : workspaces.find((ws) => ws.threads.some((t) => t.id === activeThreadId))
 
-  const handleNewThread = useCallback(async () => {
-    if (!activeWorkspace) return
-    const thread = await createThread(activeWorkspace.id)
-    addThreadTab(thread.id, thread.title, true)
-    navigate({ to: "/workspace/$threadId", params: { threadId: thread.id } })
-  }, [activeWorkspace, createThread, addThreadTab, navigate])
+  const handleNewThread = useCallback(() => {
+    navigate({ to: "/new", search: activeWorkspace ? { ws: activeWorkspace.id } : {} })
+  }, [activeWorkspace, navigate])
 
   const handleTabClick = (tab: MainTab) => {
     setActiveTab(tab.id)
@@ -162,7 +159,7 @@ export function MainTabBar() {
         )
       })}
 
-      {activeWorkspace && (
+      {workspaces.length > 0 && (
         <button
           onClick={handleNewThread}
           className="flex h-7 items-center rounded-md px-2 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"

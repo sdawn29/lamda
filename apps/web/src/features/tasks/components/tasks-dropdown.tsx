@@ -58,7 +58,7 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
             render={
               <DropdownMenuTrigger
                 render={
-                  <Button variant="outline" className="size-7">
+                  <Button variant="ghost" className="size-7">
                     <Play className="size-4" />
                     <span className="sr-only">Tasks</span>
                   </Button>
