@@ -42,9 +42,9 @@ export function RightSidebarContent({
   workspaceId,
   workspacePath,
 }: RightSidebarProps) {
-  const { isFileTreeOpen, toggleFileTree, isOpen, close, width } = useRightSidebar()
+  const { isFileTreeOpen, toggleFileTree, isOpen, close } = useRightSidebar()
   const { isFullscreen, toggleFullscreen } = useDiffPanel()
-  const isMobile = useIsMobile()
+  const isMobile = useIsMobile(900)
   const fullscreenBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF)
   const fileTreeBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE)
   const { tabs, activeTabId, setActiveTab, closeTab, clearActiveTab } = useMainTabs()
@@ -205,8 +205,8 @@ export function RightSidebarContent({
         <SheetContent
           side="right"
           showCloseButton={false}
-          className="bg-sidebar p-0 text-sidebar-foreground"
-          style={{ width: `${width}px`, maxWidth: "90vw" }}
+          className="bg-sidebar p-0 text-sidebar-foreground sm:max-w-none"
+          style={{ width: "90vw", maxWidth: "90vw" }}
         >
           {sidebarEl}
         </SheetContent>

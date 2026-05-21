@@ -95,6 +95,10 @@ class WorkspaceIndexer {
       } catch {}
     }
     this.workspaces.delete(workspaceId);
+    // Shut down any LSP servers spawned for this workspace.
+    void import("./language-service.js")
+      .then((m) => m.shutdownWorkspace(workspaceId))
+      .catch((err) => console.warn(`[workspace-indexer] LSP shutdown failed:`, err));
   }
 
   async reindex(workspaceId: string): Promise<void> {

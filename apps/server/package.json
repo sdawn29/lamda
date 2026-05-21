@@ -14,6 +14,7 @@
   "dependencies": {
     "@lamda/db": "*",
     "@lamda/git": "*",
+    "@lamda/lsp": "*",
     "@lamda/mcp": "*",
     "@lamda/pi-sdk": "*",
     "@hono/node-server": "^1.13.0",

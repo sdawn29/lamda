@@ -3,43 +3,26 @@ import {
   useMemo,
   useState,
   memo,
-  lazy,
-  Suspense,
 } from "react"
 import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { FileHeader } from "@/features/git/components/file-header"
-import { useTheme } from "@/shared/components/theme-provider"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
 import { getServerUrl } from "@/shared/lib/client"
 import { cn } from "@/shared/lib/utils"
-import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
+import { LANGUAGE_MAP } from "@/shared/lib/language-map"
+import {
+  LspCodeViewer,
+  ProblemsStrip,
+  OutlinePanel,
+  useFileDiagnostics,
+  useLspConnection,
+  useOpenDocument,
+  useResolveWorkspaceId,
+  useDocumentSymbols,
+} from "@/features/lsp"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-
-const PrismCode = lazy(() =>
-  import("@/features/chat/components/prism-code").then((m) => ({
-    default: m.default,
-  }))
-)
-
-const LANGUAGE_MAP: Record<string, string> = {
-  ts: "typescript",
-  tsx: "tsx",
-  mts: "typescript",
-  cts: "typescript",
-  js: "javascript",
-  jsx: "jsx",
-  mjs: "javascript",
-  cjs: "javascript",
-  mjsx: "jsx",
-  cjsx: "jsx",
-  py: "python",
-  rb: "ruby",
-  rs: "rust",
-  yml: "yaml",
-  md: "markdown",
-}
 
 function resolveFilePath(currentFilePath: string, href: string): string {
   const dir = currentFilePath.split(/[/\\]/).slice(0, -1).join("/")
@@ -71,8 +54,10 @@ export const FileContentView = memo(function FileContentView({
   const [serverUrl, setServerUrl] = useState<string>("")
   const [markdownPreview, setMarkdownPreview] = useState(false)
   const [htmlPreview, setHtmlPreview] = useState(true)
-  const { resolvedTheme } = useTheme()
-  const isDark = resolvedTheme === "dark"
+  const [scrollToLine, setScrollToLine] = useState<number | null>(null)
+
+  const workspaceId = useResolveWorkspaceId(workspacePath)
+  const lsp = useLspConnection(workspaceId)
 
   const { data: platform } = useElectronPlatform()
   const isMac = platform === "darwin"
@@ -97,6 +82,13 @@ export const FileContentView = memo(function FileContentView({
   )
   const isHtml = fileExtension === "html" || fileExtension === "htm"
   const isPdf = fileExtension === "pdf"
+
+  // Only open in LSP when we're rendering source code (not markdown preview, not image, etc.)
+  const isCodeView = !isImage && !isPdf && !markdownPreview && !(isHtml && htmlPreview)
+  const lspFilePath = isCodeView ? filePath : null
+  useOpenDocument(lsp, lspFilePath, isCodeView ? content : null)
+  const diagnostics = useFileDiagnostics(lsp, lspFilePath)
+  const symbols = useDocumentSymbols(lsp, lspFilePath, isCodeView)
 
   const markdownLinkComponents = useMemo(
     () => ({
@@ -254,6 +246,18 @@ export const FileContentView = memo(function FileContentView({
           isPdf={isPdf}
         />
       </div>
+      {isCodeView && (
+        <>
+          <ProblemsStrip
+            diagnostics={diagnostics}
+            onJumpToLine={(line) => setScrollToLine(line)}
+          />
+          <OutlinePanel
+            symbols={symbols}
+            onJumpToLine={(line) => setScrollToLine(line)}
+          />
+        </>
+      )}
       <div className="flex min-h-0 flex-1 flex-col p-2">
         <div
           className={cn(
@@ -295,22 +299,16 @@ export const FileContentView = memo(function FileContentView({
               {content ?? ""}
             </ReactMarkdown>
           ) : (
-            <Suspense
-              fallback={
-                <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" />
-                  Loading…
-                </div>
-              }
-            >
-              <PrismCode
-                code={content ?? ""}
-                language={language}
-                style={isDark ? jellybeansdark : jellybeanslight}
-                showLineNumbers
-                fontSize="0.75rem"
-              />
-            </Suspense>
+            <LspCodeViewer
+              code={content ?? ""}
+              language={language}
+              fontSize="0.75rem"
+              diagnostics={diagnostics}
+              connection={lsp}
+              filePath={lspFilePath}
+              onOpenFile={(target, title) => onOpenFile?.(target, title)}
+              scrollToLine={scrollToLine}
+            />
           )}
         </div>
       </div>

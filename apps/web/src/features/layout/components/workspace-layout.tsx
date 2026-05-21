@@ -144,7 +144,7 @@ function RightSidebarControls() {
 
   return (
     <div
-      className="fixed top-0 right-0 z-50 flex h-11 items-center gap-0.5 px-2"
+      className="fixed top-0 right-0 z-[60] flex h-11 items-center gap-0.5 px-2"
       style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
     >
       <Tooltip>
@@ -234,7 +234,7 @@ export function WorkspaceLayout() {
     setWidth: setRightSidebarWidth,
   } = useRightSidebar()
 
-  const isMobile = useIsMobile()
+  const isMobile = useIsMobile(900)
   const isDragging = useRef(false)
   const dragStartX = useRef(0)
   const dragStartWidth = useRef(0)

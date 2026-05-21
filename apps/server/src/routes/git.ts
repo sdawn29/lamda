@@ -364,16 +364,20 @@ git.get("/session/:id/git/turns", (c) => {
 
   // Merge in-progress turn files from the live hub so the UI can see the
   // current turn's changes before it completes and lands in the DB.
-  const liveFiles = sessionEvents.getLastTurnFiles(id);
+  // currentTurnStartTime is reset to 0 once the post-turn capture writes the
+  // turn to the DB, so it's the authoritative signal for "a turn is running."
+  // Without this guard, lastTurnFiles still contains the just-completed turn's
+  // files and we'd emit a phantom live turn alongside its DB counterpart.
+  const currentTurnStartTime = sessionEvents.getCurrentTurnStartTime(id);
+  const liveFiles = currentTurnStartTime > 0 ? sessionEvents.getLastTurnFiles(id) : [];
   const turns = listAgentTurnsBySession(id);
 
-  // Attach live files to the most recent in-progress turn (id=0 sentinel).
   const liveTurn = liveFiles.length > 0
     ? [{
         id: 0,
         sessionId: id,
         threadId: "",
-        startedAt: sessionEvents.getCurrentTurnStartTime(id),
+        startedAt: currentTurnStartTime,
         endedAt: 0,
         checkpointSha: "",
         files: liveFiles.map((f) => ({

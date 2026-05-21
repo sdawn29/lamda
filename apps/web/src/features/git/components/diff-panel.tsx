@@ -3,9 +3,7 @@ import {
   useEffect,
   useMemo,
   useState,
-  lazy,
   memo,
-  Suspense,
 } from "react"
 import {
   Archive,
@@ -65,24 +63,27 @@ import { FileListItem } from "./file-list-item"
 import { FileHeader } from "./file-header"
 import { SORT_OPTIONS, type SortMode, applySortMode } from "./sort-utils"
 import { cn } from "@/shared/lib/utils"
-import { useTheme } from "@/shared/components/theme-provider"
 import {
   useShortcutHandler,
   useShortcutBinding,
 } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { ShortcutKbd } from "@/shared/ui/kbd"
-import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 import { getServerUrl } from "@/shared/lib/client"
+import { LANGUAGE_MAP } from "@/shared/lib/language-map"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
+import {
+  LspCodeViewer,
+  ProblemsStrip,
+  OutlinePanel,
+  useFileDiagnostics,
+  useLspConnection,
+  useOpenDocument,
+  useResolveWorkspaceId,
+  useDocumentSymbols,
+} from "@/features/lsp"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-
-const PrismCode = lazy(() =>
-  import("@/features/chat/components/prism-code").then((m) => ({
-    default: m.default,
-  }))
-)
 
 interface DiffPanelProps {
   sessionId: string
@@ -90,24 +91,6 @@ interface DiffPanelProps {
   openWithAppId?: string | null
   isEmbedded?: boolean
   onClose?: () => void
-}
-
-const LANGUAGE_MAP: Record<string, string> = {
-  ts: "typescript",
-  tsx: "tsx",
-  mts: "typescript",
-  cts: "typescript",
-  js: "javascript",
-  jsx: "jsx",
-  mjs: "javascript",
-  cjs: "javascript",
-  mjsx: "jsx",
-  cjsx: "jsx",
-  py: "python",
-  rb: "ruby",
-  rs: "rust",
-  yml: "yaml",
-  md: "markdown",
 }
 
 // ─── Turn History View ────────────────────────────────────────────────────────
@@ -166,12 +149,6 @@ const TurnItem = memo(function TurnItem({
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
           Turn {turnNumber}
         </span>
-        {turn.inProgress && (
-          <span className="flex items-center gap-1 rounded-sm bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-500">
-            <Loader2 className="h-2.5 w-2.5 animate-spin" />
-            Running
-          </span>
-        )}
         {turn.checkpointSha && (
           <span
             className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground/60"
@@ -741,8 +718,10 @@ const FileContent = memo(function FileContent({
   const { addFileTab } = useMainTabs()
   const [markdownPreview, setMarkdownPreview] = useState(false)
   const [htmlPreview, setHtmlPreview] = useState(true)
-  const { resolvedTheme } = useTheme()
-  const isDark = resolvedTheme === "dark"
+  const [scrollToLine, setScrollToLine] = useState<number | null>(null)
+
+  const workspaceId = useResolveWorkspaceId(workspacePath)
+  const lsp = useLspConnection(workspaceId)
 
   // Get available apps for default editor selection
   const { data: platform } = useElectronPlatform()
@@ -771,6 +750,12 @@ const FileContent = memo(function FileContent({
   )
   const isHtml = fileExtension === "html" || fileExtension === "htm"
   const isPdf = fileExtension === "pdf"
+
+  const isCodeView = !isImage && !isPdf && !markdownPreview && !(isHtml && htmlPreview)
+  const lspFilePath = isCodeView ? filePath : null
+  useOpenDocument(lsp, lspFilePath, isCodeView ? content : null)
+  const diagnostics = useFileDiagnostics(lsp, lspFilePath)
+  const symbols = useDocumentSymbols(lsp, lspFilePath, isCodeView)
 
   const markdownLinkComponents = useMemo(
     () => ({
@@ -933,6 +918,18 @@ const FileContent = memo(function FileContent({
           isPdf={isPdf}
         />
       </div>
+      {isCodeView && (
+        <>
+          <ProblemsStrip
+            diagnostics={diagnostics}
+            onJumpToLine={(line) => setScrollToLine(line)}
+          />
+          <OutlinePanel
+            symbols={symbols}
+            onJumpToLine={(line) => setScrollToLine(line)}
+          />
+        </>
+      )}
       <div className="flex min-h-0 flex-1 flex-col p-2">
         <div
           className={cn(
@@ -974,22 +971,18 @@ const FileContent = memo(function FileContent({
               {content ?? ""}
             </ReactMarkdown>
           ) : (
-            <Suspense
-              fallback={
-                <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" />
-                  Loading…
-                </div>
+            <LspCodeViewer
+              code={content ?? ""}
+              language={language}
+              fontSize="0.75rem"
+              diagnostics={diagnostics}
+              connection={lsp}
+              filePath={lspFilePath}
+              onOpenFile={(target, title) =>
+                addFileTab({ title, filePath: target, workspacePath })
               }
-            >
-              <PrismCode
-                code={content ?? ""}
-                language={language}
-                style={isDark ? jellybeansdark : jellybeanslight}
-                showLineNumbers
-                fontSize="0.75rem"
-              />
-            </Suspense>
+              scrollToLine={scrollToLine}
+            />
           )}
         </div>
       </div>

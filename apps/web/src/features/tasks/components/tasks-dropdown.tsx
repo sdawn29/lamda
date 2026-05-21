@@ -56,12 +56,14 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
         <Tooltip>
           <TooltipTrigger
             render={
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="size-7">
-                  <Play className="size-4" />
-                  <span className="sr-only">Tasks</span>
-                </Button>
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" className="size-7">
+                    <Play className="size-4" />
+                    <span className="sr-only">Tasks</span>
+                  </Button>
+                }
+              />
             }
           />
           <TooltipContent>Tasks</TooltipContent>

@@ -289,24 +289,32 @@ export function ChatView({
     return entryDelayFor(seq)
   }
 
-  // After each response completes, extend the snapshot to include all messages now
-  // visible. Without this, messages from the previous exchange are not in the snapshot
-  // and get isNew=true when the next prompt is sent, replaying their entry animations.
-  // Also reset the appearance-order map so the next turn's first row mounts with
-  // zero delay instead of stacking on the previous turn's counter.
+  // Extend the snapshot to include all currently-visible messages whenever the
+  // view is idle. Two windows matter:
+  //   1. Turn end (isLoading true→false): the streaming user/assistant rows
+  //      have only index-based keys at this point, so they get added to the
+  //      snapshot under those keys.
+  //   2. The post-turn refetch (~750 ms later) replaces those streaming rows
+  //      with persisted versions that carry stable DB-id / createdAt-based
+  //      keys. Without re-snapshotting here, the next prompt would see the
+  //      new keys as "not in snapshot" and replay the entry / word-reveal
+  //      animations for messages that have already been shown.
+  // The appearance-order reset still only fires on the true→false transition
+  // so mid-turn deltas don't restart row staggering.
   const prevIsLoadingRef = useRef(isLoading)
   useEffect(() => {
     const wasLoading = prevIsLoadingRef.current
     prevIsLoadingRef.current = isLoading
-    if (wasLoading && !isLoading && visibleMessagesRef.current.length > 0) {
-      setInitialSnapshot({
-        sessionId,
-        keys: new Set(visibleMessagesRef.current.map((m, i) => getMessageKey(m, i))),
-      })
+    if (isLoading || visibleMessages.length === 0) return
+    setInitialSnapshot({
+      sessionId,
+      keys: new Set(visibleMessages.map((m, i) => getMessageKey(m, i))),
+    })
+    if (wasLoading) {
       appearanceOrderRef.current = new Map()
       appearanceCounterRef.current = 0
     }
-  }, [isLoading, sessionId])
+  }, [isLoading, sessionId, visibleMessages])
 
   // Focus textbox whenever the active session changes (imperative DOM op — effect is correct here).
   useEffect(() => {

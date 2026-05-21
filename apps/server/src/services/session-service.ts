@@ -23,7 +23,7 @@ export async function createSessionForThread(
     }
   }
 
-  const customTools = workspaceId ? await import("./mcp-service.js").then(m => m.getMcpToolsForSession(workspaceId)) : undefined
+  const customTools = workspaceId ? await collectCustomTools(workspaceId, cwd) : undefined
   const handle = await createManagedSession({ cwd, customTools, ...opts })
   const sessionId = store.create(handle, cwd, threadId, workspaceId)
   
@@ -46,4 +46,22 @@ export function ensureSessionEventHub(sessionId: string, entry: NonNullable<Retu
 
 export function gitCwd(id: string): string | null {
   return store.getCwd(id) ?? null
+}
+
+/**
+ * Merge MCP- and LSP-derived tools for a workspace. Both are loaded in
+ * parallel; failures in either don't block the other.
+ */
+export async function collectCustomTools(workspaceId: string, workspacePath: string) {
+  const [mcpTools, lspTools] = await Promise.all([
+    import("./mcp-service.js").then((m) => m.getMcpToolsForSession(workspaceId)).catch((err) => {
+      console.warn("[session-service] failed to load MCP tools:", err)
+      return []
+    }),
+    import("./language-service.js").then((m) => m.getLspToolsForSession(workspaceId, workspacePath)).catch((err) => {
+      console.warn("[session-service] failed to load LSP tools:", err)
+      return []
+    }),
+  ])
+  return [...mcpTools, ...lspTools]
 }

@@ -76,6 +76,11 @@ function ensureLanguagesRegistered() {
   languagesRegistered = true
 }
 
+export interface LineDecoration {
+  severity: 1 | 2 | 3 | 4
+  message: string
+}
+
 interface PrismCodeProps {
   code: string
   language: string
@@ -83,6 +88,31 @@ interface PrismCodeProps {
   showLineNumbers?: boolean
   fontSize?: string
   opacity?: number
+  /**
+   * Optional per-line decorations (1-indexed line numbers).
+   * When provided, each line is wrapped so we can mark diagnostics + look up
+   * mouse positions back to (line, character) coordinates for LSP hover.
+   */
+  lineDecorations?: Map<number, LineDecoration[]>
+  /** When true, every line gets a data-line attribute even without decorations. */
+  enableLineDataAttrs?: boolean
+}
+
+const SEVERITY_COLOR: Record<number, string> = {
+  1: "var(--destructive, #ef4444)",
+  2: "#eab308",
+  3: "#60a5fa",
+  4: "#94a3b8",
+}
+
+function decorationStyle(decorations: LineDecoration[] | undefined): CSSProperties | undefined {
+  if (!decorations || decorations.length === 0) return undefined
+  // Use the highest severity (lowest number) for the border.
+  const minSeverity = decorations.reduce((s, d) => Math.min(s, d.severity), 4)
+  return {
+    boxShadow: `inset 2px 0 0 0 ${SEVERITY_COLOR[minSeverity] ?? SEVERITY_COLOR[1]}`,
+    display: "block",
+  }
 }
 
 export default function PrismCode({
@@ -92,8 +122,28 @@ export default function PrismCode({
   showLineNumbers = false,
   fontSize = "0.75rem",
   opacity = 1,
+  lineDecorations,
+  enableLineDataAttrs,
 }: PrismCodeProps) {
   ensureLanguagesRegistered()
+
+  const wrapLines = enableLineDataAttrs || (lineDecorations && lineDecorations.size > 0)
+
+  const lineProps = wrapLines
+    ? (lineNumber: number) => {
+        const decorations = lineDecorations?.get(lineNumber)
+        const props: { [key: string]: unknown; style?: CSSProperties } = {
+          "data-line": lineNumber,
+        }
+        const style = decorationStyle(decorations)
+        if (style) props.style = style
+        if (decorations && decorations.length > 0) {
+          props["data-severity"] = decorations.reduce((s, d) => Math.min(s, d.severity), 4)
+          props["title"] = decorations.map((d) => d.message).join("\n")
+        }
+        return props
+      }
+    : undefined
 
   return (
     <SyntaxHighlighter
@@ -102,6 +152,8 @@ export default function PrismCode({
       PreTag="div"
       showLineNumbers={showLineNumbers}
       className="syntax-highlighter"
+      wrapLines={wrapLines}
+      lineProps={lineProps}
       lineNumberStyle={{
         minWidth: "2.5em",
         paddingRight: "1em",
