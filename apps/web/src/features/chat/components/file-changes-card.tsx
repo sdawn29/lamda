@@ -1,13 +1,13 @@
 import { memo, useState, useMemo, useCallback, useEffect, useRef } from "react"
-import { GitCompare, ChevronRight, Undo2, Loader2, Sparkles, Eye, ExternalLink } from "lucide-react"
+import { GitCompare, ChevronRight, Undo2, Loader2, Eye, ExternalLink, Files } from "lucide-react"
 import { openFileWithApp } from "@/features/electron/api"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
-import { useTurns, useRevertToTurn, useGitFileDiff, DiffView, DiffStat, parseDiffCounts } from "@/features/git"
+import { useRevertToTurn, useGitFileDiff, DiffView, DiffStat, parseDiffCounts } from "@/features/git"
 import { useRightSidebar } from "@/features/layout"
 import { useMainTabs } from "@/features/main-tabs"
 import { useGitRevertFile } from "@/features/git/mutations"
-import { type ChangedFile, parseStatusLine } from "@/features/git/components/status-badge"
+import { StatusBadge, type ChangedFile, parseStatusLine } from "@/features/git/components/status-badge"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
 import {
@@ -22,6 +22,7 @@ import {
   AlertDialogCancel,
 } from "@/shared/ui/alert-dialog"
 import { cn } from "@/shared/lib/utils"
+import type { TurnSummary } from "@/features/git/api"
 
 
 const ChangedFileItem = memo(function ChangedFileItem({
@@ -82,7 +83,7 @@ const ChangedFileItem = memo(function ChangedFileItem({
   )
 
   return (
-    <div ref={cardRef}>
+    <div ref={cardRef} className="group/file">
       <div
         role="button"
         tabIndex={0}
@@ -93,27 +94,35 @@ const ChangedFileItem = memo(function ChangedFileItem({
             setExpanded((v) => !v)
           }
         }}
-        className="group flex cursor-pointer items-center gap-1.5 px-3 py-1.5 transition-colors hover:bg-muted/20"
+        className={cn(
+          "flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors hover:bg-muted/25",
+          expanded && "bg-muted/15"
+        )}
       >
-        <Icon
-          icon={`catppuccin:${getIconName(fileName)}`}
-          className="size-3 shrink-0 opacity-60"
-          aria-hidden
-        />
-        <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
-          <span className="shrink-0 font-mono text-[11px] font-medium text-foreground/70">
-            {fileName}
-          </span>
-          {dirPath && (
-            <span className="truncate font-mono text-[10px] text-muted-foreground/35">
-              {dirPath}
+        <StatusBadge file={file} />
+        <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+          <Icon
+            icon={`catppuccin:${getIconName(fileName)}`}
+            className="size-3.5 shrink-0 opacity-75"
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1 overflow-hidden">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate font-mono text-[11px] font-medium leading-4 text-foreground/80">
+                {fileName}
+              </span>
+              {counts != null && (counts.added > 0 || counts.removed > 0) && (
+                <DiffStat added={counts.added} removed={counts.removed} />
+              )}
             </span>
-          )}
-          {counts != null && (counts.added > 0 || counts.removed > 0) && (
-            <DiffStat added={counts.added} removed={counts.removed} />
-          )}
+            {dirPath && (
+              <span className="block truncate font-mono text-[10px] leading-3 text-muted-foreground/45">
+                {dirPath}
+              </span>
+            )}
+          </span>
         </span>
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/file:opacity-100">
           <button
             type="button"
             onClick={(e) => {
@@ -124,7 +133,7 @@ const ChangedFileItem = memo(function ChangedFileItem({
               addFileTab({ filePath: absPath, title: fileName, workspacePath: rootPath })
             }}
             aria-label="Open in file tab"
-            className="flex size-5 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-muted hover:text-muted-foreground"
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground/45 transition-colors hover:bg-background hover:text-foreground"
           >
             <Eye className="h-3 w-3" />
           </button>
@@ -138,7 +147,7 @@ const ChangedFileItem = memo(function ChangedFileItem({
               void openFileWithApp(absPath, effectiveAppId)
             }}
             aria-label="Open in editor"
-            className="flex size-5 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-muted hover:text-muted-foreground"
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground/45 transition-colors hover:bg-background hover:text-foreground"
           >
             <ExternalLink className="h-3 w-3" />
           </button>
@@ -148,7 +157,7 @@ const ChangedFileItem = memo(function ChangedFileItem({
               onClick={handleRevert}
               disabled={reverting}
               aria-label="Revert file"
-              className="flex size-5 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-30"
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground/45 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-30"
             >
               {reverting ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -159,15 +168,15 @@ const ChangedFileItem = memo(function ChangedFileItem({
           )}
         </div>
         <ChevronRight className={cn(
-          "h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform duration-150",
+          "h-3.5 w-3.5 shrink-0 text-muted-foreground/35 transition-transform duration-150",
           expanded && "rotate-90"
         )} />
       </div>
 
       {expanded && (
-        <div className="border-t border-border/30 px-3 py-2">
+        <div className="border-t border-border/30 bg-background/45 px-3 py-2">
           {diffLoading ? (
-            <div className="flex items-center gap-2 rounded border border-border/30 bg-muted/10 px-3 py-2.5 text-xs text-muted-foreground/50">
+            <div className="flex items-center gap-2 rounded-md border border-border/40 bg-muted/10 px-3 py-2.5 text-xs text-muted-foreground/55">
               <Loader2 className="h-3 w-3 animate-spin" />
               Loading diff…
             </div>
@@ -184,15 +193,15 @@ interface FileChangesCardProps {
   sessionId: string
   rootPath?: string
   openWithAppId?: string | null
+  turn: TurnSummary
 }
 
 export const FileChangesCard = memo(function FileChangesCard({
   sessionId,
   rootPath,
   openWithAppId,
+  turn,
 }: FileChangesCardProps) {
-  const { data: turns = [] } = useTurns(sessionId)
-  const latestTurn = turns[0]
   const { open: openRightSidebar } = useRightSidebar()
   const revertToTurn = useRevertToTurn(sessionId)
   const revertFile = useGitRevertFile(sessionId)
@@ -201,13 +210,21 @@ export const FileChangesCard = memo(function FileChangesCard({
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const files: ChangedFile[] = useMemo(() => {
-    if (!latestTurn) return []
-    return latestTurn.files
+    return turn.files
       .map((f) => parseStatusLine(`${f.postStatusCode} ${f.filePath}`))
       .filter(Boolean)
-  }, [latestTurn])
+  }, [turn])
 
   const hasChanges = files.length > 0
+  const fileSummary = useMemo(() => {
+    let newFiles = 0
+    let stagedFiles = 0
+    for (const file of files) {
+      if (file.isUntracked) newFiles++
+      else if (file.isStaged) stagedFiles++
+    }
+    return { newFiles, stagedFiles }
+  }, [files])
 
   const handleRevertFile = useCallback(
     async (file: ChangedFile) => {
@@ -217,7 +234,7 @@ export const FileChangesCard = memo(function FileChangesCard({
   )
 
   const handleConfirmRevert = () => {
-    revertToTurn.mutate(latestTurn?.id ?? 0)
+    revertToTurn.mutate(turn.id)
     setConfirmOpen(false)
   }
 
@@ -227,13 +244,13 @@ export const FileChangesCard = memo(function FileChangesCard({
 
   return (
     <>
-      <div className="mx-auto w-full max-w-3xl px-6 py-2">
-        <div className="overflow-hidden rounded-lg border border-border/40 bg-black/5 dark:bg-white/[0.03]">
+      <div className="mx-auto mb-3 w-full max-w-3xl px-6 py-2">
+        <div className="overflow-hidden rounded-lg border border-border/60 bg-card/75 shadow-sm shadow-black/[0.03] dark:bg-card/60 dark:shadow-black/20">
           {/* Header */}
-          <div className={cn("flex items-center gap-3 px-3 py-2.5", expanded && "border-b border-border/30")}>
+          <div className={cn("flex items-center gap-3 px-3 py-3", expanded && "border-b border-border/40")}>
             {/* Left: icon + label + count — clickable to expand */}
             <div
-              className="flex flex-1 cursor-pointer items-center gap-2"
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5"
               onClick={() => setExpanded(!expanded)}
               role="button"
               tabIndex={0}
@@ -244,12 +261,28 @@ export const FileChangesCard = memo(function FileChangesCard({
                 }
               }}
             >
-              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted">
-                <Sparkles className="h-3 w-3 text-muted-foreground/60" />
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/10 text-primary">
+                <Files className="h-3.5 w-3.5" />
               </div>
-              <span className="text-xs font-medium text-foreground/70">Changes this turn</span>
-              <span className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-muted px-1.5 font-mono text-[10px] tabular-nums text-muted-foreground/60">
-                {files.length}
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-medium leading-4 text-foreground/85">
+                  Files changed
+                </span>
+                <span className="flex min-w-0 items-center gap-1.5 text-[10px] leading-3 text-muted-foreground/60">
+                  <span>{files.length} this turn</span>
+                  {fileSummary.newFiles > 0 && (
+                    <>
+                      <span className="text-muted-foreground/30">·</span>
+                      <span>{fileSummary.newFiles} new</span>
+                    </>
+                  )}
+                  {fileSummary.stagedFiles > 0 && (
+                    <>
+                      <span className="text-muted-foreground/30">·</span>
+                      <span>{fileSummary.stagedFiles} staged</span>
+                    </>
+                  )}
+                </span>
               </span>
             </div>
 
@@ -259,7 +292,7 @@ export const FileChangesCard = memo(function FileChangesCard({
                 size="sm"
                 variant="outline"
                 onClick={() => openRightSidebar()}
-                className="h-7 gap-1.5 px-2.5 text-[11px] text-muted-foreground hover:text-foreground"
+                className="h-7 gap-1.5 rounded-md px-2.5 text-[11px] text-muted-foreground hover:text-foreground"
               >
                 <GitCompare className="h-3 w-3" />
                 Diff
@@ -269,7 +302,7 @@ export const FileChangesCard = memo(function FileChangesCard({
                 variant="outline"
                 onClick={() => setConfirmOpen(true)}
                 disabled={revertToTurn.isPending}
-                className="h-7 gap-1.5 px-2.5 text-[11px] text-muted-foreground disabled:opacity-50"
+                className="h-7 gap-1.5 rounded-md px-2.5 text-[11px] text-muted-foreground disabled:opacity-50"
               >
                 {revertToTurn.isPending ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -281,7 +314,7 @@ export const FileChangesCard = memo(function FileChangesCard({
               <button
                 type="button"
                 onClick={() => setExpanded(!expanded)}
-                className="rounded p-1 text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+                className="flex size-7 items-center justify-center rounded-md text-muted-foreground/45 transition-colors hover:bg-muted hover:text-foreground"
                 aria-label={expanded ? "Collapse" : "Expand"}
               >
                 <ChevronRight className={cn(
@@ -294,7 +327,7 @@ export const FileChangesCard = memo(function FileChangesCard({
 
           {/* File list */}
           {expanded && (
-            <div className="divide-y divide-border/20">
+            <div className="divide-y divide-border/25 bg-muted/[0.03]">
               {files.map((file, index) => (
                 <ChangedFileItem
                   key={`${file.filePath}-${index}`}

@@ -4,15 +4,15 @@ import { EyeIcon, ListTodoIcon, PlayIcon } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { cn } from "@/shared/lib/utils"
 import { FileIcon } from "@/shared/ui/file-icon"
-import { useTurns } from "@/features/git"
 import { useChatActions } from "../contexts/chat-actions-context"
+import type { TurnSummary } from "@/features/git/api"
 
 const PLAN_DIR_PREFIX = ".agents/plans/"
 
 interface PlanChangesCardProps {
-  sessionId: string
   /** Absolute path to the workspace root, used to compute file paths to open. */
   rootPath?: string
+  turn: TurnSummary
 }
 
 /**
@@ -21,26 +21,24 @@ interface PlanChangesCardProps {
  * the generic "Changes this turn" file list.
  */
 export const PlanChangesCard = memo(function PlanChangesCard({
-  sessionId,
   rootPath,
+  turn,
 }: PlanChangesCardProps) {
-  const { data: turns = [] } = useTurns(sessionId)
   const actions = useChatActions()
 
   const planFiles = useMemo(() => {
-    const latest = turns[0]
-    if (!latest || latest.files.length === 0) return null
-    const all = latest.files.map((f) => f.filePath.replace(/\\/g, "/"))
+    if (turn.files.length === 0) return null
+    const all = turn.files.map((f) => f.filePath.replace(/\\/g, "/"))
     if (!all.every((p) => p.startsWith(PLAN_DIR_PREFIX) && p.toLowerCase().endsWith(".md"))) {
       return null
     }
     return all
-  }, [turns])
+  }, [turn])
 
   if (!planFiles) return null
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-2">
+    <div className="mx-auto mb-3 w-full max-w-3xl px-6 py-2">
       <div
         className={cn(
           "overflow-hidden rounded-lg border border-amber-500/30 bg-amber-500/5",

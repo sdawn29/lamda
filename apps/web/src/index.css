@@ -522,6 +522,19 @@
     background: color-mix(in srgb, var(--primary) 60%, transparent);
   }
 
+  .scrollbar-none,
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar,
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
   /* ── xterm.js terminal scrollbar — narrower than the global ──────────── */
   .xterm-viewport {
     scrollbar-width: thin;

@@ -1,8 +1,7 @@
-import { Code2, Check, AlertCircle, Info } from "lucide-react"
+import { Check, AlertCircle, Info } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Badge } from "@/shared/ui/badge"
 import { Card, CardContent } from "@/shared/ui/card"
-import { Separator } from "@/shared/ui/separator"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { cn } from "@/shared/lib/utils"
 import { useLspRegistry } from "../queries"
@@ -20,22 +19,7 @@ export function LspSettingsCard() {
 
   return (
     <Card>
-      <CardContent className="flex flex-col gap-4 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Code2 className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium">Language servers</p>
-              <p className="text-xs text-muted-foreground">
-                Servers detected on your PATH power diagnostics, hover, and
-                go-to-definition.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <Separator />
-
+      <CardContent className="flex flex-col gap-3 px-4 py-0">
         {isLoading ? (
           <div className="flex flex-col gap-2">
             <Skeleton className="h-14" />
@@ -54,7 +38,7 @@ export function LspSettingsCard() {
             No language servers configured.
           </p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             {languages.map((entry) => (
               <LanguageRow key={entry.language} entry={entry} />
             ))}
@@ -64,9 +48,9 @@ export function LspSettingsCard() {
         <Alert>
           <Info />
           <AlertDescription>
-            Language servers are looked up on your <code>PATH</code> at startup.
-            Install a missing server (e.g. <code>npm i -g typescript-language-server typescript</code>)
-            and reopen the file to enable its features.
+            Language servers are looked up on your <code>PATH</code>. Install a
+            missing server and reopen the file to enable diagnostics, hover,
+            and go-to-definition.
           </AlertDescription>
         </Alert>
       </CardContent>
@@ -89,7 +73,7 @@ function LanguageRow({ entry }: { entry: LspRegistryEntry }) {
       : entry.args
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-border/60 px-3 py-2.5">
+    <div className="flex flex-col gap-1.5 rounded-md border border-border/40 px-3 py-2">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="text-sm font-medium capitalize">
@@ -133,11 +117,8 @@ function LanguageRow({ entry }: { entry: LspRegistryEntry }) {
 function StatusBadge({ available }: { available: boolean }) {
   if (available) {
     return (
-      <Badge
-        variant="outline"
-        className="shrink-0 border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-      >
-        <Check className="mr-1 h-3 w-3" />
+      <Badge variant="secondary" className="shrink-0">
+        <Check data-icon="inline-start" />
         Installed
       </Badge>
     )

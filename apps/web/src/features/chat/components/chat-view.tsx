@@ -52,6 +52,7 @@ import { useMainTabsStore } from "@/features/main-tabs"
 import { ChatActionsProvider, type ChatActions } from "../contexts/chat-actions-context"
 import { useTurns } from "@/features/git"
 import { PlanChangesCard } from "./plan-changes-card"
+import type { TurnSummary } from "@/features/git/api"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
 
 const PLAN_DIR_PREFIX = ".agents/plans/"
@@ -160,6 +161,71 @@ function groupChatMessages(messages: Message[]): MessageGroup[] {
   return groups
 }
 
+function isPlanOnlyTurn(turn: TurnSummary): boolean {
+  return turn.files.length > 0 && turn.files.every(
+    (f) =>
+      f.filePath.replace(/\\/g, "/").startsWith(PLAN_DIR_PREFIX) &&
+      f.filePath.toLowerCase().endsWith(".md"),
+  )
+}
+
+function getGroupCreatedAt(group: MessageGroup): number | null {
+  if (group.type === "regular") {
+    return "createdAt" in group.message ? (group.message.createdAt ?? null) : null
+  }
+
+  let latest: number | null = null
+  for (const message of group.messages) {
+    const createdAt = message.createdAt ?? null
+    if (createdAt == null) continue
+    latest = latest == null ? createdAt : Math.max(latest, createdAt)
+  }
+  return latest
+}
+
+function buildTurnCardsByGroup(
+  groups: MessageGroup[],
+  turns: TurnSummary[]
+): Map<number, TurnSummary[]> {
+  const completedTurns = turns
+    .filter((turn) => !turn.inProgress && turn.files.length > 0)
+    .sort((a, b) => a.startedAt - b.startedAt || a.id - b.id)
+  const groupTimes = groups.map(getGroupCreatedAt)
+  const cardsByGroup = new Map<number, TurnSummary[]>()
+  let previousTurnEndedAt = -Infinity
+
+  for (const turn of completedTurns) {
+    let targetIndex = -1
+
+    for (let i = 0; i < groupTimes.length; i++) {
+      const createdAt = groupTimes[i]
+      if (createdAt == null) continue
+      if (createdAt >= turn.startedAt && createdAt <= turn.endedAt + 5_000) {
+        targetIndex = i
+      }
+    }
+
+    if (targetIndex === -1) {
+      for (let i = 0; i < groupTimes.length; i++) {
+        const createdAt = groupTimes[i]
+        if (createdAt == null) continue
+        if (createdAt > previousTurnEndedAt && createdAt <= turn.endedAt + 5_000) {
+          targetIndex = i
+        }
+      }
+    }
+
+    if (targetIndex !== -1) {
+      const list = cardsByGroup.get(targetIndex) ?? []
+      list.push(turn)
+      cardsByGroup.set(targetIndex, list)
+    }
+    previousTurnEndedAt = turn.endedAt
+  }
+
+  return cardsByGroup
+}
+
 // Pending initial inputs keyed by threadId — used to pre-fill the textbox
 // after a fork without threading state through route params.
 const pendingInitialInputs = new Map<string, string>()
@@ -256,16 +322,7 @@ export function ChatView({
     [rootPath, selectedMode, threadId, updateThreadMode]
   )
 
-  const { data: latestTurns = [] } = useTurns(sessionId)
-  const isPlanOnlyTurn = useMemo(() => {
-    const latest = latestTurns[0]
-    if (!latest || latest.files.length === 0) return false
-    return latest.files.every(
-      (f) =>
-        f.filePath.replace(/\\/g, "/").startsWith(PLAN_DIR_PREFIX) &&
-        f.filePath.toLowerCase().endsWith(".md"),
-    )
-  }, [latestTurns])
+  const { data: turns = [] } = useTurns(sessionId)
 
   const chatActions = useMemo<ChatActions>(
     () => ({
@@ -486,6 +543,11 @@ export function ChatView({
   const groupedMessages = useMemo(
     () => groupChatMessages(visibleMessages),
     [visibleMessages]
+  )
+
+  const turnCardsByGroup = useMemo(
+    () => buildTurnCardsByGroup(groupedMessages, turns),
+    [groupedMessages, turns]
   )
 
   // Stable per-group keys derived from message identity rather than position,
@@ -1049,7 +1111,30 @@ export function ChatView({
                 }
               }
 
-              return <div key={itemKey}>{content}</div>
+              const turnCards = turnCardsByGroup.get(groupIndex) ?? []
+
+              return (
+                <div key={itemKey}>
+                  {content}
+                  {turnCards.map((turn) =>
+                    isPlanOnlyTurn(turn) ? (
+                      <PlanChangesCard
+                        key={`turn-card-${turn.id}`}
+                        rootPath={rootPath}
+                        turn={turn}
+                      />
+                    ) : (
+                      <FileChangesCard
+                        key={`turn-card-${turn.id}`}
+                        sessionId={sessionId}
+                        rootPath={rootPath}
+                        openWithAppId={openWithAppId}
+                        turn={turn}
+                      />
+                    )
+                  )}
+                </div>
+              )
             })}
           </div>
           <div className="mx-auto w-full max-w-3xl px-6">
@@ -1059,13 +1144,6 @@ export function ChatView({
             }
           </div>
 
-          {/* File changes card — swapped for the plan card when the turn
-              only touched plan-mode artifacts under .agents/plans/. */}
-          {!isLoading && visibleMessages.some((m) => m.role !== "error") && (
-            isPlanOnlyTurn
-              ? <PlanChangesCard sessionId={sessionId} rootPath={rootPath} />
-              : <FileChangesCard sessionId={sessionId} rootPath={rootPath} openWithAppId={openWithAppId} />
-          )}
         </div>
 
         <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />

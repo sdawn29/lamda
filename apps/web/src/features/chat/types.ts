@@ -71,6 +71,7 @@ export interface ToolMessage {
   partialResult?: unknown  // Partial result during execution (e.g., write tool progress)
   duration?: number
   startTime?: number
+  createdAt?: number
 }
 
 // ── Error Messages ────────────────────────────────────────────────────────────
@@ -244,6 +245,7 @@ export function blockToMessage(block: MessageBlock): Message {
         result,
         duration: block.toolDuration ?? undefined,
         startTime: block.toolStartTime ?? undefined,
+        createdAt: block.createdAt,
       }
     }
 
