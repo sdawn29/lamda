@@ -3,8 +3,7 @@
 @plugin "@tailwindcss/typography";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/jetbrains-mono";
-@import "@fontsource-variable/outfit";
-@import "@fontsource-variable/google-sans-flex";
+@import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -21,7 +20,7 @@
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: "Google Sans Flex", sans-serif;
+  --font-sans: "Geist Variable", sans-serif;
   --font-mono: "JetBrains Mono Variable", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -269,9 +268,28 @@
   }
 }
 
+/* ── Chat message entry ────────────────────────────────────────────────────
+   Pure opacity fade with no transform — used by message rows, working
+   blocks, and tool blocks. Slide-based animations were dropped because
+   simultaneous transforms compete visually when several rows mount in the
+   same frame (which is the norm when the WS stream batches events). A
+   per-row `animation-delay` style staggers concurrent mounts so the
+   sequence reads as one row appearing after another. ── */
+@keyframes chat-message-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @layer utilities {
   .animate-thinking-shimmer {
     animation: thinking-shimmer 2.2s linear infinite;
+  }
+  .animate-chat-message-in {
+    animation: chat-message-in 180ms ease-out both;
   }
 }
 
@@ -280,6 +298,9 @@
     animation: none;
     background-image: none;
     color: var(--muted-foreground);
+  }
+  .animate-chat-message-in {
+    animation: none;
   }
 }
 

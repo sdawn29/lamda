@@ -196,23 +196,26 @@ export function followUp(
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 
-/**
- * Response from /session/:id/messages endpoint.
- * Returns complete message blocks with all data fields.
- */
 export interface SessionMessagesResponse {
   blocks: MessageBlock[]
+  hasMore: boolean
 }
 
-/**
- * Fetch all message blocks for a session.
- * Returns complete message data including thinking, tool calls, model info, etc.
- */
+export interface ListMessagesParams {
+  limit?: number
+  before?: number
+}
+
 export function listMessages(
-  sessionId: string
+  sessionId: string,
+  params?: ListMessagesParams
 ): Promise<SessionMessagesResponse> {
+  const qs = new URLSearchParams()
+  if (params?.limit !== undefined) qs.set("limit", String(params.limit))
+  if (params?.before !== undefined) qs.set("before", String(params.before))
+  const query = qs.toString()
   return apiFetch<SessionMessagesResponse>(
-    `/session/${sessionId}/messages`
+    `/session/${sessionId}/messages${query ? `?${query}` : ""}`
   )
 }
 
@@ -435,6 +438,21 @@ export function forkSession(
   blockId: string
 ): Promise<ForkSessionResponse> {
   return apiFetch<ForkSessionResponse>(`/session/${sessionId}/fork`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ blockId }),
+  })
+}
+
+export interface RevertToMessageResponse {
+  text: string
+}
+
+export function revertToMessage(
+  sessionId: string,
+  blockId: string
+): Promise<RevertToMessageResponse> {
+  return apiFetch<RevertToMessageResponse>(`/session/${sessionId}/revert-to-message`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ blockId }),

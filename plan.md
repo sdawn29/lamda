@@ -1,193 +1,142 @@
-# Layout Refactor: Workspace Layout
+# Plan: Performance & Code Quality Improvements — apps/web
 
 ## Context
-
-The current layout is wired inline inside `RootLayoutInner` in `__root.tsx`, making it hard to maintain. The right sidebar uses a tab-based approach (switch between DiffPanel or FileTree) — the new design shows DiffPanel as the permanent primary content of the right sidebar, while FileTree lives as a **collapsible nested sidebar** to its right. All panels are arranged horizontally. A new dedicated `WorkspaceLayout` component extracts and owns the full layout logic.
-
----
-
-## Target Layout (horizontal everywhere)
-
-```
-SidebarProvider
-├── NavigationControls (fixed overlay, top-left)
-├── AppSidebar (left — workspaces + threads list, unchanged)
-└── ResizablePanelGroup [horizontal]
-    ├── ResizablePanel  →  SidebarInset
-    │                       ├── TitleBar
-    │                       ├── UpdateBanner
-    │                       └── ResizablePanelGroup [vertical]
-    │                           ├── MainContentArea
-    │                           └── TerminalPanel (collapsible, bottom strip)
-    ├── ResizableHandle (visible when right sidebar open)
-    └── ResizablePanel  →  RightSidebarContent
-                            └── ResizablePanelGroup [horizontal]
-                                ├── ResizablePanel  →  DiffPanel (fills remaining space)
-                                ├── ResizableHandle (visible when file tree open)
-                                └── ResizablePanel  →  FileTree nested sidebar (collapsible)
-```
+The chat feature is the core of this application. React Compiler (Babel plugin) is already enabled in `vite.config.ts`, so it auto-memoizes most component-level computations. This plan targets what the compiler *cannot* fix: context provider object identity, effect dependency correctness, code duplication, and dead code. All changes are independent and can be applied incrementally.
 
 ---
 
-## Store Changes
+## Changes
 
-**File:** `src/features/layout/store/right-sidebar.ts`
+### 1. Memoize ErrorToastProvider context value
+**File:** `src/features/chat/contexts/error-toast-context.tsx`  
+**Problem:** Line 84 — `value={{ showApiError, dismissApiError }}` creates a new object every render. Both callbacks are already `useCallback`-wrapped with stable deps, so the object identity is the only thing causing all `useErrorToast()` consumers to re-render on every parent render.  
+**Fix:**
+- Add `useMemo` to the React import (line 3–9)
+- Wrap the provider value: `value={useMemo(() => ({ showApiError, dismissApiError }), [showApiError, dismissApiError])}`
+- Also remove the `"use client"` directive on line 1 (Next.js only, unused in Vite)
 
-Replace the `activePanel: "files" | "changes"` concept with two independent booleans:
-
-```typescript
-interface RightSidebarStore {
-  isOpen: boolean           // entire right sidebar (DiffPanel area)
-  isFileTreeOpen: boolean   // nested FileTree sidebar inside right sidebar
-
-  open: () => void
-  close: () => void
-  toggle: () => void
-  openFileTree: () => void
-  closeFileTree: () => void
-  toggleFileTree: () => void
-
-  // backward compat for title-bar.tsx
-  togglePanel: (panel: "changes" | "files") => void
-}
-```
-
-`togglePanel("changes")` → toggles `isOpen` (the whole right sidebar)  
-`togglePanel("files")` → toggles `isFileTreeOpen` (nested file tree)
-
-Initial state: `isOpen: false`, `isFileTreeOpen: false`.
-
----
-
-## Files to Create / Modify
-
-### 1. NEW: `src/features/layout/components/workspace-layout.tsx`
-
-Extract `RootLayoutInner` from `__root.tsx` into this component. It owns:
-- `terminalPanelRef` and `rightSidebarPanelRef` (`useRef<PanelImperativeHandle>`)
-- `useEffect` hooks that imperatively expand/collapse panels
-- Session/workspace/file-tab derivation logic for the right sidebar props (`rsSessionId`, `rsWorkspaceId`, `rsWorkspacePath`, `rsOpenWithAppId`)
-- The outer `ResizablePanelGroup` structure
-
-`MainContentArea` and `UpdateBanner` move here from `__root.tsx` (they are only used in this file).
-
-`RootLayoutInner` in `__root.tsx` becomes a thin wrapper:
+### 2. Stabilize auto-dismiss timer in ChatErrorAlert
+**File:** `src/features/chat/components/chat-error-alert.tsx`  
+**Problem:** Line 34 — `onAction` is in the effect dep array. `onAction` maps to `handleErrorAction` in `chat-view.tsx`, which has a TanStack Query mutation object in its deps → new identity on every parent render → 4-second timer restarts during streaming.  
+**Fix:** Use a ref to hold the latest `onAction` without making it a dep:
 ```tsx
-function RootLayoutInner() {
-  if (isLoading) return <SplashScreen />
-  return <WorkspaceLayout />
-}
+const onActionRef = useRef(onAction)
+useLayoutEffect(() => { onActionRef.current = onAction })
+
+useEffect(() => {
+  if (!shouldAutoDismiss || !error) return
+  const id = error.id
+  timerRef.current = setTimeout(() => {
+    onActionRef.current({ type: "dismiss" }, id)
+  }, 4000)
+  return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+}, [error?.id, shouldAutoDismiss])  // onAction removed
+```
+Add `useLayoutEffect` to the React import.
+
+### 3. Fix stale `messages` dep in WorkingBlock start-time effect
+**File:** `src/features/chat/components/working-block.tsx`  
+**Problem:** Lines 77–89 — dep array `[isActive, messages]`. The effect is guarded by `startTimeRef.current === null` and only does meaningful work once; the `messages` dep causes it to re-run on every streamed message for no benefit.  
+**Fix:** Extract timestamp computation into a `useMemo`, then use the stable derived value in the effect:
+```tsx
+const earliestTimestamp = useMemo(() => {
+  const ts: number[] = []
+  for (const m of messages) {
+    if (m.role === "assistant" && (m as AssistantMessage).createdAt != null)
+      ts.push((m as AssistantMessage).createdAt!)
+    else if (m.role === "tool" && (m as ToolMessage).startTime != null)
+      ts.push((m as ToolMessage).startTime!)
+  }
+  return ts.length > 0 ? Math.min(...ts) : null
+}, [messages])
+
+useEffect(() => {
+  if (isActive && startTimeRef.current === null) {
+    startTimeRef.current = earliestTimestamp ?? Date.now()
+  }
+}, [isActive, earliestTimestamp])
 ```
 
-### 2. MODIFY: `src/features/layout/components/right-sidebar.tsx`
-
-Remove the `PanelTab` switcher and the `activePanel` logic entirely.
-
-New structure — the component root becomes a horizontal `ResizablePanelGroup`:
-
+### 4. Fix stale `messages` dep in WorkingBlock auto-collapse effect
+**File:** `src/features/chat/components/working-block.tsx`  
+**Problem:** Lines 104–117 — dep array `[isActive, messages]`. The `messages` dep only matters in the fallback branch `computeHistoricalDuration(messages)` when `startTimeRef.current === null`. After fix #3, this fallback is only hit for historical (never-active) blocks. The effect fires on every streamed message during active sessions unnecessarily.  
+**Fix:** Remove `messages` from deps, use only `[isActive]`:
 ```tsx
-export function RightSidebarContent({ sessionId, openWithAppId, workspaceId, workspacePath }) {
-  const { close, isFileTreeOpen } = useRightSidebar()
-  const fileTreePanelRef = useRef<PanelImperativeHandle>(null)
+useEffect(() => {
+  const wasActive = prevActiveRef.current
+  prevActiveRef.current = isActive
 
-  // sync file tree panel open/close imperatively
+  if (wasActive && !isActive) {
+    const duration = startTimeRef.current !== null
+      ? Date.now() - startTimeRef.current
+      : null  // displayDuration useMemo covers historical fallback
+    if (duration !== null) setFinalDuration(duration)
+    setExpanded(false)
+  }
+}, [isActive])
+```
+`displayDuration` (lines 119–122) already calls `computeHistoricalDuration(messages)` via `useMemo`, so historical blocks still show correct durations.
+
+### 5. Extract shared dropdown scroll hook
+**New file:** `src/features/chat/hooks/use-dropdown-scroll.ts`  
+**Files to update:** `file-mention-dropdown.tsx` (lines 22–29), `slash-command-dropdown.tsx` (lines 21–28)  
+**Problem:** Identical 6-line `useRef` + `useEffect` pattern duplicated in both files.  
+**Fix:** Create the hook:
+```ts
+import { useEffect, useRef } from "react"
+
+export function useDropdownScroll(selectedIndex: number) {
+  const listRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const p = fileTreePanelRef.current
-    if (!p) return
-    isFileTreeOpen ? p.expand() : p.collapse()
-  }, [isFileTreeOpen])
-
-  return (
-    <ResizablePanelGroup orientation="horizontal" className="h-full w-full">
-      {/* Primary: DiffPanel section */}
-      <ResizablePanel className="flex min-w-0 flex-col overflow-hidden">
-        <SidebarHeader> {/* fullscreen + close buttons */} </SidebarHeader>
-        <SidebarContent className="p-0">
-          {sessionId
-            ? <Suspense><DiffPanel sessionId={sessionId} openWithAppId={openWithAppId} isEmbedded /></Suspense>
-            : <EmptyState />}
-        </SidebarContent>
-      </ResizablePanel>
-
-      {/* Nested FileTree sidebar */}
-      <ResizableHandle withHandle className={cn(!isFileTreeOpen && "hidden")} />
-      <ResizablePanel
-        panelRef={fileTreePanelRef}
-        collapsible collapsedSize={0}
-        defaultSize={35} minSize={20} maxSize={50}
-      >
-        <div className="h-full border-l bg-sidebar overflow-hidden">
-          {workspaceId && workspacePath
-            ? <Suspense><FileTree workspaceId={workspaceId} workspacePath={workspacePath} /></Suspense>
-            : <EmptyState message="Open a workspace to browse files" />}
-        </div>
-      </ResizablePanel>
-    </ResizablePanelGroup>
-  )
+    const list = listRef.current
+    if (!list) return
+    const item = list.children[selectedIndex] as HTMLElement | undefined
+    item?.scrollIntoView({ block: "nearest" })
+  }, [selectedIndex])
+  return listRef
 }
 ```
-
-Props interface stays the same.
-
-### 3. MODIFY: `src/features/layout/store/right-sidebar.ts`
-
-Implement the store as described in the Store Changes section above.
-
-### 4. MODIFY: `src/features/layout/components/title-bar.tsx`
-
-Update lines 55–59 — the two state derivations:
-
-```typescript
-// Before:
-const { isOpen: rightSidebarOpen, activePanel: rightSidebarPanel, togglePanel } = useRightSidebar()
-const diffOpen = rightSidebarOpen && rightSidebarPanel === "changes"
-const fileTreeOpen = rightSidebarOpen && rightSidebarPanel === "files"
-
-// After:
-const { isOpen: rightSidebarOpen, isFileTreeOpen, togglePanel } = useRightSidebar()
-const diffOpen = rightSidebarOpen
-const fileTreeOpen = isFileTreeOpen
+In both dropdown components, replace the `useRef` + `useEffect` block with a single line:
+```tsx
+const listRef = useDropdownScroll(selectedIndex)
 ```
+Remove the `useEffect` and `useRef` imports if no longer needed.  
+Export the new hook from `src/features/chat/hooks/index.ts`.
 
-`toggleDiff` and `toggleFileTree` keep calling `togglePanel("changes")` and `togglePanel("files")` — the store remaps these.
+### 6. Remove `"use client"` from non-Next.js files
+**Files:**
+- `src/features/chat/contexts/error-toast-context.tsx` line 1 (covered above in #1)
+- `src/features/chat/hooks/use-api-error-toasts.ts` line 1  
 
-### 5. MODIFY: `src/features/layout/index.ts`
+These are Vite-only files. The directive does nothing here but misleads developers. The `shared/ui/` files (shadcn-generated) can remain untouched — those are managed by the shadcn CLI.
 
-Add export:
-```typescript
-export { WorkspaceLayout } from "./components/workspace-layout"
-```
-
-### 6. MODIFY: `src/routes/__root.tsx`
-
-- Import `WorkspaceLayout` from `@/features/layout`
-- Remove all extracted logic from `RootLayoutInner` (refs, effects, session derivation, `ResizablePanelGroup` JSX)
-- Move `MainContentArea` and `UpdateBanner` into `workspace-layout.tsx`
-- `RootLayoutInner` shrinks to just the loading check + `<WorkspaceLayout />`
+### 7. Delete dead file: `thread-status-context.tsx`
+**File:** `src/features/chat/thread-status-context.tsx`  
+**Evidence:** `grep -r "thread-status-context" src/` returns zero matches outside the file itself. All live exports (`useSetThreadStatus`, `useSetActiveThreadId`, `initThreadStatusWebSocket`) come from `thread-status-store.ts` (Zustand). The 279-line React context implementation is unreachable from any route or provider tree.  
+**Fix:** Delete the file. Vite tree-shakes it anyway, but its presence is misleading.
 
 ---
 
-## Critical Files
+## Files Changed
 
-| File | Role |
+| File | Change |
 |---|---|
-| `src/routes/__root.tsx` | Thin shell after refactor |
-| `src/features/layout/components/workspace-layout.tsx` | **NEW** — owns full layout logic |
-| `src/features/layout/components/right-sidebar.tsx` | Horizontal DiffPanel + nested FileTree |
-| `src/features/layout/store/right-sidebar.ts` | Two-boolean store |
-| `src/features/layout/components/title-bar.tsx` | Update 3 lines |
-| `src/features/layout/index.ts` | Add WorkspaceLayout export |
+| `src/features/chat/contexts/error-toast-context.tsx` | Memoize context value; remove `"use client"` |
+| `src/features/chat/components/chat-error-alert.tsx` | Stabilize `onAction` via ref |
+| `src/features/chat/components/working-block.tsx` | Fix 2 effect dep arrays (#3 and #4) |
+| `src/features/chat/hooks/use-dropdown-scroll.ts` | New shared hook (create) |
+| `src/features/chat/components/file-mention-dropdown.tsx` | Use shared hook |
+| `src/features/chat/components/slash-command-dropdown.tsx` | Use shared hook |
+| `src/features/chat/hooks/index.ts` | Export new hook |
+| `src/features/chat/hooks/use-api-error-toasts.ts` | Remove `"use client"` |
+| `src/features/chat/thread-status-context.tsx` | Delete (dead code) |
 
 ---
 
 ## Verification
 
-1. `pnpm dev` from `apps/web` — app loads without errors.
-2. Left sidebar shows workspaces + threads (unchanged from AppSidebar).
-3. Click FileDiff icon in TitleBar → right sidebar opens, DiffPanel visible.
-4. Click FolderTree icon → FileTree slides in to the right of DiffPanel as a nested sidebar.
-5. Resize the handle between DiffPanel and FileTree — both panels remain functional.
-6. Click FolderTree icon again → FileTree collapses, DiffPanel fills the space.
-7. Click FileDiff icon again → entire right sidebar closes.
-8. Terminal toggle still works (bottom strip in main content area).
-9. `pnpm typecheck` — zero new errors.
+1. **Type check:** `pnpm --filter web typecheck` — must pass with zero errors
+2. **Build:** `pnpm --filter web build` — must complete successfully
+3. **Dev smoke test (streaming):** Start dev server, send a message and watch it stream — "Working for N.Ns" timer should count correctly, collapse when done, and show the correct elapsed time
+4. **Error banner timer:** Trigger a dismissible error, verify the banner auto-disappears after ~4 seconds and does not restart during streaming
+5. **Dropdown keyboard nav:** Open `@` file mention and `/` command dropdowns with arrow keys — selected item should stay scrolled into view

@@ -13,7 +13,12 @@ import { useQueryClient } from "@tanstack/react-query"
 
 import { useSessionStream } from "./hooks/use-session-stream"
 import { useVisibleMessages } from "./hooks/use-visible-messages"
-import { messagesQueryKey, useSessionStatus } from "./queries"
+import {
+  messagesQueryKey,
+  useSessionStatus,
+  updateLastPageMessages,
+  type MessagesInfiniteData,
+} from "./queries"
 import { dismissSessionError } from "./api"
 import { createErrorMessage } from "./types"
 import type { ErrorMessage, Message } from "./types"
@@ -55,6 +60,9 @@ interface UseChatStreamResult {
   markStopped: () => void
   markSendFailed: () => void
   dismissError: (id: string) => void
+  fetchPreviousPage: () => void
+  hasPreviousPage: boolean
+  isFetchingPreviousPage: boolean
 }
 
 export function useChatStream({
@@ -98,7 +106,12 @@ export function useChatStream({
     }
   }, [sessionStatus, setThreadStatus, threadId])
 
-  const { messages } = useVisibleMessages({ sessionId })
+  const {
+    messages,
+    fetchPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+  } = useVisibleMessages({ sessionId })
 
   const handleIsLoadingChange = useCallback((loading: boolean) => {
     setIsLoading(loading)
@@ -140,19 +153,19 @@ export function useChatStream({
       pendingThinkingLevelRef.current = thinkingLevel ?? null
 
       const userMessage: Message = { role: "user", content: text }
-      queryClient.setQueryData<Message[]>(messagesQueryKey(sessionId), (prev) => {
-        const current = prev ?? []
-        const lastMsg = current[current.length - 1]
-        // Avoid duplicate if the same message was sent twice quickly
-        if (
-          current.length > 0 &&
-          lastMsg.role === "user" &&
-          (lastMsg as Message & { content?: string }).content === text
-        ) {
-          return current
-        }
-        return [...current, userMessage]
-      })
+      queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
+        updateLastPageMessages(prev, (current) => {
+          const lastMsg = current[current.length - 1]
+          if (
+            current.length > 0 &&
+            lastMsg.role === "user" &&
+            (lastMsg as Message & { content?: string }).content === text
+          ) {
+            return current
+          }
+          return [...current, userMessage]
+        })
+      )
     },
     [queryClient, sessionId, lastPromptRef, pendingThinkingLevelRef]
   )
@@ -165,7 +178,11 @@ export function useChatStream({
       createErrorMessage("Send failed", "Failed to send message. Please try again.", {
         retryable: true,
         action: lastPromptRef.current
-          ? { type: "retry", prompt: lastPromptRef.current.text }
+          ? {
+              type: "retry",
+              prompt: lastPromptRef.current.text,
+              thinkingLevel: lastPromptRef.current.thinkingLevel,
+            }
           : { type: "dismiss" },
       })
     )
@@ -173,14 +190,12 @@ export function useChatStream({
 
   const dismissError = useCallback(
     (id: string) => {
-      queryClient.setQueryData<Message[]>(messagesQueryKey(sessionId), (prev) =>
-        (prev ?? []).filter(
-          (m): boolean => !(m.role === "error" && (m as ErrorMessage).id === id)
+      queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
+        updateLastPageMessages(prev, (msgs) =>
+          msgs.filter((m): boolean => !(m.role === "error" && (m as ErrorMessage).id === id))
         )
       )
       setPendingError((prev) => (prev?.id === id ? null : prev))
-      // Tell the server to drop error events from its replay buffer so they
-      // don't reappear when the WebSocket reconnects after a page refresh.
       dismissSessionError(sessionId).catch(() => { /* best-effort */ })
     },
     [queryClient, sessionId]
@@ -199,5 +214,8 @@ export function useChatStream({
     markStopped,
     markSendFailed,
     dismissError,
+    fetchPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
   }
 }

@@ -5,19 +5,21 @@ import {
   sendPrompt,
   steer,
   followUp,
+  revertToMessage,
   type SendPromptParams,
 } from "./api"
 import { messagesQueryKey } from "./queries"
+import { gitKeys } from "@/features/git/queries"
 
 // ── Send prompt ───────────────────────────────────────────────────────────────
 
 export function useSendPrompt(sessionId: string) {
-  const queryClient = useQueryClient()
+  // No onSuccess invalidation: the optimistic user message is already in the
+  // cache and the WS stream is the canonical source of agent state. Invalidating
+  // here would race with the optimistic write (DB may not yet contain the new
+  // user message when the POST response returns) and briefly drop the row.
   return useMutation({
     mutationFn: (params: SendPromptParams) => sendPrompt(sessionId, params),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
-    },
   })
 }
 
@@ -28,12 +30,9 @@ export function useSendPrompt(sessionId: string) {
  * Delivered after the current assistant turn finishes its tool calls.
  */
 export function useSteer(sessionId: string) {
-  const queryClient = useQueryClient()
+  // WS stream handles the message delivery — no need to invalidate.
   return useMutation({
     mutationFn: (text: string) => steer(sessionId, text),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
-    },
   })
 }
 
@@ -44,12 +43,9 @@ export function useSteer(sessionId: string) {
  * Only delivered when agent has no more tool calls or steering messages.
  */
 export function useFollowUp(sessionId: string) {
-  const queryClient = useQueryClient()
+  // WS stream handles the message delivery — no need to invalidate.
   return useMutation({
     mutationFn: (text: string) => followUp(sessionId, text),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
-    },
   })
 }
 
@@ -70,5 +66,24 @@ export function useAbortSession(sessionId: string) {
 export function useGenerateTitle() {
   return useMutation({
     mutationFn: (message: string) => generateTitle(message),
+  })
+}
+
+// ── Revert to message ────────────────────────────────────────────────────────
+
+export function useRevertToMessage(
+  sessionId: string,
+  onSuccess?: (text: string) => void
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (blockId: string) => revertToMessage(sessionId, blockId),
+    onSuccess: ({ text }) => {
+      void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+      void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
+      void queryClient.invalidateQueries({ queryKey: gitKeys.status(sessionId) })
+      void queryClient.invalidateQueries({ queryKey: gitKeys.diffStat(sessionId) })
+      onSuccess?.(text)
+    },
   })
 }

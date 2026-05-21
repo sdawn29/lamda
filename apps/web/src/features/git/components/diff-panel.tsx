@@ -12,6 +12,7 @@ import {
   Archive,
   Check,
   ChevronDown,
+  ChevronRight,
   Columns2,
   AlignLeft,
   FolderGit2,
@@ -30,6 +31,7 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
+import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import {
@@ -43,7 +45,7 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { useDiffPanel } from "../store"
 import { useMainTabs, useMainTabsStore } from "@/features/main-tabs"
-import { useGitDiffStat, useGitStatus, useLastTurn, useRevertLastTurn } from "../queries"
+import { useGitDiffStat, useGitStatus, useTurns, useRevertToTurn, type TurnSummary } from "../queries"
 import {
   useGitStage,
   useGitStageAll,
@@ -110,21 +112,175 @@ const LANGUAGE_MAP: Record<string, string> = {
   md: "markdown",
 }
 
-// ─── Last Turn View ───────────────────────────────────────────────────────────
+// ─── Turn History View ────────────────────────────────────────────────────────
 
 type ContentView = "turn" | "all" | "history"
 
-const LastTurnView = memo(function LastTurnView({
+function formatTurnTime(ts: number): string {
+  if (!ts) return "In progress"
+  const diff = Date.now() - ts
+  if (diff < 60_000) return "just now"
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+  return new Date(ts).toLocaleDateString()
+}
+
+const TurnItem = memo(function TurnItem({
+  turn,
+  turnNumber,
   sessionId,
   mode,
-  files,
+  isExpanded,
+  onToggle,
+  revertMutation,
+}: {
+  turn: TurnSummary
+  turnNumber: number
+  sessionId: string
+  mode: DiffMode
+  isExpanded: boolean
+  onToggle: () => void
+  revertMutation: ReturnType<typeof useRevertToTurn>
+}) {
+  const files: ChangedFile[] = useMemo(
+    () =>
+      turn.files
+        .map((f) => parseStatusLine(`${f.postStatusCode} ${f.filePath}`))
+        .filter(Boolean),
+    [turn.files]
+  )
+
+  const isReverting = revertMutation.isPending
+
+  return (
+    <div className="mx-2 mt-1.5 overflow-hidden rounded-lg border border-border/50">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex h-7 w-full items-center gap-1.5 bg-muted/30 px-2.5 transition-colors hover:bg-muted/50"
+      >
+        <ChevronRight
+          className={cn(
+            "h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
+            isExpanded && "rotate-90"
+          )}
+        />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+          Turn {turnNumber}
+        </span>
+        {turn.inProgress && (
+          <span className="flex items-center gap-1 rounded-sm bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-500">
+            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+            Running
+          </span>
+        )}
+        {turn.checkpointSha && (
+          <span
+            className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground/60"
+            title={`Checkpoint: ${turn.checkpointSha}`}
+          >
+            checkpoint
+          </span>
+        )}
+        {files.length > 0 && (
+          <Badge
+            variant="secondary"
+            className="h-4 min-w-4 rounded-full px-1 text-[10px] tabular-nums"
+          >
+            {files.length}
+          </Badge>
+        )}
+        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">
+          {formatTurnTime(turn.inProgress ? turn.startedAt : turn.endedAt)}
+        </span>
+        {!turn.inProgress && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={isReverting}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    revertMutation.mutate(turn.id)
+                  }}
+                  className="shrink-0 text-muted-foreground/50 hover:text-destructive"
+                >
+                  {isReverting ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Undo2 className="h-3 w-3" />
+                  )}
+                </Button>
+              }
+            />
+            <TooltipContent side="left">Revert to before this turn</TooltipContent>
+          </Tooltip>
+        )}
+      </button>
+
+      {isExpanded && files.length > 0 && (
+        <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
+          <div className="divide-y divide-border/20">
+            {files.map((file) => (
+              <FileListItem
+                key={file.filePath}
+                file={file}
+                sessionId={sessionId}
+                mode={mode}
+                showActions={false}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isExpanded && files.length === 0 && (
+        <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
+          <p className="px-3 py-1.5 text-[11px] text-muted-foreground/40">No file changes recorded</p>
+        </div>
+      )}
+    </div>
+  )
+})
+
+const TurnHistoryView = memo(function TurnHistoryView({
+  sessionId,
+  mode,
+  turns,
   isLoading,
 }: {
   sessionId: string
   mode: DiffMode
-  files: ChangedFile[]
+  turns: TurnSummary[]
   isLoading: boolean
 }) {
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(
+    () => new Set(turns[0] ? [turns[0].id] : [])
+  )
+
+  // Auto-expand newest turn when turns list changes
+  const prevTopIdRef = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    const topId = turns[0]?.id
+    if (topId !== undefined && topId !== prevTopIdRef.current) {
+      prevTopIdRef.current = topId
+      setExpandedIds((prev) => new Set([...prev, topId]))
+    }
+  }, [turns])
+
+  const revertMutation = useRevertToTurn(sessionId)
+
+  const toggleTurn = useCallback((id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
   if (isLoading) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -136,37 +292,44 @@ const LastTurnView = memo(function LastTurnView({
     )
   }
 
-  if (files.length === 0) {
+  if (turns.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-4 py-12 text-center">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
           <History className="h-5 w-5 text-muted-foreground/40" />
         </div>
         <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground/60">No changes from last turn</p>
+          <p className="text-xs font-medium text-muted-foreground/60">No turns yet</p>
           <p className="text-[10px] leading-relaxed text-muted-foreground/40">
-            Files modified by the agent will appear here
+            Each agent turn creates a checkpoint you can revert to
           </p>
         </div>
       </div>
     )
   }
 
+  const totalTurns = turns.filter((t) => !t.inProgress).length
+
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <SectionCard label={`${files.length} file${files.length !== 1 ? "s" : ""} changed`}>
-        <div className="divide-y divide-border/20">
-          {files.map((file) => (
-            <FileListItem
-              key={file.filePath}
-              file={file}
-              sessionId={sessionId}
-              mode={mode}
-              showActions={false}
-            />
-          ))}
-        </div>
-      </SectionCard>
+    <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+      {turns.map((turn, index) => {
+        // Turn number: most recent completed turn = totalTurns, going down
+        const turnNumber = turn.inProgress
+          ? totalTurns + 1
+          : totalTurns - (index - (turns[0]?.inProgress ? 1 : 0))
+        return (
+          <TurnItem
+            key={turn.id}
+            turn={turn}
+            turnNumber={turnNumber}
+            sessionId={sessionId}
+            mode={mode}
+            isExpanded={expandedIds.has(turn.id)}
+            onToggle={() => toggleTurn(turn.id)}
+            revertMutation={revertMutation}
+          />
+        )
+      })}
     </div>
   )
 })
@@ -174,7 +337,6 @@ const LastTurnView = memo(function LastTurnView({
 // ─── Source Control Toolbar ───────────────────────────────────────────────────
 
 const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
-  sessionId,
   workspaceSessionId,
   view,
   mode,
@@ -183,7 +345,6 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
   setSortMode,
   setStashInputOpen,
 }: {
-  sessionId: string
   workspaceSessionId: string
   view: ContentView
   mode: DiffMode
@@ -192,10 +353,6 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
   setSortMode: (s: SortMode) => void
   setStashInputOpen: (open: boolean) => void
 }) {
-  const { data: lastTurnData = [] } = useLastTurn(sessionId)
-  const hasLastTurnFiles = lastTurnData.length > 0
-  const revertLastTurn = useRevertLastTurn(sessionId)
-
   const { data: statusData } = useGitStatus(workspaceSessionId)
   const { hasStaged, hasUnstaged, hasChanges } = useMemo(() => {
     const all = (statusData?.raw ?? "")
@@ -242,78 +399,65 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
           <TooltipContent>Git actions</TooltipContent>
         </Tooltip>
         <DropdownMenuContent align="end" className="w-48">
-          {view === "turn" ? (
-            <DropdownMenuItem
-              onClick={() => revertLastTurn.mutate()}
-              disabled={!hasLastTurnFiles || revertLastTurn.isPending}
-              className="flex items-center gap-2 text-destructive focus:text-destructive"
-            >
-              {revertLastTurn.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Undo2 className="h-3.5 w-3.5" />
-              )}
-              Revert last turn
-            </DropdownMenuItem>
-          ) : (
+          <DropdownMenuItem
+            onClick={() => fetch.mutate()}
+            disabled={remoteWorking}
+            className="flex items-center gap-2"
+          >
+            {fetch.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Fetch
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => pull.mutate()}
+            disabled={remoteWorking}
+            className="flex items-center gap-2"
+          >
+            {pull.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <CloudDownload className="h-3.5 w-3.5" />
+            )}
+            Pull
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => stageAll.mutateAsync()}
+            disabled={bulkWorking || !hasUnstaged || view === "turn"}
+            className="flex items-center gap-2"
+          >
+            {stageAll.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <PackagePlus className="h-3.5 w-3.5" />
+            )}
+            Stage all
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => unstageAll.mutateAsync()}
+            disabled={bulkWorking || !hasStaged || view === "turn"}
+            className="flex items-center gap-2"
+          >
+            {unstageAll.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <PackageMinus className="h-3.5 w-3.5" />
+            )}
+            Unstage all
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => setStashInputOpen(true)}
+            disabled={!hasChanges || view === "turn"}
+            className="flex items-center gap-2"
+          >
+            <Archive className="h-3.5 w-3.5" />
+            Stash changes
+          </DropdownMenuItem>
+          {view !== "turn" && (
             <>
-              <DropdownMenuItem
-                onClick={() => fetch.mutate()}
-                disabled={remoteWorking}
-                className="flex items-center gap-2"
-              >
-                {fetch.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
-                Fetch
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => pull.mutate()}
-                disabled={remoteWorking}
-                className="flex items-center gap-2"
-              >
-                {pull.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <CloudDownload className="h-3.5 w-3.5" />
-                )}
-                Pull
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => stageAll.mutateAsync()}
-                disabled={bulkWorking || !hasUnstaged}
-                className="flex items-center gap-2"
-              >
-                {stageAll.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <PackagePlus className="h-3.5 w-3.5" />
-                )}
-                Stage all
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => unstageAll.mutateAsync()}
-                disabled={bulkWorking || !hasStaged}
-                className="flex items-center gap-2"
-              >
-                {unstageAll.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <PackageMinus className="h-3.5 w-3.5" />
-                )}
-                Unstage all
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setStashInputOpen(true)}
-                disabled={!hasChanges}
-                className="flex items-center gap-2"
-              >
-                <Archive className="h-3.5 w-3.5" />
-                Stash changes
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
@@ -398,11 +542,7 @@ const SourceControlContent = memo(function SourceControlContent({
   stashInputOpen: boolean
   setStashInputOpen: (open: boolean) => void
 }) {
-  const { data: lastTurnData = [], isLoading: lastTurnLoading } = useLastTurn(sessionId)
-  const lastTurnFiles = useMemo(
-    () => lastTurnData.map((f) => parseStatusLine(`${f.postStatusCode} ${f.filePath}`)).filter(Boolean),
-    [lastTurnData]
-  )
+  const { data: turnsData = [], isLoading: turnsLoading } = useTurns(sessionId)
 
   const {
     data: statusData,
@@ -473,7 +613,7 @@ const SourceControlContent = memo(function SourceControlContent({
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex min-h-0 flex-1 flex-col">
         {view === "turn" ? (
-          <LastTurnView sessionId={sessionId} mode={mode} files={lastTurnFiles} isLoading={lastTurnLoading} />
+          <TurnHistoryView sessionId={sessionId} mode={mode} turns={turnsData} isLoading={turnsLoading} />
         ) : view === "history" ? (
           <HistoryView sessionId={workspaceSessionId} />
         ) : (
@@ -979,7 +1119,6 @@ export const DiffPanel = memo(function DiffPanel({
             {/* Git actions + diff mode — not in history view */}
             {scView !== "history" && (
               <SourceControlToolbarSection
-                sessionId={sessionId}
                 workspaceSessionId={workspaceSessionId}
                 view={scView}
                 mode={scMode}

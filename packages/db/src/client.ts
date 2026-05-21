@@ -126,11 +126,12 @@ function createDb() {
     );
 
     CREATE TABLE IF NOT EXISTS agent_turns (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id TEXT NOT NULL,
-      thread_id  TEXT NOT NULL,
-      started_at INTEGER NOT NULL,
-      ended_at   INTEGER NOT NULL
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id      TEXT NOT NULL,
+      thread_id       TEXT NOT NULL,
+      started_at      INTEGER NOT NULL,
+      ended_at        INTEGER NOT NULL,
+      checkpoint_sha  TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS agent_turn_files (
@@ -151,6 +152,16 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS agent_turns_thread_idx ON agent_turns(thread_id);
     CREATE INDEX IF NOT EXISTS agent_turn_files_turn_idx ON agent_turn_files(turn_id);
   `);
+
+  // Migration: Add checkpoint_sha column to agent_turns table.
+  try {
+    const turnCols = sqlite.prepare("PRAGMA table_info(agent_turns)").all() as { name: string }[];
+    if (!turnCols.some((col) => col.name === "checkpoint_sha")) {
+      sqlite.exec(`ALTER TABLE agent_turns ADD COLUMN checkpoint_sha TEXT NOT NULL DEFAULT ''`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
 
   // Migration: Add forked_from_id column to threads table.
   try {

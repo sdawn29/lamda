@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { insertUserBlock, insertAssistantStartBlock, insertToolBlock, appendAssistantTextDelta, appendAssistantThinkingDelta, finalizeAssistantBlock, updateToolBlockResult, updateToolBlockPartialResult, listRunningToolBlocks, insertAgentTurn, insertCompactionBlock } from "@lamda/db";
 import type { ManagedSessionHandle, SessionEvent } from "@lamda/pi-sdk";
-import { gitStatus } from "@lamda/git";
+import { gitStatus, gitStashCreate, gitStashStore } from "@lamda/git";
 import { threadStatusBroadcaster, type ThreadStatus } from "./thread-status-broadcaster.js";
 
 const MAX_RECENT_EVENTS = 512;
@@ -111,6 +111,7 @@ class SessionEventHub {
   private currentToolBlocks = new Map<string, ToolContext>();
   private preTurnStatusMap: Map<string, string> | null = null;
   private preTurnFileContents: Map<string, string> | null = null;
+  private preTurnCheckpointSha = "";
   private preTurnCapturePromise: Promise<void> | null = null;
   private currentTurnEmittedFiles = new Set<string>();
   private currentTurnStartTime = 0;
@@ -162,6 +163,10 @@ class SessionEventHub {
 
   getLastTurnFiles(): TurnFileDetail[] {
     return this.lastTurnFiles;
+  }
+
+  getCurrentTurnStartTime(): number {
+    return this.currentTurnStartTime;
   }
 
   clearLastTurnFiles(): void {
@@ -234,13 +239,27 @@ class SessionEventHub {
   private async capturePreTurnStatus(): Promise<void> {
     if (!this.cwd) return;
     this.currentTurnEmittedFiles.clear();
+    this.preTurnCheckpointSha = "";
     const timeoutMs = 5_000;
     const deadline = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("git-status timeout")), timeoutMs)
     );
     try {
-      const raw = await Promise.race([gitStatus(this.cwd), deadline]);
+      const [raw, checkpointSha] = await Promise.all([
+        Promise.race([gitStatus(this.cwd), deadline]),
+        // Create a non-destructive git stash checkpoint of current state.
+        // gitStashCreate returns empty string if working tree is clean — that's fine.
+        gitStashCreate(this.cwd).then(async (sha) => {
+          if (sha) {
+            const label = `asphalt-checkpoint:${this.sessionId}:${Date.now()}`;
+            await gitStashStore(this.cwd!, sha, label).catch(() => {});
+          }
+          return sha;
+        }).catch(() => ""),
+      ]);
+
       this.preTurnStatusMap = this.parseStatusToMap(raw);
+      this.preTurnCheckpointSha = checkpointSha;
       this.currentTurnStartTime = Date.now();
 
       // Read current content of modified files so we can restore them on revert.
@@ -267,6 +286,7 @@ class SessionEventHub {
     } catch {
       this.preTurnStatusMap = null;
       this.preTurnFileContents = null;
+      this.preTurnCheckpointSha = "";
     }
   }
 
@@ -275,8 +295,10 @@ class SessionEventHub {
     const pre = this.preTurnStatusMap ?? new Map<string, string>();
     const preContents = this.preTurnFileContents ?? new Map<string, string>();
     const startedAt = this.currentTurnStartTime || Date.now();
+    const checkpointSha = this.preTurnCheckpointSha;
     this.preTurnStatusMap = null;
     this.preTurnFileContents = null;
+    this.preTurnCheckpointSha = "";
     this.currentTurnStartTime = 0;
 
     try {
@@ -335,6 +357,7 @@ class SessionEventHub {
           threadId: this.threadId,
           startedAt,
           endedAt: Date.now(),
+          checkpointSha,
           files: turnFiles,
         });
       }
@@ -434,6 +457,7 @@ class SessionEventHub {
     this.runInProgress = false;
     this.preTurnStatusMap = null;
     this.preTurnFileContents = null;
+    this.preTurnCheckpointSha = "";
     this.preTurnCapturePromise = null;
 
     const subscribers = [...this.subscribers.values()];
@@ -804,6 +828,10 @@ class SessionEventRegistry {
 
   getLastTurnFiles(sessionId: string): TurnFileDetail[] {
     return this.hubs.get(sessionId)?.getLastTurnFiles() ?? [];
+  }
+
+  getCurrentTurnStartTime(sessionId: string): number {
+    return this.hubs.get(sessionId)?.getCurrentTurnStartTime() ?? 0;
   }
 
   clearLastTurnFiles(sessionId: string): void {

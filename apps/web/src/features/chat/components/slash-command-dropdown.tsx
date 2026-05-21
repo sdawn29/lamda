@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react"
 import { FileTextIcon, TerminalIcon } from "lucide-react"
+import { useDropdownScroll } from "../hooks/use-dropdown-scroll"
 
 import { Button } from "@/shared/ui/button"
 import { cn } from "@/shared/lib/utils"
@@ -18,14 +18,7 @@ export function SlashCommandDropdown({
   selectedIndex: number
   onSelect: (cmd: SlashCommand) => void
 }) {
-  const listRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const list = listRef.current
-    if (!list) return
-    const item = list.children[selectedIndex] as HTMLElement | undefined
-    item?.scrollIntoView({ block: "nearest" })
-  }, [selectedIndex])
+  const listRef = useDropdownScroll(selectedIndex)
 
   if (!open) return null
 

@@ -2,17 +2,29 @@ import { memo, useState } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { PluggableList } from "unified"
-import { AlertCircleIcon, GitForkIcon, SparklesIcon } from "lucide-react"
+import { AlertCircleIcon, GitForkIcon, SparklesIcon, Undo2, Loader2 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/shared/ui/alert-dialog"
 
 const remarkPlugins: PluggableList = [remarkGfm]
 
 const proseClass =
-  "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.75] prose-headings:my-0 prose-p:leading-[1.75] prose-p:mt-0 prose-p:mb-[1.25em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.75] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-2 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
+  "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.4] prose-headings:my-0 prose-p:leading-[1.6] prose-p:mt-0 prose-p:mb-[0.75em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.6] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
 
 import { ToolCallBlock } from "./tool-call-block"
 import { markdownComponents } from "./markdown-components"
 import { UserMessageContent } from "./user-message"
 import { CopyButton } from "@/shared/components/copy-button"
+import { Button } from "@/shared/ui/button"
 import { getProviderMeta } from "@/shared/lib/provider-meta"
 import { formatDuration, formatTime } from "@/shared/lib/formatters"
 import type { SlashCommand } from "../api"
@@ -63,6 +75,7 @@ interface AssistantMessageBlockProps {
   message: AssistantMessage
   showThinking: boolean
   isNew?: boolean
+  entryDelayMs?: number
   isLastInTurn?: boolean
   turnMessages?: AssistantMessage[]
 }
@@ -78,6 +91,7 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
   message,
   showThinking,
   isNew = true,
+  entryDelayMs = 0,
   isLastInTurn = true,
   turnMessages,
 }: AssistantMessageBlockProps) {
@@ -95,8 +109,21 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
     : null
   const hasMeta = !!(message.model || thinkingLabel || message.responseTime != null)
 
+  // Wrapper-only fade — content updates (word reveal) shouldn't restart the
+  // entry animation, so we apply the class to a stable outer wrapper that
+  // only changes when the message identity changes.
   return (
-    <div className="group flex flex-col gap-2">
+    <div
+      className={cn(
+        "group flex flex-col gap-2",
+        isNew && "animate-chat-message-in"
+      )}
+      style={
+        isNew && entryDelayMs > 0
+          ? { animationDelay: `${entryDelayMs}ms` }
+          : undefined
+      }
+    >
       {hasContent && (
         <div className={proseClass}>
           <Markdown remarkPlugins={remarkPlugins} components={markdownComponents}>
@@ -164,9 +191,14 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
 
 export function getMessageKey(message: Message, index: number): string {
   if (message.role === "error" || message.role === "abort" || message.role === "compaction") return message.id
-  return message.role === "tool"
-    ? message.toolCallId
-    : `${message.role}-${index}`
+  if (message.role === "tool") return `tool-${message.toolCallId}`
+  // Prefer DB id when present — stable across prepends & remounts.
+  if (message.role === "user" && message.id) return `user-${message.id}`
+  // Streaming messages have no id yet — fall back to createdAt + role, then index.
+  // createdAt is sufficiently unique for messages that have it; index covers
+  // the in-flight optimistic / streaming message that has neither id nor createdAt.
+  if (message.createdAt != null) return `${message.role}-t${message.createdAt}`
+  return `${message.role}-i${index}`
 }
 
 export function estimateMessageSize(message: Message): number {
@@ -192,10 +224,14 @@ export interface MessageRowProps {
   commandsByName: ReadonlyMap<string, SlashCommand>
   showThinking: boolean
   isNewMessage?: boolean
+  /** Stagger offset (ms) applied as CSS animation-delay when isNewMessage is true. */
+  entryDelayMs?: number
   isLastInTurn?: boolean
   turnMessages?: AssistantMessage[]
   rootPath?: string
   onFork?: (blockId: string) => Promise<void>
+  onRevert?: (blockId: string) => Promise<void>
+  isReverting?: boolean
 }
 
 function AbortBlock({ message: _ }: { message: AbortMessage }) {
@@ -235,15 +271,26 @@ export const MessageRow = memo(function MessageRow({
   commandsByName,
   showThinking,
   isNewMessage = true,
+  entryDelayMs = 0,
   isLastInTurn = true,
   turnMessages,
   rootPath,
   onFork,
+  onRevert,
+  isReverting = false,
 }: MessageRowProps) {
   const [isForking, setIsForking] = useState(false)
+  const [confirmRevertOpen, setConfirmRevertOpen] = useState(false)
 
   if (message.role === "tool") {
-    return <ToolCallBlock msg={message} isNew={isNewMessage} rootPath={rootPath} />
+    return (
+      <ToolCallBlock
+        msg={message}
+        isNew={isNewMessage}
+        entryDelayMs={entryDelayMs}
+        rootPath={rootPath}
+      />
+    )
   }
 
   if (message.role === "abort") {
@@ -257,6 +304,7 @@ export const MessageRow = memo(function MessageRow({
   if (message.role === "user") {
     const userMsg = message as UserMessage
     const canFork = !!onFork && !!userMsg.id
+    const canRevert = !!onRevert && !!userMsg.id
 
     const handleFork = async () => {
       if (!canFork || isForking) return
@@ -268,45 +316,89 @@ export const MessageRow = memo(function MessageRow({
       }
     }
 
+    const handleConfirmRevert = async () => {
+      if (!canRevert) return
+      setConfirmRevertOpen(false)
+      await onRevert(userMsg.id!)
+    }
+
     return (
-      <div
-        className={cn(
-          "group flex flex-col items-end gap-1.5 self-end",
-          isNewMessage &&
-            "animate-in duration-200 fade-in-0 slide-in-from-bottom-2"
-        )}
-      >
+      <>
         <div
-          className="max-w-3/4 rounded-xl bg-muted px-4 py-2.5 text-sm whitespace-pre-wrap break-words"
-          data-selectable
+          className={cn(
+            "group flex flex-col items-end gap-1.5 self-end",
+            isNewMessage && "animate-chat-message-in"
+          )}
+          style={
+            isNewMessage && entryDelayMs > 0
+              ? { animationDelay: `${entryDelayMs}ms` }
+              : undefined
+          }
         >
-          <UserMessageContent
-            content={message.content}
-            commandsByName={commandsByName}
-          />
+          <div
+            className="max-w-3/4 rounded-xl bg-muted px-4 py-2.5 text-sm whitespace-pre-wrap break-words"
+            data-selectable
+          >
+            <UserMessageContent
+              content={message.content}
+              commandsByName={commandsByName}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            {canRevert && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setConfirmRevertOpen(true)}
+                disabled={isReverting}
+                aria-label="Revert conversation to before this message"
+                className="opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10"
+              >
+                {isReverting ? <Loader2 className="animate-spin" /> : <Undo2 />}
+              </Button>
+            )}
+            {canFork && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleFork}
+                disabled={isForking}
+                aria-label="Fork conversation from here"
+                className="opacity-0 group-hover:opacity-100"
+              >
+                {isForking ? <Loader2 className="animate-spin" /> : <GitForkIcon />}
+              </Button>
+            )}
+            <CopyButton text={message.content} />
+            {userMsg.createdAt != null && (
+              <TimeStamp timestamp={userMsg.createdAt} />
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {canFork && (
-            <button
-              onClick={handleFork}
-              disabled={isForking}
-              className={cn(
-                "flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100",
-                "hover:bg-muted hover:text-foreground/70",
-                isForking && "cursor-not-allowed opacity-50"
-              )}
-              title="Fork conversation from here"
-            >
-              <GitForkIcon className="h-3 w-3" />
-              {isForking ? "Forking…" : "Fork"}
-            </button>
-          )}
-          <CopyButton text={message.content} />
-          {userMsg.createdAt != null && (
-            <TimeStamp timestamp={userMsg.createdAt} />
-          )}
-        </div>
-      </div>
+
+        <AlertDialog open={confirmRevertOpen} onOpenChange={setConfirmRevertOpen}>
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogMedia className="bg-destructive/10">
+                <Undo2 className="text-destructive" />
+              </AlertDialogMedia>
+              <AlertDialogTitle>Revert to before this message?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This message and all subsequent conversation and code changes will
+                be undone. The message text will be restored to your input box.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={handleConfirmRevert}>
+                Revert
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     )
   }
 
@@ -317,6 +409,7 @@ export const MessageRow = memo(function MessageRow({
       message={message}
       showThinking={showThinking}
       isNew={isNewMessage}
+      entryDelayMs={entryDelayMs}
       isLastInTurn={isLastInTurn}
       turnMessages={turnMessages}
     />

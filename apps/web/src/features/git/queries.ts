@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, getLastTurnChanges, getLastTurn, revertLastTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff } from "./api"
+import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, type TurnSummary } from "./api"
 import { getBranch, listBranches } from "@/features/chat/api"
 
 const gitRootKey = ["git"] as const
@@ -21,10 +21,8 @@ export const gitKeys = {
     [...gitSessionKey(sessionId), "branch"] as const,
   branches: (sessionId: string) =>
     [...gitSessionKey(sessionId), "branches"] as const,
-  lastTurnChanges: (sessionId: string) =>
-    [...gitSessionKey(sessionId), "last-turn-changes"] as const,
-  lastTurn: (sessionId: string) =>
-    [...gitSessionKey(sessionId), "last-turn"] as const,
+  turns: (sessionId: string) =>
+    [...gitSessionKey(sessionId), "turns"] as const,
   aheadBehind: (sessionId: string) =>
     [...gitSessionKey(sessionId), "ahead-behind"] as const,
   log: (sessionId: string) =>
@@ -181,47 +179,31 @@ export function useAheadBehind(sessionId: string) {
   })
 }
 
-// ── Last-turn file changes ─────────────────────────────────────────────────────
+// ── Turn checkpoints (multi-turn history) ─────────────────────────────────────
 
-export function useLastTurnChanges(sessionId: string) {
+export type { TurnSummary } from "./api"
+
+export function useTurns(sessionId: string) {
   return useQuery({
-    queryKey: gitKeys.lastTurnChanges(sessionId),
-    queryFn: () => getLastTurnChanges(sessionId),
+    queryKey: gitKeys.turns(sessionId),
+    queryFn: () => listTurns(sessionId),
     enabled: !!sessionId,
     staleTime: Infinity,
   })
 }
 
-// ── Last turn ─────────────────────────────────────────────────────────────────
-
-export interface LastTurnFile {
-  filePath: string
-  postStatusCode: string
-  wasCreatedByTurn: boolean
-  preContent: string | null
-}
-
-export function useLastTurn(sessionId: string) {
-  return useQuery({
-    queryKey: gitKeys.lastTurn(sessionId),
-    queryFn: () => getLastTurn(sessionId),
-    enabled: !!sessionId,
-    staleTime: Infinity,
-  })
-}
-
-export function useRevertLastTurn(sessionId: string) {
+export function useRevertToTurn(sessionId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: () => revertLastTurn(sessionId),
+    mutationFn: (turnId: number) => revertToTurn(sessionId, turnId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: gitKeys.status(sessionId) })
       void queryClient.invalidateQueries({ queryKey: gitKeys.diffStat(sessionId) })
-      void queryClient.invalidateQueries({ queryKey: gitKeys.lastTurn(sessionId) })
-      void queryClient.invalidateQueries({ queryKey: gitKeys.lastTurnChanges(sessionId) })
+      void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
     },
     onError: (error: Error) => {
-      console.error("[RevertLastTurn] Error:", error.message)
+      console.error("[RevertToTurn] Error:", error.message)
     },
   })
 }
+

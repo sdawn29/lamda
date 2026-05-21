@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useLayoutEffect, useRef } from "react"
 import { AlertCircleIcon, RotateCwIcon, WifiOffIcon, XIcon } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { cn } from "@/shared/lib/utils"
@@ -22,16 +22,19 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
   const shouldAutoDismiss = !!error && !canRetry && error.action?.type === "dismiss"
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onActionRef = useRef(onAction)
+  useLayoutEffect(() => { onActionRef.current = onAction })
 
   useEffect(() => {
     if (!shouldAutoDismiss || !error) return
+    const id = error.id
     timerRef.current = setTimeout(() => {
-      onAction({ type: "dismiss" }, error.id)
+      onActionRef.current({ type: "dismiss" }, id)
     }, 4000)
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [error?.id, shouldAutoDismiss, onAction])
+  }, [error?.id, shouldAutoDismiss])
 
   if (!error) return null
 

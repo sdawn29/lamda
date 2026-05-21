@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, asc, and, max, count } from "drizzle-orm";
+import { eq, asc, and, max, count, desc, lt, gte } from "drizzle-orm";
 import { db } from "../client.js";
 import { messageBlocks } from "../schema.js";
 
@@ -46,6 +46,43 @@ export function listMessageBlocks(threadId: string): MessageBlock[] {
     .orderBy(asc(messageBlocks.blockIndex))
     .all()
     .map(toMessageBlock);
+}
+
+export interface MessageBlocksPage {
+  blocks: MessageBlock[];
+  hasMore: boolean;
+}
+
+/**
+ * Get a paginated window of message blocks for a thread.
+ * Fetches the `limit` most recent blocks before the given cursor `before`
+ * (exclusive), returning them in chronological order.
+ * Pass `before=undefined` to get the most recent blocks.
+ */
+export function listMessageBlocksPage(
+  threadId: string,
+  limit: number,
+  before?: number
+): MessageBlocksPage {
+  const condition =
+    before !== undefined
+      ? and(eq(messageBlocks.threadId, threadId), lt(messageBlocks.blockIndex, before))
+      : eq(messageBlocks.threadId, threadId);
+
+  // Fetch one extra to detect whether older pages exist.
+  const rows = db
+    .select()
+    .from(messageBlocks)
+    .where(condition)
+    .orderBy(desc(messageBlocks.blockIndex))
+    .limit(limit + 1)
+    .all()
+    .map(toMessageBlock);
+
+  const hasMore = rows.length > limit;
+  const blocks = rows.slice(0, limit).reverse(); // restore chronological order
+
+  return { blocks, hasMore };
 }
 
 /**
@@ -273,6 +310,16 @@ export function getMessageBlock(id: string): MessageBlock | undefined {
  */
 export function deleteThreadBlocks(threadId: string): void {
   db.delete(messageBlocks).where(eq(messageBlocks.threadId, threadId)).run();
+}
+
+/**
+ * Delete all message blocks at or after the given blockIndex (inclusive).
+ * Used when reverting the conversation to a specific point.
+ */
+export function deleteMessageBlocksFrom(threadId: string, fromBlockIndex: number): void {
+  db.delete(messageBlocks)
+    .where(and(eq(messageBlocks.threadId, threadId), gte(messageBlocks.blockIndex, fromBlockIndex)))
+    .run();
 }
 
 /**

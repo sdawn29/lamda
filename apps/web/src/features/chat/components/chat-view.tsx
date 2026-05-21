@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } fr
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
-import type { AssistantMessage, ErrorAction, Message, ToolMessage } from "../types"
+import type { AssistantMessage, ErrorAction, Message, UserMessage } from "../types"
 import { WorkingBlock, type WorkingMessage } from "./working-block"
 import {
   ArrowDownIcon,
@@ -33,7 +33,7 @@ import { useSlashCommands, useSessionStats, chatKeys, messagesQueryKey } from ".
 import { useBranch } from "@/features/git/queries"
 import { useBranches } from "@/features/git/queries"
 import { useCheckoutBranch } from "@/features/git/mutations"
-import { useAbortSession, useGenerateTitle, useSendPrompt } from "../mutations"
+import { useAbortSession, useGenerateTitle, useSendPrompt, useRevertToMessage } from "../mutations"
 import { useModels } from "../queries"
 import { useConfigureProvider } from "@/features/settings"
 import { ThinkingIndicator } from "./thinking-indicator"
@@ -52,6 +52,7 @@ import { FileChangesCard } from "./file-changes-card"
 import { forkSession, listMessages } from "../api"
 import { blocksToMessages, type MessageBlock } from "../types"
 import { workspaceKeys } from "@/features/workspace/queries"
+import { MESSAGES_PAGE_SIZE, type MessagesInfiniteData } from "../queries"
 
 const PROMPT_SUGGESTIONS = [
   { icon: Code2Icon, text: "Explain this codebase", description: "Walk me through the project structure and key patterns" },
@@ -156,6 +157,18 @@ function groupChatMessages(messages: Message[]): MessageGroup[] {
 // after a fork without threading state through route params.
 const pendingInitialInputs = new Map<string, string>()
 
+// ── Sequential message entry ─────────────────────────────────────────────
+// Each row that enters the visible list within a single turn gets a sequence
+// number; CSS animation-delay is `seq * STAGGER_MS` so concurrent mounts
+// (RAF-batched WS events) cascade in instead of stacking on the same frame.
+// Capped so a long burst doesn't push the last item out by full seconds.
+const ENTRY_STAGGER_MS = 70
+const ENTRY_MAX_DELAY_MS = 420
+
+function entryDelayFor(seq: number): number {
+  return Math.min(seq * ENTRY_STAGGER_MS, ENTRY_MAX_DELAY_MS)
+}
+
 interface ChatViewProps {
   sessionId: string
   workspaceId: string
@@ -194,6 +207,9 @@ export function ChatView({
     markStopped,
     markSendFailed,
     dismissError,
+    fetchPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
   } = useChatStream({
     sessionId,
     threadId,
@@ -209,19 +225,7 @@ export function ChatView({
   const updateThreadStopped = useUpdateThreadStopped()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(false)
-  const messagesResizeObserverRef = useRef<ResizeObserver | null>(null)
-  const messagesContainerRef = useCallback((el: HTMLDivElement | null) => {
-    messagesResizeObserverRef.current?.disconnect()
-    messagesResizeObserverRef.current = null
-    if (!el) return
-    const ro = new ResizeObserver(() => {
-      if (!pinnedRef.current) return
-      const scroll = scrollContainerRef.current
-      if (scroll) scroll.scrollTop = scroll.scrollHeight
-    })
-    ro.observe(el)
-    messagesResizeObserverRef.current = ro
-  }, [])
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const isScrollingToBottomRef = useRef(false)
   const lastScrollTopRef = useRef(0)
   const chatTextboxRef = useRef<ChatTextboxHandle>(null)
@@ -229,6 +233,9 @@ export function ChatView({
   // Only messages that arrive after the initial snapshot get animate-in treatment.
   // State (not a ref) so it can be safely read during render.
   const [initialSnapshot, setInitialSnapshot] = useState<{ sessionId: string; keys: Set<string> } | null>(null)
+  // Always-current ref used by the snapshot update effect below.
+  const visibleMessagesRef = useRef(visibleMessages)
+  visibleMessagesRef.current = visibleMessages
   // Tracks the last-rendered session so we can detect switches during render.
   const [localSessionId, setLocalSessionId] = useState(sessionId)
   const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -246,6 +253,8 @@ export function ChatView({
 
   // Capture initial keys for this session as soon as messages are available,
   // also during render so isNewMessage is correct on the very same frame.
+  // Use the per-message key (not per-group) so we can ask "was this message
+  // present at first paint?" for both regular and working-block messages.
   if (
     visibleMessages.length > 0 &&
     (initialSnapshot === null || initialSnapshot.sessionId !== sessionId)
@@ -255,6 +264,46 @@ export function ChatView({
       keys: new Set(visibleMessages.map((m, i) => getMessageKey(m, i))),
     })
   }
+
+  // Per-turn appearance order: assigns a stable sequence number the first
+  // time we see a not-in-snapshot key. Used to derive `animation-delay` so
+  // rows mounted in the same RAF batch cascade instead of overlapping.
+  // Reset when the active session changes; cleared by an effect when a turn
+  // completes so the next turn's first row starts at delay 0.
+  const appearanceOrderRef = useRef<Map<string, number>>(new Map())
+  const appearanceCounterRef = useRef(0)
+  if (localSessionId !== sessionId) {
+    appearanceOrderRef.current = new Map()
+    appearanceCounterRef.current = 0
+  }
+  const getEntryDelayMs = (key: string): number => {
+    const map = appearanceOrderRef.current
+    let seq = map.get(key)
+    if (seq === undefined) {
+      seq = appearanceCounterRef.current++
+      map.set(key, seq)
+    }
+    return entryDelayFor(seq)
+  }
+
+  // After each response completes, extend the snapshot to include all messages now
+  // visible. Without this, messages from the previous exchange are not in the snapshot
+  // and get isNew=true when the next prompt is sent, replaying their entry animations.
+  // Also reset the appearance-order map so the next turn's first row mounts with
+  // zero delay instead of stacking on the previous turn's counter.
+  const prevIsLoadingRef = useRef(isLoading)
+  useEffect(() => {
+    const wasLoading = prevIsLoadingRef.current
+    prevIsLoadingRef.current = isLoading
+    if (wasLoading && !isLoading && visibleMessagesRef.current.length > 0) {
+      setInitialSnapshot({
+        sessionId,
+        keys: new Set(visibleMessagesRef.current.map((m, i) => getMessageKey(m, i))),
+      })
+      appearanceOrderRef.current = new Map()
+      appearanceCounterRef.current = 0
+    }
+  }, [isLoading, sessionId])
 
   // Focus textbox whenever the active session changes (imperative DOM op — effect is correct here).
   useEffect(() => {
@@ -270,14 +319,22 @@ export function ChatView({
     }
   }, [threadId])
 
-  // Flush any pending scroll-to-localStorage write on unmount.
+  // Flush any pending scroll-to-localStorage write on unmount so the last
+  // sub-debounce scroll position survives a thread switch / reload.
   useEffect(() => {
     return () => {
       if (scrollSaveTimeoutRef.current !== null) {
         clearTimeout(scrollSaveTimeoutRef.current)
+        scrollSaveTimeoutRef.current = null
+        const meta = pendingScrollMetaRef.current
+        if (meta) {
+          pendingScrollMetaRef.current = null
+          queryClient.setQueryData(chatKeys.scroll(sessionId), meta)
+          syncEngine.saveScrollMeta(sessionId, meta)
+        }
       }
     }
-  }, [])
+  }, [queryClient, sessionId, syncEngine])
 
   // ── Queries ───────────────────────────────────────────────────────────────────
   const { data: commandsData } = useSlashCommands(sessionId)
@@ -313,12 +370,15 @@ export function ChatView({
   const { data: sessionStats } = useSessionStats(sessionId)
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────────
-  // During streaming, smooth scrolling is called on every delta and the browser
-  // interrupts each animation before it finishes, causing the view to lag behind
-  // the final content. Rapid smooth-scroll calls also fire onScroll mid-animation,
-  // which can flip pinnedRef to false and stop further scrolls entirely.
-  // Fix: use instant scrollTop assignment while loading so every update reliably
-  // lands at the bottom; only use smooth scroll once the stream is stable.
+  // Two-layer approach:
+  // 1. A ResizeObserver on the messages container tracks content growth (word-reveal,
+  //    streaming text deltas) and instantly keeps the user at the bottom — no visible
+  //    jump because content grows in small increments.
+  // 2. The useLayoutEffect below handles coarser events (loading state changes, new
+  //    message groups) and uses smooth scroll so there is a clear visual cue for
+  //    each "something new appeared" moment.
+  // The isScrollingToBottomRef guard prevents handleScroll from flipping pinnedRef
+  // to false mid-animation, which would stop further auto-scroll.
   const commandsByName = useMemo(
     () => new Map((commandsData ?? []).map((command) => [command.name, command])),
     [commandsData]
@@ -329,24 +389,83 @@ export function ChatView({
     [visibleMessages]
   )
 
+  // Stable per-group keys derived from message identity rather than position,
+  // so prepending older history doesn't re-key existing rows. Used as the
+  // React key for each rendered group and by the initialSnapshot isNew lookup.
+  const groupKeys = useMemo(() => {
+    const keys: string[] = new Array(groupedMessages.length)
+    for (let i = 0; i < groupedMessages.length; i++) {
+      const group = groupedMessages[i]
+      if (group.type === "working") {
+        const firstMsg = group.messages[0]
+        if (firstMsg?.role === "tool") {
+          keys[i] = `working-tool-${firstMsg.toolCallId}`
+        } else if (firstMsg?.role === "assistant") {
+          const a = firstMsg as AssistantMessage
+          keys[i] = a.createdAt != null
+            ? `working-assistant-t${a.createdAt}`
+            : `working-assistant-i${group.startIndex}`
+        } else {
+          // Synthetic working block (final-thinking placeholder) is always
+          // followed by a regular assistant group; share its key prefix.
+          const next = groupedMessages[i + 1]
+          if (next?.type === "regular") {
+            keys[i] = `working-syn-${getMessageKey(next.message, next.index)}`
+          } else {
+            keys[i] = `working-i${group.startIndex}`
+          }
+        }
+      } else {
+        keys[i] = getMessageKey(group.message, group.index)
+      }
+    }
+    return keys
+  }, [groupedMessages])
+
+  // ThinkingIndicator is shown while there is nothing else visible to indicate
+  // progress. It disappears once the agent produces tool calls or text content
+  // (working block or assistant message) — those take over the loading signal.
+  // But a working block that contains only an empty in-flight assistant message
+  // (message_start fired, no text/tool yet) renders null, so we must also show
+  // the indicator in that case to avoid a blank gap before the first delta.
+  const lastGroup = groupedMessages.at(-1)
+  const lastGroupIsEmptyWorking =
+    lastGroup?.type === "working" &&
+    lastGroup.messages.every((m) => m.role !== "tool")
+  const showThinkingIndicator =
+    isLoading &&
+    !isCompacting &&
+    (!lastGroup ||
+      (lastGroup.type === "regular" && lastGroup.message.role === "user") ||
+      lastGroupIsEmptyWorking)
+
+  // Track group count + previous scrollHeight so we can restore scroll position
+  // after older pages prepend (keeps the previously-first visible row in place
+  // instead of jumping to the top).
+  const prevGroupCountRef = useRef(groupedMessages.length)
+  const prevScrollHeightRef = useRef(0)
+  const isLoadingOlderRef = useRef(false)
+
   // ── Scroll position persistence via query cache & localStorage ──────────────────
-  // Scroll positions are stored in both TanStack Query cache and localStorage.
-  // localStorage persists across garbage collection and page reloads.
+  // Both writes are debounced (~150 ms) — onScroll can fire 60×/s, but neither
+  // the query cache (no live subscribers) nor localStorage benefits from
+  // per-frame precision. Only the latest scroll position needs to survive
+  // a thread switch / reload.
+  const pendingScrollMetaRef = useRef<{ scrollTop: number; isPinned: boolean; visited: true } | null>(null)
   const saveScrollPosition = useCallback(
     (scrollTop: number) => {
-      const meta = {
+      pendingScrollMetaRef.current = {
         scrollTop,
         isPinned: pinnedRef.current,
         visited: true,
       }
-      // Update in-memory cache immediately (cheap, O(1))
-      queryClient.setQueryData(chatKeys.scroll(sessionId), meta)
-      // Debounce the synchronous localStorage write (fires 150ms after last scroll)
-      if (scrollSaveTimeoutRef.current !== null) {
-        clearTimeout(scrollSaveTimeoutRef.current)
-      }
+      if (scrollSaveTimeoutRef.current !== null) return
       scrollSaveTimeoutRef.current = setTimeout(() => {
         scrollSaveTimeoutRef.current = null
+        const meta = pendingScrollMetaRef.current
+        if (!meta) return
+        pendingScrollMetaRef.current = null
+        queryClient.setQueryData(chatKeys.scroll(sessionId), meta)
         syncEngine.saveScrollMeta(sessionId, meta)
       }, 150)
     },
@@ -405,42 +524,100 @@ export function ChatView({
   }, [threadId, sessionId, queryClient, syncEngine])
 
   useLayoutEffect(() => {
+    if (!pinnedRef.current || groupedMessages.length === 0) return
     const el = scrollContainerRef.current
-    if (!el || !pinnedRef.current) return
-    el.scrollTop = el.scrollHeight
-  }, [isLoading, visibleMessages])
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distanceFromBottom < 5) return
+    isScrollingToBottomRef.current = true
+    lastScrollTopRef.current = el.scrollTop
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }, [isLoading, groupedMessages.length])
+
+  // After older pages are prepended, offset scrollTop by the height delta so
+  // the previously-first visible item stays in place instead of jumping.
+  useLayoutEffect(() => {
+    const prevCount = prevGroupCountRef.current
+    const newCount = groupedMessages.length
+    if (isLoadingOlderRef.current && newCount > prevCount) {
+      isLoadingOlderRef.current = false
+      const el = scrollContainerRef.current
+      if (el) {
+        const delta = el.scrollHeight - prevScrollHeightRef.current
+        if (delta > 0) el.scrollTop = el.scrollTop + delta
+      }
+    }
+    prevGroupCountRef.current = newCount
+  }, [groupedMessages.length])
+
+  // ResizeObserver: keep the view pinned to the bottom as content grows
+  // incrementally (word-reveal, streaming text deltas). Fires whenever the
+  // messages container changes height; if we're already pinned, snap to bottom.
+  // If a smooth animation is already in progress (from the useLayoutEffect
+  // above), extend its target so the animation continues to the new bottom
+  // instead of being interrupted by an instant jump.
+  useEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+    const ro = new ResizeObserver(() => {
+      if (!pinnedRef.current) return
+      const el = scrollContainerRef.current
+      if (!el) return
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+      if (distanceFromBottom < 5) return
+      if (isScrollingToBottomRef.current) {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+      } else {
+        el.scrollTop = el.scrollHeight
+      }
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [])
+
+  const showScrollButtonRef = useRef(showScrollButton)
+  showScrollButtonRef.current = showScrollButton
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
 
+    // Trigger loading older messages when near the top
+    if (el.scrollTop < 200 && hasPreviousPage && !isFetchingPreviousPage && !isLoadingOlderRef.current) {
+      isLoadingOlderRef.current = true
+      prevGroupCountRef.current = groupedMessages.length
+      prevScrollHeightRef.current = el.scrollHeight
+      fetchPreviousPage()
+    }
+
     if (isScrollingToBottomRef.current) {
       const scrolledUp = el.scrollTop < lastScrollTopRef.current
       lastScrollTopRef.current = el.scrollTop
       if (distanceFromBottom < 10) {
-        // Animation reached the bottom — clear the in-flight flag
         isScrollingToBottomRef.current = false
         saveScrollPosition(el.scrollTop)
         return
       }
       if (!scrolledUp) {
-        // Still animating downward — skip pinned/button updates to avoid
-        // flipping pinnedRef false mid-animation (which would break auto-scroll
-        // for any message that arrives before the animation finishes)
         saveScrollPosition(el.scrollTop)
         return
       }
-      // User scrolled up to interrupt the animation — clear flag and handle normally
       isScrollingToBottomRef.current = false
     } else {
       lastScrollTopRef.current = el.scrollTop
     }
 
     pinnedRef.current = distanceFromBottom < 80
-    setShowScrollButton(distanceFromBottom >= 80)
+    // Only setState when the boolean actually flips — otherwise every
+    // scroll-frame schedules a re-render React would then bail out of.
+    const shouldShow = distanceFromBottom >= 80
+    if (shouldShow !== showScrollButtonRef.current) {
+      showScrollButtonRef.current = shouldShow
+      setShowScrollButton(shouldShow)
+    }
     saveScrollPosition(el.scrollTop)
-  }, [saveScrollPosition])
+  }, [saveScrollPosition, hasPreviousPage, isFetchingPreviousPage, fetchPreviousPage, groupedMessages.length])
 
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current
@@ -448,11 +625,13 @@ export function ChatView({
     pinnedRef.current = true
     setShowScrollButton(false)
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    if (distanceFromBottom < 10) return  // Already at bottom
-    isScrollingToBottomRef.current = true
-    lastScrollTopRef.current = el.scrollTop
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
-  }, [])
+    if (distanceFromBottom < 10) return
+    if (groupedMessages.length > 0) {
+      isScrollingToBottomRef.current = true
+      lastScrollTopRef.current = el.scrollTop
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+    }
+  }, [groupedMessages.length])
 
   const handleModelChange = useCallback(
     (id: string) => {
@@ -560,9 +739,14 @@ export function ChatView({
         if (initialInput) pendingInitialInputs.set(newThreadId, initialInput)
         // Pre-populate the messages cache so the forked thread renders immediately
         try {
-          const { blocks } = await listMessages(newSessionId)
+          const { blocks, hasMore } = await listMessages(newSessionId, { limit: MESSAGES_PAGE_SIZE })
           const seededMessages = blocksToMessages(blocks as MessageBlock[])
-          queryClient.setQueryData(messagesQueryKey(newSessionId), seededMessages)
+          const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
+          const seed: MessagesInfiniteData = {
+            pages: [{ messages: seededMessages, hasMore, oldestBlockIndex }],
+            pageParams: [undefined],
+          }
+          queryClient.setQueryData(messagesQueryKey(newSessionId), seed)
         } catch {
           // Non-fatal — the query will fetch on mount
         }
@@ -575,7 +759,27 @@ export function ChatView({
         })
       }
     },
-    [sessionId, queryClient, navigate, activeWorkspace, threadId]
+    [sessionId, queryClient, navigate]
+  )
+
+  const [revertingBlockId, setRevertingBlockId] = useState<string | null>(null)
+  const revertToMessageMutation = useRevertToMessage(sessionId, (text) => {
+    if (text) chatTextboxRef.current?.setValue(text)
+  })
+  const handleRevert = useCallback(
+    async (blockId: string) => {
+      setRevertingBlockId(blockId)
+      try {
+        await revertToMessageMutation.mutateAsync(blockId)
+      } catch (err) {
+        toast.error("Revert failed", {
+          description: err instanceof Error ? err.message : "Could not revert conversation",
+        })
+      } finally {
+        setRevertingBlockId(null)
+      }
+    },
+    [revertToMessageMutation]
   )
 
   return (
@@ -620,7 +824,7 @@ export function ChatView({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex w-full flex-1 flex-col overflow-y-auto pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [overflow-anchor:none]"
+          className="flex w-full flex-1 flex-col overflow-y-auto pt-4 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [overflow-anchor:none]"
         >
           {visibleMessages.length === 0 && !isLoading && (
             <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-8 px-6 text-center select-none">
@@ -664,75 +868,89 @@ export function ChatView({
             </div>
           )}
           {groupedMessages.length > 0 && (
-            <div ref={messagesContainerRef} className="mx-auto w-full max-w-3xl px-6">
+            <div ref={messagesContainerRef}>
+              {/* Spinner while loading older history */}
+              {isFetchingPreviousPage && (
+                <div className="flex justify-center py-3">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+                </div>
+              )}
               {groupedMessages.map((group, groupIndex) => {
+                const itemKey = groupKeys[groupIndex] ?? groupIndex
+                let content: React.ReactNode
+
                 if (group.type === "working") {
-                  const isGroupActive =
-                    isLoading && groupIndex === groupedMessages.length - 1
+                  const isGroupActive = isLoading && groupIndex === groupedMessages.length - 1
                   const firstMsg = group.messages[0] as WorkingMessage | undefined
+                  // Use the same key fn as initialSnapshot to keep isNew lookup consistent.
                   const firstKey = firstMsg
-                    ? firstMsg.role === "tool"
-                      ? (firstMsg as ToolMessage).toolCallId
-                      : `assistant-${group.startIndex}`
+                    ? getMessageKey(firstMsg, group.startIndex)
                     : `working-${group.startIndex}`
                   const isNewGroup =
+                    isLoading &&
                     initialSnapshot !== null &&
                     initialSnapshot.sessionId === sessionId &&
                     !initialSnapshot.keys.has(firstKey)
-                  const workingKey =
-                    (group.messages.find((m) => m.role === "tool") as ToolMessage | undefined)
-                      ?.toolCallId ?? `working-${group.startIndex}`
-                  return (
-                    <div key={`w-${workingKey}`} className="pb-5">
+                  const entryDelayMs = isNewGroup ? getEntryDelayMs(firstKey) : 0
+                  content = (
+                    <div className="mx-auto w-full max-w-3xl px-6 pb-3">
                       <WorkingBlock
                         messages={group.messages}
                         isActive={isGroupActive}
                         showThinking={showThinkingSetting}
                         isNew={isNewGroup}
+                        entryDelayMs={entryDelayMs}
                         finalThinking={group.finalThinking}
                         rootPath={rootPath}
                       />
                     </div>
                   )
+                } else {
+                  const { message, index, isLastInTurnStatic, turnMessages } = group
+                  if (
+                    message.role === "assistant" &&
+                    !message.content.trim() &&
+                    !message.thinking.trim() &&
+                    !message.errorMessage
+                  ) {
+                    content = null
+                  } else {
+                    const key = getMessageKey(message, index)
+                    const isNewMessage =
+                      isLoading &&
+                      initialSnapshot !== null &&
+                      initialSnapshot.sessionId === sessionId &&
+                      !initialSnapshot.keys.has(key)
+                    const isLastInTurn = !isLoading && isLastInTurnStatic
+                    const entryDelayMs = isNewMessage ? getEntryDelayMs(key) : 0
+                    content = (
+                      <div className="mx-auto w-full max-w-3xl px-6 pb-3">
+                        <MessageRow
+                          message={message}
+                          commandsByName={commandsByName}
+                          showThinking={group.suppressThinking ? false : showThinkingSetting}
+                          isNewMessage={isNewMessage}
+                          entryDelayMs={entryDelayMs}
+                          isLastInTurn={isLastInTurn}
+                          turnMessages={turnMessages}
+                          rootPath={rootPath}
+                          onFork={handleFork}
+                          onRevert={!isLoading ? handleRevert : undefined}
+                          isReverting={revertingBlockId === (message as UserMessage).id}
+                        />
+                      </div>
+                    )
+                  }
                 }
 
-                // Regular message
-                const { message, index, isLastInTurnStatic, turnMessages } = group
-                if (
-                  message.role === "assistant" &&
-                  !message.content.trim() &&
-                  !message.thinking.trim() &&
-                  !message.errorMessage
-                )
-                  return null
-                const key = getMessageKey(message, index)
-                const isNewMessage =
-                  initialSnapshot !== null &&
-                  initialSnapshot.sessionId === sessionId &&
-                  !initialSnapshot.keys.has(key)
-                // isLastInTurn is precomputed in groupChatMessages; only suppress during streaming.
-                const isLastInTurn = !isLoading && isLastInTurnStatic
-                return (
-                  <div key={key} className="pb-5">
-                    <MessageRow
-                      message={message}
-                      commandsByName={commandsByName}
-                      showThinking={group.suppressThinking ? false : showThinkingSetting}
-                      isNewMessage={isNewMessage}
-                      isLastInTurn={isLastInTurn}
-                      turnMessages={turnMessages}
-                      rootPath={rootPath}
-                      onFork={handleFork}
-                    />
-                  </div>
-                )
+                return <div key={itemKey}>{content}</div>
               })}
             </div>
           )}
           <div className="mx-auto w-full max-w-3xl px-6">
             {isCompacting
               ? <CompactingIndicator reason={compactionReason} />
-              : isLoading && <ThinkingIndicator className="py-0.5" />
+              : showThinkingIndicator && <ThinkingIndicator className="py-0.5" />
             }
           </div>
 

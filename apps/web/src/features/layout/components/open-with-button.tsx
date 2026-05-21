@@ -137,7 +137,7 @@ export function OpenWithButton({
   return (
     <div className="flex items-center" aria-label="Open workspace in app">
       <Button
-        className="h-7 max-w-36 min-w-0 justify-start overflow-hidden rounded-r-none px-2"
+        className="h-7 rounded-r-none px-2"
         disabled={disabled}
         onClick={() => {
           void openWorkspace()
@@ -146,14 +146,12 @@ export function OpenWithButton({
         variant="outline"
       >
         {openWorkspaceMutation.isPending || isLoadingApps || isLoadingIcons ? (
-          <Loader2
-            className="animate-spin text-muted-foreground"
-            data-icon="inline-start"
-          />
+          <Loader2 className="size-4 animate-spin" />
         ) : (
           <AppIcon
             appName={selectedAppName}
             iconDataUrl={selectedAppIconDataUrl}
+            className="size-4"
           />
         )}
       </Button>
@@ -163,7 +161,7 @@ export function OpenWithButton({
           aria-label="Choose app"
           disabled={disabled}
           render={
-            <Button size="icon" variant="outline" className="h-7 w-6 rounded-l-none">
+            <Button variant="outline" className="h-7 w-6 rounded-l-none border-l-0">
               <ChevronDown className="size-3" />
             </Button>
           }

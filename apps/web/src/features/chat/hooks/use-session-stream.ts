@@ -4,10 +4,10 @@ import { useQueryClient } from "@tanstack/react-query"
 
 import { openSessionWebSocket, listRunningTools } from "../api"
 import { subscribeToSessionEvents, type AgentEndMessage } from "../session-events"
-import { messagesQueryKey, chatKeys } from "../queries"
+import { messagesQueryKey, chatKeys, updateLastPageMessages, type MessagesInfiniteData } from "../queries"
 import { createAssistantMessage, createErrorMessage, blockToMessage, parseErrorMessage } from "../types"
 import type { AssistantMessage, Message, ToolMessage } from "../types"
-import { gitKeys, type LastTurnFile } from "@/features/git/queries"
+import { gitKeys } from "@/features/git/queries"
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -364,13 +364,14 @@ export function useSessionStream({
     const sideEffects: Array<() => void> = []
 
     // ── 1. Pure state transitions ───────────────────────────────────────────
-    queryClient.setQueryData<Message[]>(messagesQueryKey(sessionId), (prev) => {
-      let msgs = prev ?? []
-      for (const event of events) {
-        msgs = applyQueuedEvent(msgs, event)
-      }
-      return msgs
-    })
+    queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
+      updateLastPageMessages(prev, (msgs) => {
+        for (const event of events) {
+          msgs = applyQueuedEvent(msgs, event)
+        }
+        return msgs
+      })
+    )
 
     // ── 2. Collect side-effects in event order ──────────────────────────────
     for (const event of events) {
@@ -405,11 +406,12 @@ export function useSessionStream({
             cb.onMessageEnd?.()
             cb.onIsLoadingChange?.(false)
             if (hasError) cb.onError?.()
-            void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+            // Don't invalidate the messages query — the WS stream just wrote
+            // the canonical state into cache; refetching now races with the
+            // server's async DB write and can briefly replay stale rows.
             void queryClient.invalidateQueries({ queryKey: chatKeys.contextUsage(sessionId) })
             void queryClient.invalidateQueries({ queryKey: chatKeys.sessionStats(sessionId) })
-            void queryClient.invalidateQueries({ queryKey: gitKeys.lastTurnChanges(sessionId) })
-            void queryClient.invalidateQueries({ queryKey: gitKeys.lastTurn(sessionId) })
+            void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
             void queryClient.invalidateQueries({ queryKey: gitKeys.session(sessionId) })
             void queryClient.invalidateQueries({ queryKey: ["file-tree"] })
           })
@@ -578,9 +580,8 @@ export function useSessionStream({
 
           onAgentStart: () => {
             if (doneFlag.current) return
-            // Clear previous turn's file list so the new turn starts fresh
-            queryClient.setQueryData(gitKeys.lastTurn(sessionId), [])
-            queryClient.setQueryData(gitKeys.lastTurnChanges(sessionId), "")
+            // Invalidate turns so the new in-progress turn shows up immediately
+            void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
             void (async () => {
               try {
                 const { runningTools: blocks } = await listRunningTools(sessionId)
@@ -683,33 +684,23 @@ export function useSessionStream({
             // event carries the final accumulated model/provider/timing.
             const meta = turnMetaRef.current
             turnMetaRef.current = null
-            // Flush immediately — agent_end must settle before the user can
-            // send a follow-up, otherwise the next startUserPrompt() races
-            // with a pending RAF that still holds tool-finalization work.
-            enqueueNow({
+            // Use RAF-batched enqueue (not flushSync) — agent_end has no
+            // downstream race; the next startUserPrompt runs through the
+            // same queue, so ordering is preserved without forcing a
+            // synchronous commit that would block the main thread right
+            // when the assistant text is finishing its reveal.
+            enqueue({
               kind: "agent_end",
               agentMessages: data.messages ?? [],
               meta,
             })
           },
 
-          onTurnFileChanged: (data) => {
+          onTurnFileChanged: () => {
             if (doneFlag.current) return
-            queryClient.setQueryData<LastTurnFile[]>(
-              gitKeys.lastTurn(sessionId),
-              (old) => {
-                const existing = old ?? []
-                const idx = existing.findIndex((f) => f.filePath === data.filePath)
-                if (idx !== -1) {
-                  return [
-                    ...existing.slice(0, idx),
-                    { ...existing[idx], postStatusCode: data.postStatusCode, wasCreatedByTurn: data.wasCreatedByTurn },
-                    ...existing.slice(idx + 1),
-                  ]
-                }
-                return [...existing, { filePath: data.filePath, postStatusCode: data.postStatusCode, wasCreatedByTurn: data.wasCreatedByTurn, preContent: null }]
-              }
-            )
+            // Skip if a fetch is already in-flight — the response will reflect the latest state.
+            if (queryClient.getQueryState(gitKeys.turns(sessionId))?.fetchStatus === "fetching") return
+            void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
           },
 
           onMessageEnd: () => {},

@@ -295,7 +295,7 @@ export function TitleBar() {
       {/* Right — session actions */}
       <div
         className={cn(
-          "flex shrink-0 items-center gap-1.5 px-2 transition-[padding-right] duration-200 ease-linear",
+          "flex shrink-0 items-center gap-0.5 px-2 transition-[padding-right] duration-200 ease-linear",
           !rightSidebarOpen && "pr-9"
         )}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
@@ -305,11 +305,10 @@ export function TitleBar() {
             render={
               <Button
                 variant="outline"
-                size="icon"
                 onClick={() => setTasksDialogOpen(true)}
-                className="h-7 w-auto gap-1.5 px-2"
+                className="size-7"
               >
-                <Play className="size-3.5 shrink-0" />
+                <Play className="size-4" />
                 <span className="sr-only">Tasks</span>
               </Button>
             }
@@ -322,11 +321,10 @@ export function TitleBar() {
             render={
               <Button
                 variant="outline"
-                size="icon"
                 onClick={() => setMcpDialogOpen(true)}
-                className="h-7 w-auto gap-1.5 px-2"
+                className="h-7 gap-1.5 px-2"
               >
-                <Server className="size-3.5 shrink-0" />
+                <Server className="size-4 shrink-0" />
                 {mcpConnectedCount > 0 && (
                   <span className="flex items-center gap-1 text-[11px] font-medium tabular-nums">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
@@ -353,7 +351,7 @@ export function TitleBar() {
                 pressed={terminalOpen}
                 onPressedChange={() => toggleTerminal()}
                 disabled={!effectiveWorkspacePath}
-                className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
+                className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-muted aria-pressed:text-foreground"
               >
                 <TerminalSquare className="size-4" />
                 <span className="sr-only">Toggle terminal</span>

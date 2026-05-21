@@ -12,11 +12,17 @@ import {
   insertCompactionBlock,
   insertAbortBlock,
   listMessageBlocks,
+  listMessageBlocksPage,
   listRunningToolBlocks,
   updateThreadSessionFile,
   updateAssistantBlockContent,
   finalizeAssistantBlock,
   updateToolBlockResult,
+  deleteMessageBlocksFrom,
+  listAgentTurnsBySession,
+  getAgentTurnFiles,
+  getAgentTurnsFromId,
+  deleteAgentTurnsFrom,
 } from "@lamda/db";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
@@ -26,6 +32,8 @@ import {
 } from "../services/session-service.js";
 import { openManagedSession, readSessionHistory } from "@lamda/pi-sdk";
 import type { PromptOptions, SdkConfig } from "@lamda/pi-sdk";
+import { promises as fs } from "node:fs";
+import { gitUnstage, gitRevertFile, gitRestoreFileFromRef } from "@lamda/git";
 
 const EXCLUDED_DIRS = new Set([
   ".git",
@@ -241,16 +249,27 @@ sessions.post("/session/:id/compact", async (c) => {
 });
 
 /**
- * Get all message blocks for a session's thread.
- * Returns complete message data including thinking, tool calls, etc.
+ * Get message blocks for a session's thread.
+ * Supports optional cursor-based pagination via ?limit=N&before=blockIndex.
+ * Without params returns all blocks (used internally by fork seeding).
  */
 sessions.get("/session/:id/messages", (c) => {
   const id = c.req.param("id");
   const threadId = store.getThreadId(id);
   if (!threadId) return c.json({ error: "Session not found" }, 404);
-  
+
+  const limitParam = c.req.query("limit");
+  const beforeParam = c.req.query("before");
+
+  if (limitParam !== undefined) {
+    const limit = Math.min(Math.max(1, parseInt(limitParam, 10) || 50), 200);
+    const before = beforeParam !== undefined ? parseInt(beforeParam, 10) : undefined;
+    const page = listMessageBlocksPage(threadId, limit, before);
+    return c.json(page);
+  }
+
   const blocks = listMessageBlocks(threadId);
-  return c.json({ blocks });
+  return c.json({ blocks, hasMore: false });
 });
 
 /**
@@ -284,6 +303,123 @@ sessions.get("/session/:id/workspace-files", async (c) => {
   } catch {
     return c.json({ entries: [] });
   }
+});
+
+/**
+ * Revert the conversation and code to the state before a specific user message.
+ * Removes the message and all subsequent blocks from the DB, reverts code changes
+ * made in all agent turns that ran after the message, and truncates the session
+ * history file so the AI won't see the removed exchanges.
+ * Returns { text } — the text of the reverted user message so the UI can
+ * pre-fill the input box.
+ */
+sessions.post("/session/:id/revert-to-message", async (c) => {
+  const sessionId = c.req.param("id");
+  const body = await c.req.json<{ blockId?: string }>().catch((): { blockId?: string } => ({}));
+  if (!body.blockId) return c.json({ error: "blockId is required" }, 400);
+
+  const entry = store.get(sessionId);
+  if (!entry) return c.json({ error: "Session not found" }, 404);
+
+  const cwd = entry.cwd;
+  const threadId = entry.threadId;
+
+  // Find the target user block in the thread.
+  const allBlocks = listMessageBlocks(threadId);
+  const blockIndex = allBlocks.findIndex((b) => b.id === body.blockId);
+  if (blockIndex === -1) return c.json({ error: "Block not found in thread" }, 404);
+
+  const targetBlock = allBlocks[blockIndex];
+  if (targetBlock?.role !== "user") return c.json({ error: "Block is not a user message" }, 400);
+
+  const targetBlockIndex = targetBlock.blockIndex;
+  const messageCreatedAt = targetBlock.createdAt;
+  const messageText = targetBlock.content ?? "";
+
+  // Truncate the session JSONL so the AI doesn't see the reverted exchanges.
+  const userBlocks = allBlocks.filter((b) => b.role === "user");
+  const userMessageIndex = userBlocks.findIndex((b) => b.id === body.blockId);
+  try {
+    const newSessionFile = await entry.handle.fork(userMessageIndex);
+    // Swap the session handle in place — same sessionId, fresh truncated history.
+    store.replaceHandle(sessionId, await openManagedSession(newSessionFile, { cwd }));
+    updateThreadSessionFile(threadId, newSessionFile);
+
+    // Re-attach the event hub to the new handle.
+    await sessionEvents.dispose(sessionId);
+    const newEntry = store.get(sessionId);
+    if (newEntry) {
+      sessionEvents.ensure(sessionId, threadId, newEntry.handle, cwd);
+    }
+  } catch (err) {
+    console.error("[revert-to-message] session truncation failed:", err);
+    // Non-fatal — proceed with DB + code revert even if session file update fails.
+  }
+
+  // ── Revert code changes ─────────────────────────────────────────────────────
+  // Find all agent turns for this session that started at or after the user message.
+  const allTurns = listAgentTurnsBySession(sessionId);
+  // allTurns is sorted newest-first; find the oldest turn to revert from.
+  const firstTurnToRevert = [...allTurns].reverse().find((t) => t.startedAt >= messageCreatedAt);
+
+  if (firstTurnToRevert) {
+    const turnsToRevert = getAgentTurnsFromId(sessionId, firstTurnToRevert.id);
+    const fileTargetMap = new Map<string, ReturnType<typeof getAgentTurnFiles>[number]>();
+    const earliestCheckpointSha = turnsToRevert[0]?.checkpointSha ?? "";
+
+    for (const turn of turnsToRevert) {
+      for (const file of getAgentTurnFiles(turn.id)) {
+        if (!fileTargetMap.has(file.filePath)) {
+          fileTargetMap.set(file.filePath, file);
+        }
+      }
+    }
+
+    const errors: string[] = [];
+    for (const [, file] of fileTargetMap) {
+      const fullPath = join(cwd, file.filePath);
+      try {
+        if (file.wasCreatedByTurn) {
+          await fs.unlink(fullPath).catch(() => {});
+          await gitUnstage(cwd, file.filePath).catch(() => {});
+        } else if (earliestCheckpointSha) {
+          await gitRestoreFileFromRef(cwd, earliestCheckpointSha, file.filePath).catch(async () => {
+            if (file.preContent !== null) {
+              await fs.writeFile(fullPath, file.preContent, "utf8");
+              await gitUnstage(cwd, file.filePath).catch(() => {});
+            } else {
+              await gitRevertFile(cwd, file.filePath, file.postStatusCode).catch((err) => {
+                errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
+              });
+            }
+          });
+        } else if (file.preContent !== null) {
+          await fs.writeFile(fullPath, file.preContent, "utf8");
+          await gitUnstage(cwd, file.filePath).catch(() => {});
+        } else {
+          await gitRevertFile(cwd, file.filePath, file.postStatusCode).catch((err) => {
+            errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
+          });
+        }
+      } catch (err) {
+        errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error("[revert-to-message] some files could not be reverted:", errors);
+    }
+
+    deleteAgentTurnsFrom(sessionId, firstTurnToRevert.id);
+  }
+
+  // Also clear any in-progress turn state from the event hub.
+  sessionEvents.clearLastTurnFiles(sessionId);
+
+  // ── Remove message blocks from the target forward ─────────────────────────
+  deleteMessageBlocksFrom(threadId, targetBlockIndex);
+
+  return c.json({ text: messageText });
 });
 
 /**

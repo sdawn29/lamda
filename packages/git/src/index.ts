@@ -509,3 +509,44 @@ export async function gitStagedDiff(cwd: string): Promise<string> {
     return "";
   }
 }
+
+/**
+ * Creates a stash object for the current working tree state WITHOUT modifying
+ * the working tree or index. Returns the stash SHA, or empty string if the
+ * working tree is clean (nothing to checkpoint).
+ */
+export async function gitStashCreate(cwd: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync("git", ["stash", "create"], {
+      cwd,
+      timeout: 10000,
+    });
+    return stdout.trim();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Registers a stash object (from gitStashCreate) into the stash list with a
+ * given message. No-op if sha is empty.
+ */
+export async function gitStashStore(cwd: string, sha: string, message: string): Promise<void> {
+  if (!sha) return;
+  await execFileAsync("git", ["stash", "store", "-m", message, sha], {
+    cwd,
+    timeout: 10000,
+  });
+}
+
+/**
+ * Restores a specific file from the working-tree part of a stash object
+ * (stash^2 = the working tree snapshot). Used to revert individual files
+ * back to their pre-turn state without affecting other files.
+ */
+export async function gitRestoreFileFromRef(cwd: string, ref: string, filePath: string): Promise<void> {
+  await execFileAsync("git", ["checkout", `${ref}^2`, "--", filePath], {
+    cwd,
+    timeout: 10000,
+  });
+}

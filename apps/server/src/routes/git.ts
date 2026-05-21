@@ -31,8 +31,10 @@ import {
   gitShow,
   gitShowFiles,
   gitShowFileDiff,
+  gitRestoreFileFromRef,
 } from "@lamda/git";
 import { generateCommitMessage } from "@lamda/pi-sdk";
+import { listAgentTurnsBySession, getAgentTurnFiles, getAgentTurnsFromId, deleteAgentTurnsFrom } from "@lamda/db";
 import { store } from "../store.js";
 import { gitCwd } from "../services/session-service.js";
 import { sessionEvents } from "../session-events.js";
@@ -354,43 +356,149 @@ git.post("/session/:id/git/stash-drop", async (c) => {
   }
 });
 
-// ── Last-turn file changes (in-memory, current session only) ──────────────────
+// ── Turn checkpoints (multi-turn history) ─────────────────────────────────────
 
-git.get("/session/:id/git/last-turn-changes", (c) => {
+// List all recorded turns for this session, newest first.
+git.get("/session/:id/git/turns", (c) => {
   const id = c.req.param("id");
-  const raw = sessionEvents.getLastTurnChanges(id);
-  return c.json({ raw });
+
+  // Merge in-progress turn files from the live hub so the UI can see the
+  // current turn's changes before it completes and lands in the DB.
+  const liveFiles = sessionEvents.getLastTurnFiles(id);
+  const turns = listAgentTurnsBySession(id);
+
+  // Attach live files to the most recent in-progress turn (id=0 sentinel).
+  const liveTurn = liveFiles.length > 0
+    ? [{
+        id: 0,
+        sessionId: id,
+        threadId: "",
+        startedAt: sessionEvents.getCurrentTurnStartTime(id),
+        endedAt: 0,
+        checkpointSha: "",
+        files: liveFiles.map((f) => ({
+          filePath: f.filePath,
+          postStatusCode: f.postStatusCode,
+          wasCreatedByTurn: f.wasCreatedByTurn,
+        })),
+        inProgress: true,
+      }]
+    : [];
+
+  return c.json({
+    turns: [
+      ...liveTurn,
+      ...turns.map((t) => ({ ...t, inProgress: false })),
+    ],
+  });
 });
 
-// ── Last turn ─────────────────────────────────────────────────────────────────
-
-git.get("/session/:id/git/last-turn", (c) => {
+// Get detailed file list (with pre-content) for a specific completed turn.
+git.get("/session/:id/git/turns/:turnId/files", (c) => {
   const id = c.req.param("id");
-  const files = sessionEvents.getLastTurnFiles(id).map((f) => ({
-    filePath: f.filePath,
-    postStatusCode: f.postStatusCode,
-    wasCreatedByTurn: f.wasCreatedByTurn,
-    preContent: f.preContent ?? null,
-  }));
+  const turnIdParam = c.req.param("turnId");
+
+  // turnId=0 means the live in-progress turn
+  if (turnIdParam === "0") {
+    const files = sessionEvents.getLastTurnFiles(id).map((f) => ({
+      filePath: f.filePath,
+      postStatusCode: f.postStatusCode,
+      preStatusCode: f.preStatusCode,
+      wasCreatedByTurn: f.wasCreatedByTurn,
+      preContent: f.preContent ?? null,
+    }));
+    return c.json({ files });
+  }
+
+  const turnId = parseInt(turnIdParam, 10);
+  if (isNaN(turnId)) return c.json({ error: "Invalid turnId" }, 400);
+
+  const files = getAgentTurnFiles(turnId);
   return c.json({ files });
 });
 
-git.post("/session/:id/git/last-turn/revert", async (c) => {
+// Revert the working tree to the state before a given turn.
+// Uses the git stash checkpoint if available; falls back to per-file content restore.
+git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
   const id = c.req.param("id");
   const cwd = gitCwd(id);
   if (!cwd) return c.json({ error: "Session not found" }, 404);
 
-  const files = sessionEvents.getLastTurnFiles(id);
-  if (!files.length) return c.json({ error: "No last turn to revert" }, 404);
-
+  const turnIdParam = c.req.param("turnId");
   const errors: string[] = [];
 
-  for (const file of files) {
+  // turnId=0 → revert the in-progress / most-recent turn using in-memory data
+  if (turnIdParam === "0") {
+    const files = sessionEvents.getLastTurnFiles(id);
+    if (!files.length) return c.json({ error: "No current turn to revert" }, 404);
+
+    for (const file of files) {
+      const fullPath = join(cwd, file.filePath);
+      try {
+        if (file.wasCreatedByTurn) {
+          await fs.unlink(fullPath).catch(() => {});
+          await gitUnstage(cwd, file.filePath).catch(() => {});
+        } else if (file.preContent !== null) {
+          await fs.writeFile(fullPath, file.preContent, "utf8");
+          await gitUnstage(cwd, file.filePath).catch(() => {});
+        } else {
+          await gitRevertFile(cwd, file.filePath, file.postStatusCode).catch((err) => {
+            errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
+          });
+        }
+      } catch (err) {
+        errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      return c.json({ error: `Some files could not be reverted: ${errors.join("; ")}` }, 500);
+    }
+    sessionEvents.clearLastTurnFiles(id);
+    return new Response(null, { status: 204 });
+  }
+
+  const turnId = parseInt(turnIdParam, 10);
+  if (isNaN(turnId)) return c.json({ error: "Invalid turnId" }, 400);
+
+  // Collect this turn and all subsequent turns (sorted oldest first).
+  const turnsToRevert = getAgentTurnsFromId(id, turnId);
+  if (!turnsToRevert.length) return c.json({ error: "Turn not found" }, 404);
+
+  // For each file, the target state is the preContent of the EARLIEST turn that
+  // touched it — that represents the state before any of these turns ran.
+  const fileTargetMap = new Map<string, ReturnType<typeof getAgentTurnFiles>[number]>();
+  const earliestCheckpointSha = turnsToRevert[0]?.checkpointSha ?? "";
+
+  for (const turn of turnsToRevert) {
+    const files = getAgentTurnFiles(turn.id);
+    for (const file of files) {
+      if (!fileTargetMap.has(file.filePath)) {
+        fileTargetMap.set(file.filePath, file);
+      }
+    }
+  }
+
+  if (fileTargetMap.size === 0) return c.json({ error: "Turn has no file changes to revert" }, 404);
+
+  for (const [, file] of fileTargetMap) {
     const fullPath = join(cwd, file.filePath);
     try {
       if (file.wasCreatedByTurn) {
         await fs.unlink(fullPath).catch(() => {});
         await gitUnstage(cwd, file.filePath).catch(() => {});
+      } else if (earliestCheckpointSha) {
+        // Restore from the pre-turn stash checkpoint of the earliest turn being reverted.
+        await gitRestoreFileFromRef(cwd, earliestCheckpointSha, file.filePath).catch(async () => {
+          if (file.preContent !== null) {
+            await fs.writeFile(fullPath, file.preContent, "utf8");
+            await gitUnstage(cwd, file.filePath).catch(() => {});
+          } else {
+            await gitRevertFile(cwd, file.filePath, file.postStatusCode).catch((err) => {
+              errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
+            });
+          }
+        });
       } else if (file.preContent !== null) {
         await fs.writeFile(fullPath, file.preContent, "utf8");
         await gitUnstage(cwd, file.filePath).catch(() => {});
@@ -408,7 +516,9 @@ git.post("/session/:id/git/last-turn/revert", async (c) => {
     return c.json({ error: `Some files could not be reverted: ${errors.join("; ")}` }, 500);
   }
 
-  sessionEvents.clearLastTurnFiles(id);
+  // Remove this turn and all subsequent turns from the DB so they disappear from the sidebar.
+  deleteAgentTurnsFrom(id, turnId);
+
   return new Response(null, { status: 204 });
 });
 

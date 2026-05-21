@@ -3,7 +3,7 @@ import { GitCompare, ChevronRight, Undo2, Loader2, Sparkles, Eye, ExternalLink }
 import { openFileWithApp } from "@/features/electron/api"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
-import { useLastTurnChanges, useRevertLastTurn, useGitFileDiff, DiffView, DiffStat, parseDiffCounts } from "@/features/git"
+import { useTurns, useRevertToTurn, useGitFileDiff, DiffView, DiffStat, parseDiffCounts } from "@/features/git"
 import { useRightSidebar } from "@/features/layout"
 import { useMainTabs } from "@/features/main-tabs"
 import { useGitRevertFile } from "@/features/git/mutations"
@@ -191,22 +191,21 @@ export const FileChangesCard = memo(function FileChangesCard({
   rootPath,
   openWithAppId,
 }: FileChangesCardProps) {
-  const { data: rawChanges } = useLastTurnChanges(sessionId)
+  const { data: turns = [] } = useTurns(sessionId)
+  const latestTurn = turns[0]
   const { open: openRightSidebar } = useRightSidebar()
-  const revertLastTurn = useRevertLastTurn(sessionId)
+  const revertToTurn = useRevertToTurn(sessionId)
   const revertFile = useGitRevertFile(sessionId)
 
   const [expanded, setExpanded] = useState(true)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const files: ChangedFile[] = useMemo(() => {
-    if (!rawChanges) return []
-    return rawChanges
-      .split("\n")
-      .map((l: string) => l.trimEnd())
+    if (!latestTurn) return []
+    return latestTurn.files
+      .map((f) => parseStatusLine(`${f.postStatusCode} ${f.filePath}`))
       .filter(Boolean)
-      .map(parseStatusLine)
-  }, [rawChanges])
+  }, [latestTurn])
 
   const hasChanges = files.length > 0
 
@@ -218,7 +217,7 @@ export const FileChangesCard = memo(function FileChangesCard({
   )
 
   const handleConfirmRevert = () => {
-    revertLastTurn.mutate()
+    revertToTurn.mutate(latestTurn?.id ?? 0)
     setConfirmOpen(false)
   }
 
@@ -269,10 +268,10 @@ export const FileChangesCard = memo(function FileChangesCard({
                 size="sm"
                 variant="outline"
                 onClick={() => setConfirmOpen(true)}
-                disabled={revertLastTurn.isPending}
+                disabled={revertToTurn.isPending}
                 className="h-7 gap-1.5 px-2.5 text-[11px] text-muted-foreground disabled:opacity-50"
               >
-                {revertLastTurn.isPending ? (
+                {revertToTurn.isPending ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
                   <Undo2 className="h-3 w-3" />

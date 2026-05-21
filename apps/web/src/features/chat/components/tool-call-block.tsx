@@ -196,10 +196,13 @@ function WriteView({
 export const ToolCallBlock = memo(function ToolCallBlock({
   msg,
   isNew = true,
+  entryDelayMs = 0,
   rootPath,
 }: {
   msg: ToolMessage
   isNew?: boolean
+  /** Stagger offset (ms) applied as CSS animation-delay when isNew is true. */
+  entryDelayMs?: number
   rootPath?: string
 }) {
   const normalizedToolName = msg.toolName.toLowerCase()
@@ -271,8 +274,13 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     <div
       className={cn(
         "w-full text-xs",
-        isNew && "animate-in duration-150 fade-in-0 slide-in-from-bottom-1"
+        isNew && "animate-chat-message-in"
       )}
+      style={
+        isNew && entryDelayMs > 0
+          ? { animationDelay: `${entryDelayMs}ms` }
+          : undefined
+      }
     >
       {/* Trigger row — text accordion style */}
       <button
@@ -283,7 +291,11 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       >
         <span className={cn(
           "text-sm font-medium",
-          msg.status === "running" ? "text-foreground/60" : msg.status === "error" ? "text-destructive/70" : "text-muted-foreground/45"
+          msg.status === "running"
+            ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
+            : msg.status === "error"
+              ? "text-destructive/70"
+              : "text-muted-foreground/45"
         )}>
           {msg.toolName}
         </span>
@@ -383,7 +395,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               {msg.status === "running" &&
                 !isWrite &&
                 (isEdit || !resultText) && (
-                  <span className="text-muted-foreground/40">
+                  <span className="animate-thinking-shimmer bg-linear-to-r from-muted-foreground/30 via-foreground/80 to-muted-foreground/30 bg-size-[200%_100%] bg-clip-text text-transparent">
                     {isEdit ? "Editing…" : isRead ? "Reading…" : "Running…"}
                   </span>
                 )}

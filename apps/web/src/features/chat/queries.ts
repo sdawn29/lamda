@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query"
+import type { InfiniteData } from "@tanstack/react-query"
 import {
   listMessages,
   fetchModels,
@@ -46,38 +47,90 @@ export const chatKeys = {
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 
+export const MESSAGES_PAGE_SIZE = 50
+
 export const messagesQueryKey = (sessionId: string) =>
   chatKeys.messages(sessionId)
 
-/**
- * Fetch messages from server and convert blocks to UI messages.
- * Uses the new block-based message storage.
- *
- * IMPORTANT: This query merges localStorage data with streaming messages
- * from setQueryData calls. This ensures thread switches show the latest
- * data even when the WebSocket is adding messages.
- */
-export function useMessages(sessionId: string) {
-  // const queryClient = useQueryClient()
+export interface MessagesPage {
+  messages: Message[]
+  hasMore: boolean
+  /** blockIndex of the oldest block in this page — used as cursor for the previous page */
+  oldestBlockIndex: number | null
+}
+
+export type MessagesInfiniteData = InfiniteData<MessagesPage, number | undefined>
+
+/** Apply a transform to only the last (most-recent) page in the infinite cache. */
+export function updateLastPageMessages(
+  data: MessagesInfiniteData | undefined,
+  updater: (msgs: Message[]) => Message[]
+): MessagesInfiniteData | undefined {
+  if (!data) return data
+  const { pages, pageParams } = data
+  const last = pages[pages.length - 1]
+  return {
+    pages: [...pages.slice(0, -1), { ...last, messages: updater(last.messages) }],
+    pageParams,
+  }
+}
+
+/** Flatten all pages into a single chronological message list. */
+export function getMessagesFromInfinite(data: MessagesInfiniteData | undefined): Message[] {
+  if (!data) return []
+  return data.pages.flatMap((p) => p.messages)
+}
+
+export function useInfiniteMessages(sessionId: string) {
   const syncEngine = getChatSyncEngine()
 
-  return useQuery({
+  return useInfiniteQuery<
+    MessagesPage,
+    Error,
+    MessagesInfiniteData,
+    ReturnType<typeof messagesQueryKey>,
+    number | undefined
+  >({
     queryKey: messagesQueryKey(sessionId),
-    queryFn: async (): Promise<Message[]> => {
-      const { blocks } = await listMessages(sessionId)
-      const serverMessages = blocksToMessages(blocks as MessageBlock[])
-      syncEngine.saveMessages(sessionId, serverMessages)
-      return serverMessages
+    queryFn: async ({ pageParam }): Promise<MessagesPage> => {
+      const { blocks, hasMore } = await listMessages(sessionId, {
+        limit: MESSAGES_PAGE_SIZE,
+        before: pageParam,
+      })
+      const messages = blocksToMessages(blocks as MessageBlock[])
+      const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
+      // Persist the first (most-recent) page so the next thread switch is instant.
+      if (pageParam === undefined) {
+        syncEngine.saveMessages(sessionId, messages)
+      }
+      return { messages, hasMore, oldestBlockIndex }
     },
-    // Load from localStorage first (instant, no network)
-    initialData: () => {
+    initialPageParam: undefined,
+    // Older pages are loaded when the user scrolls up.
+    getPreviousPageParam: (firstPage) =>
+      firstPage.hasMore && firstPage.oldestBlockIndex !== null
+        ? firstPage.oldestBlockIndex
+        : undefined,
+    getNextPageParam: () => undefined, // WS stream handles new messages
+    // Always return a valid InfiniteData — never undefined.
+    // When initialData returns undefined, TQ v5 creates { pages: undefined, pageParams: undefined }
+    // which causes getNextPageParam to crash on pages.length.
+    initialData: (): MessagesInfiniteData => {
       const stored = loadThreadFromStorage(sessionId)
-      return stored?.messages ?? undefined
+      const storedMsgs = stored?.messages ?? []
+      const msgs = storedMsgs.slice(-MESSAGES_PAGE_SIZE)
+      return {
+        pages: [{ messages: msgs, hasMore: storedMsgs.length > MESSAGES_PAGE_SIZE, oldestBlockIndex: null }],
+        pageParams: [undefined],
+      }
     },
     gcTime: 30 * 60 * 1000,
-    staleTime: 5 * 60 * 1000, // WS stream keeps cache current via setQueryData
-    refetchOnMount: "always", // Still fetch on first mount before WS connects
-    refetchOnWindowFocus: false, // WS handles freshness; avoid redundant round-trips
+    staleTime: 5 * 60 * 1000,
+    // Default mount behavior respects staleTime — paired with the WS stream
+    // delivering live deltas, this avoids a redundant full-page fetch on every
+    // thread switch (and avoids racing the optimistic message + WS state).
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
     enabled: !!sessionId,
   })
 }

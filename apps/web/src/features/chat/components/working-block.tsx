@@ -39,6 +39,8 @@ interface WorkingBlockProps {
   isActive: boolean
   showThinking: boolean
   isNew?: boolean
+  /** Stagger offset (ms) applied as CSS animation-delay when isNew is true. */
+  entryDelayMs?: number
   finalThinking?: string
   rootPath?: string
 }
@@ -63,6 +65,7 @@ export const WorkingBlock = memo(function WorkingBlock({
   isActive,
   showThinking,
   isNew = true,
+  entryDelayMs = 0,
   finalThinking,
   rootPath,
 }: WorkingBlockProps) {
@@ -73,20 +76,24 @@ export const WorkingBlock = memo(function WorkingBlock({
   const [elapsed, setElapsed] = useState(0)
   const [finalDuration, setFinalDuration] = useState<number | null>(null)
 
-  // Record start time once when first activated — earliest of any thinking or tool timestamp
+  // Derive earliest timestamp from messages — stable input for the start-time effect below
+  const earliestTimestamp = useMemo(() => {
+    const ts: number[] = []
+    for (const m of messages) {
+      if (m.role === "assistant" && (m as AssistantMessage).createdAt != null)
+        ts.push((m as AssistantMessage).createdAt!)
+      else if (m.role === "tool" && (m as ToolMessage).startTime != null)
+        ts.push((m as ToolMessage).startTime!)
+    }
+    return ts.length > 0 ? Math.min(...ts) : null
+  }, [messages])
+
+  // Record start time once when first activated
   useEffect(() => {
     if (isActive && startTimeRef.current === null) {
-      const timestamps: number[] = []
-      for (const m of messages) {
-        if (m.role === "assistant" && (m as AssistantMessage).createdAt != null) {
-          timestamps.push((m as AssistantMessage).createdAt!)
-        } else if (m.role === "tool" && (m as ToolMessage).startTime != null) {
-          timestamps.push((m as ToolMessage).startTime!)
-        }
-      }
-      startTimeRef.current = timestamps.length > 0 ? Math.min(...timestamps) : Date.now()
+      startTimeRef.current = earliestTimestamp ?? Date.now()
     }
-  }, [isActive, messages])
+  }, [isActive, earliestTimestamp])
 
   // Live elapsed counter while active
   useEffect(() => {
@@ -102,19 +109,18 @@ export const WorkingBlock = memo(function WorkingBlock({
   }, [isActive])
 
   // Auto-collapse + capture duration when work finishes
+  // messages omitted from deps — displayDuration useMemo handles historical fallback
   useEffect(() => {
     const wasActive = prevActiveRef.current
     prevActiveRef.current = isActive
 
     if (wasActive && !isActive) {
       const duration =
-        startTimeRef.current !== null
-          ? Date.now() - startTimeRef.current
-          : computeHistoricalDuration(messages)
-      setFinalDuration(duration)
+        startTimeRef.current !== null ? Date.now() - startTimeRef.current : null
+      if (duration !== null) setFinalDuration(duration)
       setExpanded(false)
     }
-  }, [isActive, messages])
+  }, [isActive])
 
   const displayDuration = useMemo(
     () => finalDuration ?? computeHistoricalDuration(messages),
@@ -135,8 +141,13 @@ export const WorkingBlock = memo(function WorkingBlock({
     <div
       className={cn(
         "w-full text-xs",
-        isNew && "animate-in duration-200 fade-in-0 slide-in-from-bottom-1"
+        isNew && "animate-chat-message-in"
       )}
+      style={
+        isNew && entryDelayMs > 0
+          ? { animationDelay: `${entryDelayMs}ms` }
+          : undefined
+      }
     >
       {/* Trigger row — looks like inline text, no card chrome */}
       <button
@@ -181,11 +192,11 @@ export const WorkingBlock = memo(function WorkingBlock({
               if (msg.role === "assistant") {
                 const a = msg as AssistantMessage
                 if (!showThinking || !a.thinking.trim()) return null
-                return <ThinkingBlock key={i} thinking={a.thinking} isNew={isNew} />
+                return <ThinkingBlock key={`thinking-${i}`} thinking={a.thinking} isNew={isNew} />
               }
               if (msg.role === "tool") {
                 const t = msg as ToolMessage
-                return <ToolCallBlock key={`${t.toolCallId}-${i}`} msg={t} isNew={false} rootPath={rootPath} />
+                return <ToolCallBlock key={t.toolCallId} msg={t} isNew={false} rootPath={rootPath} />
               }
               return null
             })}

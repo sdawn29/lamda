@@ -56,6 +56,14 @@ class SessionStore {
     return result
   }
 
+  replaceHandle(id: string, newHandle: ManagedSessionHandle): boolean {
+    const entry = this.sessions.get(id);
+    if (!entry) return false;
+    entry.handle.dispose();
+    entry.handle = newHandle;
+    return true;
+  }
+
   delete(id: string): boolean {
     const entry = this.sessions.get(id);
     if (!entry) return false;

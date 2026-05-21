@@ -309,7 +309,7 @@ export function WorkspaceLayout() {
 
   const isEmptyState = !activeThreadId
 
-  usePrefetchThreadsMessages({ activeThreadId })
+  usePrefetchThreadsMessages()
 
   const activeWorkspace = workspaces.find((ws) =>
     ws.threads.some((t) => t.id === activeThreadId)

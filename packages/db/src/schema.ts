@@ -91,6 +91,7 @@ export const agentTurns = sqliteTable("agent_turns", {
   threadId: text("thread_id").notNull(),
   startedAt: integer("started_at").notNull(),
   endedAt: integer("ended_at").notNull(),
+  checkpointSha: text("checkpoint_sha").notNull().default(""),
 })
 
 export const agentTurnFiles = sqliteTable("agent_turn_files", {

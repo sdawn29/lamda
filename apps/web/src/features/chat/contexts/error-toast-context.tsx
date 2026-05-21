@@ -1,9 +1,8 @@
-"use client"
-
 import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   type ReactNode,
 } from "react"
@@ -80,8 +79,13 @@ export function ErrorToastProvider({ children }: { children: ReactNode }) {
     [dismissApiError]
   )
 
+  const value = useMemo(
+    () => ({ showApiError, dismissApiError }),
+    [showApiError, dismissApiError]
+  )
+
   return (
-    <ErrorToastContext.Provider value={{ showApiError, dismissApiError }}>
+    <ErrorToastContext.Provider value={value}>
       {children}
     </ErrorToastContext.Provider>
   )
