@@ -72,16 +72,16 @@ const SideBySideCell = memo(function SideBySideCell({
     <div
       className={cn(
         "flex min-w-full leading-5",
-        isAdded && "bg-green-500/8",
-        isRemoved && "bg-red-500/8"
+        isAdded && "bg-emerald-500/8",
+        isRemoved && "bg-rose-500/8"
       )}
     >
       {/* Gutter */}
       <div
         className={cn(
           "sticky left-0 z-10 flex shrink-0 select-none",
-          isAdded && "bg-green-50 dark:bg-green-950",
-          isRemoved && "bg-red-50 dark:bg-red-950",
+          isAdded && "bg-emerald-50 dark:bg-emerald-950",
+          isRemoved && "bg-rose-50 dark:bg-rose-950",
           isNeutral && "bg-background"
         )}
       >
@@ -89,8 +89,8 @@ const SideBySideCell = memo(function SideBySideCell({
         <span
           className={cn(
             "w-0.5 shrink-0",
-            isAdded && "bg-green-500/50",
-            isRemoved && "bg-red-500/50"
+            isAdded && "bg-emerald-500/50",
+            isRemoved && "bg-rose-500/50"
           )}
         />
 
@@ -98,8 +98,8 @@ const SideBySideCell = memo(function SideBySideCell({
         <span
           className={cn(
             "w-7 shrink-0 border-r pr-1.5 text-right font-mono text-[10px] leading-5",
-            isAdded && "border-green-500/20 text-green-400/70",
-            isRemoved && "border-red-500/20 text-red-400/70",
+            isAdded && "border-emerald-500/20 text-emerald-400/70",
+            isRemoved && "border-rose-500/20 text-rose-400/70",
             isNeutral && "border-border/40 text-muted-foreground/30"
           )}
         >
@@ -110,8 +110,8 @@ const SideBySideCell = memo(function SideBySideCell({
         <span
           className={cn(
             "w-4 shrink-0 text-center font-mono text-[11px] leading-5",
-            isAdded && "text-green-500",
-            isRemoved && "text-red-500",
+            isAdded && "text-emerald-500",
+            isRemoved && "text-rose-500",
             isNeutral && "text-muted-foreground/20"
           )}
         >
@@ -136,8 +136,8 @@ const SideBySideCell = memo(function SideBySideCell({
                 className={cn(
                   "rounded-sm",
                   isAdded
-                    ? "bg-green-500/30 dark:bg-green-400/25"
-                    : "bg-red-500/30 dark:bg-red-400/25"
+                    ? "bg-emerald-500/30 dark:bg-emerald-400/25"
+                    : "bg-rose-500/30 dark:bg-rose-400/25"
                 )}
               >
                 {part.text}

@@ -24,10 +24,10 @@ export const DiffStat = memo(function DiffStat({
   return (
     <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-[10px]">
       {added > 0 && (
-        <span className="text-green-600 dark:text-green-400">+{added}</span>
+        <span className="text-emerald-600 dark:text-emerald-400">+{added}</span>
       )}
       {removed > 0 && (
-        <span className="text-red-500 dark:text-red-400">-{removed}</span>
+        <span className="text-rose-500 dark:text-rose-400">-{removed}</span>
       )}
     </span>
   )

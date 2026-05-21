@@ -28,8 +28,8 @@ export const DiffRow = memo(function DiffRow({
     <div
       className={cn(
         "group/diff-row flex min-w-full leading-5",
-        isAdded && "bg-green-500/8 hover:bg-green-500/12",
-        isRemoved && "bg-red-500/8 hover:bg-red-500/12"
+        isAdded && "bg-emerald-500/8 hover:bg-emerald-500/12",
+        isRemoved && "bg-rose-500/8 hover:bg-rose-500/12"
       )}
     >
       {/* Gutter */}
@@ -37,9 +37,9 @@ export const DiffRow = memo(function DiffRow({
         className={cn(
           "sticky left-0 z-10 flex shrink-0 select-none",
           isAdded &&
-            "bg-green-50 group-hover/diff-row:bg-green-100 dark:bg-green-950 dark:group-hover/diff-row:bg-green-900",
+            "bg-emerald-50 group-hover/diff-row:bg-emerald-100 dark:bg-emerald-950 dark:group-hover/diff-row:bg-emerald-900",
           isRemoved &&
-            "bg-red-50 group-hover/diff-row:bg-red-100 dark:bg-red-950 dark:group-hover/diff-row:bg-red-900",
+            "bg-rose-50 group-hover/diff-row:bg-rose-100 dark:bg-rose-950 dark:group-hover/diff-row:bg-rose-900",
           isNeutral && "bg-background"
         )}
       >
@@ -47,8 +47,8 @@ export const DiffRow = memo(function DiffRow({
         <span
           className={cn(
             "w-0.5 shrink-0",
-            isAdded && "bg-green-500/50",
-            isRemoved && "bg-red-500/50"
+            isAdded && "bg-emerald-500/50",
+            isRemoved && "bg-rose-500/50"
           )}
         />
 
@@ -56,7 +56,7 @@ export const DiffRow = memo(function DiffRow({
         <span
           className={cn(
             "w-7 shrink-0 pr-1.5 text-right font-mono text-[10px] leading-5",
-            isRemoved ? "text-red-400/70" : "text-muted-foreground/30"
+            isRemoved ? "text-rose-400/70" : "text-muted-foreground/30"
           )}
         >
           {line.oldLineNum}
@@ -67,9 +67,9 @@ export const DiffRow = memo(function DiffRow({
           className={cn(
             "w-7 shrink-0 border-r pr-1.5 text-right font-mono text-[10px] leading-5",
             isAdded
-              ? "border-green-500/20 text-green-400/70"
+              ? "border-emerald-500/20 text-emerald-400/70"
               : isRemoved
-                ? "border-red-500/20 text-muted-foreground/20"
+                ? "border-rose-500/20 text-muted-foreground/20"
                 : "border-border/40 text-muted-foreground/30"
           )}
         >
@@ -80,8 +80,8 @@ export const DiffRow = memo(function DiffRow({
         <span
           className={cn(
             "w-4 shrink-0 text-center font-mono text-[11px] leading-5",
-            isAdded && "text-green-500",
-            isRemoved && "text-red-500",
+            isAdded && "text-emerald-500",
+            isRemoved && "text-rose-500",
             isNeutral && "text-muted-foreground/20"
           )}
         >
@@ -106,8 +106,8 @@ export const DiffRow = memo(function DiffRow({
                 className={cn(
                   "rounded-sm",
                   isAdded
-                    ? "bg-green-500/30 dark:bg-green-400/25"
-                    : "bg-red-500/30 dark:bg-red-400/25"
+                    ? "bg-emerald-500/30 dark:bg-emerald-400/25"
+                    : "bg-rose-500/30 dark:bg-rose-400/25"
                 )}
               >
                 {part.text}

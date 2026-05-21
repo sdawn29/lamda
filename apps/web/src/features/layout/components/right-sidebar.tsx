@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react"
-import { FolderTree, Maximize2, Minimize2, X } from "lucide-react"
+import { FileDiff, FolderTree, Maximize2, Minimize2, X } from "lucide-react"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
 import { Button } from "@/shared/ui/button"
@@ -59,12 +59,13 @@ export function RightSidebarContent({
           type="button"
           onClick={clearActiveTab}
           className={cn(
-            "flex h-7 shrink-0 items-center rounded-md px-2.5 text-xs font-medium select-none transition-all duration-150",
+            "flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium select-none transition-all duration-150",
             isChangesActive
               ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-border/60"
               : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
           )}
         >
+          <FileDiff className="size-3.5 shrink-0" aria-hidden />
           Review
         </button>
 

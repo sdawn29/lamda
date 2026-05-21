@@ -1098,8 +1098,8 @@ export const DiffPanel = memo(function DiffPanel({
 
             {diffStat && (diffStat.additions > 0 || diffStat.deletions > 0) && (
               <span className="flex animate-in items-center gap-1 font-mono text-[11px] leading-none duration-200 fade-in-0 zoom-in-90">
-                <span className="text-green-500">+{diffStat.additions}</span>
-                <span className="text-red-500">-{diffStat.deletions}</span>
+                <span className="text-emerald-500">+{diffStat.additions}</span>
+                <span className="text-rose-500">-{diffStat.deletions}</span>
               </span>
             )}
 
