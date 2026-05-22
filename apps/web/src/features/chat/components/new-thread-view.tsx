@@ -26,7 +26,12 @@ import { BranchSelector } from "@/features/git"
 
 import { useBranch, useBranches } from "@/features/git"
 import { checkoutBranch } from "../api"
-import { ChatTextbox, type ChatTextboxHandle } from "./chat-textbox"
+import {
+  ChatTextbox,
+  type ChatTextboxHandle,
+  type ThinkingLevel,
+} from "./chat-textbox"
+import { setPendingThreadPreferences } from "./pending-thread-preferences"
 import { sendPrompt, generateTitle } from "../api"
 import {
   messagesQueryKey,
@@ -51,6 +56,9 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
   const [workspaceId, setWorkspaceId] = useState<string | null>(initialId)
   const [wsPickerOpen, setWsPickerOpen] = useState(false)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
+  const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<
+    ThinkingLevel | undefined
+  >(undefined)
   const [selectedMode, setSelectedMode] = useState<Mode>("code")
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
@@ -114,8 +122,10 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           selectedMode !== "code"
             ? updateThreadMode(thread.id, selectedMode)
             : Promise.resolve()
-        const persistModel = selectedModelId
-          ? updateThreadModel(thread.id, selectedModelId)
+        const threadModelId =
+          provider && modelId ? `${provider}::${modelId}` : selectedModelId
+        const persistModel = threadModelId
+          ? updateThreadModel(thread.id, threadModelId)
           : Promise.resolve()
         await Promise.all([persistMode, persistModel])
 
@@ -134,12 +144,16 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
                       : {
                           ...t,
                           mode: selectedMode,
-                          modelId: selectedModelId ?? t.modelId,
-                        },
+                          modelId: threadModelId ?? t.modelId,
+                        }
                   ),
                 }
           )
         )
+        setPendingThreadPreferences(thread.id, {
+          modelId: threadModelId,
+          thinkingLevel: thinkingLevel as ThinkingLevel | undefined,
+        })
 
         // Pre-populate the messages cache so the optimistic user message is
         // visible the moment the new thread route mounts.
@@ -208,6 +222,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
       selectedBranch,
       currentBranch,
       selectedMode,
+      selectedModelId,
       createThread,
       queryClient,
       navigate,
@@ -221,9 +236,9 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
       <div className="flex flex-1 items-center justify-center overflow-y-auto px-6">
         <div className="-mt-8 flex w-full max-w-2xl flex-col items-stretch">
           <div className="mb-8 flex flex-col items-center gap-3 text-center select-none">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-[#1c1c1e] ring-1 ring-white/5 shadow-md">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-[#1c1c1e] shadow-md ring-1 ring-white/5">
               <span
-                className="font-black text-3xl leading-none"
+                className="text-3xl leading-none font-black"
                 style={{ color: "#d4a017" }}
               >
                 Λ
@@ -240,55 +255,58 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           </div>
 
           <div className="flex">
-          <Popover open={wsPickerOpen} onOpenChange={setWsPickerOpen}>
-            <PopoverTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={noWorkspaces}
-                  aria-expanded={wsPickerOpen}
-                  className="mb-2 w-auto"
-                >
-                  <FolderIcon data-icon="inline-start" />
-                  <span className="whitespace-nowrap">
-                    {selectedWorkspace?.name ?? "Select workspace"}
-                  </span>
-                  <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
-                </Button>
-              }
-            />
-            <PopoverContent
-              className="w-auto min-w-40 p-0"
-              side="bottom"
-              align="start"
-              sideOffset={6}
-            >
-              <Command>
-                <CommandInput placeholder="Search workspaces…" />
-                <CommandList>
-                  <CommandEmpty>No workspaces found</CommandEmpty>
-                  <CommandGroup>
-                    {workspaces.map((ws) => (
-                      <CommandItem
-                        key={ws.id}
-                        value={ws.name}
-                        data-checked={ws.id === workspaceId}
-                        className="whitespace-nowrap"
-                        onSelect={() => {
-                          setWorkspaceId(ws.id)
-                          setWsPickerOpen(false)
-                        }}
-                      >
-                        <FolderIcon />
-                        {ws.name}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+            <Popover open={wsPickerOpen} onOpenChange={setWsPickerOpen}>
+              <PopoverTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={noWorkspaces}
+                    aria-expanded={wsPickerOpen}
+                    className="mb-2 w-auto"
+                  >
+                    <FolderIcon data-icon="inline-start" />
+                    <span className="whitespace-nowrap">
+                      {selectedWorkspace?.name ?? "Select workspace"}
+                    </span>
+                    <ChevronsUpDownIcon
+                      data-icon="inline-end"
+                      className="opacity-50"
+                    />
+                  </Button>
+                }
+              />
+              <PopoverContent
+                className="w-auto min-w-40 p-0"
+                side="bottom"
+                align="start"
+                sideOffset={6}
+              >
+                <Command>
+                  <CommandInput placeholder="Search workspaces…" />
+                  <CommandList>
+                    <CommandEmpty>No workspaces found</CommandEmpty>
+                    <CommandGroup>
+                      {workspaces.map((ws) => (
+                        <CommandItem
+                          key={ws.id}
+                          value={ws.name}
+                          data-checked={ws.id === workspaceId}
+                          className="whitespace-nowrap"
+                          onSelect={() => {
+                            setWorkspaceId(ws.id)
+                            setWsPickerOpen(false)
+                          }}
+                        >
+                          <FolderIcon />
+                          {ws.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <ChatTextbox
@@ -298,6 +316,8 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
             workspaceId={workspaceId ?? undefined}
             selectedModelId={selectedModelId}
             onModelChange={setSelectedModelId}
+            selectedThinkingLevel={selectedThinkingLevel}
+            onThinkingLevelChange={setSelectedThinkingLevel}
             mode={selectedMode}
             onModeChange={setSelectedMode}
             placeholder={

@@ -168,15 +168,7 @@ export function useCreateWorkspaceAction() {
     async (path: string) => {
       const folderName = path.split(/[/\\]/).pop() || path
       const workspace = await createWorkspace(folderName, path)
-      const firstThread = workspace.threads[0]
-      if (firstThread) {
-        navigate({
-          to: "/workspace/$threadId",
-          params: { threadId: firstThread.id },
-        })
-      } else {
-        navigate({ to: "/new", search: { ws: workspace.id } })
-      }
+      navigate({ to: "/new", search: { ws: workspace.id } })
     },
     [createWorkspace, navigate]
   )
@@ -184,15 +176,7 @@ export function useCreateWorkspaceAction() {
   const handleCreateRemote = useCallback(
     async (url: string, path: string) => {
       const workspace = await cloneRepository(url, path)
-      const firstThread = workspace.threads[0]
-      if (firstThread) {
-        navigate({
-          to: "/workspace/$threadId",
-          params: { threadId: firstThread.id },
-        })
-      } else {
-        navigate({ to: "/new", search: { ws: workspace.id } })
-      }
+      navigate({ to: "/new", search: { ws: workspace.id } })
     },
     [cloneRepository, navigate]
   )

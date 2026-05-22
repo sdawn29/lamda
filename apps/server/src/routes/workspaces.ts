@@ -4,7 +4,6 @@ import {
   getWorkspace,
   getWorkspaceByPath,
   insertWorkspace,
-  insertThread,
   deleteWorkspace,
   deleteAllWorkspaces,
   updateWorkspaceOpenWithApp,
@@ -12,7 +11,6 @@ import {
 } from "@lamda/db";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
-import { createSessionForThread } from "../services/session-service.js";
 import { workspaceIndexer } from "../services/workspace-indexer.js";
 
 const workspaces = new Hono();
@@ -74,11 +72,6 @@ workspaces.post("/workspace", async (c) => {
   }
 
   const workspaceId = insertWorkspace(body.name, body.path);
-  const threadId = insertThread(workspaceId);
-  const sessionId = await createSessionForThread(threadId, body.path, workspaceId, {
-    provider: body.provider,
-    model: body.model,
-  });
 
   workspaceIndexer.startIndexing(workspaceId, body.path);
 
@@ -90,17 +83,7 @@ workspaces.post("/workspace", async (c) => {
         path: body.path,
         openWithAppId: null,
         env: {},
-        threads: [
-          {
-            id: threadId,
-            workspaceId,
-            title: "New Thread",
-            modelId: null,
-            isStopped: false,
-            createdAt: Date.now(),
-            sessionId,
-          },
-        ],
+        threads: [],
       },
     },
     201,

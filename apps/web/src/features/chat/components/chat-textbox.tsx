@@ -38,6 +38,7 @@ import { BranchSelector } from "@/features/git"
 import { ModelCombobox } from "./model-combobox"
 import { ModeCombobox, getModeOption } from "./mode-combobox"
 import { ThinkingCombobox, type ThinkingLevel } from "./thinking-combobox"
+export type { ThinkingLevel } from "./thinking-combobox"
 import type { Mode } from "@/features/workspace/api"
 import {
   RichInput,
@@ -97,6 +98,8 @@ interface ChatTextboxProps {
   workspaceId?: string
   selectedModelId?: string | null
   onModelChange?: (modelId: string) => void
+  selectedThinkingLevel?: ThinkingLevel
+  onThinkingLevelChange?: (level: ThinkingLevel) => void
   mode?: Mode
   onModeChange?: (mode: Mode) => void
   sessionStats?: SessionStats | null
@@ -119,6 +122,8 @@ export const ChatTextbox = memo(
       workspaceId,
       selectedModelId: controlledModelId,
       onModelChange,
+      selectedThinkingLevel: controlledThinkingLevel,
+      onThinkingLevelChange,
       mode = "code",
       onModeChange,
       sessionStats,
@@ -133,14 +138,18 @@ export const ChatTextbox = memo(
     // (e.g. new-thread → thread view, or switching between threads).
     const [thinkingLevel, setThinkingLevelState] =
       React.useState<ThinkingLevel>(() => readStoredThinkingLevel())
-    const setThinkingLevel = React.useCallback((level: ThinkingLevel) => {
-      setThinkingLevelState(level)
-      try {
-        window.localStorage.setItem(THINKING_LEVEL_STORAGE_KEY, level)
-      } catch {
-        // localStorage may be unavailable (private mode / disabled) — ignore.
-      }
-    }, [])
+    const setThinkingLevel = React.useCallback(
+      (level: ThinkingLevel) => {
+        setThinkingLevelState(level)
+        onThinkingLevelChange?.(level)
+        try {
+          window.localStorage.setItem(THINKING_LEVEL_STORAGE_KEY, level)
+        } catch {
+          // localStorage may be unavailable (private mode / disabled) — ignore.
+        }
+      },
+      [onThinkingLevelChange]
+    )
     const [atMention, setAtMention] = React.useState<
       (AtMention & { selectedIndex: number }) | null
     >(null)
@@ -150,6 +159,7 @@ export const ChatTextbox = memo(
     const mentionEntries = React.useRef<WorkspaceEntry[]>([])
     const slashItemsRef = React.useRef<ChatSlashItem[]>([])
     const isControlled = controlledModelId !== undefined
+    const isThinkingControlled = controlledThinkingLevel !== undefined
 
     const navigate = useNavigate()
     const queryClient = useQueryClient()
@@ -157,6 +167,9 @@ export const ChatTextbox = memo(
     const openSettings = useSettingsModal((s) => s.openSettings)
     const { resolvedTheme, setTheme } = useTheme()
     const selectedModelId = isControlled ? controlledModelId : internalModelId
+    const selectedThinkingLevel = isThinkingControlled
+      ? controlledThinkingLevel
+      : thinkingLevel
     const richInputRef = React.useRef<RichInputHandle>(null)
 
     useImperativeHandle(ref, () => ({
@@ -184,7 +197,7 @@ export const ChatTextbox = memo(
     React.useEffect(() => {
       if (!availableLevels.length) return
       // When thinking is available, default to "medium" if not set or not in available levels
-      if (!availableLevels.includes(thinkingLevel)) {
+      if (!availableLevels.includes(selectedThinkingLevel)) {
         const mediumIndex = availableLevels.indexOf("medium")
         if (mediumIndex !== -1) {
           setThinkingLevel("medium")
@@ -193,7 +206,7 @@ export const ChatTextbox = memo(
           setThinkingLevel(availableLevels[0] as ThinkingLevel)
         }
       }
-    }, [availableLevels, thinkingLevel])
+    }, [availableLevels, selectedThinkingLevel, setThinkingLevel])
 
     const grouped = React.useMemo(
       () =>
@@ -425,9 +438,7 @@ export const ChatTextbox = memo(
     }, [commandsData, slashFilter])
 
     const slashGroups = React.useMemo<ChatSlashGroup[]>(() => {
-      const skills = filteredServerCommands.filter(
-        (c) => c.source === "skill"
-      )
+      const skills = filteredServerCommands.filter((c) => c.source === "skill")
       const prompts = filteredServerCommands.filter(
         (c) => c.source === "prompt"
       )
@@ -468,9 +479,11 @@ export const ChatTextbox = memo(
       const text = richInputRef.current?.getValue() ?? ""
       if (!text.trim()) return
       const safeLevel =
-        availableLevels.length && !availableLevels.includes(thinkingLevel)
-          ? ((availableLevels[availableLevels.length - 1] ?? "medium") as ThinkingLevel)
-          : thinkingLevel
+        availableLevels.length &&
+        !availableLevels.includes(selectedThinkingLevel)
+          ? ((availableLevels[availableLevels.length - 1] ??
+              "medium") as ThinkingLevel)
+          : selectedThinkingLevel
       const effectiveThinkingLevel = selectedModel?.reasoning
         ? safeLevel
         : undefined
@@ -592,14 +605,11 @@ export const ChatTextbox = memo(
 
     return (
       <div className={cn("flex w-full flex-col gap-1", className)}>
-        <div
-          className="relative flex w-full flex-col rounded-2xl border border-input bg-card shadow-sm transition-colors"
-        >
+        <div className="relative flex w-full flex-col rounded-2xl border border-input bg-card shadow-sm transition-colors">
           <SlashCommandDropdown
             groups={slashGroups}
             open={
-              slashCommandOpen &&
-              (slashItems.length > 0 || commandsLoading)
+              slashCommandOpen && (slashItems.length > 0 || commandsLoading)
             }
             isLoading={commandsLoading}
             selectedValue={
@@ -727,7 +737,7 @@ export const ChatTextbox = memo(
 
               {selectedModel?.reasoning && (
                 <ThinkingCombobox
-                  selected={thinkingLevel}
+                  selected={selectedThinkingLevel}
                   onSelect={setThinkingLevel}
                   availableLevels={availableLevels}
                 />
@@ -735,7 +745,11 @@ export const ChatTextbox = memo(
             </div>
 
             <div className="flex items-center gap-1.5 pr-0.5">
-              <ContextChart contextUsage={contextUsage} sessionId={sessionId} sessionStats={sessionStats} />
+              <ContextChart
+                contextUsage={contextUsage}
+                sessionId={sessionId}
+                sessionStats={sessionStats}
+              />
               {isLoading ? (
                 <Tooltip>
                   <TooltipTrigger
@@ -745,13 +759,15 @@ export const ChatTextbox = memo(
                         onClick={onStop}
                         disabled={isAborting}
                         aria-label="Stop generation"
-                        className="rounded-full animate-in bg-destructive duration-150 fade-in-0 zoom-in-90 hover:bg-destructive/90 aspect-square disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="aspect-square animate-in rounded-full bg-destructive duration-150 fade-in-0 zoom-in-90 hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <div className="h-2.5 w-2.5 rounded-sm bg-white" />
                       </Button>
                     }
                   />
-                  <TooltipContent>{isAborting ? "Stopping…" : "Stop"}</TooltipContent>
+                  <TooltipContent>
+                    {isAborting ? "Stopping…" : "Stop"}
+                  </TooltipContent>
                 </Tooltip>
               ) : (
                 <Tooltip>
@@ -763,8 +779,8 @@ export const ChatTextbox = memo(
                         disabled={!canSend}
                         aria-label="Send message"
                         className={cn(
-                          "rounded-full animate-in duration-150 fade-in-0 zoom-in-90 aspect-square transition-colors",
-                          modeSendButton,
+                          "aspect-square animate-in rounded-full transition-colors duration-150 fade-in-0 zoom-in-90",
+                          modeSendButton
                         )}
                       >
                         <ArrowUpIcon />

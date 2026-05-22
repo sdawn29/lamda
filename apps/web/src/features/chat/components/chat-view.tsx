@@ -1,8 +1,20 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react"
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
-import type { AssistantMessage, ErrorAction, Message, UserMessage } from "../types"
+import type {
+  AssistantMessage,
+  ErrorAction,
+  Message,
+  UserMessage,
+} from "../types"
 import { WorkingBlock, type WorkingMessage } from "./working-block"
 import {
   ArrowDownIcon,
@@ -17,7 +29,11 @@ import {
 
 import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
-import { ChatTextbox, type ChatTextboxHandle } from "./chat-textbox"
+import {
+  ChatTextbox,
+  type ChatTextboxHandle,
+  type ThinkingLevel,
+} from "./chat-textbox"
 import { MessageRow, getMessageKey } from "./message-row"
 import {
   AlertDialog,
@@ -29,11 +45,21 @@ import {
   AlertDialogAction,
 } from "@/shared/ui/alert-dialog"
 import { Button } from "@/shared/ui/button"
-import { useSlashCommands, useSessionStats, chatKeys, messagesQueryKey } from "../queries"
+import {
+  useSlashCommands,
+  useSessionStats,
+  chatKeys,
+  messagesQueryKey,
+} from "../queries"
 import { useBranch } from "@/features/git/queries"
 import { useBranches } from "@/features/git/queries"
 import { useCheckoutBranch } from "@/features/git/mutations"
-import { useAbortSession, useGenerateTitle, useSendPrompt, useRevertToMessage } from "../mutations"
+import {
+  useAbortSession,
+  useGenerateTitle,
+  useSendPrompt,
+  useRevertToMessage,
+} from "../mutations"
 import { useModels } from "../queries"
 import { useConfigureProvider } from "@/features/settings"
 import { ThinkingIndicator } from "./thinking-indicator"
@@ -49,11 +75,18 @@ import {
 import { useWorkspace } from "@/features/workspace"
 import { useChatStream } from "../use-chat-stream"
 import { useMainTabsStore } from "@/features/main-tabs"
-import { ChatActionsProvider, type ChatActions } from "../contexts/chat-actions-context"
+import {
+  ChatActionsProvider,
+  type ChatActions,
+} from "../contexts/chat-actions-context"
 import { useTurns } from "@/features/git"
 import { PlanChangesCard } from "./plan-changes-card"
 import type { TurnSummary } from "@/features/git/api"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
+import {
+  clearPendingThreadPreferences,
+  getPendingThreadPreferences,
+} from "./pending-thread-preferences"
 
 const PLAN_DIR_PREFIX = ".agents/plans/"
 import { FileChangesCard } from "./file-changes-card"
@@ -63,17 +96,53 @@ import { workspaceKeys } from "@/features/workspace/queries"
 import { MESSAGES_PAGE_SIZE, type MessagesInfiniteData } from "../queries"
 
 const PROMPT_SUGGESTIONS = [
-  { icon: Code2Icon, text: "Explain this codebase", description: "Walk me through the project structure and key patterns" },
-  { icon: BugIcon, text: "Debug an issue", description: "Describe a bug and let me investigate the root cause" },
-  { icon: TestTubeIcon, text: "Write tests", description: "Add unit, integration, or end-to-end test coverage" },
-  { icon: Wand2Icon, text: "Refactor code", description: "Improve readability, structure, or performance" },
-  { icon: FileSearchIcon, text: "Find something", description: "Locate a function, component, or pattern" },
-  { icon: GitBranchIcon, text: "Review changes", description: "Explain recent git changes in plain language" },
+  {
+    icon: Code2Icon,
+    text: "Explain this codebase",
+    description: "Walk me through the project structure and key patterns",
+  },
+  {
+    icon: BugIcon,
+    text: "Debug an issue",
+    description: "Describe a bug and let me investigate the root cause",
+  },
+  {
+    icon: TestTubeIcon,
+    text: "Write tests",
+    description: "Add unit, integration, or end-to-end test coverage",
+  },
+  {
+    icon: Wand2Icon,
+    text: "Refactor code",
+    description: "Improve readability, structure, or performance",
+  },
+  {
+    icon: FileSearchIcon,
+    text: "Find something",
+    description: "Locate a function, component, or pattern",
+  },
+  {
+    icon: GitBranchIcon,
+    text: "Review changes",
+    description: "Explain recent git changes in plain language",
+  },
 ] as const
 
 type MessageGroup =
-  | { type: "regular"; message: Message; index: number; suppressThinking?: boolean; isLastInTurnStatic: boolean; turnMessages?: AssistantMessage[] }
-  | { type: "working"; messages: WorkingMessage[]; startIndex: number; finalThinking?: string }
+  | {
+      type: "regular"
+      message: Message
+      index: number
+      suppressThinking?: boolean
+      isLastInTurnStatic: boolean
+      turnMessages?: AssistantMessage[]
+    }
+  | {
+      type: "working"
+      messages: WorkingMessage[]
+      startIndex: number
+      finalThinking?: string
+    }
 
 function groupChatMessages(messages: Message[]): MessageGroup[] {
   const groups: MessageGroup[] = []
@@ -83,7 +152,10 @@ function groupChatMessages(messages: Message[]): MessageGroup[] {
   const isWorkingEntry = (m: Message): boolean => {
     if (m.role === "tool") return true
     if (m.role === "assistant") {
-      return !(m as AssistantMessage).content.trim() && !(m as AssistantMessage).errorMessage
+      return (
+        !(m as AssistantMessage).content.trim() &&
+        !(m as AssistantMessage).errorMessage
+      )
     }
     return false
   }
@@ -108,7 +180,12 @@ function groupChatMessages(messages: Message[]): MessageGroup[] {
         finalThinking = (nextMsg as AssistantMessage).thinking
         suppressNextThinking = true
       }
-      groups.push({ type: "working", messages: workingMsgs, startIndex, finalThinking })
+      groups.push({
+        type: "working",
+        messages: workingMsgs,
+        startIndex,
+        finalThinking,
+      })
     } else {
       const suppress = suppressNextThinking && msg.role === "assistant"
       suppressNextThinking = false
@@ -120,10 +197,29 @@ function groupChatMessages(messages: Message[]): MessageGroup[] {
         msg.role === "assistant" &&
         (msg as AssistantMessage).thinking.trim().length > 0
       ) {
-        groups.push({ type: "working", messages: [], startIndex: i, finalThinking: (msg as AssistantMessage).thinking })
-        groups.push({ type: "regular", message: msg, index: i, suppressThinking: true, isLastInTurnStatic: false, turnMessages: undefined })
+        groups.push({
+          type: "working",
+          messages: [],
+          startIndex: i,
+          finalThinking: (msg as AssistantMessage).thinking,
+        })
+        groups.push({
+          type: "regular",
+          message: msg,
+          index: i,
+          suppressThinking: true,
+          isLastInTurnStatic: false,
+          turnMessages: undefined,
+        })
       } else {
-        groups.push({ type: "regular", message: msg, index: i, suppressThinking: suppress, isLastInTurnStatic: false, turnMessages: undefined })
+        groups.push({
+          type: "regular",
+          message: msg,
+          index: i,
+          suppressThinking: suppress,
+          isLastInTurnStatic: false,
+          turnMessages: undefined,
+        })
       }
       i++
     }
@@ -151,7 +247,10 @@ function groupChatMessages(messages: Message[]): MessageGroup[] {
     if (group.message.role === "user" || group.message.role === "abort") {
       currentTurnAssistants = []
     } else if (group.message.role === "assistant") {
-      currentTurnAssistants = [...currentTurnAssistants, group.message as AssistantMessage]
+      currentTurnAssistants = [
+        ...currentTurnAssistants,
+        group.message as AssistantMessage,
+      ]
       if (group.isLastInTurnStatic) {
         group.turnMessages = currentTurnAssistants
       }
@@ -162,16 +261,21 @@ function groupChatMessages(messages: Message[]): MessageGroup[] {
 }
 
 function isPlanOnlyTurn(turn: TurnSummary): boolean {
-  return turn.files.length > 0 && turn.files.every(
-    (f) =>
-      f.filePath.replace(/\\/g, "/").startsWith(PLAN_DIR_PREFIX) &&
-      f.filePath.toLowerCase().endsWith(".md"),
+  return (
+    turn.files.length > 0 &&
+    turn.files.every(
+      (f) =>
+        f.filePath.replace(/\\/g, "/").startsWith(PLAN_DIR_PREFIX) &&
+        f.filePath.toLowerCase().endsWith(".md")
+    )
   )
 }
 
 function getGroupCreatedAt(group: MessageGroup): number | null {
   if (group.type === "regular") {
-    return "createdAt" in group.message ? (group.message.createdAt ?? null) : null
+    return "createdAt" in group.message
+      ? (group.message.createdAt ?? null)
+      : null
   }
 
   let latest: number | null = null
@@ -209,7 +313,10 @@ function buildTurnCardsByGroup(
       for (let i = 0; i < groupTimes.length; i++) {
         const createdAt = groupTimes[i]
         if (createdAt == null) continue
-        if (createdAt > previousTurnEndedAt && createdAt <= turn.endedAt + 5_000) {
+        if (
+          createdAt > previousTurnEndedAt &&
+          createdAt <= turn.endedAt + 5_000
+        ) {
           targetIndex = i
         }
       }
@@ -270,12 +377,18 @@ export function ChatView({
   const { data: models, isLoading: modelsLoading } = useModels()
   const { openConfigure } = useConfigureProvider()
   const noProvider = !modelsLoading && !models?.models?.length
+  const pendingPreferences = getPendingThreadPreferences(threadId)
+  const initialSelectedModelId = pendingPreferences?.modelId ?? initialModelId
+  const initialThinkingLevel = pendingPreferences?.thinkingLevel
 
   const [gitError, setGitError] = useState<string | null>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(
-    initialModelId
+    initialSelectedModelId
   )
+  const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<
+    ThinkingLevel | undefined
+  >(initialThinkingLevel)
   const [selectedMode, setSelectedMode] = useState<"ask" | "plan" | "code">(
     initialMode
   )
@@ -291,7 +404,13 @@ export function ChatView({
   }, [threadId])
 
   const handlePlanSaved = useCallback(
-    ({ filePath, relativePath }: { filePath: string; relativePath: string }) => {
+    ({
+      filePath,
+      relativePath,
+    }: {
+      filePath: string
+      relativePath: string
+    }) => {
       if (announcedPlansRef.current.has(relativePath)) return
       announcedPlansRef.current.add(relativePath)
 
@@ -379,23 +498,30 @@ export function ChatView({
   // Messages present on the first non-empty render (from cache) skip entry animations.
   // Only messages that arrive after the initial snapshot get animate-in treatment.
   // State (not a ref) so it can be safely read during render.
-  const [initialSnapshot, setInitialSnapshot] = useState<{ sessionId: string; keys: Set<string> } | null>(null)
+  const [initialSnapshot, setInitialSnapshot] = useState<{
+    sessionId: string
+    keys: Set<string>
+  } | null>(null)
   // Always-current ref used by the snapshot update effect below.
   const visibleMessagesRef = useRef(visibleMessages)
   visibleMessagesRef.current = visibleMessages
   // Tracks the last-rendered session so we can detect switches during render.
   const [localSessionId, setLocalSessionId] = useState(sessionId)
-  const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  )
   const updateTitleMutation = useUpdateThreadTitle()
 
   // React's "adjusting state while rendering" pattern — reset all session-local
   // state in one batched pass when the active session changes, avoiding the
   // setState-inside-effect cascade that React 19 rejects.
   if (localSessionId !== sessionId) {
+    const nextPendingPreferences = getPendingThreadPreferences(threadId)
     setLocalSessionId(sessionId)
     setGitError(null)
     setShowScrollButton(false)
-    setSelectedModelId(initialModelId)
+    setSelectedModelId(nextPendingPreferences?.modelId ?? initialModelId)
+    setSelectedThinkingLevel(nextPendingPreferences?.thinkingLevel)
     setSelectedMode(initialMode)
   }
 
@@ -473,6 +599,7 @@ export function ChatView({
       pendingInitialInputs.delete(threadId)
       chatTextboxRef.current?.setValue(pending)
     }
+    clearPendingThreadPreferences(threadId)
   }, [threadId])
 
   // Flush any pending scroll-to-localStorage write on unmount so the last
@@ -536,7 +663,8 @@ export function ChatView({
   // programmaticScrollRef prevents handleScroll from flipping pinnedRef
   // to false mid-animation, which would stop further auto-scroll.
   const commandsByName = useMemo(
-    () => new Map((commandsData ?? []).map((command) => [command.name, command])),
+    () =>
+      new Map((commandsData ?? []).map((command) => [command.name, command])),
     [commandsData]
   )
 
@@ -563,9 +691,10 @@ export function ChatView({
           keys[i] = `working-tool-${firstMsg.toolCallId}`
         } else if (firstMsg?.role === "assistant") {
           const a = firstMsg as AssistantMessage
-          keys[i] = a.createdAt != null
-            ? `working-assistant-t${a.createdAt}`
-            : `working-assistant-i${group.startIndex}`
+          keys[i] =
+            a.createdAt != null
+              ? `working-assistant-t${a.createdAt}`
+              : `working-assistant-i${group.startIndex}`
         } else {
           // Synthetic working block (final-thinking placeholder) is always
           // followed by a regular assistant group; share its key prefix.
@@ -612,7 +741,11 @@ export function ChatView({
   // the query cache (no live subscribers) nor localStorage benefits from
   // per-frame precision. Only the latest scroll position needs to survive
   // a thread switch / reload.
-  const pendingScrollMetaRef = useRef<{ scrollTop: number; isPinned: boolean; visited: true } | null>(null)
+  const pendingScrollMetaRef = useRef<{
+    scrollTop: number
+    isPinned: boolean
+    visited: true
+  } | null>(null)
   const saveScrollPosition = useCallback(
     (scrollTop: number) => {
       pendingScrollMetaRef.current = {
@@ -691,7 +824,7 @@ export function ChatView({
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     if (distanceFromBottom < 5) return
     programmaticScrollRef.current = true
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
   }, [isLoading, groupedMessages.length])
 
   // After older pages are prepended, offset scrollTop by the height delta so
@@ -716,9 +849,11 @@ export function ChatView({
   useEffect(() => {
     const el = scrollContainerRef.current
     if (!el) return
-    const onScrollEnd = () => { programmaticScrollRef.current = false }
-    el.addEventListener('scrollend', onScrollEnd)
-    return () => el.removeEventListener('scrollend', onScrollEnd)
+    const onScrollEnd = () => {
+      programmaticScrollRef.current = false
+    }
+    el.addEventListener("scrollend", onScrollEnd)
+    return () => el.removeEventListener("scrollend", onScrollEnd)
   }, [])
 
   // ResizeObserver: keep the view pinned to the bottom as content grows
@@ -732,7 +867,8 @@ export function ChatView({
       if (!pinnedRef.current) return
       const el = scrollContainerRef.current
       if (!el) return
-      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+      const distanceFromBottom =
+        el.scrollHeight - el.scrollTop - el.clientHeight
       if (distanceFromBottom < 1) return
       programmaticScrollRef.current = true
       el.scrollTop = el.scrollHeight
@@ -750,7 +886,12 @@ export function ChatView({
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
 
     // Trigger loading older messages when near the top
-    if (el.scrollTop < 200 && hasPreviousPage && !isFetchingPreviousPage && !isLoadingOlderRef.current) {
+    if (
+      el.scrollTop < 200 &&
+      hasPreviousPage &&
+      !isFetchingPreviousPage &&
+      !isLoadingOlderRef.current
+    ) {
       isLoadingOlderRef.current = true
       prevGroupCountRef.current = groupedMessages.length
       prevScrollHeightRef.current = el.scrollHeight
@@ -780,7 +921,13 @@ export function ChatView({
       setShowScrollButton(shouldShow)
     }
     saveScrollPosition(el.scrollTop)
-  }, [saveScrollPosition, hasPreviousPage, isFetchingPreviousPage, fetchPreviousPage, groupedMessages.length])
+  }, [
+    saveScrollPosition,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+    fetchPreviousPage,
+    groupedMessages.length,
+  ])
 
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current
@@ -903,14 +1050,21 @@ export function ChatView({
   const handleFork = useCallback(
     async (blockId: string) => {
       try {
-        const { threadId: newThreadId, sessionId: newSessionId, initialInput } = await forkSession(sessionId, blockId)
+        const {
+          threadId: newThreadId,
+          sessionId: newSessionId,
+          initialInput,
+        } = await forkSession(sessionId, blockId)
         // Store the forked user message so the new ChatView can pre-fill the textbox
         if (initialInput) pendingInitialInputs.set(newThreadId, initialInput)
         // Pre-populate the messages cache so the forked thread renders immediately
         try {
-          const { blocks, hasMore } = await listMessages(newSessionId, { limit: MESSAGES_PAGE_SIZE })
+          const { blocks, hasMore } = await listMessages(newSessionId, {
+            limit: MESSAGES_PAGE_SIZE,
+          })
           const seededMessages = blocksToMessages(blocks as MessageBlock[])
-          const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
+          const oldestBlockIndex =
+            blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
           const seed: MessagesInfiniteData = {
             pages: [{ messages: seededMessages, hasMore, oldestBlockIndex }],
             pageParams: [undefined],
@@ -921,10 +1075,14 @@ export function ChatView({
         }
         // Fire-and-forget — the route guards against premature redirect via isTabKnown
         void queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
-        navigate({ to: "/workspace/$threadId", params: { threadId: newThreadId } })
+        navigate({
+          to: "/workspace/$threadId",
+          params: { threadId: newThreadId },
+        })
       } catch (err) {
         toast.error("Fork failed", {
-          description: err instanceof Error ? err.message : "Could not fork conversation",
+          description:
+            err instanceof Error ? err.message : "Could not fork conversation",
         })
       }
     },
@@ -942,7 +1100,10 @@ export function ChatView({
         await revertToMessageMutation.mutateAsync(blockId)
       } catch (err) {
         toast.error("Revert failed", {
-          description: err instanceof Error ? err.message : "Could not revert conversation",
+          description:
+            err instanceof Error
+              ? err.message
+              : "Could not revert conversation",
         })
       } finally {
         setRevertingBlockId(null)
@@ -998,11 +1159,18 @@ export function ChatView({
           {visibleMessages.length === 0 && !isLoading && !isLoadingMessages && (
             <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-8 px-6 text-center select-none">
               <div className="flex flex-col items-center gap-3">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-[#1c1c1e] ring-1 ring-white/5 shadow-md">
-                  <span className="font-black text-3xl leading-none" style={{ color: "#d4a017" }}>Λ</span>
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-[#1c1c1e] shadow-md ring-1 ring-white/5">
+                  <span
+                    className="text-3xl leading-none font-black"
+                    style={{ color: "#d4a017" }}
+                  >
+                    Λ
+                  </span>
                 </div>
                 <div className="space-y-1.5">
-                  <p className="text-lg font-semibold tracking-tight">How can I help?</p>
+                  <p className="text-lg font-semibold tracking-tight">
+                    How can I help?
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     Use{" "}
                     <kbd className="rounded border border-border/60 bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground">
@@ -1028,8 +1196,12 @@ export function ChatView({
                       <Icon className="size-3.5" />
                     </div>
                     <div>
-                      <p className="text-[11px] font-medium leading-tight text-foreground/80">{text}</p>
-                      <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{description}</p>
+                      <p className="text-[11px] leading-tight font-medium text-foreground/80">
+                        {text}
+                      </p>
+                      <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+                        {description}
+                      </p>
                     </div>
                   </button>
                 ))}
@@ -1048,7 +1220,8 @@ export function ChatView({
               let content: React.ReactNode
 
               if (group.type === "working") {
-                const isGroupActive = isLoading && groupIndex === groupedMessages.length - 1
+                const isGroupActive =
+                  isLoading && groupIndex === groupedMessages.length - 1
                 const firstMsg = group.messages[0] as WorkingMessage | undefined
                 // Use the same key fn as initialSnapshot to keep isNew lookup consistent.
                 const firstKey = firstMsg
@@ -1074,7 +1247,8 @@ export function ChatView({
                   </div>
                 )
               } else {
-                const { message, index, isLastInTurnStatic, turnMessages } = group
+                const { message, index, isLastInTurnStatic, turnMessages } =
+                  group
                 if (
                   message.role === "assistant" &&
                   !message.content.trim() &&
@@ -1096,7 +1270,9 @@ export function ChatView({
                       <MessageRow
                         message={message}
                         commandsByName={commandsByName}
-                        showThinking={group.suppressThinking ? false : showThinkingSetting}
+                        showThinking={
+                          group.suppressThinking ? false : showThinkingSetting
+                        }
                         isNewMessage={isNewMessage}
                         entryDelayMs={entryDelayMs}
                         isLastInTurn={isLastInTurn}
@@ -1104,7 +1280,9 @@ export function ChatView({
                         rootPath={rootPath}
                         onFork={handleFork}
                         onRevert={!isLoading ? handleRevert : undefined}
-                        isReverting={revertingBlockId === (message as UserMessage).id}
+                        isReverting={
+                          revertingBlockId === (message as UserMessage).id
+                        }
                       />
                     </div>
                   )
@@ -1138,12 +1316,12 @@ export function ChatView({
             })}
           </div>
           <div className="mx-auto w-full max-w-3xl px-6">
-            {isCompacting
-              ? <CompactingIndicator reason={compactionReason} />
-              : showThinkingIndicator && <ThinkingIndicator className="py-0.5" />
-            }
+            {isCompacting ? (
+              <CompactingIndicator reason={compactionReason} />
+            ) : (
+              showThinkingIndicator && <ThinkingIndicator className="py-0.5" />
+            )}
           </div>
-
         </div>
 
         <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
@@ -1176,6 +1354,8 @@ export function ChatView({
             workspaceId={workspaceId}
             selectedModelId={selectedModelId}
             onModelChange={handleModelChange}
+            selectedThinkingLevel={selectedThinkingLevel}
+            onThinkingLevelChange={setSelectedThinkingLevel}
             mode={selectedMode}
             onModeChange={handleModeChange}
             sessionStats={sessionStats}
