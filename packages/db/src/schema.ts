@@ -10,6 +10,7 @@ export const workspaces = sqliteTable("workspaces", {
   name: text("name").notNull(),
   path: text("path").notNull(),
   openWithAppId: text("open_with_app_id"),
+  isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
   env: text("env"), // JSON object: { KEY: "value" }
   createdAt: integer("created_at").notNull(),
 })

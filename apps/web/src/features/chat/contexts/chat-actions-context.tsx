@@ -1,4 +1,5 @@
-import { createContext, useContext, type ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
+import { create } from "zustand"
 
 /**
  * Imperative chat-scope actions used by deep components (e.g. tool-call blocks,
@@ -15,7 +16,19 @@ export interface ChatActions {
   implementPlan: (relativePath: string) => void
 }
 
-const ChatActionsContext = createContext<ChatActions | null>(null)
+interface ChatActionsStore {
+  initialized: boolean
+  actions: ChatActions | null
+  setInitialized: (value: boolean) => void
+  setActions: (value: ChatActions | null) => void
+}
+
+const useChatActionsStore = create<ChatActionsStore>((set) => ({
+  initialized: false,
+  actions: null,
+  setInitialized: (value) => set({ initialized: value }),
+  setActions: (value) => set({ actions: value }),
+}))
 
 export function ChatActionsProvider({
   value,
@@ -24,13 +37,27 @@ export function ChatActionsProvider({
   value: ChatActions
   children: ReactNode
 }) {
-  return (
-    <ChatActionsContext.Provider value={value}>
-      {children}
-    </ChatActionsContext.Provider>
-  )
+  const setInitialized = useChatActionsStore((state) => state.setInitialized)
+  const setActions = useChatActionsStore((state) => state.setActions)
+
+  useEffect(() => {
+    setInitialized(true)
+    return () => {
+      setActions(null)
+      setInitialized(false)
+    }
+  }, [setActions, setInitialized])
+
+  useEffect(() => {
+    setActions(value)
+  }, [setActions, value])
+
+  return <>{children}</>
 }
 
 export function useChatActions(): ChatActions | null {
-  return useContext(ChatActionsContext)
+  const initialized = useChatActionsStore((state) => state.initialized)
+  const actions = useChatActionsStore((state) => state.actions)
+  if (!initialized) return null
+  return actions
 }

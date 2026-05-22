@@ -17,7 +17,7 @@ import {
   GitCompare,
   History,
   Loader2,
-  MoreHorizontal,
+  GitBranch,
   PackageMinus,
   PackagePlus,
   Undo2,
@@ -42,7 +42,7 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { useDiffPanel } from "../store"
 import { useMainTabs, useMainTabsStore } from "@/features/main-tabs"
-import { useGitDiffStat, useGitStatus, useTurns, useRevertToTurn, type TurnSummary } from "../queries"
+import { useGitDiffStat, useGitStatus, useTurns, useTurnDiffStat, useRevertToTurn, type TurnSummary } from "../queries"
 import {
   useGitStage,
   useGitStageAll,
@@ -362,7 +362,7 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
                     size="icon-sm"
                     className="text-muted-foreground/70 hover:text-foreground"
                   >
-                    <MoreHorizontal />
+                    <GitBranch />
                     <span className="sr-only">Git actions</span>
                   </Button>
                 }
@@ -457,41 +457,28 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
       <div className="mx-0.5 h-4 w-px bg-border/50" />
 
       {/* Diff mode */}
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setMode("inline")}
-              data-active={mode === "inline"}
-              className="text-muted-foreground/70 hover:text-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-            >
-              <AlignLeft />
-              <span className="sr-only">Inline view</span>
-            </Button>
-          }
-        />
-        <TooltipContent>Inline diff</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setMode("side-by-side")}
-              data-active={mode === "side-by-side"}
-              className="text-muted-foreground/70 hover:text-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-            >
-              <Columns2 />
-              <span className="sr-only">Side-by-side</span>
-            </Button>
-          }
-        />
-        <TooltipContent>Side-by-side diff</TooltipContent>
-      </Tooltip>
+      <div className="inline-flex h-7 items-center rounded-md border border-border/70 bg-muted/30 p-0.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setMode("inline")}
+          data-active={mode === "inline"}
+          className="h-6 rounded-sm px-1.5 text-muted-foreground/75 hover:text-foreground data-[active=true]:bg-background data-[active=true]:text-foreground data-[active=true]:shadow-xs"
+        >
+          <AlignLeft className="h-3.5 w-3.5" />
+          <span className="sr-only">Inline</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setMode("side-by-side")}
+          data-active={mode === "side-by-side"}
+          className="h-6 rounded-sm px-1.5 text-muted-foreground/75 hover:text-foreground data-[active=true]:bg-background data-[active=true]:text-foreground data-[active=true]:shadow-xs"
+        >
+          <Columns2 className="h-3.5 w-3.5" />
+          <span className="sr-only">Side-by-side</span>
+        </Button>
+      </div>
     </div>
   )
 })
@@ -1018,12 +1005,21 @@ export const DiffPanel = memo(function DiffPanel({
   const close = onClose ?? closeDiffPanel
 
   const { data: diffStat } = useGitDiffStat(workspaceSessionId)
+  const { data: turnsData = [] } = useTurns(sessionId)
 
   // Source-control tab state (lifted so toolbar and content share it)
   const [scView, setScView] = useState<ContentView>("turn")
   const [scMode, setScMode] = useState<DiffMode>("inline")
   const [scSortMode, setScSortMode] = useState<SortMode>("name")
   const [scStashInputOpen, setScStashInputOpen] = useState(false)
+  const activeTurnId = turnsData[0]?.id
+  const { data: turnDiffStat } = useTurnDiffStat(
+    sessionId,
+    activeTurnId,
+    scView === "turn" && activeTurnId !== undefined
+  )
+  const visibleDiffStat =
+    scView === "all" ? diffStat : scView === "turn" ? turnDiffStat : undefined
 
   useShortcutHandler(SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF, toggleFullscreen)
   const fullscreenBinding = useShortcutBinding(
@@ -1040,7 +1036,7 @@ export const DiffPanel = memo(function DiffPanel({
       <div className="flex h-full w-full flex-col bg-transparent">
         {/* Tab bar — only shown when viewing source control */}
         {!activeFileTab && (
-          <div className="flex h-9 shrink-0 items-center gap-1 bg-transparent px-2">
+          <div className="flex h-9 shrink-0 items-center gap-0.5 bg-transparent px-1">
             {/* View selector for source-control content */}
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -1096,10 +1092,11 @@ export const DiffPanel = memo(function DiffPanel({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {diffStat && (diffStat.additions > 0 || diffStat.deletions > 0) && (
+            {visibleDiffStat &&
+              (visibleDiffStat.additions > 0 || visibleDiffStat.deletions > 0) && (
               <span className="flex animate-in items-center gap-1 font-mono text-[11px] leading-none duration-200 fade-in-0 zoom-in-90">
-                <span className="text-emerald-500">+{diffStat.additions}</span>
-                <span className="text-rose-500">-{diffStat.deletions}</span>
+                <span className="text-emerald-500">+{visibleDiffStat.additions}</span>
+                <span className="text-rose-500">-{visibleDiffStat.deletions}</span>
               </span>
             )}
 
@@ -1119,7 +1116,7 @@ export const DiffPanel = memo(function DiffPanel({
             )}
 
             {/* Right side buttons */}
-            <div className="flex shrink-0 items-center gap-0.5 px-1">
+            <div className="flex shrink-0 items-center gap-0.5 px-0.5">
               {!isEmbedded && (
                 <Tooltip>
                   <TooltipTrigger

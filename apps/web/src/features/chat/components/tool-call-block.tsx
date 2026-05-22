@@ -138,7 +138,8 @@ function getReadFilePath(args: unknown): string | null {
 }
 
 function isReadTool(toolName: string, args: unknown): boolean {
-  return toolName.toLowerCase() === "read" && getReadFilePath(args) !== null
+  const name = toolName.toLowerCase()
+  return (name === "read" || name === "plan_read") && getReadFilePath(args) !== null
 }
 
 // ── ReadView ───────────────────────────────────────────────────────────────────
@@ -187,19 +188,24 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   isNew = true,
   entryDelayMs = 0,
   rootPath,
+  suppressPlanSavedCard = false,
 }: {
   msg: ToolMessage
   isNew?: boolean
   /** Stagger offset (ms) applied as CSS animation-delay when isNew is true. */
   entryDelayMs?: number
   rootPath?: string
+  /** When true, render write output inline instead of the plan-ready card UI. */
+  suppressPlanSavedCard?: boolean
 }) {
   const normalizedToolName = msg.toolName.toLowerCase()
   const isEdit = normalizedToolName === "edit" && isEditArgs(msg.args)
   const diff = isEdit ? getEditDiff(msg.result) : null
   const isRead = isReadTool(normalizedToolName, msg.args)
   const readFilePath = isRead ? getReadFilePath(msg.args) : null
-  const isWrite = normalizedToolName === "write" && isWriteArgs(msg.args)
+  const isWrite =
+    (normalizedToolName === "write" || normalizedToolName === "plan_write") &&
+    isWriteArgs(msg.args)
   const writeArgs = isWrite ? (msg.args as WriteArgs) : null
   const filePath = (isEdit || isWrite) ? getReadFilePath(msg.args) : null
 
@@ -216,7 +222,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   // Plan-mode writes get a custom card with Review + Implement CTAs.
   // Must come after the hooks above to keep call order stable.
   const planMeta = isWrite && writeArgs ? planWriteMeta(writeArgs.path, rootPath) : null
-  if (planMeta && writeArgs) {
+  if (!suppressPlanSavedCard && planMeta && writeArgs) {
     return (
       <PlanSavedCard
         msg={msg}

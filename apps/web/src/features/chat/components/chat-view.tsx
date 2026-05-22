@@ -87,6 +87,7 @@ import {
   clearPendingThreadPreferences,
   getPendingThreadPreferences,
 } from "./pending-thread-preferences"
+import { getNextMode } from "./mode-combobox"
 
 const PLAN_DIR_PREFIX = ".agents/plans/"
 import { FileChangesCard } from "./file-changes-card"
@@ -458,7 +459,7 @@ export function ChatView({
           setSelectedMode("code")
           updateThreadMode.mutate({ threadId, mode: "code" })
         }
-        const prompt = `Implement the plan in \`${relativePath}\`.`
+        const prompt = `Implement the plan in @${relativePath}.`
         chatTextboxRef.current?.setValue(prompt)
         chatTextboxRef.current?.focus()
       },
@@ -712,22 +713,7 @@ export function ChatView({
     return keys
   }, [groupedMessages])
 
-  // ThinkingIndicator is shown while there is nothing else visible to indicate
-  // progress. It disappears once the agent produces tool calls or text content
-  // (working block or assistant message) — those take over the loading signal.
-  // But a working block that contains only an empty in-flight assistant message
-  // (message_start fired, no text/tool yet) renders null, so we must also show
-  // the indicator in that case to avoid a blank gap before the first delta.
-  const lastGroup = groupedMessages.at(-1)
-  const lastGroupIsEmptyWorking =
-    lastGroup?.type === "working" &&
-    lastGroup.messages.every((m) => m.role !== "tool")
-  const showThinkingIndicator =
-    isLoading &&
-    !isCompacting &&
-    (!lastGroup ||
-      (lastGroup.type === "regular" && lastGroup.message.role === "user") ||
-      lastGroupIsEmptyWorking)
+  const showThinkingIndicator = isLoading && !isCompacting
 
   // Track group count + previous scrollHeight so we can restore scroll position
   // after older pages prepend (keeps the previously-first visible row in place
@@ -956,6 +942,11 @@ export function ChatView({
     [threadId, updateThreadMode]
   )
 
+  const cycleAgentMode = useCallback(() => {
+    const nextMode = getNextMode(selectedMode)
+    handleModeChange(nextMode)
+  }, [handleModeChange, selectedMode])
+
   const handleGitError = useCallback((message: string) => {
     setGitError(message)
   }, [])
@@ -1002,6 +993,7 @@ export function ChatView({
     isLoading ? handleStop : null
   )
   useShortcutHandler(SHORTCUT_ACTIONS.SCROLL_TO_BOTTOM, scrollToBottom)
+  useShortcutHandler(SHORTCUT_ACTIONS.CYCLE_AGENT_MODE, cycleAgentMode)
 
   const handleSend = useCallback(
     (

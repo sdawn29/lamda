@@ -7,6 +7,7 @@ import type { SlashCommand } from "../api"
 
 const ZERO_WIDTH_SPACE_RE = /\u200B/g
 const NBSP_RE = /\u00A0/g
+const PASTE_MENTION_RE = /(@[^\s]+)/g
 
 export interface RichInputHandle {
   getValue: () => string
@@ -126,6 +127,27 @@ export function buildSlashCommandChip(cmd: SlashCommand): HTMLSpanElement {
   return chip
 }
 
+function appendRichTextFromPlainText(target: Node, text: string) {
+  const parts = text.split(PASTE_MENTION_RE)
+  for (const part of parts) {
+    if (part.startsWith("@")) {
+      const path = part.slice(1)
+      target.appendChild(buildMentionChip(path))
+      target.appendChild(document.createTextNode("\u200B"))
+    } else if (part) {
+      const lines = part.split("\n")
+      for (let i = 0; i < lines.length; i++) {
+        if (i > 0) {
+          target.appendChild(document.createElement("br"))
+        }
+        if (lines[i]) {
+          target.appendChild(document.createTextNode(lines[i]))
+        }
+      }
+    }
+  }
+}
+
 export const RichInput = React.forwardRef<
   RichInputHandle,
   {
@@ -197,7 +219,8 @@ export const RichInput = React.forwardRef<
       },
       setValue(text: string) {
         if (divRef.current) {
-          divRef.current.textContent = text
+          divRef.current.innerHTML = ""
+          appendRichTextFromPlainText(divRef.current, text)
           syncEmptyState()
           onInput?.()
           divRef.current.focus()
@@ -407,30 +430,12 @@ export const RichInput = React.forwardRef<
     e.preventDefault()
     const text = e.clipboardData.getData("text/plain")
     if (!text) return
-    const PASTE_MENTION_RE = /(@[^\s]+)/g
-    const parts = text.split(PASTE_MENTION_RE)
     const sel = window.getSelection()
     if (!sel || !sel.rangeCount) return
     const range = sel.getRangeAt(0)
     range.deleteContents()
     const frag = document.createDocumentFragment()
-    for (const part of parts) {
-      if (part.startsWith("@")) {
-        const path = part.slice(1)
-        frag.appendChild(buildMentionChip(path))
-        frag.appendChild(document.createTextNode("\u200B"))
-      } else if (part) {
-        const lines = part.split("\n")
-        for (let i = 0; i < lines.length; i++) {
-          if (i > 0) {
-            frag.appendChild(document.createElement("br"))
-          }
-          if (lines[i]) {
-            frag.appendChild(document.createTextNode(lines[i]))
-          }
-        }
-      }
-    }
+    appendRichTextFromPlainText(frag, text)
     range.insertNode(frag)
     range.collapse(false)
     sel.removeAllRanges()

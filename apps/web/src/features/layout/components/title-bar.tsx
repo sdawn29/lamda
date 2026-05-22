@@ -6,7 +6,6 @@ import {
   Trash2,
   Server,
 } from "lucide-react"
-import { Icon } from "@iconify/react"
 import {
   useRouter,
   useParams,
@@ -38,7 +37,6 @@ import { ShortcutKbd } from "@/shared/ui/kbd"
 import { McpDialog, useMcpServerStatus } from "@/features/mcp"
 import { TasksDropdown } from "@/features/tasks"
 import { useMainTabs } from "@/features/main-tabs"
-import { getIconName } from "@/shared/ui/file-icon"
 import { cn } from "@/shared/lib/utils"
 
 export function TitleBar() {
@@ -82,15 +80,6 @@ export function TitleBar() {
   }, [activeTabFile, workspaces])
 
   const effectiveWorkspacePath = urlActiveWorkspace?.path ?? fileWorkspace?.path
-
-  const fileRelativePath = !activeTabFile
-    ? ""
-    : !activeTabFile.workspacePath ||
-        !activeTabFile.filePath.startsWith(activeTabFile.workspacePath)
-      ? activeTabFile.filePath
-      : activeTabFile.filePath
-          .slice(activeTabFile.workspacePath.length)
-          .replace(/^[/\\]+/, "")
 
   const {
     isOpen: terminalOpen,
@@ -192,31 +181,7 @@ export function TitleBar() {
         )}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-        {activeTabFile ? (
-          <div className="flex min-w-0 flex-1 items-center gap-1">
-            {fileWorkspace && (
-              <>
-                <span className="shrink truncate text-[11px] font-medium text-muted-foreground/70">
-                  {fileWorkspace.name}
-                </span>
-                <span className="mx-0.5 shrink-0 text-[11px] text-muted-foreground/40 select-none">
-                  /
-                </span>
-              </>
-            )}
-            <Icon
-              icon={`catppuccin:${getIconName(activeTabFile.title)}`}
-              className="size-3.5 shrink-0 opacity-70"
-              aria-hidden
-            />
-            <span
-              className="min-w-0 truncate text-sm font-semibold text-foreground"
-              title={fileRelativePath}
-            >
-              {activeTabFile.title}
-            </span>
-          </div>
-        ) : urlActiveThread ? (
+        {urlActiveThread ? (
           <div className="flex min-w-0 flex-1 items-center gap-1">
             {urlActiveWorkspace && (
               <>

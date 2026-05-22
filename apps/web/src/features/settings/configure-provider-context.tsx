@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from "react"
+import React, { useEffect } from "react"
+import { create } from "zustand"
 
 export type ConfigureProviderTab = "subscriptions" | "api-keys"
 
@@ -10,32 +11,37 @@ interface ConfigureProviderContextValue {
   setTab: (tab: ConfigureProviderTab) => void
 }
 
-const ConfigureProviderContext = createContext<ConfigureProviderContextValue | null>(null)
+interface ConfigureProviderStore extends ConfigureProviderContextValue {
+  initialized: boolean
+  setInitialized: (value: boolean) => void
+}
+
+const useConfigureProviderStore = create<ConfigureProviderStore>((set) => ({
+  initialized: false,
+  open: false,
+  tab: "subscriptions",
+  openConfigure: (tab = "subscriptions") => set({ open: true, tab }),
+  closeConfigure: () => set({ open: false }),
+  setTab: (tab) => set({ tab }),
+  setInitialized: (value) => set({ initialized: value }),
+}))
 
 export function ConfigureProviderProvider({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState<ConfigureProviderTab>("subscriptions")
-
-  return (
-    <ConfigureProviderContext.Provider
-      value={{
-        open,
-        tab,
-        openConfigure: (t = "subscriptions") => {
-          setTab(t)
-          setOpen(true)
-        },
-        closeConfigure: () => setOpen(false),
-        setTab,
-      }}
-    >
-      {children}
-    </ConfigureProviderContext.Provider>
-  )
+  const setInitialized = useConfigureProviderStore((state) => state.setInitialized)
+  useEffect(() => {
+    setInitialized(true)
+    return () => setInitialized(false)
+  }, [setInitialized])
+  return <>{children}</>
 }
 
 export function useConfigureProvider() {
-  const ctx = useContext(ConfigureProviderContext)
-  if (!ctx) throw new Error("useConfigureProvider must be used within ConfigureProviderProvider")
-  return ctx
+  const initialized = useConfigureProviderStore((state) => state.initialized)
+  const open = useConfigureProviderStore((state) => state.open)
+  const tab = useConfigureProviderStore((state) => state.tab)
+  const openConfigure = useConfigureProviderStore((state) => state.openConfigure)
+  const closeConfigure = useConfigureProviderStore((state) => state.closeConfigure)
+  const setTab = useConfigureProviderStore((state) => state.setTab)
+  if (!initialized) throw new Error("useConfigureProvider must be used within ConfigureProviderProvider")
+  return { open, tab, openConfigure, closeConfigure, setTab }
 }

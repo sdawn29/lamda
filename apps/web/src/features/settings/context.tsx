@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from "react"
+import React, { useEffect } from "react"
+import { create } from "zustand"
 
 interface SettingsModalContextValue {
   open: boolean
@@ -6,25 +7,33 @@ interface SettingsModalContextValue {
   closeSettings: () => void
 }
 
-const SettingsModalContext = createContext<SettingsModalContextValue | null>(null)
+interface SettingsModalStore extends SettingsModalContextValue {
+  initialized: boolean
+  setInitialized: (value: boolean) => void
+}
+
+const useSettingsModalStore = create<SettingsModalStore>((set) => ({
+  initialized: false,
+  open: false,
+  openSettings: () => set({ open: true }),
+  closeSettings: () => set({ open: false }),
+  setInitialized: (value) => set({ initialized: value }),
+}))
 
 export function SettingsModalProvider({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <SettingsModalContext.Provider
-      value={{
-        open,
-        openSettings: () => setOpen(true),
-        closeSettings: () => setOpen(false),
-      }}
-    >
-      {children}
-    </SettingsModalContext.Provider>
-  )
+  const setInitialized = useSettingsModalStore((state) => state.setInitialized)
+  useEffect(() => {
+    setInitialized(true)
+    return () => setInitialized(false)
+  }, [setInitialized])
+  return <>{children}</>
 }
 
 export function useSettingsModal() {
-  const ctx = useContext(SettingsModalContext)
-  if (!ctx) throw new Error("useSettingsModal must be used within SettingsModalProvider")
-  return ctx
+  const initialized = useSettingsModalStore((state) => state.initialized)
+  const open = useSettingsModalStore((state) => state.open)
+  const openSettings = useSettingsModalStore((state) => state.openSettings)
+  const closeSettings = useSettingsModalStore((state) => state.closeSettings)
+  if (!initialized) throw new Error("useSettingsModal must be used within SettingsModalProvider")
+  return { open, openSettings, closeSettings }
 }

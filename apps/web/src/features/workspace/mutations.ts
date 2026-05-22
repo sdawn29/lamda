@@ -9,6 +9,8 @@ import {
   deleteWorkspace as apiDeleteWorkspace,
   updateWorkspaceOpenWithApp as apiUpdateWorkspaceOpenWithApp,
   updateWorkspaceEnv as apiUpdateWorkspaceEnv,
+  pinWorkspace as apiPinWorkspace,
+  unpinWorkspace as apiUnpinWorkspace,
   createThread as apiCreateThread,
   deleteThread as apiDeleteThread,
   archiveThread as apiArchiveThread,
@@ -261,6 +263,40 @@ export function useUpdateWorkspaceEnv() {
       setWorkspacesData(queryClient, (workspaces) =>
         workspaces.map((ws) =>
           ws.id !== workspaceId ? ws : { ...ws, env }
+        )
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function usePinWorkspace() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (workspaceId: string) => apiPinWorkspace(workspaceId),
+    onMutate: (workspaceId) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((ws) =>
+          ws.id !== workspaceId ? ws : { ...ws, isPinned: true }
+        )
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function useUnpinWorkspace() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (workspaceId: string) => apiUnpinWorkspace(workspaceId),
+    onMutate: (workspaceId) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((ws) =>
+          ws.id !== workspaceId ? ws : { ...ws, isPinned: false }
         )
       )
     },

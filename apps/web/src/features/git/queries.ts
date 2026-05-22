@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff } from "./api"
+import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFiles } from "./api"
 import { getBranch, listBranches } from "@/features/chat/api"
 
 const gitRootKey = ["git"] as const
@@ -33,6 +33,8 @@ export const gitKeys = {
     [...gitSessionKey(sessionId), "show-files", sha] as const,
   showFileDiff: (sessionId: string, sha: string, filePath: string) =>
     [...gitSessionKey(sessionId), "show-file-diff", sha, filePath] as const,
+  turnDiffStat: (sessionId: string, turnId: number) =>
+    [...gitSessionKey(sessionId), "turn-diff-stat", turnId] as const,
 }
 
 // ── Git status ────────────────────────────────────────────────────────────────
@@ -85,6 +87,61 @@ export function useGitDiffStat(sessionId: string) {
     enabled: !!sessionId,
     gcTime: 30 * 1000,
     staleTime: 0,
+    refetchInterval: 3_000,
+  })
+}
+
+function countDiffLines(diff: string): { additions: number; deletions: number } {
+  let additions = 0
+  let deletions = 0
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) additions++
+    else if (line.startsWith("-") && !line.startsWith("---")) deletions++
+  }
+  return { additions, deletions }
+}
+
+export function useTurnDiffStat(
+  sessionId: string,
+  turnId: number | undefined,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey:
+      turnId !== undefined
+        ? gitKeys.turnDiffStat(sessionId, turnId)
+        : ([...gitSessionKey(sessionId), "turn-diff-stat-none"] as const),
+    queryFn: async (): Promise<{ additions: number; deletions: number }> => {
+      if (turnId === undefined) return { additions: 0, deletions: 0 }
+      const files = await getTurnFiles(sessionId, turnId)
+      if (!files.length) return { additions: 0, deletions: 0 }
+
+      const perFile = await Promise.all(
+        files.slice(0, 100).map(async (file) => {
+          try {
+            const diff = await gitFileDiff(
+              sessionId,
+              file.filePath,
+              file.postStatusCode
+            )
+            return countDiffLines(diff)
+          } catch {
+            return { additions: 0, deletions: 0 }
+          }
+        })
+      )
+
+      return perFile.reduce(
+        (acc, next) => ({
+          additions: acc.additions + next.additions,
+          deletions: acc.deletions + next.deletions,
+        }),
+        { additions: 0, deletions: 0 }
+      )
+    },
+    enabled: enabled && !!sessionId && turnId !== undefined,
+    staleTime: 0,
+    gcTime: 30 * 1000,
     refetchInterval: 3_000,
   })
 }
@@ -206,4 +263,3 @@ export function useRevertToTurn(sessionId: string) {
     },
   })
 }
-

@@ -13,11 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/shared/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/shared/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 import type { Mode } from "@/features/workspace/api"
 
 interface ModeOption {
@@ -79,6 +75,11 @@ export const MODE_OPTIONS: ModeOption[] = [
 
 export function getModeOption(mode: Mode): ModeOption {
   return MODE_OPTIONS.find((m) => m.value === mode) ?? MODE_OPTIONS[2]
+}
+
+export function getNextMode(mode: Mode): Mode {
+  const index = MODE_OPTIONS.findIndex((option) => option.value === mode)
+  return MODE_OPTIONS[(index + 1) % MODE_OPTIONS.length].value
 }
 
 export function ModeCombobox({

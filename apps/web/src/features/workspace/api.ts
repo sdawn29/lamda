@@ -27,6 +27,7 @@ export interface WorkspaceDto {
   name: string
   path: string
   openWithAppId: string | null
+  isPinned?: boolean
   env: Record<string, string>
   createdAt: number
   threads: ThreadDto[]
@@ -80,6 +81,14 @@ export function updateWorkspaceEnv(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ env }),
   })
+}
+
+export function pinWorkspace(workspaceId: string): Promise<void> {
+  return apiFetch<void>(`/workspace/${workspaceId}/pin`, { method: "PATCH" })
+}
+
+export function unpinWorkspace(workspaceId: string): Promise<void> {
+  return apiFetch<void>(`/workspace/${workspaceId}/unpin`, { method: "PATCH" })
 }
 
 export function createThread(

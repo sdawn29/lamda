@@ -58,6 +58,7 @@ function createDb() {
       name             TEXT NOT NULL,
       path             TEXT NOT NULL,
       open_with_app_id TEXT,
+      is_pinned        INTEGER NOT NULL DEFAULT 0,
       created_at       INTEGER NOT NULL
     );
 
@@ -168,6 +169,16 @@ function createDb() {
     const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
     if (!wsCols.some((col) => col.name === "env")) {
       sqlite.exec(`ALTER TABLE workspaces ADD COLUMN env TEXT`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
+  // Migration: Add is_pinned column to workspaces table.
+  try {
+    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+    if (!wsCols.some((col) => col.name === "is_pinned")) {
+      sqlite.exec(`ALTER TABLE workspaces ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0`);
     }
   } catch {
     // Safe to ignore — column may already exist.

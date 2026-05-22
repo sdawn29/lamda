@@ -228,7 +228,7 @@ class SessionEventHub {
     // Tool name may arrive on the event or only on the earlier _start.
     const meta = this.toolMetaMap.get(msg.toolCallId);
     const toolName = (msg.toolName ?? meta?.toolName ?? "").toLowerCase();
-    if (toolName !== "write") return;
+    if (toolName !== "plan_write" && toolName !== "write") return;
 
     const args = meta?.args as { path?: unknown } | undefined;
     const rawPath = typeof args?.path === "string" ? args.path : null;

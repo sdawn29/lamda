@@ -1,4 +1,4 @@
-import { createManagedSession, PLAN_DIR, type SdkConfig } from "@lamda/pi-sdk"
+import { createManagedSession, createPlanModeTools, PLAN_DIR, type SdkConfig } from "@lamda/pi-sdk"
 import { updateThreadSessionFile, getWorkspace, getThread } from "@lamda/db"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
@@ -31,7 +31,7 @@ export async function createSessionForThread(
   // on a missing directory. Cheap and safe to run unconditionally.
   await mkdir(join(cwd, PLAN_DIR), { recursive: true }).catch(() => {})
 
-  const customTools = workspaceId ? await collectCustomTools(workspaceId, cwd) : undefined
+  const customTools = workspaceId ? await collectCustomTools(workspaceId, cwd, mode) : (mode === "plan" ? createPlanModeTools(cwd) : undefined)
   const handle = await createManagedSession({ cwd, customTools, mode, ...opts })
   const sessionId = store.create(handle, cwd, threadId, workspaceId)
   
@@ -60,7 +60,15 @@ export function gitCwd(id: string): string | null {
  * Merge MCP- and LSP-derived tools for a workspace. Both are loaded in
  * parallel; failures in either don't block the other.
  */
-export async function collectCustomTools(workspaceId: string, workspacePath: string) {
+export async function collectCustomTools(
+  workspaceId: string,
+  workspacePath: string,
+  mode?: SdkConfig["mode"],
+) {
+  if (mode === "plan" || mode === "ask") {
+    return mode === "plan" ? createPlanModeTools(workspacePath) : []
+  }
+
   const [mcpTools, lspTools] = await Promise.all([
     import("./mcp-service.js").then((m) => m.getMcpToolsForSession(workspaceId)).catch((err) => {
       console.warn("[session-service] failed to load MCP tools:", err)

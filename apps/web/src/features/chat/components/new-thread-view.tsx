@@ -5,6 +5,8 @@ import { toast } from "sonner"
 import { ChevronsUpDownIcon, FolderIcon } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
+import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
+import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import {
   Command,
   CommandEmpty,
@@ -32,6 +34,7 @@ import {
   type ThinkingLevel,
 } from "./chat-textbox"
 import { setPendingThreadPreferences } from "./pending-thread-preferences"
+import { getNextMode } from "./mode-combobox"
 import { sendPrompt, generateTitle } from "../api"
 import {
   messagesQueryKey,
@@ -93,6 +96,12 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
   useEffect(() => {
     chatTextboxRef.current?.focus()
   }, [])
+
+  const cycleAgentMode = useCallback(() => {
+    setSelectedMode((mode) => getNextMode(mode))
+  }, [])
+
+  useShortcutHandler(SHORTCUT_ACTIONS.CYCLE_AGENT_MODE, cycleAgentMode)
 
   const handleSend = useCallback(
     async (
@@ -254,7 +263,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
             </div>
           </div>
 
-          <div className="flex">
+          <div className="mb-2 flex items-center gap-2">
             <Popover open={wsPickerOpen} onOpenChange={setWsPickerOpen}>
               <PopoverTrigger
                 render={
@@ -263,7 +272,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
                     size="sm"
                     disabled={noWorkspaces}
                     aria-expanded={wsPickerOpen}
-                    className="mb-2 w-auto"
+                    className="h-8 w-auto"
                   >
                     <FolderIcon data-icon="inline-start" />
                     <span className="whitespace-nowrap">
@@ -278,7 +287,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               />
               <PopoverContent
                 className="w-auto min-w-40 p-0"
-                side="bottom"
+                side="top"
                 align="start"
                 sideOffset={6}
               >
@@ -307,6 +316,19 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
                 </Command>
               </PopoverContent>
             </Popover>
+            {hasBranchInfo && (
+              <>
+                <span className="text-muted-foreground/60">/</span>
+                <div className="flex h-8 items-center">
+                  <BranchSelector
+                    branch={selectedBranch ?? currentBranch}
+                    branches={branches}
+                    onBranchSelect={setSelectedBranch}
+                    sessionId={refSessionId}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <ChatTextbox
@@ -326,17 +348,6 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
                 : "Ask anything… @ for files"
             }
           />
-
-          {hasBranchInfo && (
-            <div className="mt-1 flex items-center gap-1">
-              <BranchSelector
-                branch={selectedBranch ?? currentBranch}
-                branches={branches}
-                onBranchSelect={setSelectedBranch}
-                sessionId={refSessionId}
-              />
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -31,18 +31,23 @@ interface TaskFormDialogProps {
 }
 
 export function TaskFormDialog({ open, onOpenChange, task, onSave }: TaskFormDialogProps) {
-  const [icon, setIcon] = useState<TaskIconId>((task?.icon as TaskIconId) ?? "terminal")
-  const [command, setCommand] = useState(task?.command ?? "")
+  const [icon, setIcon] = useState<TaskIconId>("terminal")
+  const [command, setCommand] = useState("")
   const [errors, setErrors] = useState<{ command?: string }>({})
 
-  const reset = () => {
+  const syncFromTask = () => {
     setIcon((task?.icon as TaskIconId) ?? "terminal")
     setCommand(task?.command ?? "")
     setErrors({})
   }
 
+  useEffect(() => {
+    if (open) syncFromTask()
+    // Keep local form state aligned with the selected task while dialog is open.
+  }, [open, task])
+
   const handleOpenChange = (next: boolean) => {
-    if (!next) reset()
+    if (!next) syncFromTask()
     onOpenChange(next)
   }
 

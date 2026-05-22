@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -174,7 +174,7 @@ const TreeItem = memo(function TreeItem({
         title={node.relativePath}
         aria-expanded={node.isDirectory ? isExpanded : undefined}
         className={cn(
-          "group flex h-7 w-full items-center gap-1.5 rounded-md pr-2 text-left text-xs text-sidebar-foreground/80 transition-colors",
+          "group flex h-6 w-full items-center gap-1 rounded-md pr-1.5 text-left text-xs text-sidebar-foreground/80 transition-colors",
           "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           "focus-visible:bg-sidebar-accent focus-visible:text-sidebar-accent-foreground focus-visible:outline-none"
         )}
@@ -247,11 +247,11 @@ const SKELETON_ROWS = [
 
 function FileTreeSkeleton() {
   return (
-    <div className="space-y-0.5 p-1 animate-in fade-in duration-200">
+    <div className="space-y-0 p-1 animate-in fade-in duration-200">
       {SKELETON_ROWS.map((row, i) => (
         <div
           key={i}
-          className="flex items-center gap-1 py-0.5"
+          className="flex items-center gap-1 py-0"
           style={{ paddingLeft: `${row.indent * 12 + 8}px` }}
         >
           <Skeleton className="size-3 shrink-0 rounded-sm" />
@@ -272,16 +272,17 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
   )
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState("")
+  const deferredFilter = useDeferredValue(filter)
 
   const tree = useMemo(() => buildTree(entries), [entries])
-  const filteredTree = useMemo(() => filterTree(tree, filter), [filter, tree])
-  const isFiltering = filter.trim().length > 0
+  const filteredTree = useMemo(() => filterTree(tree, deferredFilter), [deferredFilter, tree])
+  const isFiltering = deferredFilter.trim().length > 0
   const totalFiles = useMemo(() => countFiles(tree), [tree])
   const visibleFiles = useMemo(() => countFiles(filteredTree), [filteredTree])
 
   useEffect(() => {
     setFilterCollapsed(new Set())
-  }, [filter])
+  }, [deferredFilter])
 
   const handleToggleDir = useCallback(
     (relativePath: string) => {
@@ -338,8 +339,8 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-sidebar-border/80 bg-sidebar text-sidebar-foreground shadow-sm">
-      <SidebarHeader className="gap-1.5 border-b bg-sidebar/95 px-2 py-2">
-        <div className="flex items-center gap-1.5">
+      <SidebarHeader className="gap-1 border-b bg-sidebar/95 px-1.5 py-1.5">
+        <div className="flex items-center gap-1">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-sidebar-foreground/40" />
             <Input
@@ -383,7 +384,7 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
           </div>
         )}
       </SidebarHeader>
-      <SidebarContent className="p-1.5">
+      <SidebarContent className="p-1">
         {showSkeleton ? (
           <FileTreeSkeleton />
         ) : isEmpty ? (

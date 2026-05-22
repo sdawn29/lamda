@@ -2,6 +2,7 @@ export { createManagedSession, openManagedSession, readSessionHistory } from "./
 export { getAvailableModels, invalidateModelCache } from "./models.js";
 export { generateThreadTitle } from "./title.js";
 export { generateCommitMessage, DEFAULT_COMMIT_PROMPT } from "./commit-message.js";
+export { createPlanModeTools } from "./plan-tools.js";
 export {
   MODES,
   MODE_CONFIG,

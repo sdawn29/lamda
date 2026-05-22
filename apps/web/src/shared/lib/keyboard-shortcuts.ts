@@ -7,6 +7,7 @@ export const SHORTCUT_ACTIONS = {
   NEW_THREAD: "new_thread",
   NEW_WORKSPACE: "new_workspace",
   FOCUS_CHAT: "focus_chat",
+  CYCLE_AGENT_MODE: "cycle_agent_mode",
   STOP_GENERATION: "stop_generation",
   TOGGLE_THEME: "toggle_theme",
   OPEN_SETTINGS: "open_settings",
@@ -19,7 +20,8 @@ export const SHORTCUT_ACTIONS = {
   OPEN_COMMAND_PALETTE: "open_command_palette",
 } as const
 
-export type ShortcutAction = (typeof SHORTCUT_ACTIONS)[keyof typeof SHORTCUT_ACTIONS]
+export type ShortcutAction =
+  (typeof SHORTCUT_ACTIONS)[keyof typeof SHORTCUT_ACTIONS]
 
 export const SHORTCUT_LABELS: Record<ShortcutAction, string> = {
   toggle_sidebar: "Toggle Sidebar",
@@ -30,6 +32,7 @@ export const SHORTCUT_LABELS: Record<ShortcutAction, string> = {
   new_thread: "New Thread",
   new_workspace: "New Workspace",
   focus_chat: "Focus Chat Input",
+  cycle_agent_mode: "Cycle Agent Mode",
   stop_generation: "Stop Generation",
   toggle_theme: "Toggle Theme",
   open_settings: "Open Settings",
@@ -53,6 +56,7 @@ export const SHORTCUT_ACTION_ORDER: ShortcutAction[] = [
   "new_thread",
   "new_workspace",
   "focus_chat",
+  "cycle_agent_mode",
   "stop_generation",
   "toggle_theme",
   "open_settings",
@@ -74,6 +78,7 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutAction, string> = {
   new_thread: "mod+t",
   new_workspace: "mod+shift+n",
   focus_chat: "/",
+  cycle_agent_mode: "shift+tab",
   stop_generation: "escape",
   toggle_theme: "d",
   open_settings: "mod+,",
@@ -88,6 +93,7 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutAction, string> = {
 
 // Actions that fire even when focus is in an editable element
 export const BYPASS_EDITABLE_GUARD = new Set<ShortcutAction>([
+  "cycle_agent_mode",
   "stop_generation",
 ])
 
@@ -122,20 +128,29 @@ function formatPart(p: string, isMac: boolean): string {
   if (p === "ctrl") return isMac ? "⌃" : "Ctrl"
   if (KEY_DISPLAY[p]) return KEY_DISPLAY[p]
   if (p.startsWith("f") && /^f\d+$/.test(p)) return p.toUpperCase()
-  return p.length === 1 ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1)
+  return p.length === 1
+    ? p.toUpperCase()
+    : p.charAt(0).toUpperCase() + p.slice(1)
 }
 
 /** Returns each key part as a separate string, suitable for rendering as individual Kbd elements. */
 export function formatBindingParts(binding: string): string[] {
   if (!binding) return []
   const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform)
-  return binding.toLowerCase().split("+").map((p) => formatPart(p, isMac))
+  return binding
+    .toLowerCase()
+    .split("+")
+    .map((p) => formatPart(p, isMac))
 }
 
 export function formatBinding(binding: string): string {
   if (!binding) return "—"
   const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform)
-  return binding.toLowerCase().split("+").map((p) => formatPart(p, isMac)).join(isMac ? "" : "+")
+  return binding
+    .toLowerCase()
+    .split("+")
+    .map((p) => formatPart(p, isMac))
+    .join(isMac ? "" : "+")
 }
 
 const KEY_ALIASES: Record<string, string> = {
@@ -149,9 +164,18 @@ const KEY_ALIASES: Record<string, string> = {
   backspace: "Backspace",
   delete: "Delete",
   space: " ",
-  f1: "F1", f2: "F2", f3: "F3", f4: "F4", f5: "F5",
-  f6: "F6", f7: "F7", f8: "F8", f9: "F9", f10: "F10",
-  f11: "F11", f12: "F12",
+  f1: "F1",
+  f2: "F2",
+  f3: "F3",
+  f4: "F4",
+  f5: "F5",
+  f6: "F6",
+  f7: "F7",
+  f8: "F8",
+  f9: "F9",
+  f10: "F10",
+  f11: "F11",
+  f12: "F12",
 }
 
 export function matchesBinding(event: KeyboardEvent, binding: string): boolean {

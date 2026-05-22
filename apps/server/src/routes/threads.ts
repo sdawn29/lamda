@@ -15,10 +15,10 @@ import {
   updateThreadStopped,
   updateThreadLastAccessed,
 } from "@lamda/db";
-import { isMode, type Mode } from "@lamda/pi-sdk";
+import { createPlanModeTools, isMode, type Mode } from "@lamda/pi-sdk";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
-import { createSessionForThread } from "../services/session-service.js";
+import { collectCustomTools, createSessionForThread } from "../services/session-service.js";
 
 const threads = new Hono();
 
@@ -101,7 +101,18 @@ threads.patch("/thread/:id/mode", async (c) => {
   const mode: Mode = body.mode;
   updateThreadMode(threadId, mode);
   const session = store.getByThreadId(threadId);
-  if (session) session.handle.setMode(mode);
+  if (session) {
+    const entry = store.get(session.sessionId);
+    if (entry) {
+      const customTools = entry.workspaceId
+        ? await collectCustomTools(entry.workspaceId, entry.cwd, mode)
+        : mode === "plan"
+          ? createPlanModeTools(entry.cwd)
+          : [];
+      session.handle.setCustomTools(customTools);
+    }
+    session.handle.setMode(mode);
+  }
   return c.json({ ok: true });
 });
 

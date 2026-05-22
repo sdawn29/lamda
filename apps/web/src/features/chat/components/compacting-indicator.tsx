@@ -1,5 +1,3 @@
-import { Loader2Icon } from "lucide-react"
-
 import { cn } from "@/shared/lib/utils"
 
 type CompactionReason = "manual" | "threshold" | "overflow"
@@ -28,8 +26,7 @@ export function CompactingIndicator({ className, reason }: CompactingIndicatorPr
       aria-label={label}
     >
       <div className="h-px flex-1 bg-border/60" />
-      <div className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground/60">
-        <Loader2Icon className="h-3 w-3 animate-spin" />
+      <div className="flex shrink-0 items-center text-xs text-muted-foreground/60">
         <span className="animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground/70 to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent">
           {label}
         </span>

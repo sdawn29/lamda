@@ -314,15 +314,24 @@ export function WorkspaceLayout() {
     ws.threads.some((t) => t.id === activeThreadId)
   )
 
-  const activeTerminalOpen =
-    !diffFullscreen &&
-    (activeWorkspace
-      ? (terminalStates[activeWorkspace.id]?.isOpen ?? false)
-      : false)
-
   const terminalHost =
     activeWorkspace ??
+    workspaces.find((ws) => terminalStates[ws.id]?.isOpen) ??
     workspaces.find((ws) => (terminalStates[ws.id]?.tabs.length ?? 0) > 0)
+
+  const activeTerminalOpen =
+    !diffFullscreen &&
+    (terminalHost
+      ? (terminalStates[terminalHost.id]?.isOpen ?? false)
+      : false)
+
+  // Keep the terminal panel mounted as long as any workspace has live tabs, so
+  // switching threads between workspaces doesn't tear down PTYs that are still
+  // running. The panel is hidden (not unmounted) when the active workspace's
+  // terminal isn't open.
+  const anyTerminalTabs = Object.values(terminalStates).some(
+    (s) => s.tabs.length > 0
+  )
 
   // Session derivation for the right sidebar — always follows the active thread
   const activeThread = activeWorkspace?.threads.find(
@@ -378,11 +387,14 @@ export function WorkspaceLayout() {
                   <div className="min-h-0 flex-1 overflow-hidden">
                     <MainContentArea />
                   </div>
-                  {activeTerminalOpen && terminalHost && (
+                  {terminalHost && anyTerminalTabs && (
                     <div
                       onMouseDown={handleTerminalResizeStart}
                       className="shrink-0 cursor-row-resize border-t"
-                      style={{ height: terminalHeight }}
+                      style={{
+                        height: terminalHeight,
+                        display: activeTerminalOpen ? undefined : "none",
+                      }}
                     >
                       <Suspense
                         fallback={<div className="h-full bg-background" />}

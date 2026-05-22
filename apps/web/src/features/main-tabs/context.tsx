@@ -1,11 +1,5 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useReducer,
-  type ReactNode,
-} from "react"
+import { useEffect, type ReactNode } from "react"
+import { create } from "zustand"
 
 export interface ThreadMainTab {
   id: string
@@ -26,103 +20,90 @@ export interface FileMainTab {
 export type MainTab = ThreadMainTab | FileMainTab
 
 interface MainTabsState {
+  initialized: boolean
   tabs: MainTab[]
   activeTabId: string | null
+  setInitialized: (value: boolean) => void
+  addThreadTab: (threadId: string, title: string) => void
+  addFileTab: (tab: Omit<FileMainTab, "id" | "type">) => void
+  closeTab: (id: string) => void
+  setActiveTab: (id: string) => void
+  updateThreadTitle: (threadId: string, title: string) => void
+  reorderTabs: (draggedId: string, targetId: string, before: boolean) => void
 }
 
-type MainTabsAction =
-  | { type: "ADD_THREAD_TAB"; payload: { threadId: string; title: string } }
-  | { type: "ADD_FILE_TAB"; payload: Omit<FileMainTab, "id" | "type"> }
-  | { type: "CLOSE_TAB"; payload: string }
-  | { type: "SET_ACTIVE_TAB"; payload: string }
-  | { type: "UPDATE_THREAD_TITLE"; payload: { threadId: string; title: string } }
-  | { type: "REORDER_TABS"; payload: { draggedId: string; targetId: string; before: boolean } }
-
-const initialState: MainTabsState = {
+const useMainTabsStore = create<MainTabsState>((set) => ({
+  initialized: false,
   tabs: [],
   activeTabId: null,
-}
-
-function mainTabsReducer(
-  state: MainTabsState,
-  action: MainTabsAction
-): MainTabsState {
-  switch (action.type) {
-    case "ADD_THREAD_TAB": {
-      const { threadId, title } = action.payload
+  setInitialized: (value) => set({ initialized: value }),
+  addThreadTab: (threadId, title) =>
+    set((state) => {
       const existing = state.tabs.find(
-        (t) => t.type === "thread" && t.threadId === threadId
+        (tab) => tab.type === "thread" && tab.threadId === threadId
       )
       if (existing) {
-        return { ...state, activeTabId: existing.id }
+        return { activeTabId: existing.id }
       }
       const id = `thread-${threadId}`
       const newTab: ThreadMainTab = { id, type: "thread", threadId, title }
-      return { ...state, tabs: [...state.tabs, newTab], activeTabId: id }
-    }
-
-    case "ADD_FILE_TAB": {
-      const { filePath } = action.payload
+      return { tabs: [...state.tabs, newTab], activeTabId: id }
+    }),
+  addFileTab: (tab) =>
+    set((state) => {
       const existing = state.tabs.find(
-        (t) => t.type === "file" && t.filePath === filePath
+        (item) => item.type === "file" && item.filePath === tab.filePath
       )
       if (existing) {
-        return { ...state, activeTabId: existing.id }
+        return { activeTabId: existing.id }
       }
       const id = `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-      const newTab: FileMainTab = { id, type: "file", ...action.payload }
-      return { ...state, tabs: [...state.tabs, newTab], activeTabId: id }
-    }
-
-    case "CLOSE_TAB": {
-      const id = action.payload
-      const idx = state.tabs.findIndex((t) => t.id === id)
+      const newTab: FileMainTab = { id, type: "file", ...tab }
+      return { tabs: [...state.tabs, newTab], activeTabId: id }
+    }),
+  closeTab: (id) =>
+    set((state) => {
+      const idx = state.tabs.findIndex((tab) => tab.id === id)
       if (idx === -1) return state
-      const newTabs = state.tabs.filter((t) => t.id !== id)
-      let newActiveTabId = state.activeTabId
+      const tabs = state.tabs.filter((tab) => tab.id !== id)
+      let activeTabId = state.activeTabId
       if (state.activeTabId === id) {
-        newActiveTabId =
-          newTabs.length > 0 ? newTabs[Math.max(0, idx - 1)].id : null
+        activeTabId = tabs.length > 0 ? tabs[Math.max(0, idx - 1)].id : null
       }
-      return { ...state, tabs: newTabs, activeTabId: newActiveTabId }
-    }
-
-    case "SET_ACTIVE_TAB":
-      return { ...state, activeTabId: action.payload }
-
-    case "UPDATE_THREAD_TITLE": {
-      const { threadId, title } = action.payload
+      return { tabs, activeTabId }
+    }),
+  setActiveTab: (id) => set({ activeTabId: id }),
+  updateThreadTitle: (threadId, title) =>
+    set((state) => {
       const existing = state.tabs.find(
-        (t) => t.type === "thread" && t.threadId === threadId
+        (tab) => tab.type === "thread" && tab.threadId === threadId
       )
       if (!existing || existing.title === title) return state
       return {
-        ...state,
-        tabs: state.tabs.map((t) =>
-          t.type === "thread" && t.threadId === threadId
-            ? { ...t, title }
-            : t
+        tabs: state.tabs.map((tab) =>
+          tab.type === "thread" && tab.threadId === threadId
+            ? { ...tab, title }
+            : tab
         ),
       }
-    }
-
-    case "REORDER_TABS": {
-      const { draggedId, targetId, before } = action.payload
+    }),
+  reorderTabs: (draggedId, targetId, before) =>
+    set((state) => {
       if (draggedId === targetId) return state
-      const dragged = state.tabs.find((t) => t.id === draggedId)
+      const dragged = state.tabs.find((tab) => tab.id === draggedId)
       if (!dragged) return state
-      const without = state.tabs.filter((t) => t.id !== draggedId)
-      const targetIdx = without.findIndex((t) => t.id === targetId)
+      const without = state.tabs.filter((tab) => tab.id !== draggedId)
+      const targetIdx = without.findIndex((tab) => tab.id === targetId)
       if (targetIdx === -1) return state
       const insertAt = before ? targetIdx : targetIdx + 1
-      const newTabs = [...without.slice(0, insertAt), dragged, ...without.slice(insertAt)]
-      return { ...state, tabs: newTabs }
-    }
-
-    default:
-      return state
-  }
-}
+      const tabs = [
+        ...without.slice(0, insertAt),
+        dragged,
+        ...without.slice(insertAt),
+      ]
+      return { tabs }
+    }),
+}))
 
 interface MainTabsContextValue {
   tabs: MainTab[]
@@ -136,75 +117,43 @@ interface MainTabsContextValue {
   reorderTabs: (draggedId: string, targetId: string, before: boolean) => void
 }
 
-const MainTabsContext = createContext<MainTabsContextValue | null>(null)
-
 export function MainTabsProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(mainTabsReducer, initialState)
+  const setInitialized = useMainTabsStore((state) => state.setInitialized)
 
-  const addThreadTab = useCallback(
-    (threadId: string, title: string) =>
-      dispatch({ type: "ADD_THREAD_TAB", payload: { threadId, title } }),
-    []
-  )
-  const addFileTab = useCallback(
-    (tab: Omit<FileMainTab, "id" | "type">) =>
-      dispatch({ type: "ADD_FILE_TAB", payload: tab }),
-    []
-  )
-  const closeTab = useCallback(
-    (id: string) => dispatch({ type: "CLOSE_TAB", payload: id }),
-    []
-  )
-  const setActiveTab = useCallback(
-    (id: string) => dispatch({ type: "SET_ACTIVE_TAB", payload: id }),
-    []
-  )
-  const updateThreadTitle = useCallback(
-    (threadId: string, title: string) =>
-      dispatch({ type: "UPDATE_THREAD_TITLE", payload: { threadId, title } }),
-    []
-  )
-  const reorderTabs = useCallback(
-    (draggedId: string, targetId: string, before: boolean) =>
-      dispatch({ type: "REORDER_TABS", payload: { draggedId, targetId, before } }),
-    []
-  )
+  useEffect(() => {
+    setInitialized(true)
+    return () => setInitialized(false)
+  }, [setInitialized])
 
-  const activeTab = useMemo(
-    () => state.tabs.find((t) => t.id === state.activeTabId) ?? null,
-    [state.tabs, state.activeTabId]
-  )
-
-  const value = useMemo(
-    () => ({
-      tabs: state.tabs,
-      activeTabId: state.activeTabId,
-      activeTab,
-      addThreadTab,
-      addFileTab,
-      closeTab,
-      setActiveTab,
-      updateThreadTitle,
-      reorderTabs,
-    }),
-    [
-      state.tabs,
-      state.activeTabId,
-      activeTab,
-      addThreadTab,
-      addFileTab,
-      closeTab,
-      setActiveTab,
-      updateThreadTitle,
-      reorderTabs,
-    ]
-  )
-
-  return <MainTabsContext value={value}>{children}</MainTabsContext>
+  return <>{children}</>
 }
 
-export function useMainTabs() {
-  const ctx = useContext(MainTabsContext)
-  if (!ctx) throw new Error("useMainTabs must be used within MainTabsProvider")
-  return ctx
+export function useMainTabs(): MainTabsContextValue {
+  const initialized = useMainTabsStore((state) => state.initialized)
+  const tabs = useMainTabsStore((state) => state.tabs)
+  const activeTabId = useMainTabsStore((state) => state.activeTabId)
+  const addThreadTab = useMainTabsStore((state) => state.addThreadTab)
+  const addFileTab = useMainTabsStore((state) => state.addFileTab)
+  const closeTab = useMainTabsStore((state) => state.closeTab)
+  const setActiveTab = useMainTabsStore((state) => state.setActiveTab)
+  const updateThreadTitle = useMainTabsStore((state) => state.updateThreadTitle)
+  const reorderTabs = useMainTabsStore((state) => state.reorderTabs)
+
+  if (!initialized) {
+    throw new Error("useMainTabs must be used within MainTabsProvider")
+  }
+
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
+
+  return {
+    tabs,
+    activeTabId,
+    activeTab,
+    addThreadTab,
+    addFileTab,
+    closeTab,
+    setActiveTab,
+    updateThreadTitle,
+    reorderTabs,
+  }
 }
