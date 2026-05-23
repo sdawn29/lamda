@@ -134,7 +134,7 @@ Displayed in palette:
 - `@/shared/lib/keyboard-shortcuts` — `SHORTCUT_ACTIONS`, `formatBindingParts`
 - `@/features/workspace/` — Workspace data, thread creation
 - `@/features/terminal/context` — `useTerminalForWorkspace`
-- `@/features/git/context` — `useDiffPanel`
+- `@/features/git/context` — `useReviewPanel`
 - `@/features/file-tree/context` — `useFileTree`
 - `@/features/settings` — `useSettingsModal`
 - `@/shared/components/theme-provider` — `useTheme`

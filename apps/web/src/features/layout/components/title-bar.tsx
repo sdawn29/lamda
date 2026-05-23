@@ -145,7 +145,7 @@ export function TitleBar() {
 
   useShortcutHandler(SHORTCUT_ACTIONS.TOGGLE_SIDEBAR, toggleSidebar)
   useShortcutHandler(
-    SHORTCUT_ACTIONS.TOGGLE_DIFF_PANEL,
+    SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL,
     isSettings ? null : toggleDiff
   )
   useShortcutHandler(

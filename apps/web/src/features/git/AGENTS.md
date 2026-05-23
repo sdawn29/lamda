@@ -21,17 +21,17 @@ The git module provides a complete git workflow UI (26 files, ~2400 lines). It m
 ## Architecture
 
 ```
-┌─ DiffPanel.tsx (main exported component)
+┌─ ReviewPanel.tsx (main exported component)
 │  └─ Shows diff content, branch selector, file listing, stash management
 │
 ├─ Data Management Layer
-│  ├─ context.tsx — DiffPanelProvider + useDiffPanel (context state)
+│  ├─ context.tsx — ReviewPanelProvider + useReviewPanel (context state)
 │  ├─ queries.ts — TanStack Query hooks (useGitDiffStat, useBranch, useBranches, gitStatus)
 │  ├─ mutations.ts — TanStack Mutations (useCheckoutBranch, useCreateBranch, useInitializeGitRepository)
 │  └─ api.ts — Server HTTP client (status, diff, branches, commit)
 │
 ├─ Components Layer
-│  ├─ DiffPanel.tsx — Main container (unrolled layout)
+│  ├─ ReviewPanel.tsx — Main container (unrolled layout)
 │  ├─ BranchSelector.tsx — Branch dropdown + checkout + create flow
 │  ├─ CommitDialog.tsx — Commit form with conventional commit structure
 │  ├─ DiffView.tsx — Syntax-highlighted diff renderer
@@ -53,14 +53,14 @@ The git module provides a complete git workflow UI (26 files, ~2400 lines). It m
 
 ### Data Management
 
-- **`context.tsx`** (230 lines) — DiffPanel context + state
-  - `DiffPanelContext` — Tracks:
+- **`context.tsx`** (230 lines) — ReviewPanel context + state
+  - `ReviewPanelContext` — Tracks:
     - `selectedFile` — Currently displayed diff
     - `expandedFiles` — Set of file paths to show previews
     - `showStashed` — Toggle stash section visibility
     - `gitStatus` — Raw `git status --short` output
     - `fileDiffs` — Map of `filepath → diff content`
-  - `useDiffPanel()` — Hook to access context
+  - `useReviewPanel()` — Hook to access context
   - Memoization for stability
 
 - **`queries.ts`** — TanStack Query hooks
@@ -102,7 +102,7 @@ The git module provides a complete git workflow UI (26 files, ~2400 lines). It m
 
 ### Main Component
 
-- **`components/diff-panel.tsx`** (400+ lines) — Main UI container
+- **`components/review-panel.tsx`** (400+ lines) — Main UI container
   - Unrolled layout (all sections expanded by default)
   - Sections (top to bottom):
     1. Branch selector + stats
@@ -204,7 +204,7 @@ The git module provides a complete git workflow UI (26 files, ~2400 lines). It m
 - **Stage/unstage per-file** — no bulk file selection UI yet (checkbox prepared for future)
 - **Stash messages are user-provided** — server stores them as `git stash push -m "<message>"`
 - **Commit message structure is enforced** — conventional commit format (type, scope, subject, body, footer)
-- **Diff panel is **always visible** in the main layout** — not lazily rendered
+- **Review panel is **always visible** in the main layout** — not lazily rendered
 - **Branch creation creates and checks out** — not just creates locally
 - **Untracked files cannot be staged individually** — only "Create Stash" or "Stage All" includes them
 - **Diff rendering is syntax-aware** — language auto-detected but can fall back to plaintext

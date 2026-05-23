@@ -54,7 +54,7 @@ AppProviders wraps everything
 
 **Key hooks used:**
 - `useWorkspace()` / `useWorkspaces()` — workspace data
-- `useDiffPanel()` — diff panel context (set workspace path)
+- `useReviewPanel()` — review panel context (set workspace path)
 - `useMainTabs()` — tab management
 - `useUpdateAppSetting()` — persist active thread
 - `useUpdateThreadLastAccessed()` — update timestamp

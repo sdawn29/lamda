@@ -53,7 +53,7 @@ layout/
 
 **State Management:**
 - Uses `useSidebar()` from shared UI for sidebar state
-- Uses `useTerminal()`, `useDiffPanel()`, `useFileTree()` for panel states
+- Uses `useTerminal()`, `useReviewPanel()`, `useFileTree()` for panel states
 - Uses `useWorkspace()` for thread operations
 - Uses `useElectronPlatform()` and `useElectronFullscreen()` for desktop integration
 - Uses `useRouter()`, `useNavigate()`, `useLocation()` for navigation

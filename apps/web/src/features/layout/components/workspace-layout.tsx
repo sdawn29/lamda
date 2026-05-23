@@ -26,7 +26,7 @@ import {
   TooltipContent,
 } from "@/shared/ui/tooltip"
 import { useTerminal } from "@/features/terminal"
-import { useDiffPanel } from "@/features/git"
+import { useReviewPanel } from "@/features/git"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
 import { usePrefetchThreadsMessages } from "@/features/chat/hooks"
 import {
@@ -140,7 +140,7 @@ function NavigationControls() {
 
 function RightSidebarControls() {
   const { isOpen, toggle } = useRightSidebar()
-  const diffBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_DIFF_PANEL)
+  const diffBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL)
 
   return (
     <div
@@ -225,7 +225,7 @@ export function WorkspaceLayout() {
     threadId?: string
   }
   const { states: terminalStates } = useTerminal()
-  const { isFullscreen: diffFullscreen } = useDiffPanel()
+  const { isFullscreen: diffFullscreen } = useReviewPanel()
   const {
     isOpen: rightSidebarOpen,
     toggleFileTree,

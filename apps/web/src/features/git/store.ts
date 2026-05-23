@@ -1,31 +1,31 @@
 import { create } from "zustand"
 
-export interface DiffPanelTab {
+export interface ReviewPanelTab {
   id: string
   title: string
   type: "source-control" | "file"
   filePath?: string
 }
 
-const SOURCE_CONTROL_TAB: DiffPanelTab = {
+const SOURCE_CONTROL_TAB: ReviewPanelTab = {
   id: "tab-source-control",
   title: "Changes",
   type: "source-control",
 }
 
-interface DiffPanelStore {
+interface ReviewPanelStore {
   isOpen: boolean
   isFullscreen: boolean
-  tabs: DiffPanelTab[]
+  tabs: ReviewPanelTab[]
   activeTabId: string | null
   pendingTabId: string | null
   currentWorkspacePath: string | null
-  workspaceTabs: Record<string, DiffPanelTab[]>
+  workspaceTabs: Record<string, ReviewPanelTab[]>
   toggle: () => void
   open: () => void
   close: () => void
   toggleFullscreen: () => void
-  addTab: (tab: Omit<DiffPanelTab, "id">) => void
+  addTab: (tab: Omit<ReviewPanelTab, "id">) => void
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
   clearPendingTab: () => void
@@ -33,7 +33,7 @@ interface DiffPanelStore {
   setCurrentWorkspace: (path: string | null) => void
 }
 
-export const useDiffPanelStore = create<DiffPanelStore>()((set) => ({
+export const useReviewPanelStore = create<ReviewPanelStore>()((set) => ({
   isOpen: false,
   isFullscreen: false,
   tabs: [SOURCE_CONTROL_TAB],
@@ -144,6 +144,6 @@ export const useDiffPanelStore = create<DiffPanelStore>()((set) => ({
     }),
 }))
 
-export function useDiffPanel() {
-  return useDiffPanelStore()
+export function useReviewPanel() {
+  return useReviewPanelStore()
 }

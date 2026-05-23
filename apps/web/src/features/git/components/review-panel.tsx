@@ -40,7 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
-import { useDiffPanel } from "../store"
+import { useReviewPanel } from "../store"
 import { useMainTabs, useMainTabsStore } from "@/features/main-tabs"
 import { useGitDiffStat, useGitStatus, useTurns, useTurnDiffStat, useRevertToTurn, type TurnSummary } from "../queries"
 import {
@@ -85,7 +85,7 @@ import {
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
-interface DiffPanelProps {
+interface ReviewPanelProps {
   sessionId: string
   workspaceSessionId?: string
   openWithAppId?: string | null
@@ -977,15 +977,15 @@ const FileContent = memo(function FileContent({
   )
 })
 
-// ─── Main DiffPanel ────────────────────────────────────────────────────────────
+// ─── Main ReviewPanel ──────────────────────────────────────────────────────────
 
-export const DiffPanel = memo(function DiffPanel({
+export const ReviewPanel = memo(function ReviewPanel({
   sessionId,
   workspaceSessionId: workspaceSessionIdProp,
   openWithAppId,
   isEmbedded = false,
   onClose,
-}: DiffPanelProps) {
+}: ReviewPanelProps) {
   const workspaceSessionId = workspaceSessionIdProp ?? sessionId
 
   const {
@@ -993,7 +993,7 @@ export const DiffPanel = memo(function DiffPanel({
     toggleFullscreen,
     isFullscreen,
     currentWorkspacePath,
-  } = useDiffPanel()
+  } = useReviewPanel()
 
   const activeFileTab = useMainTabsStore((s) => {
     if (!s.activeTabId) return null

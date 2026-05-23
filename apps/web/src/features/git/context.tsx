@@ -1,34 +1,34 @@
 import { useEffect, type ReactNode } from "react"
 import { create } from "zustand"
 
-export interface DiffPanelTab {
+export interface ReviewPanelTab {
   id: string
   title: string
   type: "source-control" | "file"
   filePath?: string
 }
 
-const SOURCE_CONTROL_TAB: DiffPanelTab = {
+const SOURCE_CONTROL_TAB: ReviewPanelTab = {
   id: "tab-source-control",
   title: "Changes",
   type: "source-control",
 }
 
-interface DiffPanelState {
+interface ReviewPanelState {
   initialized: boolean
   isOpen: boolean
   isFullscreen: boolean
-  tabs: DiffPanelTab[]
+  tabs: ReviewPanelTab[]
   activeTabId: string | null
   pendingTabId: string | null
   currentWorkspacePath: string | null
-  workspaceTabs: Record<string, DiffPanelTab[]>
+  workspaceTabs: Record<string, ReviewPanelTab[]>
   setInitialized: (value: boolean) => void
   toggle: () => void
   open: () => void
   close: () => void
   toggleFullscreen: () => void
-  addTab: (tab: Omit<DiffPanelTab, "id">) => void
+  addTab: (tab: Omit<ReviewPanelTab, "id">) => void
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
   clearPendingTab: () => void
@@ -36,7 +36,7 @@ interface DiffPanelState {
   setCurrentWorkspace: (path: string | null) => void
 }
 
-const useDiffPanelStore = create<DiffPanelState>((set) => ({
+const useReviewPanelStore = create<ReviewPanelState>((set) => ({
   initialized: false,
   isOpen: false,
   isFullscreen: false,
@@ -158,17 +158,17 @@ const useDiffPanelStore = create<DiffPanelState>((set) => ({
     }),
 }))
 
-interface DiffPanelContextValue {
+interface ReviewPanelContextValue {
   isOpen: boolean
   toggle: () => void
   open: () => void
   close: () => void
   isFullscreen: boolean
   toggleFullscreen: () => void
-  tabs: DiffPanelTab[]
+  tabs: ReviewPanelTab[]
   activeTabId: string | null
   pendingTabId: string | null
-  addTab: (tab: Omit<DiffPanelTab, "id">) => void
+  addTab: (tab: Omit<ReviewPanelTab, "id">) => void
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
   clearPendingTab: () => void
@@ -177,8 +177,8 @@ interface DiffPanelContextValue {
   setCurrentWorkspace: (path: string | null) => void
 }
 
-export function DiffPanelProvider({ children }: { children: ReactNode }) {
-  const setInitialized = useDiffPanelStore((state) => state.setInitialized)
+export function ReviewPanelProvider({ children }: { children: ReactNode }) {
+  const setInitialized = useReviewPanelStore((state) => state.setInitialized)
 
   useEffect(() => {
     setInitialized(true)
@@ -188,27 +188,27 @@ export function DiffPanelProvider({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-export function useDiffPanel(): DiffPanelContextValue {
-  const initialized = useDiffPanelStore((state) => state.initialized)
-  const isOpen = useDiffPanelStore((state) => state.isOpen)
-  const toggle = useDiffPanelStore((state) => state.toggle)
-  const open = useDiffPanelStore((state) => state.open)
-  const close = useDiffPanelStore((state) => state.close)
-  const isFullscreen = useDiffPanelStore((state) => state.isFullscreen)
-  const toggleFullscreen = useDiffPanelStore((state) => state.toggleFullscreen)
-  const tabs = useDiffPanelStore((state) => state.tabs)
-  const activeTabId = useDiffPanelStore((state) => state.activeTabId)
-  const pendingTabId = useDiffPanelStore((state) => state.pendingTabId)
-  const addTab = useDiffPanelStore((state) => state.addTab)
-  const closeTab = useDiffPanelStore((state) => state.closeTab)
-  const setActiveTab = useDiffPanelStore((state) => state.setActiveTab)
-  const clearPendingTab = useDiffPanelStore((state) => state.clearPendingTab)
-  const renameTab = useDiffPanelStore((state) => state.renameTab)
-  const currentWorkspacePath = useDiffPanelStore((state) => state.currentWorkspacePath)
-  const setCurrentWorkspace = useDiffPanelStore((state) => state.setCurrentWorkspace)
+export function useReviewPanel(): ReviewPanelContextValue {
+  const initialized = useReviewPanelStore((state) => state.initialized)
+  const isOpen = useReviewPanelStore((state) => state.isOpen)
+  const toggle = useReviewPanelStore((state) => state.toggle)
+  const open = useReviewPanelStore((state) => state.open)
+  const close = useReviewPanelStore((state) => state.close)
+  const isFullscreen = useReviewPanelStore((state) => state.isFullscreen)
+  const toggleFullscreen = useReviewPanelStore((state) => state.toggleFullscreen)
+  const tabs = useReviewPanelStore((state) => state.tabs)
+  const activeTabId = useReviewPanelStore((state) => state.activeTabId)
+  const pendingTabId = useReviewPanelStore((state) => state.pendingTabId)
+  const addTab = useReviewPanelStore((state) => state.addTab)
+  const closeTab = useReviewPanelStore((state) => state.closeTab)
+  const setActiveTab = useReviewPanelStore((state) => state.setActiveTab)
+  const clearPendingTab = useReviewPanelStore((state) => state.clearPendingTab)
+  const renameTab = useReviewPanelStore((state) => state.renameTab)
+  const currentWorkspacePath = useReviewPanelStore((state) => state.currentWorkspacePath)
+  const setCurrentWorkspace = useReviewPanelStore((state) => state.setCurrentWorkspace)
 
   if (!initialized) {
-    throw new Error("useDiffPanel must be used within DiffPanelProvider")
+    throw new Error("useReviewPanel must be used within ReviewPanelProvider")
   }
 
   return {

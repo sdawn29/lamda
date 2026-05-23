@@ -11,7 +11,7 @@ import {
 } from "@/shared/ui/sidebar"
 import { Sheet, SheetContent } from "@/shared/ui/sheet"
 import { useRightSidebar } from "../store/right-sidebar"
-import { useDiffPanel } from "@/features/git"
+import { useReviewPanel } from "@/features/git"
 import { useMainTabs } from "@/features/main-tabs"
 import { useShortcutBinding } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
@@ -19,8 +19,8 @@ import { ShortcutKbd } from "@/shared/ui/kbd"
 import { cn } from "@/shared/lib/utils"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
 
-const DiffPanel = lazy(() =>
-  import("@/features/git").then((m) => ({ default: m.DiffPanel }))
+const ReviewPanel = lazy(() =>
+  import("@/features/git").then((m) => ({ default: m.ReviewPanel }))
 )
 
 const FileTree = lazy(() =>
@@ -43,7 +43,7 @@ export function RightSidebarContent({
   workspacePath,
 }: RightSidebarProps) {
   const { isFileTreeOpen, toggleFileTree, isOpen, close } = useRightSidebar()
-  const { isFullscreen, toggleFullscreen } = useDiffPanel()
+  const { isFullscreen, toggleFullscreen } = useReviewPanel()
   const isMobile = useIsMobile(900)
   const fullscreenBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF)
   const fileTreeBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE)
@@ -174,7 +174,7 @@ export function RightSidebarContent({
           <div className="min-w-0 flex-1 overflow-hidden">
             {sessionId ? (
               <Suspense fallback={<div className="h-full bg-sidebar" />}>
-                <DiffPanel
+                <ReviewPanel
                   sessionId={sessionId}
                   workspaceSessionId={workspaceSessionId ?? sessionId}
                   openWithAppId={openWithAppId}

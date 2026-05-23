@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from "react"
 
 import { useSetActiveThreadId, ChatView } from "@/features/chat"
 import { useWorkspace, useWorkspaces } from "@/features/workspace"
-import { useDiffPanel } from "@/features/git"
+import { useReviewPanel } from "@/features/git"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
 import { useUpdateThreadLastAccessed } from "@/features/workspace/mutations"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
@@ -45,7 +45,7 @@ function WorkspaceThreadRoute() {
   const { workspaces, isLoading } = useWorkspace()
   const { isFetching } = useWorkspaces()
   const navigate = useNavigate()
-  const { setCurrentWorkspace } = useDiffPanel()
+  const { setCurrentWorkspace } = useReviewPanel()
   const { mutate: updateSetting } = useUpdateAppSetting()
   const { mutate: updateLastAccessed } = useUpdateThreadLastAccessed()
   const setActiveThreadId = useSetActiveThreadId()

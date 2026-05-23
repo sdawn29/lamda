@@ -9,7 +9,6 @@ import {
   PlusIcon,
   SunIcon,
   MoonIcon,
-  GitCommitHorizontalIcon,
   MessageSquareIcon,
   Loader2,
 } from "lucide-react"
@@ -59,7 +58,7 @@ export function CommandPalette() {
   const navigate = useNavigate()
   const { threadId: activeThreadId } = useParams({ strict: false }) as { threadId?: string }
   const { workspaces } = useWorkspace()
-  const { isOpen: rightSidebarOpen, isFileTreeOpen, togglePanel, open: openRightSidebar } = useRightSidebar()
+  const { isOpen: rightSidebarOpen, isFileTreeOpen, togglePanel } = useRightSidebar()
   const { addFileTab } = useMainTabs()
   const { toggleSidebar } = useSidebar()
   const { openSettings } = useSettingsModal()
@@ -89,11 +88,10 @@ export function CommandPalette() {
 
   const toggleSidebarBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_SIDEBAR)
   const toggleTerminalBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_TERMINAL)
-  const toggleDiffBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_DIFF_PANEL)
+  const toggleDiffBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL)
   const toggleFileTreeBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE)
   const newThreadBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_THREAD)
   const openSettingsBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_SETTINGS)
-  const openCommitBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_COMMIT_DIALOG)
 
   useShortcutHandler(SHORTCUT_ACTIONS.OPEN_COMMAND_PALETTE, openPalette)
 
@@ -232,11 +230,11 @@ export function CommandPalette() {
               <ShortcutHint binding={toggleTerminalBinding} />
             </CommandItem>
             <CommandItem
-              value="toggle diff source control panel"
+              value="toggle review source control panel"
               onSelect={() => run(() => togglePanel("changes"))}
             >
               <PanelRightIcon />
-              {rightSidebarOpen ? "Close Diff Panel" : "Open Diff Panel"}
+              {rightSidebarOpen ? "Close Review Panel" : "Open Review Panel"}
               <ShortcutHint binding={toggleDiffBinding} />
             </CommandItem>
             <CommandItem
@@ -274,18 +272,6 @@ export function CommandPalette() {
             >
               {theme === "dark" ? <SunIcon /> : <MoonIcon />}
               {theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            </CommandItem>
-            <CommandItem
-              value="open commit dialog git source control"
-              onSelect={() =>
-                run(() => {
-                  openRightSidebar()
-                })
-              }
-            >
-              <GitCommitHorizontalIcon />
-              Open Source Control
-              <ShortcutHint binding={openCommitBinding} />
             </CommandItem>
           </CommandGroup>
         </CommandList>
