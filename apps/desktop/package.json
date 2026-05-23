@@ -21,6 +21,7 @@
     "electron-updater": "^6.3.9"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.5.0",
     "electron": "41.1.1",
@@ -69,10 +70,15 @@
       "owner": "sdawn29",
       "repo": "lamda"
     },
+    "afterSign": "notarize.mjs",
     "mac": {
       "icon": "assets/icon.icns",
       "category": "public.app-category.developer-tools",
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.inherit.plist",
       "target": [
         {
           "target": "dmg",
