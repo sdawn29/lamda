@@ -163,7 +163,7 @@ const ThreadRow = memo(function ThreadRow({
             />
           </span>
           <span className="min-w-0 truncate">{thread.title}</span>
-          <div className="ml-auto grid shrink-0 items-center">
+          <div className="ml-auto grid shrink-0 items-center justify-items-end">
             <span className="col-start-1 row-start-1 text-xs text-muted-foreground/50 group-hover/thread:invisible">
               {relativeTime(thread.createdAt, now)}
             </span>
