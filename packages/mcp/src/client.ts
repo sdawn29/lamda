@@ -2,10 +2,46 @@
  * MCP Client for connecting to Model Context Protocol servers
  */
 
+import { execSync } from "child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServerConfig, McpTool, McpToolResult, McpEvent, McpEventHandler } from "./types.js";
+
+// Lazily resolved login-shell PATH so we pick up nvm/volta/fnm/mise/asdf etc.
+let resolvedShellPath: string | undefined;
+
+function getShellPath(): string {
+  if (resolvedShellPath !== undefined) return resolvedShellPath;
+
+  const fallbackPaths = [
+    "/opt/homebrew/bin",
+    "/opt/homebrew/sbin",
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
+    "/usr/sbin",
+    "/sbin",
+  ];
+
+  try {
+    const shell = process.env.SHELL ?? "/bin/zsh";
+    // -l forces a login shell so .zprofile / .bash_profile / etc. are sourced
+    const output = execSync(`${shell} -l -c 'echo $PATH'`, {
+      encoding: "utf8",
+      timeout: 5_000,
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    resolvedShellPath = output || fallbackPaths.join(":");
+  } catch {
+    resolvedShellPath = [
+      ...fallbackPaths,
+      ...(process.env.PATH ? [process.env.PATH] : []),
+    ].join(":");
+  }
+
+  return resolvedShellPath;
+}
 
 /**
  * Internal server connection state
@@ -34,22 +70,13 @@ export class McpClient {
     }
 
     try {
-      // In a packaged Electron app macOS provides only a minimal PATH
-      // (/usr/bin:/bin:/usr/sbin:/sbin). Prepend the common locations where
-      // node/npx/uvx live so user-configured MCP commands resolve correctly.
-      const augmentedPath = [
-        "/opt/homebrew/bin",
-        "/opt/homebrew/sbin",
-        "/usr/local/bin",
-        process.env.PATH,
-      ]
-        .filter(Boolean)
-        .join(":");
-
+      // In a packaged Electron app, macOS provides only a minimal PATH
+      // (/usr/bin:/bin:/usr/sbin:/sbin). Use the login-shell PATH so that
+      // commands installed via nvm/volta/fnm/mise/asdf/homebrew all resolve.
       const transport = new StdioClientTransport({
         command: config.command,
         args: config.args,
-        env: { ...process.env, ...config.env, PATH: augmentedPath },
+        env: { ...process.env, ...config.env, PATH: getShellPath() },
       });
 
       const client = new Client(
