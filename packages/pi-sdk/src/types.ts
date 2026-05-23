@@ -1,6 +1,7 @@
 import type {
   AgentSessionEvent,
   AuthStorage,
+  ExtensionFactory,
   ModelRegistry,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
@@ -66,6 +67,10 @@ export interface SdkConfig {
   modelRegistry?: ModelRegistry;
   /** Additional custom tools to register with the agent (e.g., MCP tools). */
   customTools?: ToolDefinition[];
+  /** Built-in or extension tool names to allow for this session. */
+  tools?: string[];
+  /** Additional programmatic Pi extensions to load for this session. */
+  extensionFactories?: ExtensionFactory[];
   /** Agent mode — controls base tool set ("code" = full, "plan"/"ask" = read-only). Defaults to "code". */
   mode?: Mode;
 }

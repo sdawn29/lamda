@@ -12,6 +12,7 @@ import {
 import { buildAuthStorage } from "./auth.js"
 import { sessionEventGenerator } from "./stream.js"
 import { computeActiveToolsForMode, type Mode } from "./modes.js"
+import { createSubagentExtension } from "./subagent-extension.js"
 import type { HistoryBlock, ManagedSessionHandle, ManagedSessionStats, SdkConfig, SessionTokenStats } from "./types.js"
 
 // Duck-typed shapes for SDK message content — avoids a direct @earendil-works/pi-ai dependency
@@ -111,6 +112,16 @@ function buildRuntimeFactory(
   modelRegistry: ModelRegistry,
 ): CreateAgentSessionRuntimeFactory {
   const model = config.provider && config.model ? modelRegistry.find(config.provider, config.model) : undefined
+  const extensionFactories = [
+    createSubagentExtension({
+      authStorage,
+      modelRegistry,
+      provider: config.provider,
+      model: config.model,
+      thinkingLevel: config.thinkingLevel,
+    }),
+    ...(config.extensionFactories ?? []),
+  ]
 
   return async ({ cwd: effectiveCwd, agentDir, sessionManager, sessionStartEvent }) => {
     const services = await createAgentSessionServices({
@@ -118,6 +129,9 @@ function buildRuntimeFactory(
       agentDir,
       authStorage,
       modelRegistry,
+      resourceLoaderOptions: {
+        extensionFactories,
+      },
     })
     return {
       ...(await createAgentSessionFromServices({
@@ -126,6 +140,7 @@ function buildRuntimeFactory(
         sessionStartEvent,
         model,
         thinkingLevel: config.thinkingLevel as any,
+        tools: config.tools,
         customTools: config.customTools,
       })),
       services,

@@ -1,9 +1,19 @@
 import { lazy, memo, Suspense, useEffect, useRef, useState } from "react"
 import {
   AlertCircleIcon,
+  BotIcon,
   CheckIcon,
   ChevronRightIcon,
   CopyIcon,
+  BookOpenIcon,
+  FolderIcon,
+  GlobeIcon,
+  Loader2Icon,
+  SearchIcon,
+  SquarePenIcon,
+  TerminalIcon,
+  WrenchIcon,
+  type LucideIcon,
 } from "lucide-react"
 import { FileIcon } from "@/shared/ui/file-icon"
 import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
@@ -13,8 +23,10 @@ import { LivePre } from "./live-pre"
 import { DiffView, detectLanguage, parseDiffCounts } from "@/features/git"
 import { useTheme } from "@/shared/components/theme-provider"
 import { RollingTimerText } from "./working-block"
+import { formatDuration } from "@/shared/lib/formatters"
 import { WriteView } from "./write-view"
 import { PlanSavedCard } from "./plan-saved-card"
+import { SubagentToolView, getSubagentMeta, hasSubagentContent } from "./subagent-tool-view"
 import type { ToolMessage } from "../types"
 
 const PrismCode = lazy(() => import("./prism-code"))
@@ -181,6 +193,37 @@ function ReadView({
   )
 }
 
+// ── Tool icon mapping ──────────────────────────────────────────────────────────
+
+function getToolIcon(toolName: string): LucideIcon {
+  switch (toolName) {
+    case "bash":
+    case "shell":
+      return TerminalIcon
+    case "read":
+    case "plan_read":
+      return BookOpenIcon
+    case "edit":
+    case "plan_edit":
+    case "write":
+    case "plan_write":
+      return SquarePenIcon
+    case "grep":
+    case "find":
+    case "glob":
+      return SearchIcon
+    case "ls":
+      return FolderIcon
+    case "webfetch":
+    case "web_fetch":
+    case "websearch":
+    case "web_search":
+      return GlobeIcon
+    default:
+      return WrenchIcon
+  }
+}
+
 // ── ToolCallBlock ──────────────────────────────────────────────────────────────
 
 export const ToolCallBlock = memo(function ToolCallBlock({
@@ -199,6 +242,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   suppressPlanSavedCard?: boolean
 }) {
   const normalizedToolName = msg.toolName.toLowerCase()
+  const isSubagent = normalizedToolName === "subagent"
+  const subagentMeta = isSubagent ? getSubagentMeta(msg) : null
   const isEdit = normalizedToolName === "edit" && isEditArgs(msg.args)
   const diff = isEdit ? getEditDiff(msg.result) : null
   const isRead = isReadTool(normalizedToolName, msg.args)
@@ -209,15 +254,29 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const writeArgs = isWrite ? (msg.args as WriteArgs) : null
   const filePath = (isEdit || isWrite) ? getReadFilePath(msg.args) : null
 
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(isSubagent && (msg.status === "running" || msg.status === "error"))
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [elapsed, setElapsed] = useState(() =>
+    isSubagent && msg.status === "running" && msg.startTime
+      ? Date.now() - msg.startTime
+      : 0
+  )
 
   useEffect(() => {
     return () => {
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isSubagent || msg.status !== "running") return
+    const start = msg.startTime ?? Date.now()
+    const tick = () => setElapsed(Date.now() - start)
+    tick()
+    const id = setInterval(tick, 500)
+    return () => clearInterval(id)
+  }, [isSubagent, msg.status, msg.startTime])
 
   // Plan-mode writes get a custom card with Review + Implement CTAs.
   // Must come after the hooks above to keep call order stable.
@@ -251,7 +310,9 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   }
 
   const resultText = getResultText(msg)
-  const summary = argsSummary(msg.args, rootPath)
+  const summary = isSubagent
+    ? (subagentMeta?.agentName ?? "subagent")
+    : argsSummary(msg.args, rootPath)
 
   const editCounts =
     isEdit && msg.status === "done" && diff !== null
@@ -276,16 +337,22 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     !isEdit &&
     !isRead &&
     !isWrite &&
+    !isSubagent &&
     (resultText !== null || msg.status === "running" || msg.status === "error")
+  const showSubagentContent =
+    isSubagent &&
+    (hasSubagentContent(msg) || msg.status === "running" || msg.status === "error")
 
   const hasBody =
     showEditContent || showReadContent || showWriteContent || showOtherContent
+    || showSubagentContent
 
   return (
     <div
       className={cn(
         "w-full text-xs",
-        isNew && "animate-chat-message-in"
+        isNew && "animate-chat-message-in",
+        isSubagent && "overflow-hidden rounded-lg border border-border/40"
       )}
       style={
         isNew && entryDelayMs > 0
@@ -296,51 +363,95 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       {/* Trigger row — text accordion style */}
       <button
         type="button"
-        className="flex items-center gap-1.5 text-left"
+        className={cn(
+          "flex items-center gap-1.5 text-left",
+          isSubagent && "w-full px-3 py-2.5"
+        )}
         onClick={toggle}
         aria-expanded={expanded}
       >
-        <span className={cn(
-          "text-sm font-medium",
-          msg.status === "running"
-            ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
-            : msg.status === "error"
-              ? "text-destructive/70"
-              : "text-muted-foreground/45"
-        )}>
-          {msg.toolName}
-        </span>
-
-        {filePath ? (
-          <span className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground/35">
-            <FileIcon filename={filePath} className="h-3.5 w-3.5 shrink-0 opacity-50" />
-            <span className="truncate">{fileBasename(filePath)}</span>
-          </span>
-        ) : summary ? (
-          <span className="truncate text-sm text-muted-foreground/35">{summary}</span>
-        ) : null}
-
-        {editCounts && (editCounts.added > 0 || editCounts.removed > 0) && (
-          <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-xs tabular-nums">
-            {editCounts.added > 0 && (
-              <span className="text-green-600 dark:text-green-400">
-                +<RollingTimerText text={String(editCounts.added)} />
-              </span>
+        {isSubagent ? (
+          <>
+            {msg.status === "running" ? (
+              <Loader2Icon className="h-3 w-3 shrink-0 animate-spin text-muted-foreground/35" />
+            ) : (
+              <BotIcon className={cn(
+                "h-3.5 w-3.5 shrink-0",
+                msg.status === "error" ? "text-destructive/70" : "text-muted-foreground/45"
+              )} />
             )}
-            {editCounts.removed > 0 && (
-              <span className="text-red-500 dark:text-red-400">
-                -<RollingTimerText text={String(editCounts.removed)} />
-              </span>
-            )}
-          </span>
-        )}
-
-        {writeLineCount !== null && writeLineCount > 0 && (
-          <span className="flex shrink-0 items-baseline font-mono text-xs tabular-nums">
-            <span className="text-green-600 dark:text-green-400">
-              +<RollingTimerText text={String(writeLineCount)} />
+            <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground/35">
+              {subagentMeta?.agentName ?? "subagent"}
             </span>
-          </span>
+            {(subagentMeta?.toolCallCount ?? 0) > 0 && (
+              <span className="shrink-0 tabular-nums text-[11px] text-muted-foreground/30">
+                {subagentMeta!.toolCallCount} {subagentMeta!.toolCallCount === 1 ? "call" : "calls"}
+              </span>
+            )}
+            {msg.status === "running" && elapsed > 0 ? (
+              <span className="shrink-0 font-mono tabular-nums text-[11px] text-muted-foreground/30">
+                <RollingTimerText text={formatDuration(elapsed)} />
+              </span>
+            ) : msg.status !== "running" && msg.duration ? (
+              <span className="shrink-0 font-mono tabular-nums text-[11px] text-muted-foreground/30">
+                {formatDuration(msg.duration)}
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {(() => {
+              const Icon = getToolIcon(normalizedToolName)
+              return (
+                <Icon className={cn(
+                  "h-3.5 w-3.5 shrink-0",
+                  msg.status === "error" ? "text-destructive/70" : "text-muted-foreground/45"
+                )} />
+              )
+            })()}
+            <span className={cn(
+              "text-sm font-medium",
+              msg.status === "running"
+                ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
+                : msg.status === "error"
+                  ? "text-destructive/70"
+                  : "text-muted-foreground/45"
+            )}>
+              {msg.toolName}
+            </span>
+
+            {filePath ? (
+              <span className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground/35">
+                <FileIcon filename={filePath} className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                <span className="truncate">{fileBasename(filePath)}</span>
+              </span>
+            ) : summary ? (
+              <span className="truncate text-sm text-muted-foreground/35">{summary}</span>
+            ) : null}
+
+            {editCounts && (editCounts.added > 0 || editCounts.removed > 0) && (
+              <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-xs tabular-nums">
+                {editCounts.added > 0 && (
+                  <span className="text-green-600 dark:text-green-400">
+                    +<RollingTimerText text={String(editCounts.added)} />
+                  </span>
+                )}
+                {editCounts.removed > 0 && (
+                  <span className="text-red-500 dark:text-red-400">
+                    -<RollingTimerText text={String(editCounts.removed)} />
+                  </span>
+                )}
+              </span>
+            )}
+
+            {writeLineCount !== null && writeLineCount > 0 && (
+              <span className="flex shrink-0 items-baseline font-mono text-xs tabular-nums">
+                <span className="text-green-600 dark:text-green-400">
+                  +<RollingTimerText text={String(writeLineCount)} />
+                </span>
+              </span>
+            )}
+          </>
         )}
 
         <ChevronRightIcon
@@ -359,107 +470,97 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         )}
       >
         <div className="overflow-hidden">
-          <div className="group/copy mt-2 overflow-hidden rounded-lg border border-border/40 bg-black/5 dark:bg-white/[0.03]">
-            {/* Header: summary + copy */}
-            <div className="flex items-start gap-2 border-b border-border/30 px-3 py-1.5">
-              {normalizedToolName === "bash" ? (
-                <span className="mt-px font-mono text-[11px] font-bold text-foreground/60">$</span>
-              ) : (isEdit || isWrite) && filePath ? (
-                <FileIcon filename={filePath} className="mt-px h-3.5 w-3.5 shrink-0 opacity-50" />
-              ) : null}
-              <span className={cn(
-                "flex-1 font-mono text-[11px] text-foreground/60",
-                normalizedToolName === "bash" ? "break-all whitespace-pre-wrap" : "truncate"
-              )}>
-                {summary || msg.toolName}
-              </span>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className={cn(
-                  "shrink-0 rounded p-1 text-muted-foreground/40 opacity-0 transition-colors group-hover/copy:opacity-100 hover:bg-muted hover:text-muted-foreground",
-                  copied && "text-emerald-500"
-                )}
-                aria-label="Copy result"
-              >
-                {copied ? (
-                  <CheckIcon className="h-3 w-3" />
-                ) : (
-                  <CopyIcon className="h-3 w-3" />
-                )}
-              </button>
+          {isSubagent ? (
+            /* Subagent: no inner card — render directly inside the outer border */
+            <div className="border-t border-border/30 px-3 py-3">
+              <SubagentToolView msg={msg} live={msg.status === "running"} rootPath={rootPath} />
             </div>
+          ) : (
+            /* All other tools: card with monospace header + copy button */
+            <div className="group/copy mt-2 overflow-hidden rounded-lg border border-border/40 bg-black/5 dark:bg-white/[0.03]">
+              {/* Header: summary + copy */}
+              <div className="flex items-start gap-2 border-b border-border/30 px-3 py-1.5">
+                {normalizedToolName === "bash" ? (
+                  <span className="mt-px font-mono text-[11px] font-bold text-foreground/60">$</span>
+                ) : (isEdit || isWrite) && filePath ? (
+                  <FileIcon filename={filePath} className="mt-px h-3.5 w-3.5 shrink-0 opacity-50" />
+                ) : null}
+                <span className={cn(
+                  "flex-1 font-mono text-[11px] text-foreground/60",
+                  normalizedToolName === "bash" ? "break-all whitespace-pre-wrap" : "truncate"
+                )}>
+                  {summary || msg.toolName}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className={cn(
+                    "shrink-0 rounded p-1 text-muted-foreground/40 opacity-0 transition-colors group-hover/copy:opacity-100 hover:bg-muted hover:text-muted-foreground",
+                    copied && "text-emerald-500"
+                  )}
+                  aria-label="Copy result"
+                >
+                  {copied ? (
+                    <CheckIcon className="h-3 w-3" />
+                  ) : (
+                    <CopyIcon className="h-3 w-3" />
+                  )}
+                </button>
+              </div>
 
-            {/* Content */}
-            <div className="px-3 py-2">
-              {/* Write tool: show content from args immediately — available at tool_start */}
-              {isWrite && writeArgs && msg.status !== "error" && (
-                <WriteView
-                  content={writeArgs.content}
-                  filePath={writeArgs.path}
-                  live={msg.status === "running"}
-                />
-              )}
+              {/* Content */}
+              <div className="px-3 py-2">
+                {isWrite && writeArgs && msg.status !== "error" && (
+                  <WriteView
+                    content={writeArgs.content}
+                    filePath={writeArgs.path}
+                    live={msg.status === "running"}
+                  />
+                )}
 
-              {/* Running placeholder — always for edit (no partial results), only
-                  when there is no content yet for read/other tools */}
-              {msg.status === "running" &&
-                !isWrite &&
-                (isEdit || !resultText) && (
+                {msg.status === "running" && !isWrite && (isEdit || !resultText) && (
                   <span className="animate-thinking-shimmer bg-linear-to-r from-muted-foreground/30 via-foreground/80 to-muted-foreground/30 bg-size-[200%_100%] bg-clip-text text-transparent">
                     {isEdit ? "Editing…" : isRead ? "Reading…" : "Running…"}
                   </span>
                 )}
 
-              {/* Running: partial result for read / other tools */}
-              {msg.status === "running" && !isWrite && resultText && (
-                <>
-                  {isRead && readFilePath && (
-                    <ReadView
-                      text={resultText}
-                      filePath={readFilePath}
-                      live={true}
-                    />
-                  )}
-                  {!isRead && <LivePre text={resultText} live={true} />}
-                </>
-              )}
+                {msg.status === "running" && !isWrite && resultText && (
+                  <>
+                    {isRead && readFilePath && (
+                      <ReadView text={resultText} filePath={readFilePath} live={true} />
+                    )}
+                    {!isRead && <LivePre text={resultText} live={true} />}
+                  </>
+                )}
 
-              {/* Done state */}
-              {msg.status === "done" && (
-                <>
-                  {isEdit && diff !== null && (
-                    <DiffView
-                      diff={diff}
-                      filePath={(msg.args as { path?: string }).path}
-                    />
-                  )}
+                {msg.status === "done" && (
+                  <>
+                    {isEdit && diff !== null && (
+                      <DiffView
+                        diff={diff}
+                        filePath={(msg.args as { path?: string }).path}
+                      />
+                    )}
+                    {isRead && readFilePath && resultText && (
+                      <ReadView text={resultText} filePath={readFilePath} live={false} />
+                    )}
+                    {!isEdit && !isRead && !isWrite && resultText && (
+                      <LivePre text={resultText} live={false} />
+                    )}
+                  </>
+                )}
 
-                  {isRead && readFilePath && resultText && (
-                    <ReadView
-                      text={resultText}
-                      filePath={readFilePath}
-                      live={false}
-                    />
-                  )}
-
-                  {!isEdit && !isRead && !isWrite && resultText && (
-                    <LivePre text={resultText} live={false} />
-                  )}
-                </>
-              )}
-
-              {/* Error state */}
-              {msg.status === "error" && (
-                <div className="flex items-start gap-2 rounded border border-destructive/30 bg-destructive/10 px-3 py-2">
-                  <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/80" />
-                  <pre className="flex-1 overflow-auto text-xs break-all whitespace-pre-wrap text-destructive/80">
-                    {resultText ?? "Tool execution failed"}
-                  </pre>
-                </div>
-              )}
+                {msg.status === "error" && (
+                  <div className="flex items-start gap-2 rounded border border-destructive/30 bg-destructive/10 px-3 py-2">
+                    <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/80" />
+                    <pre className="flex-1 overflow-auto text-xs break-all whitespace-pre-wrap text-destructive/80">
+                      {resultText ?? "Tool execution failed"}
+                    </pre>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
