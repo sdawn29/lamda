@@ -1,4 +1,8 @@
-import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter"
+import {
+  PrismLight as SyntaxHighlighter,
+  createElement as createSyntaxElement,
+  type SyntaxHighlighterProps,
+} from "react-syntax-highlighter"
 import bash from "react-syntax-highlighter/dist/esm/languages/prism/bash"
 import c from "react-syntax-highlighter/dist/esm/languages/prism/c"
 import cpp from "react-syntax-highlighter/dist/esm/languages/prism/cpp"
@@ -21,7 +25,7 @@ import tsx from "react-syntax-highlighter/dist/esm/languages/prism/tsx"
 import typescript from "react-syntax-highlighter/dist/esm/languages/prism/typescript"
 import yaml from "react-syntax-highlighter/dist/esm/languages/prism/yaml"
 import { refractor } from "refractor/core"
-import type { CSSProperties } from "react"
+import { Fragment, type CSSProperties, type ReactNode } from "react"
 
 let languagesRegistered = false
 
@@ -53,7 +57,11 @@ function ensureLanguagesRegistered() {
   // Prism's markdown grammar matches entire GFM tables as a single multi-line
   // block token, producing phantom blank lines when split for line numbers.
   // Patch the shared refractor singleton directly after registration.
-  const mdGrammar = (refractor as unknown as { languages?: Record<string, Record<string, unknown>> }).languages?.markdown
+  const mdGrammar = (
+    refractor as unknown as {
+      languages?: Record<string, Record<string, unknown>>
+    }
+  ).languages?.markdown
   if (mdGrammar && "table" in mdGrammar) {
     delete mdGrammar.table
   }
@@ -96,6 +104,12 @@ interface PrismCodeProps {
   lineDecorations?: Map<number, LineDecoration[]>
   /** When true, every line gets a data-line attribute even without decorations. */
   enableLineDataAttrs?: boolean
+  /** 1-indexed active line, used for line-level UI such as file comments. */
+  activeLine?: number | null
+  /** Render extra UI immediately after a 1-indexed line. */
+  renderAfterLine?: (lineNumber: number) => ReactNode
+  /** Render a hover action over the line-number gutter for a 1-indexed line. */
+  renderLineAction?: (lineNumber: number) => ReactNode
 }
 
 const SEVERITY_COLOR: Record<number, string> = {
@@ -105,7 +119,9 @@ const SEVERITY_COLOR: Record<number, string> = {
   4: "#94a3b8",
 }
 
-function decorationStyle(decorations: LineDecoration[] | undefined): CSSProperties | undefined {
+function decorationStyle(
+  decorations: LineDecoration[] | undefined
+): CSSProperties | undefined {
   if (!decorations || decorations.length === 0) return undefined
   // Use the highest severity (lowest number) for the border.
   const minSeverity = decorations.reduce((s, d) => Math.min(s, d.severity), 4)
@@ -114,6 +130,10 @@ function decorationStyle(decorations: LineDecoration[] | undefined): CSSProperti
     display: "block",
   }
 }
+
+type SyntaxRendererProps = Parameters<
+  NonNullable<SyntaxHighlighterProps["renderer"]>
+>[0]
 
 export default function PrismCode({
   code,
@@ -124,10 +144,18 @@ export default function PrismCode({
   opacity = 1,
   lineDecorations,
   enableLineDataAttrs,
+  activeLine,
+  renderAfterLine,
+  renderLineAction,
 }: PrismCodeProps) {
   ensureLanguagesRegistered()
 
-  const wrapLines = enableLineDataAttrs || (lineDecorations && lineDecorations.size > 0)
+  const wrapLines =
+    enableLineDataAttrs ||
+    !!activeLine ||
+    !!renderAfterLine ||
+    !!renderLineAction ||
+    (lineDecorations && lineDecorations.size > 0)
 
   const lineProps = wrapLines
     ? (lineNumber: number) => {
@@ -135,15 +163,48 @@ export default function PrismCode({
         const props: { [key: string]: unknown; style?: CSSProperties } = {
           "data-line": lineNumber,
         }
+        if (activeLine === lineNumber) {
+          props.className =
+            "block bg-primary/10 ring-1 ring-inset ring-primary/20"
+        }
         const style = decorationStyle(decorations)
         if (style) props.style = style
         if (decorations && decorations.length > 0) {
-          props["data-severity"] = decorations.reduce((s, d) => Math.min(s, d.severity), 4)
+          props["data-severity"] = decorations.reduce(
+            (s, d) => Math.min(s, d.severity),
+            4
+          )
           props["title"] = decorations.map((d) => d.message).join("\n")
         }
         return props
       }
     : undefined
+
+  const renderer =
+    renderAfterLine || renderLineAction
+      ? ({ rows, stylesheet, useInlineStyles }: SyntaxRendererProps) =>
+          rows.map((node, index) => {
+            const lineNumber = Number(
+              node.properties?.["data-line"] ?? index + 1
+            )
+            const afterLine = renderAfterLine?.(lineNumber)
+            const lineAction = renderLineAction?.(lineNumber)
+            return (
+              <Fragment key={`code-line-${lineNumber}-${index}`}>
+                <span className="group/code-line relative block">
+                  {createSyntaxElement({
+                    node,
+                    stylesheet,
+                    useInlineStyles,
+                    key: `code-segment-${index}`,
+                  })}
+                  {lineAction}
+                </span>
+                {afterLine}
+              </Fragment>
+            )
+          })
+      : undefined
 
   return (
     <SyntaxHighlighter
@@ -154,6 +215,7 @@ export default function PrismCode({
       className="syntax-highlighter"
       wrapLines={wrapLines}
       lineProps={lineProps}
+      renderer={renderer}
       lineNumberStyle={{
         minWidth: "2.5em",
         paddingRight: "1em",

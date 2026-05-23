@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react"
 import { create } from "zustand"
+import type { FileCommentContext } from "../lib/file-context"
 
 /**
  * Imperative chat-scope actions used by deep components (e.g. tool-call blocks,
@@ -14,6 +15,8 @@ export interface ChatActions {
    * "Implement the plan in <relativePath>" prompt. The user can edit or send.
    */
   implementPlan: (relativePath: string) => void
+  /** Add a file-line comment token to the current chat textbox. */
+  addFileCommentContext: (context: FileCommentContext) => void
 }
 
 interface ChatActionsStore {

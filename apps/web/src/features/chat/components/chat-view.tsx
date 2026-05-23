@@ -79,6 +79,7 @@ import {
   ChatActionsProvider,
   type ChatActions,
 } from "../contexts/chat-actions-context"
+import { formatFileCommentContext } from "../lib/file-context"
 import { useTurns } from "@/features/git"
 import { PlanChangesCard } from "./plan-changes-card"
 import type { TurnSummary } from "@/features/git/api"
@@ -461,6 +462,15 @@ export function ChatView({
         }
         const prompt = `Implement the plan in @${relativePath}.`
         chatTextboxRef.current?.setValue(prompt)
+        chatTextboxRef.current?.focus()
+      },
+      addFileCommentContext: (context) => {
+        const current = chatTextboxRef.current?.getValue() ?? ""
+        const token = formatFileCommentContext(context)
+        const next = current.trim()
+          ? `${current.replace(/\s*$/, "")}\n${token}`
+          : token
+        chatTextboxRef.current?.setValue(next)
         chatTextboxRef.current?.focus()
       },
     }),

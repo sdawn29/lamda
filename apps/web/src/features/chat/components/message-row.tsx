@@ -354,7 +354,7 @@ export const MessageRow = memo(function MessageRow({
           }
         >
           <div
-            className="max-w-3/4 rounded-xl bg-muted px-4 py-2.5 text-sm wrap-break-word whitespace-pre-wrap"
+            className="max-w-3/4 rounded-xl bg-muted/70 px-2 py-2 text-sm wrap-break-word whitespace-pre-wrap ring-1 ring-foreground/5"
             data-selectable
           >
             <UserMessageContent

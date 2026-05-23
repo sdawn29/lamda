@@ -2,17 +2,14 @@ import { FileTextIcon, TerminalIcon } from "lucide-react"
 import { Icon } from "@iconify/react"
 
 import { cn } from "@/shared/lib/utils"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/shared/ui/tooltip"
 import { getIconName } from "@/shared/ui/file-icon"
 import type { SlashCommand } from "../api"
-
-const CHIP_BASE_CLASS =
-  "mx-0.5 inline-flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 align-middle font-mono text-xs text-foreground/80 select-text"
+import { MessageChip } from "./message-chip"
+import {
+  FILE_CONTEXT_RE,
+  parseFileCommentContext,
+  type FileCommentContext,
+} from "../lib/file-context"
 
 const TOKEN_RE = /(@[^\s]+|\/[^\s]+)/g
 
@@ -26,27 +23,24 @@ function isFileMention(path: string): boolean {
 function FileChip({ filePath }: { filePath: string }) {
   const basename = filePath.split("/").pop() ?? filePath
   return (
-    <TooltipProvider delay={500}>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <span className="inline-flex align-middle">
-              <span className={CHIP_BASE_CLASS}>
-                <Icon
-                  icon={`catppuccin:${getIconName(basename)}`}
-                  className="size-3.5 shrink-0"
-                  aria-hidden
-                />
-                {basename}
-              </span>
-            </span>
-          }
+    <MessageChip
+      icon={
+        <Icon
+          icon={`catppuccin:${getIconName(basename)}`}
+          data-icon="inline-start"
+          aria-hidden
         />
-        <TooltipContent side="top" align="start" sideOffset={8}>
+      }
+      label={basename}
+      detail={
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+            File
+          </span>
           <span className="font-mono text-xs break-all">{filePath}</span>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+        </div>
+      }
+    />
   )
 }
 
@@ -54,23 +48,20 @@ function FolderChip({ folderPath }: { folderPath: string }) {
   const normalized = folderPath.replace(/\/+$/, "")
   const basename = normalized.split("/").pop() || normalized
   return (
-    <TooltipProvider delay={500}>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <span className="inline-flex align-middle">
-              <span className={CHIP_BASE_CLASS}>
-                <Icon icon="catppuccin:folder" className="size-3.5 shrink-0" aria-hidden />
-                {basename}
-              </span>
-            </span>
-          }
-        />
-        <TooltipContent side="top" align="start" sideOffset={8}>
+    <MessageChip
+      icon={
+        <Icon icon="catppuccin:folder" data-icon="inline-start" aria-hidden />
+      }
+      label={basename}
+      detail={
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+            Folder
+          </span>
           <span className="font-mono text-xs break-all">{normalized}</span>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+        </div>
+      }
+    />
   )
 }
 
@@ -78,28 +69,18 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
   const isSkill = command.source === "skill"
 
   return (
-    <TooltipProvider delay={500}>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <span className="inline-flex align-middle">
-              <span className={CHIP_BASE_CLASS}>
-                {isSkill ? (
-                  <TerminalIcon className="size-3 shrink-0" aria-hidden />
-                ) : (
-                  <FileTextIcon className="size-3 shrink-0" aria-hidden />
-                )}
-                <span className="font-mono">/{command.name}</span>
-              </span>
-            </span>
-          }
-        />
-        <TooltipContent
-          side="top"
-          align="start"
-          sideOffset={8}
-          className="w-64 flex-col items-start gap-0 overflow-hidden p-0"
-        >
+    <MessageChip
+      icon={
+        isSkill ? (
+          <TerminalIcon data-icon="inline-start" aria-hidden />
+        ) : (
+          <FileTextIcon data-icon="inline-start" aria-hidden />
+        )
+      }
+      label={<span className="font-mono">/{command.name}</span>}
+      detailClassName="w-64 flex-col items-start gap-0 overflow-hidden p-0"
+      detail={
+        <>
           {/* Header: icon badge + type label + command name */}
           <div className="flex items-center gap-2.5 border-b border-foreground/10 px-3 py-2.5">
             <div
@@ -132,14 +113,59 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
                 {command.description}
               </p>
             ) : (
-              <p className="text-[11px] italic text-foreground/40">
+              <p className="text-[11px] text-foreground/40 italic">
                 No description available
               </p>
             )}
           </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+        </>
+      }
+    />
+  )
+}
+
+function FileContextChip({ context }: { context: FileCommentContext }) {
+  const basename = context.path.split("/").pop() ?? context.path
+  return (
+    <MessageChip
+      icon={
+        <Icon
+          icon={`catppuccin:${getIconName(basename)}`}
+          data-icon="inline-start"
+          aria-hidden
+        />
+      }
+      label={basename}
+      meta={`L${context.line}`}
+      detailClassName="w-80 flex-col items-start gap-0 overflow-hidden p-0"
+      detail={
+        <>
+          <div className="flex w-full items-center gap-2 border-b border-foreground/10 px-3 py-2.5">
+            <Icon
+              icon={`catppuccin:${getIconName(basename)}`}
+              className="size-4 shrink-0"
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-mono text-[11px] font-medium">
+                {context.path}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Line {context.line} context
+              </p>
+            </div>
+          </div>
+          {context.code && (
+            <pre className="max-h-20 w-full overflow-auto border-b border-foreground/10 bg-muted/40 px-3 py-2 font-mono text-[10px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+              {context.code}
+            </pre>
+          )}
+          <p className="px-3 py-2.5 text-[11px] leading-relaxed text-foreground/80">
+            {context.comment}
+          </p>
+        </>
+      }
+    />
   )
 }
 
@@ -155,44 +181,70 @@ export function UserMessageContent({
   let match: RegExpExecArray | null
   let key = 0
 
-  while ((match = TOKEN_RE.exec(content)) !== null) {
-    const token = match[0]
-    const start = match.index
+  FILE_CONTEXT_RE.lastIndex = 0
+  TOKEN_RE.lastIndex = 0
 
-    if (start > lastIndex) {
-      parts.push(content.slice(lastIndex, start))
-    }
+  const pushInlineTokens = (text: string) => {
+    let tokenLastIndex = 0
+    let tokenMatch: RegExpExecArray | null
+    TOKEN_RE.lastIndex = 0
+    while ((tokenMatch = TOKEN_RE.exec(text)) !== null) {
+      const token = tokenMatch[0]
+      const start = tokenMatch.index
 
-    if (token.startsWith("@")) {
-      const path = token.slice(1)
+      if (start > tokenLastIndex) {
+        parts.push(text.slice(tokenLastIndex, start))
+      }
+
+      if (token.startsWith("@")) {
+        const path = token.slice(1)
+        parts.push(
+          isFileMention(path) ? (
+            <FileChip key={`token-${key++}`} filePath={path} />
+          ) : (
+            <FolderChip key={`token-${key++}`} folderPath={path} />
+          )
+        )
+        tokenLastIndex = start + token.length
+        continue
+      }
+
+      const hasBoundary = start === 0 || /\s/.test(text[start - 1] ?? "")
+      const command = hasBoundary
+        ? commandsByName?.get(token.slice(1))
+        : undefined
+
       parts.push(
-        isFileMention(path) ? (
-          <FileChip key={`token-${key++}`} filePath={path} />
+        command ? (
+          <SlashCommandChip key={`token-${key++}`} command={command} />
         ) : (
-          <FolderChip key={`token-${key++}`} folderPath={path} />
+          token
         )
       )
-      lastIndex = start + token.length
-      continue
+      tokenLastIndex = start + token.length
     }
 
-    const hasBoundary = start === 0 || /\s/.test(content[start - 1] ?? "")
-    const command = hasBoundary
-      ? commandsByName?.get(token.slice(1))
-      : undefined
+    if (tokenLastIndex < text.length) {
+      parts.push(text.slice(tokenLastIndex))
+    }
+  }
+
+  while ((match = FILE_CONTEXT_RE.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      pushInlineTokens(content.slice(lastIndex, match.index))
+    }
 
     parts.push(
-      command ? (
-        <SlashCommandChip key={`token-${key++}`} command={command} />
-      ) : (
-        token
-      )
+      <FileContextChip
+        key={`context-${key++}`}
+        context={parseFileCommentContext(match)}
+      />
     )
-    lastIndex = start + token.length
+    lastIndex = match.index + match[0].length
   }
 
   if (lastIndex < content.length) {
-    parts.push(content.slice(lastIndex))
+    pushInlineTokens(content.slice(lastIndex))
   }
 
   return <>{parts}</>

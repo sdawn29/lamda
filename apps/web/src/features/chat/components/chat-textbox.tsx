@@ -2,6 +2,7 @@ import * as React from "react"
 import { memo, forwardRef, useImperativeHandle } from "react"
 
 export interface ChatTextboxHandle {
+  getValue: () => string
   setValue: (text: string) => void
   focus: () => void
 }
@@ -173,6 +174,9 @@ export const ChatTextbox = memo(
     const richInputRef = React.useRef<RichInputHandle>(null)
 
     useImperativeHandle(ref, () => ({
+      getValue() {
+        return richInputRef.current?.getValue() ?? ""
+      },
       setValue(text: string) {
         richInputRef.current?.setValue(text)
         setIsEmpty(text.trim().length === 0)

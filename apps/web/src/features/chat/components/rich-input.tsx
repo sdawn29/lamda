@@ -4,6 +4,12 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { getIconName, buildCatppuccinSvgElement } from "@/shared/ui/file-icon"
 import { cn } from "@/shared/lib/utils"
 import type { SlashCommand } from "../api"
+import {
+  FILE_CONTEXT_RE,
+  formatFileCommentContext,
+  parseFileCommentContext,
+  type FileCommentContext,
+} from "../lib/file-context"
 
 const ZERO_WIDTH_SPACE_RE = /\u200B/g
 const NBSP_RE = /\u00A0/g
@@ -42,6 +48,13 @@ function readRichInputValue(root: Node): string {
           text += `@${el.dataset.filePath}`
         } else if (el.dataset.commandName) {
           text += `/${el.dataset.commandName}`
+        } else if (el.dataset.contextPath && el.dataset.contextLine) {
+          text += formatFileCommentContext({
+            path: el.dataset.contextPath,
+            line: Number(el.dataset.contextLine),
+            comment: el.dataset.contextComment ?? "",
+            code: el.dataset.contextCode,
+          })
         } else {
           walk(el.childNodes)
         }
@@ -65,7 +78,7 @@ function hasFileExtension(p: string): boolean {
 }
 
 const CHIP_CLASS =
-  "mx-0.5 inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/50 px-1.5 py-0.5 align-middle font-mono text-xs text-foreground select-none"
+  "mx-0.5 inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-border bg-input/20 px-2 py-0.5 align-middle text-[0.625rem] font-medium whitespace-nowrap text-foreground/80 select-none dark:bg-input/30 [&>svg]:pointer-events-none [&>svg]:size-2.5!"
 
 function buildChipBase(className?: string): HTMLSpanElement {
   const chip = document.createElement("span")
@@ -127,7 +140,28 @@ export function buildSlashCommandChip(cmd: SlashCommand): HTMLSpanElement {
   return chip
 }
 
-function appendRichTextFromPlainText(target: Node, text: string) {
+function buildFileContextChip(context: FileCommentContext): HTMLSpanElement {
+  const basename = context.path.split("/").pop() ?? context.path
+  const chip = buildChipBase(
+    "rounded-full border-border bg-input/20 text-foreground/80 dark:bg-input/30"
+  )
+  chip.dataset.contextPath = context.path
+  chip.dataset.contextLine = String(context.line)
+  chip.dataset.contextComment = context.comment
+  if (context.code) chip.dataset.contextCode = context.code
+  chip.title = `${context.path}:${context.line}\n${context.comment}`
+  const line = document.createElement("span")
+  line.className = "font-mono text-[10px] uppercase tracking-wide opacity-70"
+  line.textContent = `L${context.line}`
+  chip.append(
+    buildIconifyIcon(getIconName(basename)),
+    document.createTextNode(basename),
+    line
+  )
+  return chip
+}
+
+function appendMentionsFromPlainText(target: Node, text: string) {
   const parts = text.split(PASTE_MENTION_RE)
   for (const part of parts) {
     if (part.startsWith("@")) {
@@ -145,6 +179,25 @@ function appendRichTextFromPlainText(target: Node, text: string) {
         }
       }
     }
+  }
+}
+
+function appendRichTextFromPlainText(target: Node, text: string) {
+  FILE_CONTEXT_RE.lastIndex = 0
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = FILE_CONTEXT_RE.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      appendMentionsFromPlainText(target, text.slice(lastIndex, match.index))
+    }
+    target.appendChild(buildFileContextChip(parseFileCommentContext(match)))
+    target.appendChild(document.createTextNode("\u200B"))
+    lastIndex = match.index + match[0].length
+  }
+
+  if (lastIndex < text.length) {
+    appendMentionsFromPlainText(target, text.slice(lastIndex))
   }
 }
 

@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-  memo,
-} from "react"
+import { useEffect, useMemo, useState, memo } from "react"
 import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { FileHeader } from "@/features/git/components/file-header"
@@ -21,6 +16,7 @@ import {
   useResolveWorkspaceId,
   useDocumentSymbols,
 } from "@/features/lsp"
+import { useChatActions } from "@/features/chat/contexts/chat-actions-context"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -55,6 +51,7 @@ export const FileContentView = memo(function FileContentView({
   const [markdownPreview, setMarkdownPreview] = useState(false)
   const [htmlPreview, setHtmlPreview] = useState(true)
   const [scrollToLine, setScrollToLine] = useState<number | null>(null)
+  const chatActions = useChatActions()
 
   const workspaceId = useResolveWorkspaceId(workspacePath)
   const lsp = useLspConnection(workspaceId)
@@ -84,7 +81,8 @@ export const FileContentView = memo(function FileContentView({
   const isPdf = fileExtension === "pdf"
 
   // Only open in LSP when we're rendering source code (not markdown preview, not image, etc.)
-  const isCodeView = !isImage && !isPdf && !markdownPreview && !(isHtml && htmlPreview)
+  const isCodeView =
+    !isImage && !isPdf && !markdownPreview && !(isHtml && htmlPreview)
   const lspFilePath = isCodeView ? filePath : null
   useOpenDocument(lsp, lspFilePath, isCodeView ? content : null)
   const diagnostics = useFileDiagnostics(lsp, lspFilePath)
@@ -307,6 +305,20 @@ export const FileContentView = memo(function FileContentView({
               connection={lsp}
               filePath={lspFilePath}
               onOpenFile={(target, title) => onOpenFile?.(target, title)}
+              onAddCommentContext={(context) => {
+                const contextPath =
+                  workspacePath && context.filePath.startsWith(workspacePath)
+                    ? context.filePath
+                        .slice(workspacePath.length)
+                        .replace(/^[/\\]+/, "")
+                    : context.filePath
+                chatActions?.addFileCommentContext({
+                  path: contextPath,
+                  line: context.line,
+                  comment: context.comment,
+                  code: context.code,
+                })
+              }}
               scrollToLine={scrollToLine}
             />
           )}

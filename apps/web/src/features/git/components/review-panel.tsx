@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  memo,
-} from "react"
+import { useCallback, useEffect, useMemo, useState, memo } from "react"
 import {
   Archive,
   Check,
@@ -42,7 +36,14 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { useReviewPanel } from "../store"
 import { useMainTabs, useMainTabsStore } from "@/features/main-tabs"
-import { useGitDiffStat, useGitStatus, useTurns, useTurnDiffStat, useRevertToTurn, type TurnSummary } from "../queries"
+import {
+  useGitDiffStat,
+  useGitStatus,
+  useTurns,
+  useTurnDiffStat,
+  useRevertToTurn,
+  type TurnSummary,
+} from "../queries"
 import {
   useGitStage,
   useGitStageAll,
@@ -72,6 +73,7 @@ import { ShortcutKbd } from "@/shared/ui/kbd"
 import { getServerUrl } from "@/shared/lib/client"
 import { LANGUAGE_MAP } from "@/shared/lib/language-map"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
+import { useChatActions } from "@/features/chat/contexts/chat-actions-context"
 import {
   LspCodeViewer,
   ProblemsStrip,
@@ -146,7 +148,7 @@ const TurnItem = memo(function TurnItem({
             isExpanded && "rotate-90"
           )}
         />
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
           Turn {turnNumber}
         </span>
         {turn.checkpointSha && (
@@ -190,7 +192,9 @@ const TurnItem = memo(function TurnItem({
                 </Button>
               }
             />
-            <TooltipContent side="left">Revert to before this turn</TooltipContent>
+            <TooltipContent side="left">
+              Revert to before this turn
+            </TooltipContent>
           </Tooltip>
         )}
       </button>
@@ -213,7 +217,9 @@ const TurnItem = memo(function TurnItem({
 
       {isExpanded && files.length === 0 && (
         <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
-          <p className="px-3 py-1.5 text-[11px] text-muted-foreground/40">No file changes recorded</p>
+          <p className="px-3 py-1.5 text-[11px] text-muted-foreground/40">
+            No file changes recorded
+          </p>
         </div>
       )}
     </div>
@@ -272,7 +278,9 @@ const TurnHistoryView = memo(function TurnHistoryView({
           <History className="h-5 w-5 text-muted-foreground/40" />
         </div>
         <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground/60">No turns yet</p>
+          <p className="text-xs font-medium text-muted-foreground/60">
+            No turns yet
+          </p>
           <p className="text-[10px] leading-relaxed text-muted-foreground/40">
             Each agent turn creates a checkpoint you can revert to
           </p>
@@ -433,7 +441,7 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
             <>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuLabel className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                <DropdownMenuLabel className="px-2 py-1 text-[10px] font-medium tracking-wider text-muted-foreground/60 uppercase">
                   Sort by
                 </DropdownMenuLabel>
                 {SORT_OPTIONS.map((opt) => (
@@ -573,7 +581,12 @@ const SourceControlContent = memo(function SourceControlContent({
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex min-h-0 flex-1 flex-col">
         {view === "turn" ? (
-          <TurnHistoryView sessionId={sessionId} mode={mode} turns={turnsData} isLoading={turnsLoading} />
+          <TurnHistoryView
+            sessionId={sessionId}
+            mode={mode}
+            turns={turnsData}
+            isLoading={turnsLoading}
+          />
         ) : view === "history" ? (
           <HistoryView sessionId={workspaceSessionId} />
         ) : (
@@ -593,7 +606,9 @@ const SourceControlContent = memo(function SourceControlContent({
                     <FolderGit2 className="h-5 w-5 text-muted-foreground/40" />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground/60">Not a git repository</p>
+                    <p className="text-xs font-medium text-muted-foreground/60">
+                      Not a git repository
+                    </p>
                     <p className="text-[10px] leading-relaxed text-muted-foreground/40">
                       This folder is not tracked by git
                     </p>
@@ -617,53 +632,62 @@ const SourceControlContent = memo(function SourceControlContent({
 
               {isGitRepo && (
                 <>
-              {loading && staged.length === 0 && unstaged.length === 0 && (
-                <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" />
-                  Loading status…
-                </div>
-              )}
+                  {loading && staged.length === 0 && unstaged.length === 0 && (
+                    <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
+                      <Loader2 className="size-3 animate-spin" />
+                      Loading status…
+                    </div>
+                  )}
 
-              {!loading && error && (
-                <Alert variant="destructive" className="mx-3 mt-3">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+                  {!loading && error && (
+                    <Alert variant="destructive" className="mx-3 mt-3">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
 
-              {!loading && !error && staged.length === 0 && unstaged.length === 0 && (
-                <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                    <GitCompare className="h-5 w-5 text-muted-foreground/40" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground/60">No changes</p>
-                    <p className="text-[10px] text-muted-foreground/40">Your working tree is clean</p>
-                  </div>
-                </div>
-              )}
+                  {!loading &&
+                    !error &&
+                    staged.length === 0 &&
+                    unstaged.length === 0 && (
+                      <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                          <GitCompare className="h-5 w-5 text-muted-foreground/40" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground/60">
+                            No changes
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/40">
+                            Your working tree is clean
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
-              {!loading && !error && (staged.length > 0 || unstaged.length > 0) && (
-                <FilesSection
-                  label="Staged"
-                  files={staged}
-                  sessionId={workspaceSessionId}
-                  mode={mode}
-                  onStageToggle={handleStageToggle}
-                  onRevert={handleRevert}
-                  emptyText="No staged changes"
-                />
-              )}
+                  {!loading &&
+                    !error &&
+                    (staged.length > 0 || unstaged.length > 0) && (
+                      <FilesSection
+                        label="Staged"
+                        files={staged}
+                        sessionId={workspaceSessionId}
+                        mode={mode}
+                        onStageToggle={handleStageToggle}
+                        onRevert={handleRevert}
+                        emptyText="No staged changes"
+                      />
+                    )}
 
-              {!loading && !error && unstaged.length > 0 && (
-                <FilesSection
-                  label="Changes"
-                  files={unstaged}
-                  sessionId={workspaceSessionId}
-                  mode={mode}
-                  onStageToggle={handleStageToggle}
-                  onRevert={handleRevert}
-                />
-              )}
+                  {!loading && !error && unstaged.length > 0 && (
+                    <FilesSection
+                      label="Changes"
+                      files={unstaged}
+                      sessionId={workspaceSessionId}
+                      mode={mode}
+                      onStageToggle={handleStageToggle}
+                      onRevert={handleRevert}
+                    />
+                  )}
                 </>
               )}
             </div>
@@ -703,6 +727,7 @@ const FileContent = memo(function FileContent({
   const [error, setError] = useState<string | null>(null)
   const [serverUrl, setServerUrl] = useState<string>("")
   const { addFileTab } = useMainTabs()
+  const chatActions = useChatActions()
   const [markdownPreview, setMarkdownPreview] = useState(false)
   const [htmlPreview, setHtmlPreview] = useState(true)
   const [scrollToLine, setScrollToLine] = useState<number | null>(null)
@@ -738,7 +763,8 @@ const FileContent = memo(function FileContent({
   const isHtml = fileExtension === "html" || fileExtension === "htm"
   const isPdf = fileExtension === "pdf"
 
-  const isCodeView = !isImage && !isPdf && !markdownPreview && !(isHtml && htmlPreview)
+  const isCodeView =
+    !isImage && !isPdf && !markdownPreview && !(isHtml && htmlPreview)
   const lspFilePath = isCodeView ? filePath : null
   useOpenDocument(lsp, lspFilePath, isCodeView ? content : null)
   const diagnostics = useFileDiagnostics(lsp, lspFilePath)
@@ -968,6 +994,20 @@ const FileContent = memo(function FileContent({
               onOpenFile={(target, title) =>
                 addFileTab({ title, filePath: target, workspacePath })
               }
+              onAddCommentContext={(context) => {
+                const contextPath =
+                  workspacePath && context.filePath.startsWith(workspacePath)
+                    ? context.filePath
+                        .slice(workspacePath.length)
+                        .replace(/^[/\\]+/, "")
+                    : context.filePath
+                chatActions?.addFileCommentContext({
+                  path: contextPath,
+                  line: context.line,
+                  comment: context.comment,
+                  code: context.code,
+                })
+              }}
               scrollToLine={scrollToLine}
             />
           )}
@@ -1053,7 +1093,11 @@ export const ReviewPanel = memo(function ReviewPanel({
                     ) : (
                       <GitCompare className="h-3 w-3" />
                     )}
-                    {scView === "turn" ? "This Turn" : scView === "history" ? "History" : "All Changes"}
+                    {scView === "turn"
+                      ? "This Turn"
+                      : scView === "history"
+                        ? "History"
+                        : "All Changes"}
                     <ChevronDown className="h-3 w-3 opacity-60" />
                   </Button>
                 }
@@ -1093,12 +1137,17 @@ export const ReviewPanel = memo(function ReviewPanel({
             </DropdownMenu>
 
             {visibleDiffStat &&
-              (visibleDiffStat.additions > 0 || visibleDiffStat.deletions > 0) && (
-              <span className="flex animate-in items-center gap-1 font-mono text-[11px] leading-none duration-200 fade-in-0 zoom-in-90">
-                <span className="text-emerald-500">+{visibleDiffStat.additions}</span>
-                <span className="text-rose-500">-{visibleDiffStat.deletions}</span>
-              </span>
-            )}
+              (visibleDiffStat.additions > 0 ||
+                visibleDiffStat.deletions > 0) && (
+                <span className="flex animate-in items-center gap-1 font-mono text-[11px] leading-none duration-200 fade-in-0 zoom-in-90">
+                  <span className="text-emerald-500">
+                    +{visibleDiffStat.additions}
+                  </span>
+                  <span className="text-rose-500">
+                    -{visibleDiffStat.deletions}
+                  </span>
+                </span>
+              )}
 
             <div className="flex-1" />
 
@@ -1168,7 +1217,9 @@ export const ReviewPanel = memo(function ReviewPanel({
             <FileContent
               filePath={activeFileTab.filePath}
               openWithAppId={openWithAppId}
-              workspacePath={currentWorkspacePath ?? activeFileTab.workspacePath}
+              workspacePath={
+                currentWorkspacePath ?? activeFileTab.workspacePath
+              }
             />
           ) : (
             <SourceControlContent

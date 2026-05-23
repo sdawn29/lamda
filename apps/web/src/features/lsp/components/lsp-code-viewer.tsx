@@ -16,9 +16,18 @@ import {
   useState,
   type CSSProperties,
 } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, PlusIcon } from "lucide-react"
 import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 import { useTheme } from "@/shared/components/theme-provider"
+import { Button } from "@/shared/ui/button"
+import { Card, CardContent } from "@/shared/ui/card"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/shared/ui/field"
+import { Textarea } from "@/shared/ui/textarea"
 import type {
   Diagnostic,
   Hover,
@@ -30,7 +39,9 @@ import { LspConnection } from "../client"
 import type { LineDecoration } from "@/features/chat/components/prism-code"
 
 const PrismCode = lazy(() =>
-  import("@/features/chat/components/prism-code").then((m) => ({ default: m.default })),
+  import("@/features/chat/components/prism-code").then((m) => ({
+    default: m.default,
+  }))
 )
 
 interface LspCodeViewerProps {
@@ -41,6 +52,12 @@ interface LspCodeViewerProps {
   connection: LspConnection | null
   filePath: string | null
   onOpenFile?: (filePath: string, title: string, line?: number) => void
+  onAddCommentContext?: (context: {
+    filePath: string
+    line: number
+    comment: string
+    code?: string
+  }) => void
   /** External request to scroll to a given 1-indexed line (e.g. from problems strip). */
   scrollToLine?: number | null
 }
@@ -50,6 +67,11 @@ interface HoverInfo {
   diagnostics: Diagnostic[]
   x: number
   y: number
+}
+
+interface CommentComposer {
+  line: number
+  code: string
 }
 
 const HOVER_DEBOUNCE_MS = 250
@@ -62,12 +84,16 @@ export function LspCodeViewer({
   connection,
   filePath,
   onOpenFile,
+  onAddCommentContext,
   scrollToLine,
 }: LspCodeViewerProps) {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
   const containerRef = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<HoverInfo | null>(null)
+  const [commentComposer, setCommentComposer] =
+    useState<CommentComposer | null>(null)
+  const [commentText, setCommentText] = useState("")
   const hoverTimer = useRef<number | null>(null)
   const lastHoverPos = useRef<{ line: number; character: number } | null>(null)
 
@@ -89,7 +115,7 @@ export function LspCodeViewer({
   useEffect(() => {
     if (!scrollToLine || !containerRef.current) return
     const el = containerRef.current.querySelector(
-      `[data-line="${scrollToLine}"]`,
+      `[data-line="${scrollToLine}"]`
     ) as HTMLElement | null
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" })
@@ -111,8 +137,9 @@ export function LspCodeViewer({
       warning: `lsp-warning-${instanceId}`,
       info: `lsp-info-${instanceId}`,
     }),
-    [instanceId],
+    [instanceId]
   )
+  const commentTextareaId = `${instanceId}-comment-context`
 
   useEffect(() => {
     const css = (globalThis as { CSS?: { highlights?: HighlightRegistry } }).CSS
@@ -146,44 +173,52 @@ export function LspCodeViewer({
   }, [diagnostics, highlightNames, code])
 
   /** Resolve (x, y) → (line, character) by walking the DOM. Returns null if outside code. */
-  const resolvePosition = useCallback((clientX: number, clientY: number): Position | null => {
-    const root = containerRef.current
-    if (!root) return null
-    const target = document.elementFromPoint(clientX, clientY)
-    if (!target || !(target instanceof Node) || !root.contains(target)) return null
-    const lineEl = (target as Element).closest?.("[data-line]") as HTMLElement | null
-    if (!lineEl) return null
-    const lineNumber = Number(lineEl.getAttribute("data-line"))
-    if (!Number.isFinite(lineNumber) || lineNumber <= 0) return null
+  const resolvePosition = useCallback(
+    (clientX: number, clientY: number): Position | null => {
+      const root = containerRef.current
+      if (!root) return null
+      const target = document.elementFromPoint(clientX, clientY)
+      if (!target || !(target instanceof Node) || !root.contains(target))
+        return null
+      const lineEl = (target as Element).closest?.(
+        "[data-line]"
+      ) as HTMLElement | null
+      if (!lineEl) return null
+      const lineNumber = Number(lineEl.getAttribute("data-line"))
+      if (!Number.isFinite(lineNumber) || lineNumber <= 0) return null
 
-    // Resolve a caret position in the line.
-    // caretRangeFromPoint is Chromium-only but Electron is Chromium, so we're fine.
-    type CaretFn = (x: number, y: number) => Range | null
-    const caretFn = (document as unknown as { caretRangeFromPoint?: CaretFn }).caretRangeFromPoint
-    if (!caretFn) return { line: lineNumber - 1, character: 0 }
-    const range = caretFn.call(document, clientX, clientY)
-    if (!range) return { line: lineNumber - 1, character: 0 }
-    if (!lineEl.contains(range.startContainer)) {
-      return { line: lineNumber - 1, character: 0 }
-    }
-    const measureRange = document.createRange()
-    // Start measurement after the line-number span (if any) so the count
-    // reflects code characters only.
-    const lineNumberEl = lineEl.querySelector(
-      ".linenumber, .react-syntax-highlighter-line-number",
-    ) as Element | null
-    if (lineNumberEl?.parentNode) {
-      const parent = lineNumberEl.parentNode
-      const idx = Array.from(parent.childNodes).indexOf(lineNumberEl as ChildNode) + 1
-      measureRange.setStart(parent, idx)
-    } else {
-      measureRange.setStart(lineEl, 0)
-    }
-    measureRange.setEnd(range.startContainer, range.startOffset)
-    const character = measureRange.toString().length
-    measureRange.detach?.()
-    return { line: lineNumber - 1, character }
-  }, [])
+      // Resolve a caret position in the line.
+      // caretRangeFromPoint is Chromium-only but Electron is Chromium, so we're fine.
+      type CaretFn = (x: number, y: number) => Range | null
+      const caretFn = (document as unknown as { caretRangeFromPoint?: CaretFn })
+        .caretRangeFromPoint
+      if (!caretFn) return { line: lineNumber - 1, character: 0 }
+      const range = caretFn.call(document, clientX, clientY)
+      if (!range) return { line: lineNumber - 1, character: 0 }
+      if (!lineEl.contains(range.startContainer)) {
+        return { line: lineNumber - 1, character: 0 }
+      }
+      const measureRange = document.createRange()
+      // Start measurement after the line-number span (if any) so the count
+      // reflects code characters only.
+      const lineNumberEl = lineEl.querySelector(
+        ".linenumber, .react-syntax-highlighter-line-number"
+      ) as Element | null
+      if (lineNumberEl?.parentNode) {
+        const parent = lineNumberEl.parentNode
+        const idx =
+          Array.from(parent.childNodes).indexOf(lineNumberEl as ChildNode) + 1
+        measureRange.setStart(parent, idx)
+      } else {
+        measureRange.setStart(lineEl, 0)
+      }
+      measureRange.setEnd(range.startContainer, range.startOffset)
+      const character = measureRange.toString().length
+      measureRange.detach?.()
+      return { line: lineNumber - 1, character }
+    },
+    []
+  )
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -195,14 +230,17 @@ export function LspCodeViewer({
         return
       }
       const prev = lastHoverPos.current
-      if (prev && prev.line === pos.line && prev.character === pos.character) return
+      if (prev && prev.line === pos.line && prev.character === pos.character)
+        return
       lastHoverPos.current = pos
       if (hoverTimer.current) clearTimeout(hoverTimer.current)
       const x = e.clientX
       const y = e.clientY
 
       // Diagnostics overlapping this position — show them right away.
-      const matchingDiags = diagnostics.filter((d) => positionInRange(pos, d.range))
+      const matchingDiags = diagnostics.filter((d) =>
+        positionInRange(pos, d.range)
+      )
       if (matchingDiags.length > 0) {
         setHover({ contents: "", diagnostics: matchingDiags, x, y })
       }
@@ -223,7 +261,7 @@ export function LspCodeViewer({
           })
       }, HOVER_DEBOUNCE_MS)
     },
-    [connection, filePath, resolvePosition, diagnostics],
+    [connection, filePath, resolvePosition, diagnostics]
   )
 
   const handlePointerLeave = useCallback(() => {
@@ -234,6 +272,26 @@ export function LspCodeViewer({
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      const target = e.target as Element | null
+      const lineNumberEl = target?.closest(
+        ".linenumber, .react-syntax-highlighter-line-number"
+      )
+      if (onAddCommentContext && filePath && lineNumberEl) {
+        const lineEl = lineNumberEl.closest("[data-line]") as HTMLElement | null
+        const line = Number(lineEl?.getAttribute("data-line"))
+        if (Number.isFinite(line) && line > 0) {
+          e.preventDefault()
+          e.stopPropagation()
+          setHover(null)
+          setCommentText("")
+          setCommentComposer({
+            line,
+            code: code.split("\n")[line - 1]?.trim() ?? "",
+          })
+          return
+        }
+      }
+
       if (!connection || !filePath || !(e.metaKey || e.ctrlKey)) return
       const pos = resolvePosition(e.clientX, e.clientY)
       if (!pos) return
@@ -243,7 +301,7 @@ export function LspCodeViewer({
         if (!target) return
         if (target.filePath === filePath) {
           const lineEl = containerRef.current?.querySelector(
-            `[data-line="${target.line + 1}"]`,
+            `[data-line="${target.line + 1}"]`
           ) as HTMLElement | null
           lineEl?.scrollIntoView({ behavior: "smooth", block: "center" })
         } else if (onOpenFile) {
@@ -252,8 +310,40 @@ export function LspCodeViewer({
         }
       })
     },
-    [connection, filePath, onOpenFile, resolvePosition],
+    [
+      code,
+      connection,
+      filePath,
+      onAddCommentContext,
+      onOpenFile,
+      resolvePosition,
+    ]
   )
+
+  const openCommentComposer = useCallback(
+    (line: number) => {
+      if (!onAddCommentContext || !filePath) return
+      setHover(null)
+      setCommentText("")
+      setCommentComposer({
+        line,
+        code: code.split("\n")[line - 1]?.trim() ?? "",
+      })
+    },
+    [code, filePath, onAddCommentContext]
+  )
+
+  const handleSubmitComment = useCallback(() => {
+    if (!commentComposer || !filePath || !commentText.trim()) return
+    onAddCommentContext?.({
+      filePath,
+      line: commentComposer.line,
+      comment: commentText.trim(),
+      code: commentComposer.code,
+    })
+    setCommentComposer(null)
+    setCommentText("")
+  }, [commentComposer, commentText, filePath, onAddCommentContext])
 
   useEffect(() => {
     return () => {
@@ -287,7 +377,93 @@ export function LspCodeViewer({
         text-decoration-skip-ink: none;
       }
     `,
-    [highlightNames],
+    [highlightNames]
+  )
+
+  const renderCommentComposer = useCallback(
+    (lineNumber: number) => {
+      if (!commentComposer || commentComposer.line !== lineNumber) return null
+
+      return (
+        <Card
+          size="sm"
+          className="my-2 mr-1 ml-8 w-[calc(100%-2.25rem)] animate-in gap-0 bg-popover p-0 font-sans whitespace-normal text-popover-foreground shadow-md duration-150 fade-in-0 slide-in-from-top-2"
+          onClick={(event) => event.stopPropagation()}
+          onPointerMove={(event) => event.stopPropagation()}
+        >
+          <CardContent className="flex flex-col gap-1 py-1">
+            <FieldGroup className="gap-1">
+              <Field className="gap-1">
+                <FieldLabel htmlFor={commentTextareaId}>Comment</FieldLabel>
+                <Textarea
+                  id={commentTextareaId}
+                  value={commentText}
+                  onChange={(event) => setCommentText(event.target.value)}
+                  placeholder="What should the agent know about this line?"
+                  className="min-h-20 text-xs"
+                  autoFocus
+                  onKeyDown={(event) => {
+                    if (
+                      (event.metaKey || event.ctrlKey) &&
+                      event.key === "Enter"
+                    ) {
+                      event.preventDefault()
+                      handleSubmitComment()
+                    }
+                  }}
+                />
+                <FieldDescription className="text-[10px]">
+                  Saved into chat as file context.
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                onClick={() => setCommentComposer(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="default"
+                disabled={!commentText.trim()}
+                onClick={handleSubmitComment}
+              >
+                Add context
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    },
+    [commentComposer, commentTextareaId, commentText, handleSubmitComment]
+  )
+
+  const renderLineAction = useCallback(
+    (lineNumber: number) => {
+      if (!onAddCommentContext || !filePath) return null
+
+      return (
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon-xs"
+          className="absolute top-1/2 left-2 z-10 -translate-y-1/2 opacity-0 shadow-sm transition-opacity group-hover/code-line:opacity-100 focus-visible:opacity-100"
+          aria-label={`Add comment for line ${lineNumber}`}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            openCommentComposer(lineNumber)
+          }}
+        >
+          <PlusIcon className="size-3" aria-hidden />
+        </Button>
+      )
+    },
+    [filePath, onAddCommentContext, openCommentComposer]
   )
 
   return (
@@ -315,6 +491,9 @@ export function LspCodeViewer({
           fontSize={fontSize}
           lineDecorations={lineDecorations}
           enableLineDataAttrs
+          activeLine={commentComposer?.line ?? null}
+          renderAfterLine={renderCommentComposer}
+          renderLineAction={renderLineAction}
         />
       </Suspense>
       {hover && (
@@ -339,7 +518,9 @@ export function LspCodeViewer({
                             : "text-muted-foreground"
                     }
                   >
-                    <span className="text-[11px] leading-relaxed">{d.message}</span>
+                    <span className="text-[11px] leading-relaxed">
+                      {d.message}
+                    </span>
                     {(d.source || d.code !== undefined) && (
                       <span className="ml-2 text-[10px] opacity-60">
                         {d.source ?? ""}
@@ -354,7 +535,7 @@ export function LspCodeViewer({
           {hover.contents && (
             <>
               {hover.diagnostics.length > 0 && <div className="border-t" />}
-              <pre className="whitespace-pre-wrap px-2 py-1.5 font-mono text-[11px] leading-relaxed">
+              <pre className="px-2 py-1.5 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
                 {hover.contents}
               </pre>
             </>
@@ -372,16 +553,21 @@ export function LspCodeViewer({
  */
 function createCharRange(
   root: Element,
-  lspRange: { start: { line: number; character: number }; end: { line: number; character: number } },
+  lspRange: {
+    start: { line: number; character: number }
+    end: { line: number; character: number }
+  }
 ): Range | null {
-  const startLine = root.querySelector(`[data-line="${lspRange.start.line + 1}"]`)
+  const startLine = root.querySelector(
+    `[data-line="${lspRange.start.line + 1}"]`
+  )
   if (!startLine) return null
 
   if (lspRange.start.line === lspRange.end.line) {
     return createRangeFromCharOffsets(
       startLine,
       lspRange.start.character,
-      lspRange.end.character,
+      lspRange.end.character
     )
   }
 
@@ -389,7 +575,11 @@ function createCharRange(
   const endLine = root.querySelector(`[data-line="${lspRange.end.line + 1}"]`)
   if (!endLine) {
     const lineLen = (startLine.textContent ?? "").length
-    return createRangeFromCharOffsets(startLine, lspRange.start.character, lineLen)
+    return createRangeFromCharOffsets(
+      startLine,
+      lspRange.start.character,
+      lineLen
+    )
   }
   const startAnchor = findTextNodeAt(startLine, lspRange.start.character)
   const endAnchor = findTextNodeAt(endLine, lspRange.end.character)
@@ -403,7 +593,7 @@ function createCharRange(
 function createRangeFromCharOffsets(
   lineEl: Element,
   startChar: number,
-  endChar: number,
+  endChar: number
 ): Range | null {
   const start = findTextNodeAt(lineEl, startChar)
   const end = findTextNodeAt(lineEl, Math.max(endChar, startChar + 1))
@@ -417,11 +607,13 @@ function createRangeFromCharOffsets(
 /** Find the text node containing the Nth character of CODE in the element. */
 function findTextNodeAt(
   container: Element,
-  charOffset: number,
+  charOffset: number
 ): { node: Node; offset: number } | null {
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) =>
-      isInsideLineNumber(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+      isInsideLineNumber(n)
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT,
   })
   let consumed = 0
   let node = walker.nextNode()
@@ -478,7 +670,7 @@ function flattenHover(hover: Hover | null | undefined): string {
 }
 
 function pickFirstLocation(
-  result: Location | Location[] | LocationLink[] | null,
+  result: Location | Location[] | LocationLink[] | null
 ): { filePath: string; line: number; character: number } | null {
   if (!result) return null
   const arr = Array.isArray(result) ? result : [result]
@@ -509,10 +701,12 @@ function uriToFilePath(uri: string): string {
 
 function positionInRange(
   pos: Position,
-  range: { start: Position; end: Position },
+  range: { start: Position; end: Position }
 ): boolean {
   if (pos.line < range.start.line || pos.line > range.end.line) return false
-  if (pos.line === range.start.line && pos.character < range.start.character) return false
-  if (pos.line === range.end.line && pos.character > range.end.character) return false
+  if (pos.line === range.start.line && pos.character < range.start.character)
+    return false
+  if (pos.line === range.end.line && pos.character > range.end.character)
+    return false
   return true
 }
