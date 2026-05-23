@@ -1,4 +1,11 @@
 import { notarize } from "@electron/notarize";
+import { existsSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const envPath = resolve(__dirname, ".env");
+if (existsSync(envPath)) process.loadEnvFile(envPath);
 
 export default async function notarizing(context) {
   const { electronPlatformName, appOutDir } = context;
