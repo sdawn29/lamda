@@ -222,7 +222,7 @@ export default function PrismCode({
         position: "sticky",
         left: 0,
         zIndex: 1,
-        backgroundColor: "var(--background)",
+        backgroundColor: "var(--code-gutter-bg, var(--background))",
         color: "var(--muted-foreground)",
         userSelect: "none",
         fontStyle: "normal",

@@ -377,39 +377,40 @@ export function WorkspaceLayout() {
         <AppSidebar />
 
         <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden">
-          {!diffFullscreen && (
-            <SidebarInset className="h-full min-h-0 w-full overflow-hidden rounded-2xl border border-border shadow-sm">
-              {/* Left column: TitleBar + content + terminal */}
-              <div className="flex h-full min-w-0 flex-col overflow-hidden">
-                {!isEmptyState && <TitleBar />}
-                <UpdateBanner />
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                  <div className="min-h-0 flex-1 overflow-hidden">
-                    <MainContentArea />
-                  </div>
-                  {terminalHost && anyTerminalTabs && (
-                    <div
-                      onMouseDown={handleTerminalResizeStart}
-                      className="shrink-0 cursor-row-resize border-t"
-                      style={{
-                        height: terminalHeight,
-                        display: activeTerminalOpen ? undefined : "none",
-                      }}
-                    >
-                      <Suspense
-                        fallback={<div className="h-full bg-background" />}
-                      >
-                        <TerminalPanel
-                          activeWorkspaceId={terminalHost.id}
-                          cwd={terminalHost.path}
-                        />
-                      </Suspense>
-                    </div>
-                  )}
+          <SidebarInset
+            className="h-full min-h-0 w-full overflow-hidden rounded-2xl border border-border shadow-sm"
+            style={{ display: diffFullscreen ? "none" : undefined }}
+          >
+            {/* Left column: TitleBar + content + terminal */}
+            <div className="flex h-full min-w-0 flex-col overflow-hidden">
+              {!isEmptyState && <TitleBar />}
+              <UpdateBanner />
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <MainContentArea />
                 </div>
+                {terminalHost && anyTerminalTabs && (
+                  <div
+                    onMouseDown={handleTerminalResizeStart}
+                    className="shrink-0 cursor-row-resize border-t"
+                    style={{
+                      height: terminalHeight,
+                      display: activeTerminalOpen ? undefined : "none",
+                    }}
+                  >
+                    <Suspense
+                      fallback={<div className="h-full bg-background" />}
+                    >
+                      <TerminalPanel
+                        activeWorkspaceId={terminalHost.id}
+                        cwd={terminalHost.path}
+                      />
+                    </Suspense>
+                  </div>
+                )}
               </div>
-            </SidebarInset>
-          )}
+            </div>
+          </SidebarInset>
 
           {/* Right sidebar — outside the card, mirrors AppSidebar on the left */}
           {rsReady && (

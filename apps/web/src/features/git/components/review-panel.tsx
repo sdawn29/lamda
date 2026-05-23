@@ -946,7 +946,7 @@ const FileContent = memo(function FileContent({
       <div className="flex min-h-0 flex-1 flex-col p-2">
         <div
           className={cn(
-            "min-h-0 flex-1 overflow-auto rounded-lg border border-border/50",
+            "min-h-0 flex-1 overflow-auto rounded-lg border border-border/50 [--code-gutter-bg:var(--sidebar)]",
             isImage && "flex items-center justify-center p-4",
             isHtml && htmlPreview && "overflow-hidden",
             !isImage &&
