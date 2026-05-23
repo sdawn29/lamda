@@ -34,18 +34,46 @@ export class McpClient {
     }
 
     try {
+      // In a packaged Electron app macOS provides only a minimal PATH
+      // (/usr/bin:/bin:/usr/sbin:/sbin). Prepend the common locations where
+      // node/npx/uvx live so user-configured MCP commands resolve correctly.
+      const augmentedPath = [
+        "/opt/homebrew/bin",
+        "/opt/homebrew/sbin",
+        "/usr/local/bin",
+        process.env.PATH,
+      ]
+        .filter(Boolean)
+        .join(":");
+
       const transport = new StdioClientTransport({
         command: config.command,
         args: config.args,
-        env: config.env,
+        env: { ...process.env, ...config.env, PATH: augmentedPath },
       });
 
       const client = new Client(
-        { name: `lamda-mcp-${config.name}`, version: "1.0.0" },
+        { name: `lambda-mcp-${config.name}`, version: "1.0.0" },
         { capabilities: {} }
       );
 
-      await client.connect(transport);
+      // Enforce a 30-second connection timeout so a hung process never blocks indefinitely
+      let connectTimeoutId: ReturnType<typeof setTimeout> | undefined;
+      const connectionTimeout = new Promise<never>((_, reject) => {
+        connectTimeoutId = setTimeout(
+          () => reject(new Error(`Connection to MCP server "${config.name}" timed out after 30s`)),
+          30_000
+        );
+      });
+
+      try {
+        await Promise.race([client.connect(transport), connectionTimeout]);
+      } catch (e) {
+        clearTimeout(connectTimeoutId);
+        try { await transport.close(); } catch { /* best-effort cleanup */ }
+        throw e;
+      }
+      clearTimeout(connectTimeoutId);
 
       this.servers.set(config.name, {
         client,
@@ -206,7 +234,7 @@ export class McpClient {
     content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>
   ): Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> {
     return content.map((item) => {
-      if (item.type === "text" && item.text) {
+      if (item.type === "text" && item.text !== undefined) {
         return { type: "text" as const, text: item.text };
       }
       if (item.type === "image" && item.data && item.mimeType) {

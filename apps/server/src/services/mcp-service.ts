@@ -33,7 +33,7 @@ const clientPool = new Map<string, Map<string, ClientEntry>>()
 setInterval(() => {
   for (const workspaceId of clientPool.keys()) {
     if (getMcpServers(workspaceId).length === 0) {
-      removeAllClients(workspaceId)
+      removeAllClients(workspaceId).catch((e) => console.error("[MCP] sweep cleanup error:", e))
     }
   }
 }, 15 * 60 * 1000).unref()
@@ -50,18 +50,21 @@ function getClientEntry(workspaceId: string, config: McpServerConfig): ClientEnt
   return entry
 }
 
-function removeAllClients(workspaceId: string): void {
-  clientPool.get(workspaceId)?.forEach((entry) => entry.client.disconnectAll())
+async function removeAllClients(workspaceId: string): Promise<void> {
+  const pool = clientPool.get(workspaceId)
   clientPool.delete(workspaceId)
+  if (pool) {
+    await Promise.all(Array.from(pool.values()).map((entry) => entry.client.disconnectAll()))
+  }
 }
 
-function removeClient(workspaceId: string, name: string): void {
+async function removeClient(workspaceId: string, name: string): Promise<void> {
   const pool = clientPool.get(workspaceId)
   if (pool) {
     const entry = pool.get(name)
     if (entry) {
-      entry.client.disconnectAll()
       pool.delete(name)
+      await entry.client.disconnectAll()
     }
   }
 }
@@ -76,19 +79,25 @@ export function getMcpSettings(workspaceId: string): McpSettings {
 }
 
 export function saveMcpSettings(workspaceId: string, settings: McpSettings): void {
-  // Reset manuallyStopped state when settings are saved
   const pool = clientPool.get(workspaceId)
   if (pool) {
-    for (const entry of pool.values()) {
-      entry.manuallyStopped = false
+    const newNames = new Set(settings.servers.map((s) => s.name))
+    for (const [name, entry] of pool) {
+      if (!newNames.has(name)) {
+        // Server was removed — disconnect and evict from pool immediately
+        pool.delete(name)
+        entry.client.disconnectAll().catch((e) => console.error(`[MCP] error disconnecting removed server "${name}":`, e))
+      } else {
+        // Reset manuallyStopped so re-saved servers reconnect on next use
+        entry.manuallyStopped = false
+      }
     }
   }
   saveMcpServers(workspaceId, settings.servers)
 }
 
-export function deleteMcpSettings(workspaceId: string): void {
-  removeAllClients(workspaceId)
-  // Delete from DB
+export async function deleteMcpSettings(workspaceId: string): Promise<void> {
+  await removeAllClients(workspaceId)
   const servers = getMcpServers(workspaceId)
   for (const s of servers) {
     deleteMcpServer(workspaceId, s.name)
@@ -169,20 +178,21 @@ export async function getMcpServerStatus(workspaceId: string) {
   const servers = getMcpServers(workspaceId)
   return Promise.all(servers.map(async (s) => {
     try {
-      const config = dbToMcpConfig(s)
-      const entry = getClientEntry(workspaceId, config)
+      // Peek at the existing pool entry without creating one for disabled/stopped servers
+      const existingEntry = clientPool.get(workspaceId)?.get(s.name)
 
-      // If disabled or manually stopped, don't auto-connect
-      if (!s.enabled || entry.manuallyStopped) {
-        const connected = entry.client.isConnected(s.name)
-        // If still connected somehow, disconnect it
-        if (connected && entry.manuallyStopped) {
-          await entry.client.disconnect(s.name)
+      if (!s.enabled || existingEntry?.manuallyStopped) {
+        // Disconnect if somehow still running after being manually stopped
+        if (existingEntry?.client.isConnected(s.name) && existingEntry.manuallyStopped) {
+          await existingEntry.client.disconnect(s.name)
         }
         return { name: s.name, connected: false, toolCount: 0, enabled: s.enabled }
       }
 
-      // Auto-connect if not connected
+      // Only now create/fetch the pool entry for enabled servers
+      const config = dbToMcpConfig(s)
+      const entry = getClientEntry(workspaceId, config)
+
       if (!entry.client.isConnected(s.name)) {
         await entry.client.connect(config)
       }

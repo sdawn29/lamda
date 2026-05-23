@@ -2,7 +2,7 @@
  * Converter functions for transforming MCP tools to pi-compatible tools
  */
 
-import { Type } from "typebox";
+import { Type, type TSchema } from "typebox";
 import type { McpTool } from "./types.js";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
@@ -42,7 +42,7 @@ function buildSchemaFromMcpTool(mcpTool: McpTool) {
 /**
  * Convert a JSON schema property to a typebox type
  */
-function convertJsonSchemaToTypebox(prop: Record<string, unknown>) {
+function convertJsonSchemaToTypebox(prop: Record<string, unknown>): TSchema {
   const type = prop.type as string | undefined;
   const description = prop.description as string | undefined;
 
@@ -55,10 +55,22 @@ function convertJsonSchemaToTypebox(prop: Record<string, unknown>) {
       return Type.Integer({ description });
     case "boolean":
       return Type.Boolean({ description });
-    case "array":
-      return Type.Array(Type.Any(), { description });
-    case "object":
-      return Type.Object({}, { description });
+    case "array": {
+      const items = prop.items as Record<string, unknown> | undefined;
+      const itemType = items ? convertJsonSchemaToTypebox(items) : Type.Any();
+      return Type.Array(itemType, { description });
+    }
+    case "object": {
+      const nestedProps: Record<string, unknown> = {};
+      if (prop.properties && typeof prop.properties === "object") {
+        for (const [k, v] of Object.entries(prop.properties as Record<string, unknown>)) {
+          if (v && typeof v === "object") {
+            nestedProps[k] = convertJsonSchemaToTypebox(v as Record<string, unknown>);
+          }
+        }
+      }
+      return Type.Object(nestedProps as Parameters<typeof Type.Object>[0], { description });
+    }
     default:
       return Type.Any({ description });
   }
