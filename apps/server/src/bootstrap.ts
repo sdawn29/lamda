@@ -1,7 +1,7 @@
-import { createManagedSession, openManagedSession } from "@lamda/pi-sdk";
 import { listWorkspacesWithThreads } from "@lamda/db";
 import { store } from "./store.js";
 import { workspaceIndexer } from "./services/workspace-indexer.js";
+import { createSessionForThread, openSessionForThread } from "./services/session-service.js";
 
 /**
  * Recreate Pi sessions for every persisted thread on server startup.
@@ -14,11 +14,13 @@ export async function bootstrapSessions(): Promise<void> {
 
   const tasks = workspaceList.flatMap((ws) =>
     ws.threads.map(async (thread) => {
-      const mode = thread.mode as "ask" | "plan" | "code" | undefined;
-      const handle = thread.sessionFile
-        ? await openManagedSession(thread.sessionFile, { cwd: ws.path, mode })
-        : await createManagedSession({ cwd: ws.path, mode });
-      store.create(handle, ws.path, thread.id, ws.id);
+      if (thread.sessionFile) {
+        const handle = await openSessionForThread(thread.id, thread.sessionFile, ws.path, ws.id);
+        store.create(handle, ws.path, thread.id, ws.id);
+        return;
+      }
+
+      await createSessionForThread(thread.id, ws.path, ws.id);
     }),
   );
 

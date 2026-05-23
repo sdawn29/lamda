@@ -29,8 +29,9 @@ import { sessionEvents } from "../session-events.js";
 import {
   createSessionForThread,
   ensureSessionEventHub,
+  openSessionForThread,
 } from "../services/session-service.js";
-import { openManagedSession, readSessionHistory, getModePreamble } from "@lamda/pi-sdk";
+import { readSessionHistory, getModePreamble } from "@lamda/pi-sdk";
 import type { Mode, PromptOptions, SdkConfig } from "@lamda/pi-sdk";
 import { promises as fs } from "node:fs";
 import { gitUnstage, gitRevertFile, gitRestoreFileFromRef } from "@lamda/git";
@@ -357,9 +358,10 @@ sessions.post("/session/:id/revert-to-message", async (c) => {
   try {
     const newSessionFile = await entry.handle.fork(userMessageIndex);
     // Swap the session handle in place — same sessionId, fresh truncated history.
-    const thread = getThread(threadId);
-    const mode = thread?.mode as "ask" | "plan" | "code" | undefined;
-    store.replaceHandle(sessionId, await openManagedSession(newSessionFile, { cwd, mode }));
+    store.replaceHandle(
+      sessionId,
+      await openSessionForThread(threadId, newSessionFile, cwd, entry.workspaceId),
+    );
     updateThreadSessionFile(threadId, newSessionFile);
 
     // Re-attach the event hub to the new handle.
@@ -519,9 +521,12 @@ sessions.post("/session/:id/fork", async (c) => {
     console.error("[fork] history seeding failed (non-fatal):", err);
   }
 
-  const newThread = getThread(newThreadId);
-  const newMode = newThread?.mode as "ask" | "plan" | "code" | undefined;
-  const forkedHandle = await openManagedSession(newSessionFile, { cwd: entry.cwd, mode: newMode });
+  const forkedHandle = await openSessionForThread(
+    newThreadId,
+    newSessionFile,
+    entry.cwd,
+    entry.workspaceId,
+  );
   const newSessionId = store.create(forkedHandle, entry.cwd, newThreadId, entry.workspaceId);
   sessionEvents.ensure(newSessionId, newThreadId, forkedHandle, entry.cwd);
 

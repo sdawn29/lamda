@@ -16,18 +16,7 @@ import {
   stopMcpServer,
   setServerEnabled,
 } from "../services/mcp-service.js"
-import { collectCustomTools } from "../services/session-service.js"
-import { getWorkspace } from "@lamda/db"
-import { store } from "../store.js"
-
-async function refreshSessionTools(workspaceId: string) {
-  const ws = getWorkspace(workspaceId)
-  if (!ws) return
-  const tools = await collectCustomTools(workspaceId, ws.path)
-  for (const { handle } of store.getByWorkspaceId(workspaceId)) {
-    handle.setCustomTools(tools)
-  }
-}
+import { refreshWorkspaceSessionTools } from "../services/session-service.js"
 
 const mcpRouter = new Hono()
 
@@ -61,7 +50,7 @@ mcpRouter.put("/settings/:workspaceId", async (c) => {
   }>()
 
   saveMcpSettings(workspaceId, settings)
-  await refreshSessionTools(workspaceId)
+  await refreshWorkspaceSessionTools(workspaceId)
   return c.json({ success: true })
 })
 
@@ -117,7 +106,7 @@ mcpRouter.post("/start/:workspaceId/:serverName", async (c) => {
   const serverName = c.req.param("serverName")
   
   const result = await startMcpServer(workspaceId, serverName)
-  if (result.success) await refreshSessionTools(workspaceId)
+  if (result.success) await refreshWorkspaceSessionTools(workspaceId)
   return c.json(result)
 })
 
@@ -130,7 +119,7 @@ mcpRouter.post("/stop/:workspaceId/:serverName", async (c) => {
   const serverName = c.req.param("serverName")
   
   const result = await stopMcpServer(workspaceId, serverName)
-  if (result.success) await refreshSessionTools(workspaceId)
+  if (result.success) await refreshWorkspaceSessionTools(workspaceId)
   return c.json(result)
 })
 
@@ -144,7 +133,7 @@ mcpRouter.patch("/enabled/:workspaceId/:serverName", async (c) => {
   const { enabled } = await c.req.json<{ enabled: boolean }>()
   
   setServerEnabled(workspaceId, serverName, enabled)
-  await refreshSessionTools(workspaceId)
+  await refreshWorkspaceSessionTools(workspaceId)
   return c.json({ success: true })
 })
 

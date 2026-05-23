@@ -1,9 +1,25 @@
-import { createManagedSession, createPlanModeTools, PLAN_DIR, type SdkConfig } from "@lamda/pi-sdk"
+import { createManagedSession, openManagedSession, createPlanModeTools, PLAN_DIR, type SdkConfig } from "@lamda/pi-sdk"
 import { updateThreadSessionFile, getWorkspace, getThread } from "@lamda/db"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { store } from "../store.js"
 import { sessionEvents } from "../session-events.js"
+
+async function buildSessionCustomTools(
+  threadId: string,
+  cwd: string,
+  workspaceId?: string,
+) {
+  const thread = getThread(threadId)
+  const mode = thread?.mode as SdkConfig["mode"] | undefined
+  const customTools = workspaceId
+    ? await collectCustomTools(workspaceId, cwd, mode)
+    : mode === "plan"
+      ? createPlanModeTools(cwd)
+      : undefined
+
+  return { customTools, mode }
+}
 
 export async function createSessionForThread(
   threadId: string,
@@ -11,8 +27,6 @@ export async function createSessionForThread(
   workspaceId?: string,
   opts: Omit<Partial<SdkConfig>, "cwd"> = {},
 ): Promise<string> {
-  const thread = getThread(threadId)
-  const mode = thread?.mode as SdkConfig["mode"] | undefined
   // Inject workspace-scoped env vars into process.env so they are inherited
   // by any child processes (e.g. bash tool) that Claude spawns during the session.
   if (workspaceId) {
@@ -31,7 +45,7 @@ export async function createSessionForThread(
   // on a missing directory. Cheap and safe to run unconditionally.
   await mkdir(join(cwd, PLAN_DIR), { recursive: true }).catch(() => {})
 
-  const customTools = workspaceId ? await collectCustomTools(workspaceId, cwd, mode) : (mode === "plan" ? createPlanModeTools(cwd) : undefined)
+  const { customTools, mode } = await buildSessionCustomTools(threadId, cwd, workspaceId)
   const handle = await createManagedSession({ cwd, customTools, mode, ...opts })
   const sessionId = store.create(handle, cwd, threadId, workspaceId)
   
@@ -46,6 +60,17 @@ export async function createSessionForThread(
   }
 
   return sessionId
+}
+
+export async function openSessionForThread(
+  threadId: string,
+  sessionFilePath: string,
+  cwd: string,
+  workspaceId?: string,
+  opts: Omit<Partial<SdkConfig>, "cwd" | "mode" | "customTools"> = {},
+) {
+  const { customTools, mode } = await buildSessionCustomTools(threadId, cwd, workspaceId)
+  return openManagedSession(sessionFilePath, { cwd, customTools, mode, ...opts })
 }
 
 export function ensureSessionEventHub(sessionId: string, entry: NonNullable<ReturnType<typeof store.get>>) {
@@ -80,4 +105,23 @@ export async function collectCustomTools(
     }),
   ])
   return [...mcpTools, ...lspTools]
+}
+
+export async function refreshWorkspaceSessionTools(workspaceId: string) {
+  const ws = getWorkspace(workspaceId)
+  if (!ws) return
+
+  for (const { sessionId, handle } of store.getByWorkspaceId(workspaceId)) {
+    const threadId = store.getThreadId(sessionId)
+    if (!threadId) continue
+
+    const thread = getThread(threadId)
+    const mode = thread?.mode as SdkConfig["mode"] | undefined
+    const tools = await collectCustomTools(workspaceId, ws.path, mode)
+    handle.setCustomTools(tools)
+
+    if (mode) {
+      handle.setMode(mode)
+    }
+  }
 }
