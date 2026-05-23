@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](../../releases/tag/v0.3.0) — 2026-05-23
+
+### Features
+
+* **client:** enhance shell path resolution for improved command execution
+* **release:** improve tag retrieval to use highest semver tag
+
 ## [0.2.0](../../releases/tag/v0.2.0) — 2026-05-23
 
 ### Features
