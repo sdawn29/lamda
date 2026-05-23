@@ -37,7 +37,23 @@ function run(cmd, opts = {}) {
 
 function getLastTag() {
   try {
-    return run("git describe --tags --abbrev=0");
+    const tags = run("git tag -l 'v*'")
+      .split("\n")
+      .map((t) => t.trim())
+      .filter((t) => /^v\d+\.\d+\.\d+$/.test(t));
+
+    if (tags.length === 0) return null;
+
+    // Use the highest semver tag so a stray tag on a merged branch
+    // doesn't shadow a real release tag ahead of it in the graph.
+    return tags.sort((a, b) => {
+      const av = a.slice(1).split(".").map(Number);
+      const bv = b.slice(1).split(".").map(Number);
+      for (let i = 0; i < 3; i++) {
+        if (av[i] !== bv[i]) return bv[i] - av[i];
+      }
+      return 0;
+    })[0];
   } catch {
     return null;
   }
@@ -193,9 +209,10 @@ run(`git commit -m "release: ${tag}"`);
 console.log(`Committed release ${tag}`);
 
 // 4. Tag
-const tagExists = run("git tag -l\ ")
+const tagExists = run(`git tag -l "${tag}"`)
   .split("\n")
   .map((t) => t.trim())
+  .filter(Boolean)
   .includes(tag);
 if (!tagExists) {
   run(`git tag -a "${tag}" -m "Release ${tag}"`);
