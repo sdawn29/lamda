@@ -1,35 +1,16 @@
-import { useEffect, useState, startTransition } from "react"
+import { useMemo } from "react"
 
 import { cn } from "@/shared/lib/utils"
 import { useThinkingPhrases } from "@/shared/lib/thinking-visibility"
 
-const PHRASE_INTERVAL_MS = 2200
-
 export function ThinkingIndicator({ className }: { className?: string }) {
   const phrases = useThinkingPhrases()
-  const [phraseIndex, setPhraseIndex] = useState(0)
 
-  useEffect(() => {
-    startTransition(() => {
-      setPhraseIndex(0)
-    })
-  }, [phrases])
-
-  useEffect(() => {
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches
-
-    if (prefersReducedMotion) return
-
-    const interval = window.setInterval(() => {
-      setPhraseIndex((currentIndex) => (currentIndex + 1) % phrases.length)
-    }, PHRASE_INTERVAL_MS)
-
-    return () => window.clearInterval(interval)
-  }, [phrases])
-
-  const phrase = phrases[phraseIndex] ?? phrases[0]
+  const phrase = useMemo(
+    () => phrases[Math.floor(Math.random() * phrases.length)] ?? phrases[0],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [phrases.length]
+  )
 
   return (
     <div

@@ -7,6 +7,8 @@
 
 export interface UserMessage {
   role: "user"
+  /** DB block id — present on persisted messages, absent on optimistic placeholders */
+  id?: string
   content: string
   createdAt?: number
 }
@@ -69,6 +71,7 @@ export interface ToolMessage {
   partialResult?: unknown  // Partial result during execution (e.g., write tool progress)
   duration?: number
   startTime?: number
+  createdAt?: number
 }
 
 // ── Error Messages ────────────────────────────────────────────────────────────
@@ -84,7 +87,7 @@ export interface ErrorMessage {
 }
 
 export type ErrorAction =
-  | { type: "retry"; prompt?: string }
+  | { type: "retry"; prompt?: string; thinkingLevel?: string }
   | { type: "continue" }
   | { type: "dismiss" }
 
@@ -112,9 +115,18 @@ export interface AbortMessage {
   createdAt?: number
 }
 
+// ── Compaction Messages ────────────────────────────────────────────────────────
+
+export interface CompactionMessage {
+  role: "compaction"
+  id: string
+  reason: "manual" | "threshold" | "overflow"
+  createdAt?: number
+}
+
 // ── Union Type ─────────────────────────────────────────────────────────────────
 
-export type Message = UserMessage | AssistantMessage | ToolMessage | ErrorMessage | AbortMessage
+export type Message = UserMessage | AssistantMessage | ToolMessage | ErrorMessage | AbortMessage | CompactionMessage
 
 // ── Database Block Types ─────────────────────────────────────────────────────
 
@@ -126,7 +138,7 @@ export interface MessageBlock {
   id: string
   threadId: string
   blockIndex: number
-  role: "user" | "assistant" | "tool" | "abort"
+  role: "user" | "assistant" | "tool" | "abort" | "compaction"
   content: string | null
   thinking: string | null
   model: string | null
@@ -187,6 +199,7 @@ export function blockToMessage(block: MessageBlock): Message {
     case "user":
       return {
         role: "user",
+        id: block.id,
         content: block.content ?? "",
         createdAt: block.createdAt,
       }
@@ -232,6 +245,7 @@ export function blockToMessage(block: MessageBlock): Message {
         result,
         duration: block.toolDuration ?? undefined,
         startTime: block.toolStartTime ?? undefined,
+        createdAt: block.createdAt,
       }
     }
 
@@ -239,6 +253,14 @@ export function blockToMessage(block: MessageBlock): Message {
       return {
         role: "abort",
         id: block.id,
+        createdAt: block.createdAt,
+      }
+
+    case "compaction":
+      return {
+        role: "compaction",
+        id: block.id,
+        reason: (block.content ?? "threshold") as "manual" | "threshold" | "overflow",
         createdAt: block.createdAt,
       }
 

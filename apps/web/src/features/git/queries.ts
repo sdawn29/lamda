@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, getLastTurnChanges, getLastTurn, revertLastTurn } from "./api"
+import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFiles } from "./api"
 import { getBranch, listBranches } from "@/features/chat/api"
 
 const gitRootKey = ["git"] as const
@@ -21,10 +21,20 @@ export const gitKeys = {
     [...gitSessionKey(sessionId), "branch"] as const,
   branches: (sessionId: string) =>
     [...gitSessionKey(sessionId), "branches"] as const,
-  lastTurnChanges: (sessionId: string) =>
-    [...gitSessionKey(sessionId), "last-turn-changes"] as const,
-  lastTurn: (sessionId: string) =>
-    [...gitSessionKey(sessionId), "last-turn"] as const,
+  turns: (sessionId: string) =>
+    [...gitSessionKey(sessionId), "turns"] as const,
+  aheadBehind: (sessionId: string) =>
+    [...gitSessionKey(sessionId), "ahead-behind"] as const,
+  log: (sessionId: string) =>
+    [...gitSessionKey(sessionId), "log"] as const,
+  show: (sessionId: string, sha: string) =>
+    [...gitSessionKey(sessionId), "show", sha] as const,
+  showFiles: (sessionId: string, sha: string) =>
+    [...gitSessionKey(sessionId), "show-files", sha] as const,
+  showFileDiff: (sessionId: string, sha: string, filePath: string) =>
+    [...gitSessionKey(sessionId), "show-file-diff", sha, filePath] as const,
+  turnDiffStat: (sessionId: string, turnId: number) =>
+    [...gitSessionKey(sessionId), "turn-diff-stat", turnId] as const,
 }
 
 // ── Git status ────────────────────────────────────────────────────────────────
@@ -37,6 +47,8 @@ export function useGitStatus(sessionId: string) {
     queryFn: () => gitStatus(sessionId),
     enabled: !!sessionId,
     staleTime: 0,
+    refetchInterval: 3_000,
+    placeholderData: { raw: "", isGitRepo: true },
   })
 }
 
@@ -60,6 +72,7 @@ export function useGitFileDiff(
     enabled: enabled && !!sessionId && !!filePath,
     gcTime: 60 * 1000,
     staleTime: 0,
+    refetchInterval: 3_000,
   })
 }
 
@@ -74,6 +87,62 @@ export function useGitDiffStat(sessionId: string) {
     enabled: !!sessionId,
     gcTime: 30 * 1000,
     staleTime: 0,
+    refetchInterval: 3_000,
+  })
+}
+
+function countDiffLines(diff: string): { additions: number; deletions: number } {
+  let additions = 0
+  let deletions = 0
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) additions++
+    else if (line.startsWith("-") && !line.startsWith("---")) deletions++
+  }
+  return { additions, deletions }
+}
+
+export function useTurnDiffStat(
+  sessionId: string,
+  turnId: number | undefined,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey:
+      turnId !== undefined
+        ? gitKeys.turnDiffStat(sessionId, turnId)
+        : ([...gitSessionKey(sessionId), "turn-diff-stat-none"] as const),
+    queryFn: async (): Promise<{ additions: number; deletions: number }> => {
+      if (turnId === undefined) return { additions: 0, deletions: 0 }
+      const files = await getTurnFiles(sessionId, turnId)
+      if (!files.length) return { additions: 0, deletions: 0 }
+
+      const perFile = await Promise.all(
+        files.slice(0, 100).map(async (file) => {
+          try {
+            const diff = await gitFileDiff(
+              sessionId,
+              file.filePath,
+              file.postStatusCode
+            )
+            return countDiffLines(diff)
+          } catch {
+            return { additions: 0, deletions: 0 }
+          }
+        })
+      )
+
+      return perFile.reduce(
+        (acc, next) => ({
+          additions: acc.additions + next.additions,
+          deletions: acc.deletions + next.deletions,
+        }),
+        { additions: 0, deletions: 0 }
+      )
+    },
+    enabled: enabled && !!sessionId && turnId !== undefined,
+    staleTime: 0,
+    gcTime: 30 * 1000,
+    refetchInterval: 3_000,
   })
 }
 
@@ -115,47 +184,82 @@ export function useBranches(sessionId: string) {
   })
 }
 
-// ── Last-turn file changes ─────────────────────────────────────────────────────
+// ── Git Log / Show ────────────────────────────────────────────────────────────
 
-export function useLastTurnChanges(sessionId: string) {
+export function useGitLog(sessionId: string) {
   return useQuery({
-    queryKey: gitKeys.lastTurnChanges(sessionId),
-    queryFn: () => getLastTurnChanges(sessionId),
+    queryKey: gitKeys.log(sessionId),
+    queryFn: () => gitLog(sessionId),
+    enabled: !!sessionId,
+    staleTime: 10_000,
+  })
+}
+
+export function useGitShow(sessionId: string, sha: string, enabled: boolean) {
+  return useQuery({
+    queryKey: gitKeys.show(sessionId, sha),
+    queryFn: () => gitShow(sessionId, sha),
+    enabled: enabled && !!sessionId && !!sha,
+    gcTime: 60_000,
+    staleTime: Infinity,
+  })
+}
+
+export function useGitShowFiles(sessionId: string, sha: string, enabled: boolean) {
+  return useQuery({
+    queryKey: gitKeys.showFiles(sessionId, sha),
+    queryFn: () => gitShowFiles(sessionId, sha),
+    enabled: enabled && !!sessionId && !!sha,
+    gcTime: 5 * 60_000,
+    staleTime: Infinity,
+  })
+}
+
+export function useGitShowFileDiff(sessionId: string, sha: string, filePath: string, enabled: boolean) {
+  return useQuery({
+    queryKey: gitKeys.showFileDiff(sessionId, sha, filePath),
+    queryFn: () => gitShowFileDiff(sessionId, sha, filePath),
+    enabled: enabled && !!sessionId && !!sha && !!filePath,
+    gcTime: 5 * 60_000,
+    staleTime: Infinity,
+  })
+}
+
+// ── Ahead / Behind ────────────────────────────────────────────────────────────
+
+export function useAheadBehind(sessionId: string) {
+  return useQuery({
+    queryKey: gitKeys.aheadBehind(sessionId),
+    queryFn: () => getAheadBehind(sessionId),
+    enabled: !!sessionId,
+    staleTime: 15_000,
+  })
+}
+
+// ── Turn checkpoints (multi-turn history) ─────────────────────────────────────
+
+export type { TurnSummary } from "./api"
+
+export function useTurns(sessionId: string) {
+  return useQuery({
+    queryKey: gitKeys.turns(sessionId),
+    queryFn: () => listTurns(sessionId),
     enabled: !!sessionId,
     staleTime: Infinity,
   })
 }
 
-// ── Last turn ─────────────────────────────────────────────────────────────────
-
-export interface LastTurnFile {
-  filePath: string
-  postStatusCode: string
-  wasCreatedByTurn: boolean
-  preContent: string | null
-}
-
-export function useLastTurn(sessionId: string) {
-  return useQuery({
-    queryKey: gitKeys.lastTurn(sessionId),
-    queryFn: () => getLastTurn(sessionId),
-    enabled: !!sessionId,
-    staleTime: Infinity,
-  })
-}
-
-export function useRevertLastTurn(sessionId: string) {
+export function useRevertToTurn(sessionId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: () => revertLastTurn(sessionId),
+    mutationFn: (turnId: number) => revertToTurn(sessionId, turnId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: gitKeys.status(sessionId) })
       void queryClient.invalidateQueries({ queryKey: gitKeys.diffStat(sessionId) })
-      void queryClient.invalidateQueries({ queryKey: gitKeys.lastTurn(sessionId) })
-      void queryClient.invalidateQueries({ queryKey: gitKeys.lastTurnChanges(sessionId) })
+      void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
     },
     onError: (error: Error) => {
-      console.error("[RevertLastTurn] Error:", error.message)
+      console.error("[RevertToTurn] Error:", error.message)
     },
   })
 }

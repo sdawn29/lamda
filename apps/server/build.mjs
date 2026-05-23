@@ -43,7 +43,7 @@ await build({
   external: ["@silvia-odwyer/photon-node", "better-sqlite3", "node-pty"],
   minify: false,
   sourcemap: true,
-  // ESM packages that use import.meta.url (e.g. @mariozechner/pi-coding-agent)
+  // ESM packages that use import.meta.url (e.g. @earendil-works/pi-coding-agent)
   // get import.meta stubbed as {} by esbuild when bundling to CJS, causing
   // fileURLToPath(import.meta.url) to throw at startup. Inject a shim that
   // derives the file URL from CJS __filename, then replace the identifier.
@@ -82,7 +82,7 @@ cpSync(nodePtySrc, resolve("dist/addons/node-pty"), { recursive: true });
 const addonSrc = resolvePackageDir("@silvia-odwyer/photon-node");
 cpSync(addonSrc, resolve("dist/addons/@silvia-odwyer/photon-node"), { recursive: true });
 
-// @mariozechner/pi-coding-agent reads its own package.json at module load to
+// @earendil-works/pi-coding-agent reads its own package.json at module load to
 // pick up `version`, `piConfig.name`, and `piConfig.configDir`. Once bundled
 // into server.cjs, the SDK's getPackageDir() walks up from __dirname (= dist/
 // in dev, Resources/server/ in prod) looking for the first package.json. Drop
@@ -91,7 +91,7 @@ cpSync(addonSrc, resolve("dist/addons/@silvia-odwyer/photon-node"), { recursive:
 // Note: the package's `exports` field forbids both `./package.json` and the
 // CJS `require` condition, so neither require.resolve form works — fall back
 // to walking the node_modules chain directly.
-const piPackageDir = findPackageRoot("@mariozechner/pi-coding-agent");
+const piPackageDir = findPackageRoot("@earendil-works/pi-coding-agent");
 copyFileSync(resolve(piPackageDir, "package.json"), resolve("dist/package.json"));
 
 const REQUIRED_ADDONS = [

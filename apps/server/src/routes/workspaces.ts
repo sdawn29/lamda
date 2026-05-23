@@ -1,23 +1,27 @@
 import { Hono } from "hono";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
   listWorkspacesWithThreads,
   getWorkspace,
   getWorkspaceByPath,
   insertWorkspace,
-  insertThread,
   deleteWorkspace,
   deleteAllWorkspaces,
   updateWorkspaceOpenWithApp,
+  updateWorkspaceEnv,
+  pinWorkspace,
+  unpinWorkspace,
+  createWorkspaceTask,
 } from "@lamda/db";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
-import { createSessionForThread } from "../services/session-service.js";
 import { workspaceIndexer } from "../services/workspace-indexer.js";
 
 const workspaces = new Hono();
 
 function mapThread(
-  t: { id: string; title: string | null; modelId: string | null; isStopped: boolean; createdAt: number; isPinned: boolean },
+  t: { id: string; title: string | null; modelId: string | null; isStopped: boolean; createdAt: number; isPinned: boolean; forkedFromId?: string | null },
   workspaceId: string,
 ) {
   const session = store.getByThreadId(t.id);
@@ -28,9 +32,31 @@ function mapThread(
     modelId: t.modelId ?? null,
     isStopped: t.isStopped,
     isPinned: t.isPinned,
+    forkedFromId: t.forkedFromId ?? null,
     createdAt: t.createdAt,
     sessionId: session?.sessionId ?? null,
   };
+}
+
+function parseEnv(env: string | null | undefined): Record<string, string> {
+  if (!env) return {}
+  try { return JSON.parse(env) as Record<string, string> } catch { return {} }
+}
+
+async function createTasksFromPackageScripts(workspaceId: string, workspacePath: string) {
+  try {
+    const packageJsonText = await readFile(join(workspacePath, "package.json"), "utf8");
+    const packageJson = JSON.parse(packageJsonText) as { scripts?: Record<string, unknown> };
+    const scripts = packageJson.scripts;
+    if (!scripts) return;
+
+    for (const [scriptName, scriptCommand] of Object.entries(scripts)) {
+      if (typeof scriptCommand !== "string" || !scriptCommand.trim()) continue;
+      createWorkspaceTask(workspaceId, { icon: "terminal", command: `npm run ${scriptName}` });
+    }
+  } catch {
+    // Skip auto-task creation when package.json is missing or invalid.
+  }
 }
 
 workspaces.get("/workspaces", (c) => {
@@ -39,6 +65,8 @@ workspaces.get("/workspaces", (c) => {
     name: ws.name,
     path: ws.path,
     openWithAppId: ws.openWithAppId ?? null,
+    isPinned: ws.isPinned ?? false,
+    env: parseEnv(ws.env),
     createdAt: ws.createdAt,
     threads: ws.threads.map((t) => mapThread(t, ws.id)),
   }));
@@ -59,18 +87,14 @@ workspaces.post("/workspace", async (c) => {
     return c.json(
       {
         error: "A workspace already exists for this path",
-        workspace: { ...existing, openWithAppId: existing.openWithAppId ?? null, threads },
+        workspace: { ...existing, openWithAppId: existing.openWithAppId ?? null, env: parseEnv(existing.env), threads },
       },
       409,
     );
   }
 
   const workspaceId = insertWorkspace(body.name, body.path);
-  const threadId = insertThread(workspaceId);
-  const sessionId = await createSessionForThread(threadId, body.path, workspaceId, {
-    provider: body.provider,
-    model: body.model,
-  });
+  await createTasksFromPackageScripts(workspaceId, body.path);
 
   workspaceIndexer.startIndexing(workspaceId, body.path);
 
@@ -81,17 +105,9 @@ workspaces.post("/workspace", async (c) => {
         name: body.name,
         path: body.path,
         openWithAppId: null,
-        threads: [
-          {
-            id: threadId,
-            workspaceId,
-            title: "New Thread",
-            modelId: null,
-            isStopped: false,
-            createdAt: Date.now(),
-            sessionId,
-          },
-        ],
+        isPinned: false,
+        env: {},
+        threads: [],
       },
     },
     201,
@@ -153,6 +169,33 @@ workspaces.patch("/workspace/:id/open-with-app", async (c) => {
   const ws = getWorkspace(workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
   updateWorkspaceOpenWithApp(workspaceId, body.appId ?? null);
+  return c.json({ ok: true });
+});
+
+workspaces.patch("/workspace/:id/env", async (c) => {
+  const workspaceId = c.req.param("id");
+  const body = await c.req
+    .json<{ env?: Record<string, string> }>()
+    .catch((): { env?: Record<string, string> } => ({}));
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  updateWorkspaceEnv(workspaceId, body.env ?? null);
+  return c.json({ ok: true });
+});
+
+workspaces.patch("/workspace/:id/pin", (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  pinWorkspace(workspaceId);
+  return c.json({ ok: true });
+});
+
+workspaces.patch("/workspace/:id/unpin", (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  unpinWorkspace(workspaceId);
   return c.json({ ok: true });
 });
 

@@ -34,6 +34,7 @@ auth.post("/auth/oauth/:providerId/login", async (c) => {
     promptResolvers: new Map(),
     abortController: new AbortController(),
     rejectManualInput: null,
+    createdAt: Date.now(),
   };
   activeLogins.set(loginId, login);
 

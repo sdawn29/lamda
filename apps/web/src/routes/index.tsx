@@ -27,5 +27,5 @@ function Index() {
     )
   }
 
-  return <WorkspaceEmptyState />
+  return <Navigate to="/new" search={{ ws: workspaces[0].id }} />
 }

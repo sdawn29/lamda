@@ -58,6 +58,7 @@ function createDb() {
       name             TEXT NOT NULL,
       path             TEXT NOT NULL,
       open_with_app_id TEXT,
+      is_pinned        INTEGER NOT NULL DEFAULT 0,
       created_at       INTEGER NOT NULL
     );
 
@@ -70,6 +71,7 @@ function createDb() {
       is_stopped       INTEGER NOT NULL DEFAULT 0,
       is_archived      INTEGER NOT NULL DEFAULT 0,
       is_pinned        INTEGER NOT NULL DEFAULT 0,
+      mode             TEXT NOT NULL DEFAULT 'code',
       last_accessed_at INTEGER,
       created_at       INTEGER NOT NULL
     );
@@ -112,6 +114,14 @@ function createDb() {
       PRIMARY KEY (workspace_id, relative_path)
     );
 
+    CREATE TABLE IF NOT EXISTS workspace_tasks (
+      id           TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      icon         TEXT,
+      command      TEXT NOT NULL,
+      created_at   INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS mcp_servers (
       id           TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -126,11 +136,12 @@ function createDb() {
     );
 
     CREATE TABLE IF NOT EXISTS agent_turns (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id TEXT NOT NULL,
-      thread_id  TEXT NOT NULL,
-      started_at INTEGER NOT NULL,
-      ended_at   INTEGER NOT NULL
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id      TEXT NOT NULL,
+      thread_id       TEXT NOT NULL,
+      started_at      INTEGER NOT NULL,
+      ended_at        INTEGER NOT NULL,
+      checkpoint_sha  TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS agent_turn_files (
@@ -144,19 +155,70 @@ function createDb() {
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS workspaces_path_unique ON workspaces(path);
+    CREATE INDEX IF NOT EXISTS threads_workspace_idx ON threads(workspace_id);
     CREATE INDEX IF NOT EXISTS message_blocks_thread_idx ON message_blocks(thread_id, block_index);
     CREATE INDEX IF NOT EXISTS workspace_files_workspace_idx ON workspace_files(workspace_id);
+    CREATE INDEX IF NOT EXISTS workspace_tasks_workspace_idx ON workspace_tasks(workspace_id);
     CREATE INDEX IF NOT EXISTS mcp_servers_workspace_idx ON mcp_servers(workspace_id);
     CREATE INDEX IF NOT EXISTS agent_turns_thread_idx ON agent_turns(thread_id);
     CREATE INDEX IF NOT EXISTS agent_turn_files_turn_idx ON agent_turn_files(turn_id);
   `);
 
-  // Migration: Update message_blocks CHECK constraint to include 'abort' role
-  // SQLite doesn't support ALTER TABLE for CHECK constraints, so we need to recreate
+  // Migration: Add env column to workspaces table.
+  try {
+    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+    if (!wsCols.some((col) => col.name === "env")) {
+      sqlite.exec(`ALTER TABLE workspaces ADD COLUMN env TEXT`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
+  // Migration: Add is_pinned column to workspaces table.
+  try {
+    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+    if (!wsCols.some((col) => col.name === "is_pinned")) {
+      sqlite.exec(`ALTER TABLE workspaces ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
+  // Migration: Add checkpoint_sha column to agent_turns table.
+  try {
+    const turnCols = sqlite.prepare("PRAGMA table_info(agent_turns)").all() as { name: string }[];
+    if (!turnCols.some((col) => col.name === "checkpoint_sha")) {
+      sqlite.exec(`ALTER TABLE agent_turns ADD COLUMN checkpoint_sha TEXT NOT NULL DEFAULT ''`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
+  // Migration: Add forked_from_id column to threads table.
+  try {
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!threadCols.some((col) => col.name === "forked_from_id")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN forked_from_id TEXT`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
+  // Migration: Add mode column to threads table.
+  try {
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!threadCols.some((col) => col.name === "mode")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'code'`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
+  // Migration: Update message_blocks CHECK constraint to include 'abort' and 'compaction' roles.
+  // SQLite doesn't support ALTER TABLE for CHECK constraints, so we recreate the table when needed.
   try {
     const result = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='message_blocks'").get() as { sql: string } | undefined;
-    if (result && !result.sql.includes("'abort'")) {
-      // Check constraint doesn't include 'abort', need to migrate
+    if (result && !result.sql.includes("'compaction'")) {
       const columns = [
         'id', 'thread_id', 'block_index', 'role', 'content', 'thinking',
         'model', 'provider', 'thinking_level', 'response_time', 'error_message',
@@ -164,14 +226,12 @@ function createDb() {
         'tool_duration', 'tool_start_time', 'created_at'
       ];
       const colList = columns.join(', ');
-      
-      // Create new table with updated constraint
       sqlite.exec(`
         CREATE TABLE IF NOT EXISTS message_blocks_new (
           id              TEXT PRIMARY KEY,
           thread_id       TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
           block_index     INTEGER NOT NULL,
-          role            TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'tool', 'abort')),
+          role            TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'tool', 'abort', 'compaction')),
           content         TEXT,
           thinking        TEXT,
           model           TEXT,
@@ -194,8 +254,7 @@ function createDb() {
       `);
     }
   } catch (e) {
-    // Migration may fail if table already has correct schema or on first run
-    // This is expected and safe to ignore
+    // Migration may fail if table already has correct schema or on first run — safe to ignore.
   }
 
   return db;

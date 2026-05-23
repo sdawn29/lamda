@@ -10,6 +10,8 @@ export const workspaces = sqliteTable("workspaces", {
   name: text("name").notNull(),
   path: text("path").notNull(),
   openWithAppId: text("open_with_app_id"),
+  isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
+  env: text("env"), // JSON object: { KEY: "value" }
   createdAt: integer("created_at").notNull(),
 })
 
@@ -24,8 +26,10 @@ export const threads = sqliteTable("threads", {
   isStopped: integer("is_stopped", { mode: "boolean" }).notNull().default(false),
   isArchived: integer("is_archived", { mode: "boolean" }).notNull().default(false),
   isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
+  mode: text("mode", { enum: ["ask", "plan", "code"] }).notNull().default("code"),
   lastAccessedAt: integer("last_accessed_at"),
   createdAt: integer("created_at").notNull(),
+  forkedFromId: text("forked_from_id"),
 })
 
 /**
@@ -38,7 +42,7 @@ export const messageBlocks = sqliteTable("message_blocks", {
     .notNull()
     .references(() => threads.id, { onDelete: "cascade" }),
   blockIndex: integer("block_index").notNull(),
-  role: text("role", { enum: ["user", "assistant", "tool", "abort"] }).notNull(),
+  role: text("role", { enum: ["user", "assistant", "tool", "abort", "compaction"] }).notNull(),
   content: text("content"),
   thinking: text("thinking"),
   model: text("model"),
@@ -90,6 +94,7 @@ export const agentTurns = sqliteTable("agent_turns", {
   threadId: text("thread_id").notNull(),
   startedAt: integer("started_at").notNull(),
   endedAt: integer("ended_at").notNull(),
+  checkpointSha: text("checkpoint_sha").notNull().default(""),
 })
 
 export const agentTurnFiles = sqliteTable("agent_turn_files", {
@@ -103,6 +108,16 @@ export const agentTurnFiles = sqliteTable("agent_turn_files", {
 })
 
 // ── MCP Servers ───────────────────────────────────────────────────────────────
+
+export const workspaceTasks = sqliteTable("workspace_tasks", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  icon: text("icon"),
+  command: text("command").notNull(),
+  createdAt: integer("created_at").notNull(),
+})
 
 export const mcpServers = sqliteTable("mcp_servers", {
   id: text("id").primaryKey(),

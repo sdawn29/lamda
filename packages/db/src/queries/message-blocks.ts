@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and, max, count, desc, lt, gte } from "drizzle-orm";
 import { db } from "../client.js";
 import { messageBlocks } from "../schema.js";
 
@@ -10,7 +10,7 @@ export interface MessageBlock {
   id: string;
   threadId: string;
   blockIndex: number;
-  role: "user" | "assistant" | "tool" | "abort";
+  role: "user" | "assistant" | "tool" | "abort" | "compaction";
   content: string | null;
   thinking: string | null;
   model: string | null;
@@ -48,20 +48,53 @@ export function listMessageBlocks(threadId: string): MessageBlock[] {
     .map(toMessageBlock);
 }
 
+export interface MessageBlocksPage {
+  blocks: MessageBlock[];
+  hasMore: boolean;
+}
+
+/**
+ * Get a paginated window of message blocks for a thread.
+ * Fetches the `limit` most recent blocks before the given cursor `before`
+ * (exclusive), returning them in chronological order.
+ * Pass `before=undefined` to get the most recent blocks.
+ */
+export function listMessageBlocksPage(
+  threadId: string,
+  limit: number,
+  before?: number
+): MessageBlocksPage {
+  const condition =
+    before !== undefined
+      ? and(eq(messageBlocks.threadId, threadId), lt(messageBlocks.blockIndex, before))
+      : eq(messageBlocks.threadId, threadId);
+
+  // Fetch one extra to detect whether older pages exist.
+  const rows = db
+    .select()
+    .from(messageBlocks)
+    .where(condition)
+    .orderBy(desc(messageBlocks.blockIndex))
+    .limit(limit + 1)
+    .all()
+    .map(toMessageBlock);
+
+  const hasMore = rows.length > limit;
+  const blocks = rows.slice(0, limit).reverse(); // restore chronological order
+
+  return { blocks, hasMore };
+}
+
 /**
  * Get the next block index for a thread
  */
 function getNextBlockIndex(threadId: string): number {
   const result = db
-    .select({ maxIndex: messageBlocks.blockIndex })
+    .select({ maxIndex: max(messageBlocks.blockIndex) })
     .from(messageBlocks)
     .where(eq(messageBlocks.threadId, threadId))
-    .orderBy(asc(messageBlocks.blockIndex))
-    .limit(1)
-    .all();
-  
-  if (result.length === 0) return 0;
-  return (result[0].maxIndex ?? 0) + 1;
+    .get();
+  return (result?.maxIndex ?? -1) + 1;
 }
 
 /**
@@ -69,7 +102,8 @@ function getNextBlockIndex(threadId: string): number {
  */
 export function insertUserBlock(
   threadId: string,
-  content: string
+  content: string,
+  createdAt?: number
 ): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);
@@ -80,7 +114,7 @@ export function insertUserBlock(
       blockIndex,
       role: "user",
       content,
-      createdAt: Date.now(),
+      createdAt: createdAt ?? Date.now(),
     })
     .run();
   return id;
@@ -89,7 +123,7 @@ export function insertUserBlock(
 /**
  * Insert an assistant message block (starts the streaming block)
  */
-export function insertAssistantStartBlock(threadId: string): string {
+export function insertAssistantStartBlock(threadId: string, createdAt?: number): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);
   db.insert(messageBlocks)
@@ -98,7 +132,7 @@ export function insertAssistantStartBlock(threadId: string): string {
       threadId,
       blockIndex,
       role: "assistant",
-      createdAt: Date.now(),
+      createdAt: createdAt ?? Date.now(),
     })
     .run();
   return id;
@@ -111,10 +145,12 @@ export function insertToolBlock(
   threadId: string,
   toolCallId: string,
   toolName: string,
-  toolArgs: string
+  toolArgs: string,
+  createdAt?: number
 ): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);
+  const now = createdAt ?? Date.now();
   db.insert(messageBlocks)
     .values({
       id,
@@ -125,8 +161,8 @@ export function insertToolBlock(
       toolName,
       toolArgs,
       toolStatus: "running",
-      toolStartTime: Date.now(),
-      createdAt: Date.now(),
+      toolStartTime: now,
+      createdAt: now,
     })
     .run();
   return id;
@@ -277,15 +313,25 @@ export function deleteThreadBlocks(threadId: string): void {
 }
 
 /**
+ * Delete all message blocks at or after the given blockIndex (inclusive).
+ * Used when reverting the conversation to a specific point.
+ */
+export function deleteMessageBlocksFrom(threadId: string, fromBlockIndex: number): void {
+  db.delete(messageBlocks)
+    .where(and(eq(messageBlocks.threadId, threadId), gte(messageBlocks.blockIndex, fromBlockIndex)))
+    .run();
+}
+
+/**
  * Get block count for a thread
  */
 export function getBlockCount(threadId: string): number {
   const result = db
-    .select({ count: messageBlocks.id })
+    .select({ count: count() })
     .from(messageBlocks)
     .where(eq(messageBlocks.threadId, threadId))
-    .all();
-  return result.length;
+    .get();
+  return result?.count ?? 0;
 }
 
 /**
@@ -296,11 +342,40 @@ export function listRunningToolBlocks(threadId: string): MessageBlock[] {
   return db
     .select()
     .from(messageBlocks)
-    .where(eq(messageBlocks.threadId, threadId))
+    .where(
+      and(
+        eq(messageBlocks.threadId, threadId),
+        eq(messageBlocks.role, "tool"),
+        eq(messageBlocks.toolStatus, "running")
+      )
+    )
     .orderBy(asc(messageBlocks.blockIndex))
     .all()
-    .map(toMessageBlock)
-    .filter((block) => block.role === "tool" && block.toolStatus === "running");
+    .map(toMessageBlock);
+}
+
+/**
+ * Insert a compaction marker block.
+ * This marks the point in conversation history where context compaction occurred.
+ */
+export function insertCompactionBlock(
+  threadId: string,
+  reason: "manual" | "threshold" | "overflow",
+  createdAt?: number
+): string {
+  const id = randomUUID();
+  const blockIndex = getNextBlockIndex(threadId);
+  db.insert(messageBlocks)
+    .values({
+      id,
+      threadId,
+      blockIndex,
+      role: "compaction",
+      content: reason,
+      createdAt: createdAt ?? Date.now(),
+    })
+    .run();
+  return id;
 }
 
 /**

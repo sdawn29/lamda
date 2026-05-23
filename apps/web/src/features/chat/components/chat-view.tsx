@@ -1,17 +1,39 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import type { ErrorAction } from "../types"
+import { useNavigate } from "@tanstack/react-router"
+import { toast } from "sonner"
+import type {
+  AssistantMessage,
+  ErrorAction,
+  Message,
+  UserMessage,
+} from "../types"
+import { WorkingBlock, type WorkingMessage } from "./working-block"
 import {
   ArrowDownIcon,
   Code2Icon,
   BugIcon,
   TestTubeIcon,
   PlugZapIcon,
+  Wand2Icon,
+  FileSearchIcon,
+  GitBranchIcon,
 } from "lucide-react"
 
 import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
-import { ChatTextbox, type ChatTextboxHandle } from "./chat-textbox"
+import {
+  ChatTextbox,
+  type ChatTextboxHandle,
+  type ThinkingLevel,
+} from "./chat-textbox"
 import { MessageRow, getMessageKey } from "./message-row"
 import {
   AlertDialog,
@@ -23,30 +45,317 @@ import {
   AlertDialogAction,
 } from "@/shared/ui/alert-dialog"
 import { Button } from "@/shared/ui/button"
-import { useWorkspace } from "@/features/workspace"
-import { useSlashCommands, useSessionStats, chatKeys } from "../queries"
+import {
+  useSlashCommands,
+  useSessionStats,
+  chatKeys,
+  messagesQueryKey,
+} from "../queries"
 import { useBranch } from "@/features/git/queries"
 import { useBranches } from "@/features/git/queries"
 import { useCheckoutBranch } from "@/features/git/mutations"
-import { useAbortSession, useGenerateTitle, useSendPrompt } from "../mutations"
+import {
+  useAbortSession,
+  useGenerateTitle,
+  useSendPrompt,
+  useRevertToMessage,
+} from "../mutations"
 import { useModels } from "../queries"
 import { useConfigureProvider } from "@/features/settings"
 import { ThinkingIndicator } from "./thinking-indicator"
 import { CompactingIndicator } from "./compacting-indicator"
+import { ChatErrorAlert } from "./chat-error-alert"
 import { useShowThinkingSetting } from "@/shared/lib/thinking-visibility"
 import {
+  useUpdateThreadMode,
   useUpdateThreadModel,
   useUpdateThreadStopped,
+  useUpdateThreadTitle,
 } from "@/features/workspace/mutations"
+import { useWorkspace } from "@/features/workspace"
 import { useChatStream } from "../use-chat-stream"
+import { useMainTabsStore } from "@/features/main-tabs"
+import {
+  ChatActionsProvider,
+  type ChatActions,
+} from "../contexts/chat-actions-context"
+import { useTurns } from "@/features/git"
+import { PlanChangesCard } from "./plan-changes-card"
+import type { TurnSummary } from "@/features/git/api"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
+import {
+  clearPendingThreadPreferences,
+  getPendingThreadPreferences,
+} from "./pending-thread-preferences"
+import { getNextMode } from "./mode-combobox"
+
+const PLAN_DIR_PREFIX = ".agents/plans/"
 import { FileChangesCard } from "./file-changes-card"
+import { forkSession, listMessages } from "../api"
+import { blocksToMessages, type MessageBlock } from "../types"
+import { workspaceKeys } from "@/features/workspace/queries"
+import { MESSAGES_PAGE_SIZE, type MessagesInfiniteData } from "../queries"
+
+const PROMPT_SUGGESTIONS = [
+  {
+    icon: Code2Icon,
+    text: "Explain this codebase",
+    description: "Walk me through the project structure and key patterns",
+  },
+  {
+    icon: BugIcon,
+    text: "Debug an issue",
+    description: "Describe a bug and let me investigate the root cause",
+  },
+  {
+    icon: TestTubeIcon,
+    text: "Write tests",
+    description: "Add unit, integration, or end-to-end test coverage",
+  },
+  {
+    icon: Wand2Icon,
+    text: "Refactor code",
+    description: "Improve readability, structure, or performance",
+  },
+  {
+    icon: FileSearchIcon,
+    text: "Find something",
+    description: "Locate a function, component, or pattern",
+  },
+  {
+    icon: GitBranchIcon,
+    text: "Review changes",
+    description: "Explain recent git changes in plain language",
+  },
+] as const
+
+type MessageGroup =
+  | {
+      type: "regular"
+      message: Message
+      index: number
+      suppressThinking?: boolean
+      isLastInTurnStatic: boolean
+      turnMessages?: AssistantMessage[]
+    }
+  | {
+      type: "working"
+      messages: WorkingMessage[]
+      startIndex: number
+      finalThinking?: string
+    }
+
+function groupChatMessages(messages: Message[]): MessageGroup[] {
+  const groups: MessageGroup[] = []
+  let i = 0
+  let suppressNextThinking = false
+
+  const isWorkingEntry = (m: Message): boolean => {
+    if (m.role === "tool") return true
+    if (m.role === "assistant") {
+      return (
+        !(m as AssistantMessage).content.trim() &&
+        !(m as AssistantMessage).errorMessage
+      )
+    }
+    return false
+  }
+
+  while (i < messages.length) {
+    const msg = messages[i]
+    if (isWorkingEntry(msg)) {
+      suppressNextThinking = false
+      const workingMsgs: WorkingMessage[] = []
+      const startIndex = i
+      while (i < messages.length && isWorkingEntry(messages[i])) {
+        workingMsgs.push(messages[i] as WorkingMessage)
+        i++
+      }
+      // Pull thinking from the following assistant response into this block
+      const nextMsg = i < messages.length ? messages[i] : undefined
+      let finalThinking: string | undefined
+      if (
+        nextMsg?.role === "assistant" &&
+        (nextMsg as AssistantMessage).thinking.trim().length > 0
+      ) {
+        finalThinking = (nextMsg as AssistantMessage).thinking
+        suppressNextThinking = true
+      }
+      groups.push({
+        type: "working",
+        messages: workingMsgs,
+        startIndex,
+        finalThinking,
+      })
+    } else {
+      const suppress = suppressNextThinking && msg.role === "assistant"
+      suppressNextThinking = false
+
+      // If this assistant message has thinking that wasn't already pulled into a
+      // preceding working block, create a synthetic working block for it now.
+      if (
+        !suppress &&
+        msg.role === "assistant" &&
+        (msg as AssistantMessage).thinking.trim().length > 0
+      ) {
+        groups.push({
+          type: "working",
+          messages: [],
+          startIndex: i,
+          finalThinking: (msg as AssistantMessage).thinking,
+        })
+        groups.push({
+          type: "regular",
+          message: msg,
+          index: i,
+          suppressThinking: true,
+          isLastInTurnStatic: false,
+          turnMessages: undefined,
+        })
+      } else {
+        groups.push({
+          type: "regular",
+          message: msg,
+          index: i,
+          suppressThinking: suppress,
+          isLastInTurnStatic: false,
+          turnMessages: undefined,
+        })
+      }
+      i++
+    }
+  }
+
+  // Post-pass: compute isLastInTurnStatic + turnMessages for assistant groups.
+  // Backward scan to mark which assistant is last in its turn, then a forward
+  // scan to collect the turn's assistant messages for the copy button.
+  // Both passes are O(n) over groups, so this replaces the O(n²) per-render loop.
+  let seenAssistantAfter = false
+  for (let g = groups.length - 1; g >= 0; g--) {
+    const group = groups[g]
+    if (group.type !== "regular") continue
+    if (group.message.role === "user" || group.message.role === "abort") {
+      seenAssistantAfter = false
+    } else if (group.message.role === "assistant") {
+      group.isLastInTurnStatic = !seenAssistantAfter
+      seenAssistantAfter = true
+    }
+  }
+
+  let currentTurnAssistants: AssistantMessage[] = []
+  for (const group of groups) {
+    if (group.type !== "regular") continue
+    if (group.message.role === "user" || group.message.role === "abort") {
+      currentTurnAssistants = []
+    } else if (group.message.role === "assistant") {
+      currentTurnAssistants = [
+        ...currentTurnAssistants,
+        group.message as AssistantMessage,
+      ]
+      if (group.isLastInTurnStatic) {
+        group.turnMessages = currentTurnAssistants
+      }
+    }
+  }
+
+  return groups
+}
+
+function isPlanOnlyTurn(turn: TurnSummary): boolean {
+  return (
+    turn.files.length > 0 &&
+    turn.files.every(
+      (f) =>
+        f.filePath.replace(/\\/g, "/").startsWith(PLAN_DIR_PREFIX) &&
+        f.filePath.toLowerCase().endsWith(".md")
+    )
+  )
+}
+
+function getGroupCreatedAt(group: MessageGroup): number | null {
+  if (group.type === "regular") {
+    return "createdAt" in group.message
+      ? (group.message.createdAt ?? null)
+      : null
+  }
+
+  let latest: number | null = null
+  for (const message of group.messages) {
+    const createdAt = message.createdAt ?? null
+    if (createdAt == null) continue
+    latest = latest == null ? createdAt : Math.max(latest, createdAt)
+  }
+  return latest
+}
+
+function buildTurnCardsByGroup(
+  groups: MessageGroup[],
+  turns: TurnSummary[]
+): Map<number, TurnSummary[]> {
+  const completedTurns = turns
+    .filter((turn) => !turn.inProgress && turn.files.length > 0)
+    .sort((a, b) => a.startedAt - b.startedAt || a.id - b.id)
+  const groupTimes = groups.map(getGroupCreatedAt)
+  const cardsByGroup = new Map<number, TurnSummary[]>()
+  let previousTurnEndedAt = -Infinity
+
+  for (const turn of completedTurns) {
+    let targetIndex = -1
+
+    for (let i = 0; i < groupTimes.length; i++) {
+      const createdAt = groupTimes[i]
+      if (createdAt == null) continue
+      if (createdAt >= turn.startedAt && createdAt <= turn.endedAt + 5_000) {
+        targetIndex = i
+      }
+    }
+
+    if (targetIndex === -1) {
+      for (let i = 0; i < groupTimes.length; i++) {
+        const createdAt = groupTimes[i]
+        if (createdAt == null) continue
+        if (
+          createdAt > previousTurnEndedAt &&
+          createdAt <= turn.endedAt + 5_000
+        ) {
+          targetIndex = i
+        }
+      }
+    }
+
+    if (targetIndex !== -1) {
+      const list = cardsByGroup.get(targetIndex) ?? []
+      list.push(turn)
+      cardsByGroup.set(targetIndex, list)
+    }
+    previousTurnEndedAt = turn.endedAt
+  }
+
+  return cardsByGroup
+}
+
+// Pending initial inputs keyed by threadId — used to pre-fill the textbox
+// after a fork without threading state through route params.
+const pendingInitialInputs = new Map<string, string>()
+
+// ── Sequential message entry ─────────────────────────────────────────────
+// Each row that enters the visible list within a single turn gets a sequence
+// number; CSS animation-delay is `seq * STAGGER_MS` so concurrent mounts
+// (RAF-batched WS events) cascade in instead of stacking on the same frame.
+// Capped so a long burst doesn't push the last item out by full seconds.
+const ENTRY_STAGGER_MS = 70
+const ENTRY_MAX_DELAY_MS = 420
+
+function entryDelayFor(seq: number): number {
+  return Math.min(seq * ENTRY_STAGGER_MS, ENTRY_MAX_DELAY_MS)
+}
 
 interface ChatViewProps {
   sessionId: string
   workspaceId: string
   threadId: string
   initialModelId: string | null
+  initialMode: "ask" | "plan" | "code"
   initialIsStopped: boolean
 }
 
@@ -55,62 +364,172 @@ export function ChatView({
   workspaceId,
   threadId,
   initialModelId,
+  initialMode,
   initialIsStopped,
 }: ChatViewProps) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const syncEngine = getChatSyncEngine()
   const showThinkingSetting = useShowThinkingSetting()
+  const { workspaces } = useWorkspace()
+  const activeWorkspace = workspaces.find((w) => w.id === workspaceId)
+  const rootPath = activeWorkspace?.path
+  const openWithAppId = activeWorkspace?.openWithAppId
   const { data: models, isLoading: modelsLoading } = useModels()
   const { openConfigure } = useConfigureProvider()
   const noProvider = !modelsLoading && !models?.models?.length
+  const pendingPreferences = getPendingThreadPreferences(threadId)
+  const initialSelectedModelId = pendingPreferences?.modelId ?? initialModelId
+  const initialThinkingLevel = pendingPreferences?.thinkingLevel
+
+  const [gitError, setGitError] = useState<string | null>(null)
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(
+    initialSelectedModelId
+  )
+  const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<
+    ThinkingLevel | undefined
+  >(initialThinkingLevel)
+  const [selectedMode, setSelectedMode] = useState<"ask" | "plan" | "code">(
+    initialMode
+  )
+  const updateThreadModel = useUpdateThreadModel()
+  const updateThreadMode = useUpdateThreadMode()
+  const updateThreadStopped = useUpdateThreadStopped()
+
+  // Dedupe plan-saved announcements by relative path so a buffered/replayed
+  // event after reconnect doesn't re-toast or re-open the tab.
+  const announcedPlansRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    announcedPlansRef.current = new Set()
+  }, [threadId])
+
+  const handlePlanSaved = useCallback(
+    ({
+      filePath,
+      relativePath,
+    }: {
+      filePath: string
+      relativePath: string
+    }) => {
+      if (announcedPlansRef.current.has(relativePath)) return
+      announcedPlansRef.current.add(relativePath)
+
+      const fileName = relativePath.split("/").pop() ?? relativePath
+      useMainTabsStore.getState().addFileTab({
+        filePath,
+        title: fileName,
+        workspacePath: rootPath,
+      })
+
+      if (selectedMode === "plan") {
+        setSelectedMode("code")
+        updateThreadMode.mutate({ threadId, mode: "code" })
+        toast.success("Plan saved — switched to Code mode", {
+          description: relativePath,
+          action: {
+            label: "Undo",
+            onClick: () => {
+              setSelectedMode("plan")
+              updateThreadMode.mutate({ threadId, mode: "plan" })
+            },
+          },
+        })
+      } else {
+        toast.success("Plan saved", { description: relativePath })
+      }
+    },
+    [rootPath, selectedMode, threadId, updateThreadMode]
+  )
+
+  const { data: turns = [] } = useTurns(sessionId)
+
+  const chatActions = useMemo<ChatActions>(
+    () => ({
+      openFile: (filePath, title) => {
+        const fileName = title ?? filePath.split("/").pop() ?? filePath
+        useMainTabsStore.getState().addFileTab({
+          filePath,
+          title: fileName,
+          workspacePath: rootPath,
+        })
+      },
+      implementPlan: (relativePath) => {
+        if (selectedMode !== "code") {
+          setSelectedMode("code")
+          updateThreadMode.mutate({ threadId, mode: "code" })
+        }
+        const prompt = `Implement the plan in @${relativePath}.`
+        chatTextboxRef.current?.setValue(prompt)
+        chatTextboxRef.current?.focus()
+      },
+    }),
+    [rootPath, selectedMode, threadId, updateThreadMode]
+  )
 
   const {
     visibleMessages,
     hasConversationHistory,
     isLoading,
+    isLoadingMessages,
     isCompacting,
+    compactionReason,
+    pendingError,
     startUserPrompt,
     markStopped,
     markSendFailed,
     dismissError,
+    fetchPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
   } = useChatStream({
     sessionId,
     threadId,
     initialIsStopped,
+    onPlanSaved: handlePlanSaved,
   })
-
-  const [gitError, setGitError] = useState<string | null>(null)
-  const [showScrollButton, setShowScrollButton] = useState(false)
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(
-    initialModelId
-  )
-  const updateThreadModel = useUpdateThreadModel()
-  const updateThreadStopped = useUpdateThreadStopped()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(false)
-  const initialScrollDoneRef = useRef(false)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
+  // Set to true while we triggered a programmatic scroll (instant or smooth).
+  // handleScroll ignores pinned-state changes until scrollend clears this flag,
+  // preventing user-initiated scroll events from cancelling our animation.
+  const programmaticScrollRef = useRef(false)
   const chatTextboxRef = useRef<ChatTextboxHandle>(null)
   // Messages present on the first non-empty render (from cache) skip entry animations.
   // Only messages that arrive after the initial snapshot get animate-in treatment.
   // State (not a ref) so it can be safely read during render.
-  const [initialSnapshot, setInitialSnapshot] = useState<{ sessionId: string; keys: Set<string> } | null>(null)
+  const [initialSnapshot, setInitialSnapshot] = useState<{
+    sessionId: string
+    keys: Set<string>
+  } | null>(null)
+  // Always-current ref used by the snapshot update effect below.
+  const visibleMessagesRef = useRef(visibleMessages)
+  visibleMessagesRef.current = visibleMessages
   // Tracks the last-rendered session so we can detect switches during render.
   const [localSessionId, setLocalSessionId] = useState(sessionId)
-  const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { setThreadTitle } = useWorkspace()
+  const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  )
+  const updateTitleMutation = useUpdateThreadTitle()
 
   // React's "adjusting state while rendering" pattern — reset all session-local
   // state in one batched pass when the active session changes, avoiding the
   // setState-inside-effect cascade that React 19 rejects.
   if (localSessionId !== sessionId) {
+    const nextPendingPreferences = getPendingThreadPreferences(threadId)
     setLocalSessionId(sessionId)
     setGitError(null)
     setShowScrollButton(false)
-    setSelectedModelId(initialModelId)
+    setSelectedModelId(nextPendingPreferences?.modelId ?? initialModelId)
+    setSelectedThinkingLevel(nextPendingPreferences?.thinkingLevel)
+    setSelectedMode(initialMode)
   }
 
   // Capture initial keys for this session as soon as messages are available,
   // also during render so isNewMessage is correct on the very same frame.
+  // Use the per-message key (not per-group) so we can ask "was this message
+  // present at first paint?" for both regular and working-block messages.
   if (
     visibleMessages.length > 0 &&
     (initialSnapshot === null || initialSnapshot.sessionId !== sessionId)
@@ -121,19 +540,85 @@ export function ChatView({
     })
   }
 
+  // Per-turn appearance order: assigns a stable sequence number the first
+  // time we see a not-in-snapshot key. Used to derive `animation-delay` so
+  // rows mounted in the same RAF batch cascade instead of overlapping.
+  // Reset when the active session changes; cleared by an effect when a turn
+  // completes so the next turn's first row starts at delay 0.
+  const appearanceOrderRef = useRef<Map<string, number>>(new Map())
+  const appearanceCounterRef = useRef(0)
+  if (localSessionId !== sessionId) {
+    appearanceOrderRef.current = new Map()
+    appearanceCounterRef.current = 0
+  }
+  const getEntryDelayMs = (key: string): number => {
+    const map = appearanceOrderRef.current
+    let seq = map.get(key)
+    if (seq === undefined) {
+      seq = appearanceCounterRef.current++
+      map.set(key, seq)
+    }
+    return entryDelayFor(seq)
+  }
+
+  // Extend the snapshot to include all currently-visible messages whenever the
+  // view is idle. Two windows matter:
+  //   1. Turn end (isLoading true→false): the streaming user/assistant rows
+  //      have only index-based keys at this point, so they get added to the
+  //      snapshot under those keys.
+  //   2. The post-turn refetch (~750 ms later) replaces those streaming rows
+  //      with persisted versions that carry stable DB-id / createdAt-based
+  //      keys. Without re-snapshotting here, the next prompt would see the
+  //      new keys as "not in snapshot" and replay the entry / word-reveal
+  //      animations for messages that have already been shown.
+  // The appearance-order reset still only fires on the true→false transition
+  // so mid-turn deltas don't restart row staggering.
+  const prevIsLoadingRef = useRef(isLoading)
+  useEffect(() => {
+    const wasLoading = prevIsLoadingRef.current
+    prevIsLoadingRef.current = isLoading
+    if (isLoading || visibleMessages.length === 0) return
+    setInitialSnapshot({
+      sessionId,
+      keys: new Set(visibleMessages.map((m, i) => getMessageKey(m, i))),
+    })
+    if (wasLoading) {
+      appearanceOrderRef.current = new Map()
+      appearanceCounterRef.current = 0
+    }
+  }, [isLoading, sessionId, visibleMessages])
+
   // Focus textbox whenever the active session changes (imperative DOM op — effect is correct here).
   useEffect(() => {
     chatTextboxRef.current?.focus()
   }, [sessionId])
 
-  // Flush any pending scroll-to-localStorage write on unmount.
+  // Pre-fill input with forked user message (set by handleFork before navigation).
+  useEffect(() => {
+    const pending = pendingInitialInputs.get(threadId)
+    if (pending) {
+      pendingInitialInputs.delete(threadId)
+      chatTextboxRef.current?.setValue(pending)
+    }
+    clearPendingThreadPreferences(threadId)
+  }, [threadId])
+
+  // Flush any pending scroll-to-localStorage write on unmount so the last
+  // sub-debounce scroll position survives a thread switch / reload.
   useEffect(() => {
     return () => {
       if (scrollSaveTimeoutRef.current !== null) {
         clearTimeout(scrollSaveTimeoutRef.current)
+        scrollSaveTimeoutRef.current = null
+        const meta = pendingScrollMetaRef.current
+        if (meta) {
+          pendingScrollMetaRef.current = null
+          queryClient.setQueryData(chatKeys.scroll(sessionId), meta)
+          syncEngine.saveScrollMeta(sessionId, meta)
+        }
       }
     }
-  }, [])
+  }, [queryClient, sessionId, syncEngine])
 
   // ── Queries ───────────────────────────────────────────────────────────────────
   const { data: commandsData } = useSlashCommands(sessionId)
@@ -154,9 +639,9 @@ export function ChatView({
         dismissError(id)
       } else if (action.type === "retry" && action.prompt) {
         dismissError(id)
-        startUserPrompt(action.prompt)
+        startUserPrompt(action.prompt, action.thinkingLevel)
         sendPromptMutation.mutate(
-          { text: action.prompt },
+          { text: action.prompt, thinkingLevel: action.thinkingLevel },
           { onError: markSendFailed }
         )
       }
@@ -169,40 +654,99 @@ export function ChatView({
   const { data: sessionStats } = useSessionStats(sessionId)
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────────
-  // During streaming, smooth scrolling is called on every delta and the browser
-  // interrupts each animation before it finishes, causing the view to lag behind
-  // the final content. Rapid smooth-scroll calls also fire onScroll mid-animation,
-  // which can flip pinnedRef to false and stop further scrolls entirely.
-  // Fix: use instant scrollTop assignment while loading so every update reliably
-  // lands at the bottom; only use smooth scroll once the stream is stable.
+  // Two-layer approach:
+  // 1. A ResizeObserver on the messages container tracks content growth (word-reveal,
+  //    streaming text deltas) and instantly keeps the user at the bottom — no visible
+  //    jump because content grows in small increments.
+  // 2. The useLayoutEffect below handles coarser events (loading state changes, new
+  //    message groups) and uses smooth scroll so there is a clear visual cue for
+  //    each "something new appeared" moment.
+  // programmaticScrollRef prevents handleScroll from flipping pinnedRef
+  // to false mid-animation, which would stop further auto-scroll.
   const commandsByName = useMemo(
-    () => new Map((commandsData ?? []).map((command) => [command.name, command])),
+    () =>
+      new Map((commandsData ?? []).map((command) => [command.name, command])),
     [commandsData]
   )
 
+  const groupedMessages = useMemo(
+    () => groupChatMessages(visibleMessages),
+    [visibleMessages]
+  )
+
+  const turnCardsByGroup = useMemo(
+    () => buildTurnCardsByGroup(groupedMessages, turns),
+    [groupedMessages, turns]
+  )
+
+  // Stable per-group keys derived from message identity rather than position,
+  // so prepending older history doesn't re-key existing rows. Used as the
+  // React key for each rendered group and by the initialSnapshot isNew lookup.
+  const groupKeys = useMemo(() => {
+    const keys: string[] = new Array(groupedMessages.length)
+    for (let i = 0; i < groupedMessages.length; i++) {
+      const group = groupedMessages[i]
+      if (group.type === "working") {
+        const firstMsg = group.messages[0]
+        if (firstMsg?.role === "tool") {
+          keys[i] = `working-tool-${firstMsg.toolCallId}`
+        } else if (firstMsg?.role === "assistant") {
+          const a = firstMsg as AssistantMessage
+          keys[i] =
+            a.createdAt != null
+              ? `working-assistant-t${a.createdAt}`
+              : `working-assistant-i${group.startIndex}`
+        } else {
+          // Synthetic working block (final-thinking placeholder) is always
+          // followed by a regular assistant group; share its key prefix.
+          const next = groupedMessages[i + 1]
+          if (next?.type === "regular") {
+            keys[i] = `working-syn-${getMessageKey(next.message, next.index)}`
+          } else {
+            keys[i] = `working-i${group.startIndex}`
+          }
+        }
+      } else {
+        keys[i] = getMessageKey(group.message, group.index)
+      }
+    }
+    return keys
+  }, [groupedMessages])
+
+  const showThinkingIndicator = isLoading && !isCompacting
+
+  // Track group count + previous scrollHeight so we can restore scroll position
+  // after older pages prepend (keeps the previously-first visible row in place
+  // instead of jumping to the top).
+  const prevGroupCountRef = useRef(groupedMessages.length)
+  const prevScrollHeightRef = useRef(0)
+  const isLoadingOlderRef = useRef(false)
+
   // ── Scroll position persistence via query cache & localStorage ──────────────────
-  // Scroll positions are stored in both TanStack Query cache and localStorage.
-  // localStorage persists across garbage collection and page reloads.
+  // Both writes are debounced (~150 ms) — onScroll can fire 60×/s, but neither
+  // the query cache (no live subscribers) nor localStorage benefits from
+  // per-frame precision. Only the latest scroll position needs to survive
+  // a thread switch / reload.
+  const pendingScrollMetaRef = useRef<{
+    scrollTop: number
+    isPinned: boolean
+    visited: true
+  } | null>(null)
   const saveScrollPosition = useCallback(
     (scrollTop: number) => {
-      const meta = {
+      pendingScrollMetaRef.current = {
         scrollTop,
         isPinned: pinnedRef.current,
         visited: true,
       }
-      // Update in-memory cache immediately (cheap, O(1))
-      queryClient.setQueryData(chatKeys.scroll(sessionId), meta)
-      // Debounce the synchronous localStorage write (fires 150ms after last scroll)
-      if (scrollSaveTimeoutRef.current !== null) {
-        clearTimeout(scrollSaveTimeoutRef.current)
-      }
+      if (scrollSaveTimeoutRef.current !== null) return
       scrollSaveTimeoutRef.current = setTimeout(() => {
         scrollSaveTimeoutRef.current = null
-        syncEngine.saveScrollMeta(sessionId, {
-          scrollTop,
-          isPinned: pinnedRef.current,
-          visited: true,
-        })
+        const meta = pendingScrollMetaRef.current
+        if (!meta) return
+        pendingScrollMetaRef.current = null
+        queryClient.setQueryData(chatKeys.scroll(sessionId), meta)
+        syncEngine.saveScrollMeta(sessionId, meta)
       }, 150)
     },
     [queryClient, sessionId, syncEngine]
@@ -211,82 +755,175 @@ export function ChatView({
   // ── Restore scroll position or scroll to bottom on thread change ──────────────
   // If the thread has been visited before and has a saved position, restore it.
   // Otherwise, scroll to bottom (new thread behavior).
-  useEffect(() => {
-    initialScrollDoneRef.current = false
+  // useLayoutEffect runs before the browser paints, so scroll position is
+  // applied atomically with the DOM update — no one-frame flash of wrong position.
+  useLayoutEffect(() => {
+    programmaticScrollRef.current = false
     pinnedRef.current = true
 
-    const frame = requestAnimationFrame(() => {
-      const el = scrollContainerRef.current
-      if (!el) return
-
-      // Update scroll button visibility inside RAF callback to avoid sync setState in effect
-      setShowScrollButton(false)
-
-      // Check if this thread has been visited before
-      // First check query cache, then localStorage
-      let savedMeta = queryClient.getQueryData<{
-        scrollTop: number
-        isPinned: boolean
-        visited?: boolean
-      }>(chatKeys.scroll(sessionId))
-
-      // If not in cache, check localStorage (persisted across sessions)
-      if (!savedMeta?.visited) {
-        const localMeta = syncEngine.getScrollMeta(sessionId)
-        if (localMeta) {
-          savedMeta = localMeta
-        }
-      }
-
-      if (savedMeta?.visited) {
-        // Restore previous scroll position
-        el.scrollTop = savedMeta.scrollTop
-        pinnedRef.current = savedMeta.isPinned
-      } else {
-        // New thread - scroll to bottom and mark as visited
-        el.scrollTop = el.scrollHeight
-        // Mark as visited so next time we restore this position
-        const visitedMeta = {
-          scrollTop: el.scrollTop,
-          isPinned: pinnedRef.current,
-          visited: true,
-        }
-        queryClient.setQueryData(chatKeys.scroll(sessionId), visitedMeta)
-        syncEngine.saveScrollMeta(sessionId, visitedMeta)
-      }
-    })
-
-    return () => cancelAnimationFrame(frame)
-  }, [threadId, sessionId, queryClient, syncEngine])
-
-  useEffect(() => {
-    if (!pinnedRef.current) return
     const el = scrollContainerRef.current
     if (!el) return
-    const frame = requestAnimationFrame(() => {
-      // Always use instant scrollTop assignment for reliability.
-      // scrollIntoView with smooth behavior can be interrupted by DOM
-      // updates mid-animation, leaving the view short of the true bottom.
+
+    // Check if this thread has been visited before
+    // First check query cache, then localStorage
+    let savedMeta = queryClient.getQueryData<{
+      scrollTop: number
+      isPinned: boolean
+      visited?: boolean
+    }>(chatKeys.scroll(sessionId))
+
+    // If not in cache, check localStorage (persisted across sessions)
+    if (!savedMeta?.visited) {
+      const localMeta = syncEngine.getScrollMeta(sessionId)
+      if (localMeta) {
+        savedMeta = localMeta
+      }
+    }
+
+    if (savedMeta?.visited) {
+      // Restore previous scroll position
+      el.scrollTop = savedMeta.scrollTop
+      pinnedRef.current = savedMeta.isPinned
+    } else {
+      // New thread - scroll to bottom and mark as visited
+      el.scrollTop = el.scrollHeight
+      // Mark as visited so next time we restore this position
+      const visitedMeta = {
+        scrollTop: el.scrollTop,
+        isPinned: pinnedRef.current,
+        visited: true,
+      }
+      queryClient.setQueryData(chatKeys.scroll(sessionId), visitedMeta)
+      syncEngine.saveScrollMeta(sessionId, visitedMeta)
+    }
+
+    // Sync scroll button visibility with the restored position (no setState needed
+    // here since pinnedRef drives the auto-scroll effect, not showScrollButton).
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    setShowScrollButton(distanceFromBottom >= 80)
+  }, [threadId, sessionId, queryClient, syncEngine])
+
+  useLayoutEffect(() => {
+    if (!pinnedRef.current || groupedMessages.length === 0) return
+    const el = scrollContainerRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distanceFromBottom < 5) return
+    programmaticScrollRef.current = true
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+  }, [isLoading, groupedMessages.length])
+
+  // After older pages are prepended, offset scrollTop by the height delta so
+  // the previously-first visible item stays in place instead of jumping.
+  useLayoutEffect(() => {
+    const prevCount = prevGroupCountRef.current
+    const newCount = groupedMessages.length
+    if (isLoadingOlderRef.current && newCount > prevCount) {
+      isLoadingOlderRef.current = false
+      const el = scrollContainerRef.current
+      if (el) {
+        const delta = el.scrollHeight - prevScrollHeightRef.current
+        if (delta > 0) el.scrollTop = el.scrollTop + delta
+      }
+    }
+    prevGroupCountRef.current = newCount
+  }, [groupedMessages.length])
+
+  // Clear the programmatic-scroll guard once the browser reports the scroll
+  // animation has settled. scrollend fires after both instant (scrollTop=)
+  // and smooth (scrollTo behavior:'smooth') scrolls.
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const onScrollEnd = () => {
+      programmaticScrollRef.current = false
+    }
+    el.addEventListener("scrollend", onScrollEnd)
+    return () => el.removeEventListener("scrollend", onScrollEnd)
+  }, [])
+
+  // ResizeObserver: keep the view pinned to the bottom as content grows
+  // (word-reveal, streaming text deltas). Instant-snap only — incremental
+  // deltas during streaming are small enough that the jump is imperceptible,
+  // and stacking smooth-scroll calls causes jitter.
+  useEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+    const ro = new ResizeObserver(() => {
+      if (!pinnedRef.current) return
+      const el = scrollContainerRef.current
+      if (!el) return
+      const distanceFromBottom =
+        el.scrollHeight - el.scrollTop - el.clientHeight
+      if (distanceFromBottom < 1) return
+      programmaticScrollRef.current = true
       el.scrollTop = el.scrollHeight
     })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [])
 
-    return () => cancelAnimationFrame(frame)
-  }, [isLoading, visibleMessages])
+  const showScrollButtonRef = useRef(showScrollButton)
+  showScrollButtonRef.current = showScrollButton
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+
+    // Trigger loading older messages when near the top
+    if (
+      el.scrollTop < 200 &&
+      hasPreviousPage &&
+      !isFetchingPreviousPage &&
+      !isLoadingOlderRef.current
+    ) {
+      isLoadingOlderRef.current = true
+      prevGroupCountRef.current = groupedMessages.length
+      prevScrollHeightRef.current = el.scrollHeight
+      fetchPreviousPage()
+    }
+
+    // While a programmatic scroll is in progress, don't touch pinnedRef.
+    // If the user clearly dragged away (distance > threshold), treat it as
+    // an intentional interrupt and cancel the programmatic guard immediately.
+    if (programmaticScrollRef.current) {
+      if (distanceFromBottom >= 80) {
+        programmaticScrollRef.current = false
+        pinnedRef.current = false
+        showScrollButtonRef.current = true
+        setShowScrollButton(true)
+      }
+      saveScrollPosition(el.scrollTop)
+      return
+    }
+
     pinnedRef.current = distanceFromBottom < 80
-    setShowScrollButton(distanceFromBottom >= 80)
+    // Only setState when the boolean actually flips — otherwise every
+    // scroll-frame schedules a re-render React would then bail out of.
+    const shouldShow = distanceFromBottom >= 80
+    if (shouldShow !== showScrollButtonRef.current) {
+      showScrollButtonRef.current = shouldShow
+      setShowScrollButton(shouldShow)
+    }
     saveScrollPosition(el.scrollTop)
-  }, [saveScrollPosition])
+  }, [
+    saveScrollPosition,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+    fetchPreviousPage,
+    groupedMessages.length,
+  ])
 
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
     pinnedRef.current = true
+    setShowScrollButton(false)
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distanceFromBottom < 10) return
+    programmaticScrollRef.current = true
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
   }, [])
 
   const handleModelChange = useCallback(
@@ -296,6 +933,19 @@ export function ChatView({
     },
     [threadId, updateThreadModel]
   )
+
+  const handleModeChange = useCallback(
+    (mode: "ask" | "plan" | "code") => {
+      setSelectedMode(mode)
+      updateThreadMode.mutate({ threadId, mode })
+    },
+    [threadId, updateThreadMode]
+  )
+
+  const cycleAgentMode = useCallback(() => {
+    const nextMode = getNextMode(selectedMode)
+    handleModeChange(nextMode)
+  }, [handleModeChange, selectedMode])
 
   const handleGitError = useCallback((message: string) => {
     setGitError(message)
@@ -327,6 +977,10 @@ export function ChatView({
       },
       onError: (err: unknown) => {
         console.error("[abort]", err)
+        toast.error("Failed to stop", {
+          description: "Could not stop the agent. It may still be running.",
+          duration: 5000,
+        })
       },
     })
   }, [abortSessionMutation, markStopped, threadId, updateThreadStopped])
@@ -339,6 +993,7 @@ export function ChatView({
     isLoading ? handleStop : null
   )
   useShortcutHandler(SHORTCUT_ACTIONS.SCROLL_TO_BOTTOM, scrollToBottom)
+  useShortcutHandler(SHORTCUT_ACTIONS.CYCLE_AGENT_MODE, cycleAgentMode)
 
   const handleSend = useCallback(
     (
@@ -349,8 +1004,9 @@ export function ChatView({
     ) => {
       if (!hasConversationHistory) {
         generateTitleMutation.mutate(text, {
-          onSuccess: ({ title }) =>
-            setThreadTitle(workspaceId, threadId, title),
+          onSuccess: ({ title }) => {
+            updateTitleMutation.mutate({ workspaceId, threadId, title })
+          },
         })
       }
       pinnedRef.current = true
@@ -360,6 +1016,7 @@ export function ChatView({
       // Scroll immediately when sending
       const el = scrollContainerRef.current
       if (el) {
+        programmaticScrollRef.current = true
         el.scrollTop = el.scrollHeight
       }
 
@@ -377,13 +1034,78 @@ export function ChatView({
       startUserPrompt,
       workspaceId,
       threadId,
-      setThreadTitle,
+      updateTitleMutation,
       updateThreadStopped,
     ]
   )
 
+  const handleFork = useCallback(
+    async (blockId: string) => {
+      try {
+        const {
+          threadId: newThreadId,
+          sessionId: newSessionId,
+          initialInput,
+        } = await forkSession(sessionId, blockId)
+        // Store the forked user message so the new ChatView can pre-fill the textbox
+        if (initialInput) pendingInitialInputs.set(newThreadId, initialInput)
+        // Pre-populate the messages cache so the forked thread renders immediately
+        try {
+          const { blocks, hasMore } = await listMessages(newSessionId, {
+            limit: MESSAGES_PAGE_SIZE,
+          })
+          const seededMessages = blocksToMessages(blocks as MessageBlock[])
+          const oldestBlockIndex =
+            blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
+          const seed: MessagesInfiniteData = {
+            pages: [{ messages: seededMessages, hasMore, oldestBlockIndex }],
+            pageParams: [undefined],
+          }
+          queryClient.setQueryData(messagesQueryKey(newSessionId), seed)
+        } catch {
+          // Non-fatal — the query will fetch on mount
+        }
+        // Fire-and-forget — the route guards against premature redirect via isTabKnown
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
+        navigate({
+          to: "/workspace/$threadId",
+          params: { threadId: newThreadId },
+        })
+      } catch (err) {
+        toast.error("Fork failed", {
+          description:
+            err instanceof Error ? err.message : "Could not fork conversation",
+        })
+      }
+    },
+    [sessionId, queryClient, navigate]
+  )
+
+  const [revertingBlockId, setRevertingBlockId] = useState<string | null>(null)
+  const revertToMessageMutation = useRevertToMessage(sessionId, (text) => {
+    if (text) chatTextboxRef.current?.setValue(text)
+  })
+  const handleRevert = useCallback(
+    async (blockId: string) => {
+      setRevertingBlockId(blockId)
+      try {
+        await revertToMessageMutation.mutateAsync(blockId)
+      } catch (err) {
+        toast.error("Revert failed", {
+          description:
+            err instanceof Error
+              ? err.message
+              : "Could not revert conversation",
+        })
+      } finally {
+        setRevertingBlockId(null)
+      }
+    },
+    [revertToMessageMutation]
+  )
+
   return (
-    <>
+    <ChatActionsProvider value={chatActions}>
       <AlertDialog
         open={gitError !== null}
         onOpenChange={(open) => {
@@ -424,21 +1146,24 @@ export function ChatView({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex w-full flex-1 flex-col overflow-y-auto pt-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex w-full flex-1 flex-col overflow-y-auto pt-4 pb-4 [overflow-anchor:none] [scrollbar-gutter:stable]"
         >
-          {visibleMessages.length === 0 && !isLoading && (
-            <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-5 px-6 text-center select-none">
+          {visibleMessages.length === 0 && !isLoading && !isLoadingMessages && (
+            <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-8 px-6 text-center select-none">
               <div className="flex flex-col items-center gap-3">
-                <div className="flex size-14 items-center justify-center rounded-2xl border border-border/40 bg-muted/50 shadow-sm">
-                  <span className="text-3xl leading-none font-light text-muted-foreground/40 select-none">
-                    λ
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-[#1c1c1e] shadow-md ring-1 ring-white/5">
+                  <span
+                    className="text-3xl leading-none font-black"
+                    style={{ color: "#d4a017" }}
+                  >
+                    Λ
                   </span>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-sm font-semibold text-foreground/80">
+                <div className="space-y-1.5">
+                  <p className="text-lg font-semibold tracking-tight">
                     How can I help?
                   </p>
-                  <p className="text-xs text-muted-foreground/60">
+                  <p className="text-xs text-muted-foreground">
                     Use{" "}
                     <kbd className="rounded border border-border/60 bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground">
                       @
@@ -451,69 +1176,147 @@ export function ChatView({
                   </p>
                 </div>
               </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {[
-                  { icon: Code2Icon, text: "Explain this codebase" },
-                  { icon: BugIcon, text: "Find and fix bugs" },
-                  { icon: TestTubeIcon, text: "Write tests" },
-                ].map(({ icon: Icon, text: prompt }) => (
-                  <Button
-                    key={prompt}
+              <div className="grid w-full max-w-lg grid-cols-3 gap-2">
+                {PROMPT_SUGGESTIONS.map(({ icon: Icon, text, description }) => (
+                  <button
+                    key={text}
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => chatTextboxRef.current?.setValue(prompt)}
-                    className="h-auto gap-1.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => chatTextboxRef.current?.setValue(text)}
+                    className="group flex flex-col items-start gap-2 rounded-xl border bg-card/60 p-3 text-left transition-colors hover:border-primary/20 hover:bg-card"
                   >
-                    <Icon className="h-3.5 w-3.5" />
-                    {prompt}
-                  </Button>
+                    <div className="flex size-7 items-center justify-center rounded-lg bg-primary/8 text-primary/70 transition-colors group-hover:bg-primary/15">
+                      <Icon className="size-3.5" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] leading-tight font-medium text-foreground/80">
+                        {text}
+                      </p>
+                      <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+                        {description}
+                      </p>
+                    </div>
+                  </button>
                 ))}
               </div>
             </div>
           )}
-          {visibleMessages.length > 0 && (
-            <div className="mx-auto w-full max-w-3xl px-6">
-              {visibleMessages.map((message, index) => {
+          <div ref={messagesContainerRef}>
+            {/* Spinner while loading older history */}
+            {isFetchingPreviousPage && (
+              <div className="flex justify-center py-3">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              </div>
+            )}
+            {groupedMessages.map((group, groupIndex) => {
+              const itemKey = groupKeys[groupIndex] ?? groupIndex
+              let content: React.ReactNode
+
+              if (group.type === "working") {
+                const isGroupActive =
+                  isLoading && groupIndex === groupedMessages.length - 1
+                const firstMsg = group.messages[0] as WorkingMessage | undefined
+                // Use the same key fn as initialSnapshot to keep isNew lookup consistent.
+                const firstKey = firstMsg
+                  ? getMessageKey(firstMsg, group.startIndex)
+                  : `working-${group.startIndex}`
+                const isNewGroup =
+                  isLoading &&
+                  initialSnapshot !== null &&
+                  initialSnapshot.sessionId === sessionId &&
+                  !initialSnapshot.keys.has(firstKey)
+                const entryDelayMs = isNewGroup ? getEntryDelayMs(firstKey) : 0
+                content = (
+                  <div className="mx-auto w-full max-w-3xl px-6 pb-3">
+                    <WorkingBlock
+                      messages={group.messages}
+                      isActive={isGroupActive}
+                      showThinking={showThinkingSetting}
+                      isNew={isNewGroup}
+                      entryDelayMs={entryDelayMs}
+                      finalThinking={group.finalThinking}
+                      rootPath={rootPath}
+                    />
+                  </div>
+                )
+              } else {
+                const { message, index, isLastInTurnStatic, turnMessages } =
+                  group
                 if (
                   message.role === "assistant" &&
                   !message.content.trim() &&
                   !message.thinking.trim() &&
                   !message.errorMessage
-                )
-                  return null
-                const key = getMessageKey(message, index)
-                // Only animate messages that arrived after the initial cache snapshot
-                // for this session. A missing or stale snapshot (wrong sessionId) means
-                // we haven't captured initial keys yet → no animation for existing messages.
-                const isNewMessage =
-                  initialSnapshot !== null &&
-                  initialSnapshot.sessionId === sessionId &&
-                  !initialSnapshot.keys.has(key)
-                return (
-                  <div key={key} className="pb-3">
-                    <MessageRow
-                      message={message}
-                      commandsByName={commandsByName}
-                      showThinking={showThinkingSetting}
-                      onAction={handleErrorAction}
-                      isNewMessage={isNewMessage}
-                    />
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          <div className="mx-auto w-full max-w-3xl px-6">
-            {isLoading && <ThinkingIndicator className="py-0.5" />}
-            {isCompacting && <CompactingIndicator />}
-          </div>
+                ) {
+                  content = null
+                } else {
+                  const key = getMessageKey(message, index)
+                  const isNewMessage =
+                    isLoading &&
+                    initialSnapshot !== null &&
+                    initialSnapshot.sessionId === sessionId &&
+                    !initialSnapshot.keys.has(key)
+                  const isLastInTurn = !isLoading && isLastInTurnStatic
+                  const entryDelayMs = isNewMessage ? getEntryDelayMs(key) : 0
+                  content = (
+                    <div className="mx-auto w-full max-w-3xl px-6 pb-3">
+                      <MessageRow
+                        message={message}
+                        commandsByName={commandsByName}
+                        showThinking={
+                          group.suppressThinking ? false : showThinkingSetting
+                        }
+                        isNewMessage={isNewMessage}
+                        entryDelayMs={entryDelayMs}
+                        isLastInTurn={isLastInTurn}
+                        turnMessages={turnMessages}
+                        rootPath={rootPath}
+                        onFork={handleFork}
+                        onRevert={!isLoading ? handleRevert : undefined}
+                        isReverting={
+                          revertingBlockId === (message as UserMessage).id
+                        }
+                      />
+                    </div>
+                  )
+                }
+              }
 
-          {/* File changes card - shown after chat completion */}
-          {!isLoading && visibleMessages.some((m) => m.role !== "error") && (
-            <FileChangesCard sessionId={sessionId} />
-          )}
+              const turnCards = turnCardsByGroup.get(groupIndex) ?? []
+
+              return (
+                <div key={itemKey}>
+                  {content}
+                  {turnCards.map((turn) =>
+                    isPlanOnlyTurn(turn) ? (
+                      <PlanChangesCard
+                        key={`turn-card-${turn.id}`}
+                        rootPath={rootPath}
+                        turn={turn}
+                      />
+                    ) : (
+                      <FileChangesCard
+                        key={`turn-card-${turn.id}`}
+                        sessionId={sessionId}
+                        rootPath={rootPath}
+                        openWithAppId={openWithAppId}
+                        turn={turn}
+                      />
+                    )
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <div className="mx-auto w-full max-w-3xl px-6">
+            {isCompacting ? (
+              <CompactingIndicator reason={compactionReason} />
+            ) : (
+              showThinkingIndicator && <ThinkingIndicator className="py-0.5" />
+            )}
+          </div>
         </div>
+
+        <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
 
         {showScrollButton && (
           <div className="pointer-events-none absolute inset-x-0 bottom-40 z-10 flex justify-center">
@@ -534,6 +1337,7 @@ export function ChatView({
             onSend={handleSend}
             onStop={handleStop}
             isLoading={isLoading}
+            isAborting={abortSessionMutation.isPending}
             branch={branch}
             branches={branches}
             onBranchSelect={handleBranchSelect}
@@ -542,10 +1346,14 @@ export function ChatView({
             workspaceId={workspaceId}
             selectedModelId={selectedModelId}
             onModelChange={handleModelChange}
+            selectedThinkingLevel={selectedThinkingLevel}
+            onThinkingLevelChange={setSelectedThinkingLevel}
+            mode={selectedMode}
+            onModeChange={handleModeChange}
             sessionStats={sessionStats}
           />
         </div>
       </div>
-    </>
+    </ChatActionsProvider>
   )
 }

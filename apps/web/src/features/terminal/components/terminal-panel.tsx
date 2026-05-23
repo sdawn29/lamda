@@ -4,7 +4,7 @@ import { FitAddon } from "@xterm/addon-fit"
 import { Plus, Trash2, X, TerminalSquare } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { useTheme } from "@/shared/components/theme-provider"
-import { useTerminal } from "../context"
+import { useTerminal } from "../store"
 import { getServerUrl } from "@/shared/lib/client"
 import { cn } from "@/shared/lib/utils"
 import "@xterm/xterm/css/xterm.css"
@@ -12,52 +12,54 @@ import "@xterm/xterm/css/xterm.css"
 const TERMINAL_OUTPUT_FLUSH_MS = 16
 const TERMINAL_IMMEDIATE_FLUSH_THRESHOLD = 8_192
 
+// Fleet terminal colors — from "terminal.*" entries in the theme JSON
 const DARK_TERMINAL_THEME = {
-  background: "#121212",
-  foreground: "#e8e8d3",
-  cursor: "#8197bf",
-  cursorAccent: "#0c0c0c",
-  selectionBackground: "#8197bf40",
-  black: "#1e1e1e",
-  red: "#cc3333",
-  green: "#99ad6a",
-  yellow: "#fad07a",
-  blue: "#8197bf",
-  magenta: "#c6b6ee",
-  cyan: "#8fbfdc",
-  white: "#e8e8d3",
-  brightBlack: "#888888",
-  brightRed: "#d05050",
-  brightGreen: "#a8bc78",
-  brightYellow: "#ffdf8e",
-  brightBlue: "#98a8cc",
-  brightMagenta: "#d4c4f0",
-  brightCyan: "#9fcee8",
-  brightWhite: "#f0f0e0",
+  background: "#0d0d0d",
+  foreground: "#d6d6dd",
+  cursor: "#d6d6dd",
+  cursorAccent: "#5b51ec",
+  selectionBackground: "#636262",
+  black: "#676767",
+  red: "#f14c4c",
+  green: "#15ac91",
+  yellow: "#e5b95c",
+  blue: "#4c9df3",
+  magenta: "#e567dc",
+  cyan: "#75d3ba",
+  white: "#d6d6dd",
+  brightBlack: "#676767",
+  brightRed: "#f14c4c",
+  brightGreen: "#15ac91",
+  brightYellow: "#e5b95c",
+  brightBlue: "#4c9df3",
+  brightMagenta: "#e567dc",
+  brightCyan: "#75d3ba",
+  brightWhite: "#d6d6dd",
 }
 
+// Fleet-derived light terminal — same hues, darkened for white background
 const LIGHT_TERMINAL_THEME = {
   background: "#f3efe8",
-  foreground: "#1a1815",
-  cursor: "#4a6a9f",
-  cursorAccent: "#f3efe8",
-  selectionBackground: "#4a6a9f33",
-  black: "#1c1c1c",
-  red: "#902020",
-  green: "#5a7842",
-  yellow: "#c4870a",
-  blue: "#4a6a9f",
-  magenta: "#7c5aaf",
-  cyan: "#3a8fa8",
-  white: "#605958",
-  brightBlack: "#514948",
-  brightRed: "#a02525",
-  brightGreen: "#6a8850",
-  brightYellow: "#d4970c",
-  brightBlue: "#5a7abf",
-  brightMagenta: "#8c6abf",
-  brightCyan: "#4a9fb8",
-  brightWhite: "#2c2c2c",
+  foreground: "#1a1a1a",
+  cursor: "#228df2",
+  cursorAccent: "#ffffff",
+  selectionBackground: "#d1e8ff",
+  black: "#2a2a2a",
+  red: "#c01010",
+  green: "#007a60",
+  yellow: "#8a5a00",
+  blue: "#1565c0",
+  magenta: "#9a1a95",
+  cyan: "#006b5e",
+  white: "#6b6b6b",
+  brightBlack: "#6b6b6b",
+  brightRed: "#f14c4c",
+  brightGreen: "#15ac91",
+  brightYellow: "#c48820",
+  brightBlue: "#228df2",
+  brightMagenta: "#b020b0",
+  brightCyan: "#0e7a6e",
+  brightWhite: "#2a2a2a",
 }
 
 // ─── Single terminal instance (keeps mounted when inactive for session persistence) ───
@@ -65,14 +67,18 @@ const LIGHT_TERMINAL_THEME = {
 interface TerminalInstanceProps {
   id: string
   cwd: string
+  workspaceId: string
   isActive: boolean
+  initialCommand?: string
   onTitleChange: (id: string, title: string) => void
 }
 
 const TerminalInstance = memo(function TerminalInstance({
   id,
   cwd,
+  workspaceId,
   isActive,
+  initialCommand,
   onTitleChange,
 }: TerminalInstanceProps) {
   const { resolvedTheme } = useTheme()
@@ -152,7 +158,7 @@ const TerminalInstance = memo(function TerminalInstance({
     getServerUrl().then((serverUrl) => {
       if (cancelled) return
       const wsBase = serverUrl.replace(/^http/, "ws")
-      const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwd)}`
+      const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwd)}&workspaceId=${encodeURIComponent(workspaceId)}`
       ws = new WebSocket(url)
       wsRef.current = ws
 
@@ -162,6 +168,15 @@ const TerminalInstance = memo(function TerminalInstance({
           ws!.send(
             JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
           )
+        }
+        if (initialCommand) {
+          setTimeout(() => {
+            if (ws?.readyState === WebSocket.OPEN) {
+              ws.send(
+                JSON.stringify({ type: "input", data: initialCommand + "\r" })
+              )
+            }
+          }, 150)
         }
       }
 
@@ -198,8 +213,8 @@ const TerminalInstance = memo(function TerminalInstance({
       fitAddonRef.current = null
       wsRef.current = null
     }
-  // cwd is intentionally excluded — it's fixed at tab creation time and must not trigger re-mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // cwd is intentionally excluded — it's fixed at tab creation time and must not trigger re-mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Refit when this instance becomes active (was hidden)
@@ -230,11 +245,13 @@ const TerminalInstance = memo(function TerminalInstance({
   return (
     <div
       ref={containerRef}
-      className={cn(
-        "min-h-0 flex-1 overflow-hidden",
-        !isActive && "hidden"
-      )}
-      style={{ display: isActive ? undefined : "none", height: "100%", overflow: "hidden", padding: "0 8px" }}
+      className={cn("min-h-0 flex-1 overflow-hidden", !isActive && "hidden")}
+      style={{
+        display: isActive ? undefined : "none",
+        height: "100%",
+        overflow: "hidden",
+        padding: "0 8px",
+      }}
     />
   )
 })
@@ -251,16 +268,16 @@ export const TerminalPanel = memo(function TerminalPanel({
   cwd,
 }: TerminalPanelProps) {
   const ctx = useTerminal()
-  const allStates = ctx.getAllStates()
+  const allStates = ctx.states
 
-  const activeState = allStates.get(activeWorkspaceId)
+  const activeState = allStates[activeWorkspaceId]
   const tabs = activeState?.tabs ?? []
   const activeTabId = activeState?.activeTabId ?? null
 
   return (
-    <div className="flex h-full shrink-0 flex-col border-t bg-background">
+    <div className="flex h-full shrink-0 flex-col bg-background">
       {/* Tab bar — shows only the active workspace's tabs */}
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b bg-muted/20 px-2">
+      <div className="flex h-10 shrink-0 items-center gap-1 bg-background px-1">
         {/* Scrollable tab list */}
         <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1">
           {tabs.map((tab) => {
@@ -271,9 +288,9 @@ export const TerminalPanel = memo(function TerminalPanel({
                 type="button"
                 onClick={() => ctx.setActiveTab(activeWorkspaceId, tab.id)}
                 className={cn(
-                  "group relative flex h-7 shrink-0 items-center gap-1.5 rounded-md pl-3 pr-1.5 font-mono text-xs select-none transition-all duration-150",
+                  "group relative flex h-7 shrink-0 items-center gap-1.5 rounded-md pr-1.5 pl-3 font-mono text-xs transition-all duration-150 select-none",
                   isActive
-                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                    ? "bg-muted/30 text-foreground shadow-sm ring-1 ring-border/60"
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground/70"
                 )}
               >
@@ -305,20 +322,18 @@ export const TerminalPanel = memo(function TerminalPanel({
               </button>
             )
           })}
+        </div>
 
-          {/* New tab */}
+        {/* New tab + Kill all */}
+        <div className="flex items-center gap-0.5 px-1">
           <button
             type="button"
             onClick={() => ctx.addTab(activeWorkspaceId, cwd)}
             aria-label="New terminal tab"
-            className="flex h-7 items-center rounded-md px-2 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
-        </div>
-
-        {/* Kill all */}
-        <div className="flex items-center px-1">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -335,13 +350,17 @@ export const TerminalPanel = memo(function TerminalPanel({
       {/* Terminal instances — ALL workspace instances are mounted here.
           Inactive workspace/tab instances are CSS-hidden so their PTY connections stay alive. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {Array.from(allStates.entries()).flatMap(([wsId, state]) =>
+        {Object.entries(allStates).flatMap(([wsId, state]) =>
           state.tabs.map((tab) => (
             <TerminalInstance
               key={tab.id}
               id={tab.id}
               cwd={tab.cwd}
-              isActive={wsId === activeWorkspaceId && tab.id === state.activeTabId}
+              workspaceId={wsId}
+              isActive={
+                wsId === activeWorkspaceId && tab.id === state.activeTabId
+              }
+              initialCommand={tab.initialCommand}
               onTitleChange={(id, title) => ctx.renameTab(wsId, id, title)}
             />
           ))

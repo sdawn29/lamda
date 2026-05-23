@@ -1,5 +1,5 @@
 import { memo, useCallback, useState } from "react"
-import { ChevronRight, Minus, Plus, Undo2 } from "lucide-react"
+import { Minus, Plus, Undo2 } from "lucide-react"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
 import { LoadingSpinner } from "@/shared/ui/loading-spinner"
@@ -7,7 +7,7 @@ import { IconButtonWithTooltip } from "@/shared/ui/icon-button-with-tooltip"
 import { DiffView, type DiffMode } from "./diff-view"
 import { StatusBadge, type ChangedFile } from "./status-badge"
 import { DiffStat, parseDiffCounts } from "./diff-stat"
-import { useGitFileDiff } from "../queries"
+import { useGitFileDiff, useGitShowFileDiff } from "../queries"
 import { cn } from "@/shared/lib/utils"
 
 interface FileListItemProps {
@@ -31,6 +31,10 @@ interface FileListItemProps {
   disabled?: boolean
   /** Additional classes for the row container */
   className?: string
+  /** When set, fetches diff from the given commit SHA instead of the working tree */
+  sha?: string
+  /** Pre-fetched diff counts — shown immediately without waiting for the diff to load */
+  counts?: { added: number; removed: number }
 }
 
 export const FileListItem = memo(function FileListItem({
@@ -45,6 +49,8 @@ export const FileListItem = memo(function FileListItem({
   onRevert,
   disabled = false,
   className,
+  sha,
+  counts: preloadedCounts,
 }: FileListItemProps) {
   // Internal state for uncontrolled mode
   const [internalExpanded, setInternalExpanded] = useState(false)
@@ -56,14 +62,24 @@ export const FileListItem = memo(function FileListItem({
     controlledExpanded !== undefined ? controlledExpanded : internalExpanded
 
   const isExpandable = mode !== undefined
+  const isCommitMode = !!sha
 
-  const { data: diff, isLoading: diffLoading } = useGitFileDiff(
+  const { data: workDiff, isLoading: workDiffLoading } = useGitFileDiff(
     sessionId,
     file.filePath,
     file.raw,
-    true
+    !isCommitMode
   )
-  const counts = diff != null ? parseDiffCounts(diff) : null
+  const { data: commitDiff, isLoading: commitDiffLoading } = useGitShowFileDiff(
+    sessionId,
+    sha ?? "",
+    file.filePath,
+    isCommitMode && isExpanded
+  )
+
+  const diff = isCommitMode ? commitDiff : workDiff
+  const diffLoading = isCommitMode ? commitDiffLoading : workDiffLoading
+  const counts = preloadedCounts ?? (diff != null ? parseDiffCounts(diff) : null)
 
   const handleToggle = useCallback(
     async (e: React.MouseEvent) => {
@@ -111,35 +127,25 @@ export const FileListItem = memo(function FileListItem({
     pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : null
 
   return (
-    <div className={cn("group/file mx-1.5 my-1 overflow-hidden rounded-md border border-border/40", className)}>
+    <div className={cn("group/file", className)}>
       <div className="flex w-full items-center transition-colors hover:bg-muted/30">
         <button
           onClick={handleMainClick}
           disabled={disabled}
-          className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-1 pl-2.5 text-left focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 pr-1 pl-2.5 text-left focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isExpandable ? (
-            <ChevronRight
-              className={cn(
-                "size-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
-                isExpanded && "rotate-90"
-              )}
-            />
-          ) : (
-            <span className="size-3 shrink-0" />
-          )}
           <StatusBadge file={file} />
           <Icon
             icon={`catppuccin:${getIconName(fileName)}`}
             className="size-3 shrink-0"
             aria-hidden
           />
-          <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden pr-2">
-            <span className="shrink-0 font-mono text-xs font-medium text-foreground/85">
+          <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
+            <span className="shrink-0 font-mono text-[11px] font-medium text-foreground/80">
               {fileName}
             </span>
             {dirPath && (
-              <span className="truncate font-mono text-[10px] text-muted-foreground/40">
+              <span className="truncate font-mono text-[10px] text-muted-foreground/35">
                 {dirPath}
               </span>
             )}
@@ -175,9 +181,9 @@ export const FileListItem = memo(function FileListItem({
       </div>
 
       {isExpanded && mode && (
-        <div className="animate-in border-t border-border/20 bg-muted/10 px-3 pb-3 duration-150 fade-in-0 slide-in-from-top-1">
+        <div className="animate-in px-2.5 pb-2.5 pt-0.5 duration-150 fade-in-0">
           {diffLoading ? (
-            <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/10 px-3 py-3 text-xs text-muted-foreground">
               <LoadingSpinner size="sm" />
               Loading diff…
             </div>
@@ -186,7 +192,7 @@ export const FileListItem = memo(function FileListItem({
               diff={diff}
               filePath={file.filePath}
               mode={mode}
-              className="mt-2 rounded-md border-border/50"
+              className="border-border/40"
             />
           ) : null}
         </div>
@@ -230,7 +236,7 @@ export const FileRow = memo(function FileRow({
   return (
     <div
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2 border-t border-border/20 px-4 py-2 text-left first:border-t-0 transition-colors hover:bg-muted/40",
+        "group/row flex w-full cursor-pointer items-center gap-2.5 border-t border-border/15 px-4 py-2 text-left first:border-t-0 transition-colors hover:bg-muted/30",
         className
       )}
       onClick={handleClick}
@@ -246,15 +252,15 @@ export const FileRow = memo(function FileRow({
       <StatusBadge file={file} />
       <Icon
         icon={`catppuccin:${getIconName(fileName)}`}
-        className="size-3.5 shrink-0"
+        className="size-3.5 shrink-0 opacity-80 transition-opacity group-hover/row:opacity-100"
         aria-hidden
       />
       <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
-        <span className="shrink-0 font-mono text-xs font-medium text-foreground/85">
+        <span className="shrink-0 font-mono text-[11.5px] font-medium text-foreground/80 transition-colors group-hover/row:text-foreground">
           {fileName}
         </span>
         {dirPath && (
-          <span className="truncate font-mono text-[10px] text-muted-foreground/40">
+          <span className="truncate font-mono text-[10px] text-muted-foreground/35">
             {dirPath}
           </span>
         )}

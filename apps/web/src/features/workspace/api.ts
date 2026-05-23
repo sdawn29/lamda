@@ -7,15 +7,19 @@ export interface CreateWorkspaceBody {
   model?: string
 }
 
+export type Mode = "ask" | "plan" | "code"
+
 export interface ThreadDto {
   id: string
   workspaceId: string
   title: string
   modelId: string | null
   isStopped: boolean
+  mode: Mode
   createdAt: number
   sessionId: string | null
   isPinned?: boolean
+  forkedFromId?: string | null
 }
 
 export interface WorkspaceDto {
@@ -23,6 +27,8 @@ export interface WorkspaceDto {
   name: string
   path: string
   openWithAppId: string | null
+  isPinned?: boolean
+  env: Record<string, string>
   createdAt: number
   threads: ThreadDto[]
 }
@@ -66,6 +72,25 @@ export function updateWorkspaceOpenWithApp(
   })
 }
 
+export function updateWorkspaceEnv(
+  id: string,
+  env: Record<string, string>
+): Promise<void> {
+  return apiFetch<void>(`/workspace/${id}/env`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ env }),
+  })
+}
+
+export function pinWorkspace(workspaceId: string): Promise<void> {
+  return apiFetch<void>(`/workspace/${workspaceId}/pin`, { method: "PATCH" })
+}
+
+export function unpinWorkspace(workspaceId: string): Promise<void> {
+  return apiFetch<void>(`/workspace/${workspaceId}/unpin`, { method: "PATCH" })
+}
+
 export function createThread(
   workspaceId: string
 ): Promise<{ thread: ThreadDto }> {
@@ -99,6 +124,17 @@ export function updateThreadModel(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ modelId }),
+  })
+}
+
+export function updateThreadMode(
+  threadId: string,
+  mode: Mode
+): Promise<void> {
+  return apiFetch<void>(`/thread/${threadId}/mode`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
   })
 }
 

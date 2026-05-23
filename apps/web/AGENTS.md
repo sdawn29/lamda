@@ -1,6 +1,6 @@
 # AGENTS.md — web
 
-> Auto-generated context for coding agents. Last updated: 2026-04-27
+> Auto-generated context for coding agents. Last updated: 2026-05-17
 
 ## Purpose
 
@@ -42,6 +42,8 @@ Each feature module follows a consistent structure with `api.ts`, `queries.ts`, 
 - `features/file-tree/` — File browser with directory listing via server API
 - `features/command-palette/` — Cmd+K command interface for quick actions
 - `features/chat-v2/` — (scaffold for future work, not currently used)
+- `features/subagent/` — (stub, planned for subagent orchestration)
+- `features/themes/` — (stub, planned for theme management)
 
 ### Routes (src/routes/)
 

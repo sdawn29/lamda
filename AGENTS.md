@@ -1,6 +1,6 @@
 # AGENTS.md — lamda (root)
 
-> Auto-generated context for coding agents. Last updated: 2026-05-11
+> Auto-generated context for coding agents. Last updated: 2026-05-17
 
 ## Purpose
 
@@ -71,6 +71,7 @@ lamda/
 - [packages/git](packages/git/AGENTS.md) — Git CLI wrappers
 - [packages/mcp](packages/mcp/AGENTS.md) — MCP client integration for pi-coding-agent
 - [packages/pi-sdk](packages/pi-sdk/AGENTS.md) — Wrapper around @mariozechner/pi-coding-agent
+- [packages/subagent](packages/subagent/AGENTS.md) — Stub package for subagent orchestration (not implemented)
 
 ## Feature Module AGENTS.md
 
@@ -89,4 +90,10 @@ Detailed AGENTS.md files for complex web feature modules:
 | [File Tree](apps/web/src/features/file-tree/AGENTS.md) | `web/src/features/file-tree/` | 4 files, file navigation |
 | [Electron](apps/web/src/features/electron/AGENTS.md) | `web/src/features/electron/` | 5 files, desktop integration |
 | [Command Palette](apps/web/src/features/command-palette/AGENTS.md) | `web/src/features/command-palette/` | 3 files, Cmd+K command interface |
+| [Main Tabs](apps/web/src/features/main-tabs/AGENTS.md) | `web/src/features/main-tabs/` | 4 files, tab management |
+| [Tasks](apps/web/src/features/tasks/AGENTS.md) | `web/src/features/tasks/` | 4 files, workspace tasks |
+| [File Opening](apps/web/src/features/file-opening/AGENTS.md) | `web/src/features/file-opening/` | File open dialog + editor integration |
+| [Tree View](apps/web/src/features/tree-view/AGENTS.md) | `web/src/features/tree-view/` | Planned: virtualized tree (stub) |
 | [Shared](apps/web/src/shared/AGENTS.md) | `web/src/shared/` | 54+ files, UI components + utilities |
+| [Routes](apps/web/src/routes/AGENTS.md) | `web/src/routes/` | TanStack Router file-based routing |
+| [Providers](apps/web/src/providers/AGENTS.md) | `web/src/providers/` | AppProviders composition layer |

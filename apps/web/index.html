@@ -20,8 +20,8 @@
           // Apply the exact background values defined in index.css so the
           // window background matches from the very first paint.
           document.documentElement.style.background = dark
-            ? "#08090a"
-            : "#fbfbfc";
+            ? "#121212"
+            : "#f3efe8";
         } catch (e) {}
       })();
     </script>
@@ -31,12 +31,12 @@
         /* Fallback for the brief moment before index.css is parsed. The
            inline script above will have already set the correct colour on
            <html> via style attribute, so this just acts as a safety net. */
-        background: var(--background, #08090a);
+        background: var(--background, #121212);
       }
     </style>
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>vite-app</title>
+    <title>Lamda</title>
   </head>
   <body>
     <div id="root"></div>

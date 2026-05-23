@@ -2,25 +2,27 @@
  * Chat stream hook — connects the WebSocket stream to UI state.
  *
  * Responsibilities:
- * - Opens a WebSocket for the session and dispatches events to callbacks
+ * - Opens a WebSocket for the session and dispatches live events to callbacks
+ * - Fetches a status snapshot on mount to restore transient state (isRunning,
+ *   isCompacting, pendingError) without relying on WebSocket event replay
  * - Manages isLoading, isCompacting, pendingError as local state
  * - Provides startUserPrompt() which optimistically adds the user message
- *
- * The isLoading state is scoped to the current sessionId. When sessionId
- * changes (thread switch), the previous session's loading is cleared by the
- * new session's WebSocket opening (which calls onIsLoadingChange(true) via
- * onMessageStart). No explicit session change handling is needed here.
  */
-import { useCallback, useEffect, useState, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
 import { useSessionStream } from "./hooks/use-session-stream"
 import { useVisibleMessages } from "./hooks/use-visible-messages"
-import { messagesQueryKey } from "./queries"
+import {
+  messagesQueryKey,
+  useSessionStatus,
+  updateLastPageMessages,
+  type MessagesInfiniteData,
+} from "./queries"
 import { dismissSessionError } from "./api"
 import { createErrorMessage } from "./types"
 import type { ErrorMessage, Message } from "./types"
-import { useSetThreadStatus } from "./thread-status-context"
+import { useSetThreadStatus } from "./thread-status-store"
 import { gitStatusKey, gitKeys } from "@/features/git/queries"
 
 const FILE_MODIFYING_TOOLS = new Set([
@@ -43,6 +45,7 @@ interface UseChatStreamOptions {
   sessionId: string
   threadId: string
   initialIsStopped: boolean
+  onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
 }
 
 interface UseChatStreamResult {
@@ -50,60 +53,79 @@ interface UseChatStreamResult {
   hasConversationHistory: boolean
   hasLoadedMessages: boolean
   isLoading: boolean
+  /** True while messages are being fetched from the server (suppress empty state during initial load). */
+  isLoadingMessages: boolean
   isStopped: boolean
   isCompacting: boolean
+  compactionReason: "manual" | "threshold" | "overflow" | null
+  pendingError: ErrorMessage | null
   startUserPrompt: (text: string, thinkingLevel?: string) => void
   markStopped: () => void
   markSendFailed: () => void
   dismissError: (id: string) => void
+  fetchPreviousPage: () => void
+  hasPreviousPage: boolean
+  isFetchingPreviousPage: boolean
 }
 
 export function useChatStream({
   sessionId,
   threadId,
   initialIsStopped,
+  onPlanSaved,
 }: UseChatStreamOptions): UseChatStreamResult {
   const setThreadStatus = useSetThreadStatus()
   const queryClient = useQueryClient()
   const [isStopped, setIsStopped] = useState(initialIsStopped)
   const [isCompacting, setIsCompacting] = useState(false)
+  const [compactionReason, setCompactionReason] = useState<"manual" | "threshold" | "overflow" | null>(null)
   const [pendingError, setPendingError] = useState<ReturnType<typeof createErrorMessage> | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Track whether a live message_start fired in this session. Only errors that
-  // follow a live stream should mark the thread as "error" — replayed agent_end
-  // events from a previous run must not re-raise the red dot on refresh or
-  // when switching back to this thread.
-  const hadLiveLoadingRef = useRef(false)
-
-  // Reset state during render when the session changes ("adjusting state while
-  // rendering" — React batches these setters and does one synchronous re-render).
+  // Reset state synchronously during render when the session changes.
   const [localSessionId, setLocalSessionId] = useState(sessionId)
   if (localSessionId !== sessionId) {
     setLocalSessionId(sessionId)
     setIsLoading(false)
     setIsStopped(initialIsStopped)
     setIsCompacting(false)
+    setCompactionReason(null)
     setPendingError(null)
   }
 
-  // Reset the ref flag on session change. An effect that only mutates a ref
-  // (no setState) does not cause cascading renders and is safe in React 19.
-  useEffect(() => {
-    hadLiveLoadingRef.current = false
-  }, [sessionId])
+  // Fetch the status snapshot from the server on every thread mount/switch.
+  // This replaces event-replay as the mechanism for restoring transient UI state
+  // (isRunning, isCompacting, pendingError) without side-effect re-fires.
+  const { data: sessionStatus } = useSessionStatus(sessionId)
 
-  const { messages } = useVisibleMessages({ sessionId, pendingError })
+  useEffect(() => {
+    if (!sessionStatus) return
+    setIsLoading(sessionStatus.isRunning)
+    setIsCompacting(sessionStatus.isCompacting)
+    setCompactionReason(sessionStatus.compactionReason)
+    if (sessionStatus.pendingError) {
+      const { title, message, retryable, retryCount } = sessionStatus.pendingError
+      setPendingError(createErrorMessage(title, message, { retryable, retryCount, action: { type: "dismiss" } }))
+      setThreadStatus(threadId, "error")
+    }
+  }, [sessionStatus, setThreadStatus, threadId])
+
+  const {
+    messages,
+    isLoading: isLoadingMessages,
+    fetchPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+  } = useVisibleMessages({ sessionId })
 
   const handleIsLoadingChange = useCallback((loading: boolean) => {
-    if (loading) hadLiveLoadingRef.current = true
     setIsLoading(loading)
   }, [])
 
+  // All errors reaching this callback are from live events (no replay); mark
+  // the thread as error unconditionally.
   const handleError = useCallback(() => {
-    if (hadLiveLoadingRef.current) {
-      setThreadStatus(threadId, "error")
-    }
+    setThreadStatus(threadId, "error")
   }, [setThreadStatus, threadId])
 
   const handleToolExecutionEnd = useCallback((toolName: string) => {
@@ -120,10 +142,28 @@ export function useChatStream({
     sessionId,
     onIsLoadingChange: handleIsLoadingChange,
     onIsCompactingChange: setIsCompacting,
+    onCompactionReasonChange: setCompactionReason,
     onPendingErrorChange: setPendingError,
     onError: handleError,
     onToolExecutionEnd: handleToolExecutionEnd,
+    onPlanSaved,
   })
+
+  // After the agent finishes, refetch messages so optimistic user message
+  // placeholders (which have no DB id) get replaced with server-persisted
+  // versions that carry an id — required for the fork/revert buttons to appear.
+  // The 750 ms delay lets the server finish its async DB write before we fetch.
+  // The effect cleanup cancels the timer if the user sends another prompt first.
+  const prevIsLoadingRef = useRef(isLoading)
+  useEffect(() => {
+    const wasLoading = prevIsLoadingRef.current
+    prevIsLoadingRef.current = isLoading
+    if (!wasLoading || isLoading) return
+    const timer = setTimeout(() => {
+      void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+    }, 750)
+    return () => clearTimeout(timer)
+  }, [isLoading, queryClient, sessionId])
 
   const hasLoadedMessages = messages.length > 0 || isLoading
 
@@ -135,19 +175,19 @@ export function useChatStream({
       pendingThinkingLevelRef.current = thinkingLevel ?? null
 
       const userMessage: Message = { role: "user", content: text }
-      queryClient.setQueryData<Message[]>(messagesQueryKey(sessionId), (prev) => {
-        const current = prev ?? []
-        const lastMsg = current[current.length - 1]
-        // Avoid duplicate if the same message was sent twice quickly
-        if (
-          current.length > 0 &&
-          lastMsg.role === "user" &&
-          (lastMsg as Message & { content?: string }).content === text
-        ) {
-          return current
-        }
-        return [...current, userMessage]
-      })
+      queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
+        updateLastPageMessages(prev, (current) => {
+          const lastMsg = current[current.length - 1]
+          if (
+            current.length > 0 &&
+            lastMsg.role === "user" &&
+            (lastMsg as Message & { content?: string }).content === text
+          ) {
+            return current
+          }
+          return [...current, userMessage]
+        })
+      )
     },
     [queryClient, sessionId, lastPromptRef, pendingThinkingLevelRef]
   )
@@ -160,7 +200,11 @@ export function useChatStream({
       createErrorMessage("Send failed", "Failed to send message. Please try again.", {
         retryable: true,
         action: lastPromptRef.current
-          ? { type: "retry", prompt: lastPromptRef.current.text }
+          ? {
+              type: "retry",
+              prompt: lastPromptRef.current.text,
+              thinkingLevel: lastPromptRef.current.thinkingLevel,
+            }
           : { type: "dismiss" },
       })
     )
@@ -168,14 +212,12 @@ export function useChatStream({
 
   const dismissError = useCallback(
     (id: string) => {
-      queryClient.setQueryData<Message[]>(messagesQueryKey(sessionId), (prev) =>
-        (prev ?? []).filter(
-          (m): boolean => !(m.role === "error" && (m as ErrorMessage).id === id)
+      queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
+        updateLastPageMessages(prev, (msgs) =>
+          msgs.filter((m): boolean => !(m.role === "error" && (m as ErrorMessage).id === id))
         )
       )
       setPendingError((prev) => (prev?.id === id ? null : prev))
-      // Tell the server to drop error events from its replay buffer so they
-      // don't reappear when the WebSocket reconnects after a page refresh.
       dismissSessionError(sessionId).catch(() => { /* best-effort */ })
     },
     [queryClient, sessionId]
@@ -186,11 +228,17 @@ export function useChatStream({
     hasConversationHistory: messages.length > 0,
     hasLoadedMessages,
     isLoading,
+    isLoadingMessages,
     isStopped,
     isCompacting,
+    compactionReason,
+    pendingError,
     startUserPrompt,
     markStopped,
     markSendFailed,
     dismissError,
+    fetchPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
   }
 }

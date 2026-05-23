@@ -13,7 +13,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "^0.73.0"
+    "@earendil-works/pi-coding-agent": "^0.74.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.0",

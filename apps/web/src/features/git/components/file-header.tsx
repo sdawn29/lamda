@@ -44,7 +44,7 @@ export function FileHeader({
   }, [filePath])
 
   return (
-    <div className="flex h-10 min-w-0 items-center gap-1 px-3">
+    <div className="flex h-9 min-w-0 items-center gap-1 px-3">
       {/* File icon + breadcrumb */}
       <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
         {pathParts.map((part, i) => (

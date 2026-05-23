@@ -24,7 +24,12 @@ function parseSdkDiff(diff: string): DiffLine[] {
             : isSkipped
               ? "skipped"
               : "context"
-      return { kind, lineNum, content }
+      return {
+        kind,
+        oldLineNum: kind === "removed" || kind === "context" ? lineNum : "",
+        newLineNum: kind === "added" || kind === "context" ? lineNum : "",
+        content,
+      }
     })
 }
 
@@ -49,16 +54,16 @@ function parseUnifiedDiff(diff: string): DiffLine[] {
         oldLine = parseInt(m[1], 10)
         newLine = parseInt(m[2], 10)
       }
-      result.push({ kind: "skipped", lineNum: "", content: "" })
+      result.push({ kind: "skipped", oldLineNum: "", newLineNum: "", content: "" })
       continue
     }
 
     if (raw.startsWith("+")) {
-      result.push({ kind: "added", lineNum: String(newLine++), content: raw.slice(1) })
+      result.push({ kind: "added", oldLineNum: "", newLineNum: String(newLine++), content: raw.slice(1) })
     } else if (raw.startsWith("-")) {
-      result.push({ kind: "removed", lineNum: String(oldLine++), content: raw.slice(1) })
+      result.push({ kind: "removed", oldLineNum: String(oldLine++), newLineNum: "", content: raw.slice(1) })
     } else if (raw.startsWith(" ") || raw === "") {
-      result.push({ kind: "context", lineNum: String(oldLine), content: raw.slice(1) })
+      result.push({ kind: "context", oldLineNum: String(oldLine), newLineNum: String(newLine), content: raw.slice(1) })
       oldLine++
       newLine++
     }

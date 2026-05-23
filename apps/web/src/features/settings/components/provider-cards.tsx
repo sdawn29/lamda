@@ -166,11 +166,20 @@ export function SubscriptionsCard() {
   const [loginState, setLoginState] = useState<LoginState>({ status: "idle" })
   const [promptValue, setPromptValue] = useState("")
   const wsRef = useRef<WebSocket | null>(null)
+  const wsMessageHandlerRef = useRef<((e: MessageEvent) => void) | null>(null)
+  const wsErrorHandlerRef = useRef<(() => void) | null>(null)
+  const wsCloseHandlerRef = useRef<(() => void) | null>(null)
 
   function closeWebSocket() {
     if (wsRef.current) {
+      if (wsMessageHandlerRef.current) wsRef.current.removeEventListener("message", wsMessageHandlerRef.current)
+      if (wsErrorHandlerRef.current) wsRef.current.removeEventListener("error", wsErrorHandlerRef.current)
+      if (wsCloseHandlerRef.current) wsRef.current.removeEventListener("close", wsCloseHandlerRef.current)
       wsRef.current.close()
       wsRef.current = null
+      wsMessageHandlerRef.current = null
+      wsErrorHandlerRef.current = null
+      wsCloseHandlerRef.current = null
     }
   }
 
@@ -214,7 +223,7 @@ export function SubscriptionsCard() {
     let completed = false
     wsRef.current = socket
 
-    socket.addEventListener("message", (e: MessageEvent) => {
+    const messageHandler = (e: MessageEvent) => {
       let event: OAuthWsEvent
       try {
         event = JSON.parse(e.data as string) as OAuthWsEvent
@@ -253,21 +262,29 @@ export function SubscriptionsCard() {
         closeWebSocket()
         setLoginState({ status: "error", providerId, message: event.message })
       }
-    })
+    }
 
-    socket.addEventListener("error", () => {
+    const errorHandler = () => {
       closeWebSocket()
       if (!completed) {
         setLoginState({ status: "error", providerId, message: "Connection lost" })
       }
-    })
+    }
 
-    socket.addEventListener("close", () => {
+    const closeHandler = () => {
       if (!completed) {
         wsRef.current = null
         setLoginState({ status: "error", providerId, message: "Connection lost" })
       }
-    })
+    }
+
+    wsMessageHandlerRef.current = messageHandler
+    wsErrorHandlerRef.current = errorHandler
+    wsCloseHandlerRef.current = closeHandler
+
+    socket.addEventListener("message", messageHandler)
+    socket.addEventListener("error", errorHandler)
+    socket.addEventListener("close", closeHandler)
   }
 
   async function handlePromptSubmit() {

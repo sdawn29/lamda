@@ -10,16 +10,6 @@ import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
 
 const EXCLUDED_DIRS = new Set([
   ".git",
-  "node_modules",
-  "dist",
-  "build",
-  "out",
-  ".next",
-  ".nuxt",
-  "coverage",
-  ".turbo",
-  ".cache",
-  ".svelte-kit",
 ]);
 
 const FLUSH_DEBOUNCE_MS = 150;
@@ -33,10 +23,24 @@ interface WorkspaceState {
   flushTimer: ReturnType<typeof setTimeout> | null;
   scanInProgress: boolean;
   flushInProgress: boolean;
+  lastAccessedAt: number;
 }
+
+const IDLE_WORKSPACE_TTL_MS = 30 * 60 * 1000;
 
 class WorkspaceIndexer {
   private workspaces = new Map<string, WorkspaceState>();
+
+  constructor() {
+    setInterval(() => {
+      const now = Date.now();
+      for (const [wsId, state] of this.workspaces) {
+        if (now - state.lastAccessedAt > IDLE_WORKSPACE_TTL_MS) {
+          this.stopIndexing(wsId);
+        }
+      }
+    }, 10 * 60 * 1000).unref();
+  }
 
   /**
    * Begin tracking a workspace. Returns immediately after hydrating the in-memory
@@ -62,6 +66,7 @@ class WorkspaceIndexer {
       flushTimer: null,
       scanInProgress: false,
       flushInProgress: false,
+      lastAccessedAt: Date.now(),
     };
 
     for (const entry of listWorkspaceFileEntries(workspaceId)) {
@@ -90,6 +95,10 @@ class WorkspaceIndexer {
       } catch {}
     }
     this.workspaces.delete(workspaceId);
+    // Shut down any LSP servers spawned for this workspace.
+    void import("./language-service.js")
+      .then((m) => m.shutdownWorkspace(workspaceId))
+      .catch((err) => console.warn(`[workspace-indexer] LSP shutdown failed:`, err));
   }
 
   async reindex(workspaceId: string): Promise<void> {
@@ -102,6 +111,7 @@ class WorkspaceIndexer {
   listFiles(workspaceId: string): WorkspaceFileEntry[] {
     const state = this.workspaces.get(workspaceId);
     if (!state) return listWorkspaceFileEntries(workspaceId);
+    state.lastAccessedAt = Date.now();
     return Array.from(state.index.values());
   }
 

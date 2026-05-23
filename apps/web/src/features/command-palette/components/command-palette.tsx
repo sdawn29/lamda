@@ -24,7 +24,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/shared/ui/command"
-import { useCommandPalette } from "../context"
+import { useCommandPalette } from "../store"
 import {
   useShortcutHandler,
   useShortcutBinding,
@@ -35,9 +35,9 @@ import {
 } from "@/shared/lib/keyboard-shortcuts"
 import { useWorkspace } from "@/features/workspace"
 import { useWorkspaceIndex } from "@/features/workspace/queries"
-import { useTerminalForWorkspace } from "@/features/terminal/context"
-import { useDiffPanel } from "@/features/git/context"
-import { useFileTree } from "@/features/file-tree/context"
+import { useTerminalForWorkspace } from "@/features/terminal"
+import { useMainTabs } from "@/features/main-tabs"
+import { useRightSidebar } from "@/features/layout"
 import { useSidebar } from "@/shared/ui/sidebar"
 import { useSettingsModal } from "@/features/settings"
 import { useTheme } from "@/shared/components/theme-provider"
@@ -58,9 +58,9 @@ export function CommandPalette() {
   const { open, openPalette, closePalette } = useCommandPalette()
   const navigate = useNavigate()
   const { threadId: activeThreadId } = useParams({ strict: false }) as { threadId?: string }
-  const { workspaces, createThread } = useWorkspace()
-  const diffPanel = useDiffPanel()
-  const fileTree = useFileTree()
+  const { workspaces } = useWorkspace()
+  const { isOpen: rightSidebarOpen, isFileTreeOpen, togglePanel, open: openRightSidebar } = useRightSidebar()
+  const { addFileTab } = useMainTabs()
   const { toggleSidebar } = useSidebar()
   const { openSettings } = useSettingsModal()
   const { theme, setTheme } = useTheme()
@@ -114,13 +114,11 @@ export function CommandPalette() {
     [run, navigate]
   )
 
-  const handleNewThread = useCallback(async () => {
-    const ws = workspaces[0]
-    if (!ws) return
+  const handleNewThread = useCallback(() => {
+    const ws = activeWorkspace ?? workspaces[0]
     closePalette()
-    const thread = await createThread(ws.id)
-    navigate({ to: "/workspace/$threadId", params: { threadId: thread.id } })
-  }, [workspaces, closePalette, createThread, navigate])
+    navigate({ to: "/new", search: ws ? { ws: ws.id } : {} })
+  }, [activeWorkspace, workspaces, closePalette, navigate])
 
   const handleToggleTheme = useCallback(() => {
     run(() => setTheme(theme === "dark" ? "light" : "dark"))
@@ -133,11 +131,10 @@ export function CommandPalette() {
         if (!workspacePath) return
         const fileName = relativePath.split(/[/\\]/).pop() || relativePath
         const filePath = `${workspacePath}/${relativePath}`
-        diffPanel.open()
-        diffPanel.addTab({ title: fileName, type: "file", filePath })
+        addFileTab({ title: fileName, filePath, workspacePath })
       })
     },
-    [run, activeWorkspace, diffPanel]
+    [run, activeWorkspace, addFileTab]
   )
 
   const allThreads = workspaces.flatMap((ws) =>
@@ -236,18 +233,18 @@ export function CommandPalette() {
             </CommandItem>
             <CommandItem
               value="toggle diff source control panel"
-              onSelect={() => run(diffPanel.toggle)}
+              onSelect={() => run(() => togglePanel("changes"))}
             >
               <PanelRightIcon />
-              {diffPanel.isOpen ? "Close Diff Panel" : "Open Diff Panel"}
+              {rightSidebarOpen ? "Close Diff Panel" : "Open Diff Panel"}
               <ShortcutHint binding={toggleDiffBinding} />
             </CommandItem>
             <CommandItem
               value="toggle file tree explorer panel"
-              onSelect={() => run(fileTree.toggle)}
+              onSelect={() => run(() => togglePanel("files"))}
             >
               <FolderTreeIcon />
-              {fileTree.isOpen ? "Close File Tree" : "Open File Tree"}
+              {isFileTreeOpen ? "Close File Tree" : "Open File Tree"}
               <ShortcutHint binding={toggleFileTreeBinding} />
             </CommandItem>
           </CommandGroup>
@@ -282,7 +279,7 @@ export function CommandPalette() {
               value="open commit dialog git source control"
               onSelect={() =>
                 run(() => {
-                  diffPanel.open()
+                  openRightSidebar()
                 })
               }
             >

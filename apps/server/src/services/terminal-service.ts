@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { URL } from "node:url";
 import pty from "node-pty";
 import type { WebSocket } from "ws";
+import { getWorkspace } from "@lamda/db";
 
 const TERMINAL_OUTPUT_BATCH_MS = 16;
 const TERMINAL_OUTPUT_FLUSH_THRESHOLD = 8_192;
@@ -27,6 +28,7 @@ export function handleTerminalConnection(
 ) {
   const url = new URL(request.url ?? "/", "http://localhost");
   const cwd = resolveCwd(url.searchParams.get("cwd") ?? process.cwd());
+  const workspaceId = url.searchParams.get("workspaceId");
   const shell = resolveShell();
   let outputBuffer = "";
   let flushTimer: NodeJS.Timeout | null = null;
@@ -34,6 +36,18 @@ export function handleTerminalConnection(
   let ptyProcess: ReturnType<typeof pty.spawn> | null = null;
   try {
     const { PORT: _port, ...ptyEnv } = process.env;
+
+    // Merge workspace-scoped env vars into the PTY environment.
+    if (workspaceId) {
+      const ws = getWorkspace(workspaceId);
+      if (ws?.env) {
+        try {
+          const wsEnv = JSON.parse(ws.env) as Record<string, string>;
+          Object.assign(ptyEnv, wsEnv);
+        } catch { /* ignore malformed JSON */ }
+      }
+    }
+
     ptyProcess = pty.spawn(shell, ["-l"], {
       name: "xterm-256color",
       cols: 80,

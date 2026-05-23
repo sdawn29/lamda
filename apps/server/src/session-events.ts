@@ -1,15 +1,47 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { insertUserBlock, insertAssistantStartBlock, insertToolBlock, appendAssistantTextDelta, appendAssistantThinkingDelta, finalizeAssistantBlock, updateToolBlockResult, updateToolBlockPartialResult, listRunningToolBlocks, insertAgentTurn } from "@lamda/db";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import { insertUserBlock, insertAssistantStartBlock, insertToolBlock, appendAssistantTextDelta, appendAssistantThinkingDelta, finalizeAssistantBlock, updateToolBlockResult, updateToolBlockPartialResult, listRunningToolBlocks, insertAgentTurn, insertCompactionBlock } from "@lamda/db";
 import type { ManagedSessionHandle, SessionEvent } from "@lamda/pi-sdk";
-import { gitStatus } from "@lamda/git";
+import { PLAN_DIR } from "@lamda/pi-sdk";
+import { gitStatus, gitStashCreate, gitStashStore } from "@lamda/git";
 import { threadStatusBroadcaster, type ThreadStatus } from "./thread-status-broadcaster.js";
 
 const MAX_RECENT_EVENTS = 512;
 
+// ── Session status types ──────────────────────────────────────────────────────
+
+export type SessionPendingError = {
+  title: string;
+  message: string;
+  retryable: boolean;
+  retryCount?: number;
+};
+
+export type SessionStatus = {
+  isRunning: boolean;
+  isCompacting: boolean;
+  compactionReason: "manual" | "threshold" | "overflow" | null;
+  pendingError: SessionPendingError | null;
+};
+
+// ── Internal event types ──────────────────────────────────────────────────────
+
 type ServerErrorEvent = { type: "server_error"; message: string };
-type HubEvent = SessionEvent | ServerErrorEvent;
+type TurnFileChangedEvent = {
+  type: "turn_file_changed";
+  filePath: string;
+  postStatusCode: string;
+  wasCreatedByTurn: boolean;
+};
+type PlanSavedEvent = {
+  type: "plan_saved";
+  /** Absolute path to the plan file on disk. */
+  filePath: string;
+  /** Workspace-relative path (always forward-slash, starts with `.agents/plans/`). */
+  relativePath: string;
+};
+type HubEvent = SessionEvent | ServerErrorEvent | TurnFileChangedEvent | PlanSavedEvent;
 
 type SessionEventRecord = {
   id: number;
@@ -79,24 +111,54 @@ class SessionEventHub {
   private nextEventId = 0;
   private runInProgress = false;
   private disposed = false;
+  private isCompacting = false;
+  private compactionReason: "manual" | "threshold" | "overflow" | null = null;
+  private pendingErrorState: SessionPendingError | null = null;
   private turnContext: TurnContext | null = null;
   private pendingThinkingLevel: string | null = null;
   private currentToolBlocks = new Map<string, ToolContext>();
   private preTurnStatusMap: Map<string, string> | null = null;
   private preTurnFileContents: Map<string, string> | null = null;
+  private preTurnCheckpointSha = "";
   private preTurnCapturePromise: Promise<void> | null = null;
+  private currentTurnEmittedFiles = new Set<string>();
   private currentTurnStartTime = 0;
   private lastTurnChangedRaw = "";
   private lastTurnFiles: TurnFileDetail[] = [];
+  private textDeltaBuffer = "";
+  private thinkingDeltaBuffer = "";
+  private deltaFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  private deltaBlockId: string | null = null;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private onIdle: (() => void) | null = null;
 
   constructor(
     private readonly sessionId: string,
     private readonly threadId: string,
     private readonly handle: ManagedSessionHandle,
     private readonly cwd: string | null = null,
+    onIdle?: () => void,
   ) {
+    this.onIdle = onIdle ?? null;
     // Start consuming immediately so we don't miss any events
     this.ensureStarted();
+  }
+
+  private scheduleIdleDispose() {
+    if (this.idleTimer || this.disposed) return;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      if (this.subscribers.size === 0 && !this.disposed) {
+        this.onIdle?.();
+      }
+    }, 10 * 60 * 1000);
+  }
+
+  private cancelIdleDispose() {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
   }
 
   setNextThinkingLevel(level: string) {
@@ -111,9 +173,38 @@ class SessionEventHub {
     return this.lastTurnFiles;
   }
 
+  getCurrentTurnStartTime(): number {
+    return this.currentTurnStartTime;
+  }
+
   clearLastTurnFiles(): void {
     this.lastTurnFiles = [];
     this.lastTurnChangedRaw = "";
+  }
+
+  private flushDeltas() {
+    if (this.deltaFlushTimer) {
+      clearTimeout(this.deltaFlushTimer);
+      this.deltaFlushTimer = null;
+    }
+    if (!this.deltaBlockId) return;
+    if (this.textDeltaBuffer) {
+      appendAssistantTextDelta(this.deltaBlockId, this.textDeltaBuffer);
+      this.textDeltaBuffer = "";
+    }
+    if (this.thinkingDeltaBuffer) {
+      appendAssistantThinkingDelta(this.deltaBlockId, this.thinkingDeltaBuffer);
+      this.thinkingDeltaBuffer = "";
+    }
+  }
+
+  private scheduleDeltaFlush(blockId: string) {
+    this.deltaBlockId = blockId;
+    if (this.deltaFlushTimer) return;
+    this.deltaFlushTimer = setTimeout(() => {
+      this.deltaFlushTimer = null;
+      this.flushDeltas();
+    }, 100);
   }
 
   private parseStatusToMap(raw: string): Map<string, string> {
@@ -128,11 +219,79 @@ class SessionEventHub {
     return map;
   }
 
+  private maybeEmitPlanSaved(event: SessionEvent): void {
+    if (!this.cwd || this.disposed) return;
+    if (event.type !== "tool_execution_end") return;
+    const msg = event as { toolCallId: string; toolName?: string; isError?: boolean };
+    if (msg.isError) return;
+
+    // Tool name may arrive on the event or only on the earlier _start.
+    const meta = this.toolMetaMap.get(msg.toolCallId);
+    const toolName = (msg.toolName ?? meta?.toolName ?? "").toLowerCase();
+    if (toolName !== "plan_write" && toolName !== "write") return;
+
+    const args = meta?.args as { path?: unknown } | undefined;
+    const rawPath = typeof args?.path === "string" ? args.path : null;
+    if (!rawPath) return;
+
+    const absPath = isAbsolute(rawPath) ? rawPath : resolve(this.cwd, rawPath);
+    const rel = relative(this.cwd, absPath).replace(/\\/g, "/");
+    // Must be inside <cwd>/.agents/plans and be a markdown file.
+    if (!rel.startsWith(`${PLAN_DIR}/`) || rel.includes("..")) return;
+    if (!rel.toLowerCase().endsWith(".md")) return;
+
+    this.emit({ type: "plan_saved", filePath: absPath, relativePath: rel });
+  }
+
+  private async checkAndEmitNewFileChanges(): Promise<void> {
+    if (!this.cwd || this.disposed) return;
+    if (this.preTurnCapturePromise) await this.preTurnCapturePromise;
+    if (!this.preTurnStatusMap || this.disposed) return;
+    try {
+      const raw = await Promise.race([
+        gitStatus(this.cwd),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3_000)),
+      ]);
+      if (!this.preTurnStatusMap || this.disposed) return;
+      const postMap = this.parseStatusToMap(raw);
+      for (const [filePath, postStatusCode] of postMap) {
+        if (this.currentTurnEmittedFiles.has(filePath)) continue;
+        const preStatusCode = this.preTurnStatusMap.get(filePath) ?? "";
+        if (preStatusCode !== postStatusCode) {
+          const wasCreatedByTurn = !this.preTurnStatusMap.has(filePath);
+          this.currentTurnEmittedFiles.add(filePath);
+          this.emit({ type: "turn_file_changed", filePath, postStatusCode, wasCreatedByTurn });
+        }
+      }
+    } catch {
+      // non-critical
+    }
+  }
+
   private async capturePreTurnStatus(): Promise<void> {
     if (!this.cwd) return;
+    this.currentTurnEmittedFiles.clear();
+    this.preTurnCheckpointSha = "";
+    const timeoutMs = 5_000;
+    const deadline = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("git-status timeout")), timeoutMs)
+    );
     try {
-      const raw = await gitStatus(this.cwd);
+      const [raw, checkpointSha] = await Promise.all([
+        Promise.race([gitStatus(this.cwd), deadline]),
+        // Create a non-destructive git stash checkpoint of current state.
+        // gitStashCreate returns empty string if working tree is clean — that's fine.
+        gitStashCreate(this.cwd).then(async (sha) => {
+          if (sha) {
+            const label = `asphalt-checkpoint:${this.sessionId}:${Date.now()}`;
+            await gitStashStore(this.cwd!, sha, label).catch(() => {});
+          }
+          return sha;
+        }).catch(() => ""),
+      ]);
+
       this.preTurnStatusMap = this.parseStatusToMap(raw);
+      this.preTurnCheckpointSha = checkpointSha;
       this.currentTurnStartTime = Date.now();
 
       // Read current content of modified files so we can restore them on revert.
@@ -159,6 +318,7 @@ class SessionEventHub {
     } catch {
       this.preTurnStatusMap = null;
       this.preTurnFileContents = null;
+      this.preTurnCheckpointSha = "";
     }
   }
 
@@ -167,8 +327,10 @@ class SessionEventHub {
     const pre = this.preTurnStatusMap ?? new Map<string, string>();
     const preContents = this.preTurnFileContents ?? new Map<string, string>();
     const startedAt = this.currentTurnStartTime || Date.now();
+    const checkpointSha = this.preTurnCheckpointSha;
     this.preTurnStatusMap = null;
     this.preTurnFileContents = null;
+    this.preTurnCheckpointSha = "";
     this.currentTurnStartTime = 0;
 
     try {
@@ -227,6 +389,7 @@ class SessionEventHub {
           threadId: this.threadId,
           startedAt,
           endedAt: Date.now(),
+          checkpointSha,
           files: turnFiles,
         });
       }
@@ -243,6 +406,9 @@ class SessionEventHub {
   }
 
   dismissPendingErrors(): void {
+    this.pendingErrorState = null;
+    this.isCompacting = false;
+    this.compactionReason = null;
     const errorTypes = new Set([
       "server_error",
       "auto_retry_start",
@@ -253,6 +419,15 @@ class SessionEventHub {
     this.recentEvents = this.recentEvents.filter(
       (record) => !errorTypes.has(record.event.type),
     );
+  }
+
+  getStatus(): SessionStatus {
+    return {
+      isRunning: this.runInProgress,
+      isCompacting: this.isCompacting,
+      compactionReason: this.compactionReason,
+      pendingError: this.pendingErrorState,
+    };
   }
 
   ensureStarted() {
@@ -284,8 +459,12 @@ class SessionEventHub {
       closed = true;
       this.subscribers.delete(subscriberId);
       resolveClosed();
+      if (this.subscribers.size === 0) {
+        this.scheduleIdleDispose();
+      }
     };
 
+    this.cancelIdleDispose();
     this.subscribers.set(subscriberId, {
       onEvent: options.onEvent,
       close,
@@ -301,13 +480,16 @@ class SessionEventHub {
   async dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.cancelIdleDispose();
 
     this.toolMetaMap.clear();
     this.currentToolBlocks.clear();
+    this.currentTurnEmittedFiles.clear();
     this.currentRunEvents = [];
     this.runInProgress = false;
     this.preTurnStatusMap = null;
     this.preTurnFileContents = null;
+    this.preTurnCheckpointSha = "";
     this.preTurnCapturePromise = null;
 
     const subscribers = [...this.subscribers.values()];
@@ -323,13 +505,11 @@ class SessionEventHub {
   private getReplayEvents(lastEventId?: string): SessionEventRecord[] {
     const parsedLastEventId = parseEventId(lastEventId);
     if (parsedLastEventId === null) {
-      // New connection without lastEventId - replay all recent events
-      // to allow client to restore state from server snapshot
-      if (this.recentEvents.length > 0) {
-        return [...this.recentEvents];
-      }
+      // Fresh connect (no lastEventId) — state is restored via the REST /status
+      // endpoint; no event replay needed for idle sessions. Only replay events
+      // from the currently-in-progress agent turn so the client can track live
+      // streaming state (tool execution, text deltas, etc.).
       if (this.runInProgress) {
-        // Include running tool blocks from DB for new subscribers
         const toolBlocks = listRunningToolBlocks(this.threadId);
         const toolEvents: SessionEventRecord[] = toolBlocks
           .filter((b) => b.role === "tool" && b.toolStatus === "running")
@@ -347,18 +527,17 @@ class SessionEventHub {
       }
       return [];
     }
+    // Client has a lastEventId — replay only genuinely missed events.
+    // Prefer currentRunEvents for the active turn; fall back to recentEvents.
     const currentRunStartId = this.currentRunEvents[0]?.id;
     const currentRunEndId = this.currentRunEvents.at(-1)?.id;
     if (
       currentRunStartId !== undefined &&
       currentRunEndId !== undefined &&
+      parsedLastEventId >= currentRunStartId &&
       parsedLastEventId <= currentRunEndId
     ) {
-      return parsedLastEventId < currentRunStartId
-        ? [...this.currentRunEvents]
-        : this.currentRunEvents.filter(
-            (record) => record.id > parsedLastEventId,
-          );
+      return this.currentRunEvents.filter((record) => record.id > parsedLastEventId);
     }
     return this.recentEvents.filter((record) => record.id > parsedLastEventId);
   }
@@ -382,6 +561,12 @@ class SessionEventHub {
           // Capture post-turn status before emitting so clients see data immediately
           // when they query after receiving agent_end.
           await this.capturePostTurnStatus();
+        } else if (event.type === "tool_execution_end") {
+          // Check for file changes after each tool — non-blocking so it doesn't
+          // delay event delivery. Emits turn_file_changed for newly changed files.
+          void this.checkAndEmitNewFileChanges();
+          // Detect plan-mode artifact writes; emits plan_saved for client UX.
+          this.maybeEmitPlanSaved(event);
         }
         this.persist(event);
         this.emit(event);
@@ -412,10 +597,13 @@ class SessionEventHub {
 
         // Create assistant block in DB
         const blockId = insertAssistantStartBlock(this.threadId);
+        // Preserve thinkingLevel across multiple message_starts in one agent turn
+        // (e.g. after tool calls). pendingThinkingLevel is only set for the first call.
+        const inheritedThinkingLevel = this.turnContext?.thinkingLevel;
         this.turnContext = {
           assistantBlockId: blockId,
           startTime: Date.now(),
-          thinkingLevel: this.pendingThinkingLevel ?? undefined,
+          thinkingLevel: inheritedThinkingLevel ?? this.pendingThinkingLevel ?? undefined,
         };
         this.pendingThinkingLevel = null;
       }
@@ -438,9 +626,11 @@ class SessionEventHub {
       const blockId = this.turnContext.assistantBlockId;
 
       if (assistantEvent.type === "text_delta" && typeof assistantEvent.delta === "string") {
-        appendAssistantTextDelta(blockId, assistantEvent.delta);
+        this.textDeltaBuffer += assistantEvent.delta;
+        this.scheduleDeltaFlush(blockId);
       } else if (assistantEvent.type === "thinking_delta" && typeof assistantEvent.delta === "string") {
-        appendAssistantThinkingDelta(blockId, assistantEvent.delta);
+        this.thinkingDeltaBuffer += assistantEvent.delta;
+        this.scheduleDeltaFlush(blockId);
       }
 
       // Track model/provider from partial info
@@ -517,10 +707,20 @@ class SessionEventHub {
       return;
     }
 
+    // compaction_end - persist a marker so the divider survives page refresh
+    if (event.type === "compaction_end") {
+      const ce = event as { reason: "manual" | "threshold" | "overflow"; aborted?: boolean; errorMessage?: string };
+      if (!ce.aborted && !ce.errorMessage) {
+        insertCompactionBlock(this.threadId, ce.reason);
+      }
+      return;
+    }
+
     // agent_end - finalize assistant block and clear tool tracking
     if (event.type === "agent_end") {
       this.toolMetaMap.clear();
       this.currentToolBlocks.clear();
+      this.flushDeltas();
 
       if (this.turnContext) {
         const responseTime = Date.now() - this.turnContext.startTime;
@@ -564,6 +764,43 @@ class SessionEventHub {
       this.recentEvents.shift();
     }
 
+    // ── Track session status state ────────────────────────────────────────────
+    if (event.type === "agent_start") {
+      this.pendingErrorState = null;
+    } else if (event.type === "compaction_start") {
+      const cs = event as { reason: "manual" | "threshold" | "overflow" };
+      this.isCompacting = true;
+      this.compactionReason = cs.reason;
+      this.pendingErrorState = null;
+    } else if (event.type === "compaction_end") {
+      const ce = event as { aborted?: boolean; errorMessage?: string };
+      this.isCompacting = false;
+      this.compactionReason = null;
+      if (!ce.aborted && ce.errorMessage) {
+        this.pendingErrorState = { title: "Compaction Failed", message: ce.errorMessage, retryable: false };
+      } else if (!ce.aborted) {
+        this.pendingErrorState = null;
+        // Prune compaction events from currentRunEvents so mid-turn reconnects
+        // (parsedLastEventId === null + runInProgress) don't re-fire the success toast.
+        this.currentRunEvents = this.currentRunEvents.filter(
+          (r) => r.event.type !== "compaction_start" && r.event.type !== "compaction_end",
+        );
+      }
+    } else if (event.type === "server_error") {
+      const se = event as { message: string };
+      this.pendingErrorState = { title: "Error", message: se.message, retryable: true };
+    } else if (event.type === "auto_retry_start") {
+      const ar = event as { attempt: number; errorMessage: string };
+      this.pendingErrorState = { title: "Retrying", message: ar.errorMessage, retryable: true, retryCount: ar.attempt };
+    } else if (event.type === "auto_retry_end") {
+      const ar = event as { success: boolean; finalError?: string };
+      if (ar.success) {
+        this.pendingErrorState = null;
+      } else if (ar.finalError) {
+        this.pendingErrorState = { title: "Retry Failed", message: ar.finalError, retryable: true };
+      }
+    }
+
     if (event.type === "agent_end" || event.type === "server_error") {
       this.runInProgress = false;
       threadStatusBroadcaster.broadcast(this.threadId, "idle");
@@ -589,7 +826,10 @@ class SessionEventRegistry {
       return existing;
     }
 
-    const hub = new SessionEventHub(sessionId, threadId, handle, cwd ?? null);
+    const hub = new SessionEventHub(
+      sessionId, threadId, handle, cwd ?? null,
+      () => { this.hubs.delete(sessionId); },
+    );
     this.hubs.set(sessionId, hub);
     hub.ensureStarted();
     return hub;
@@ -607,12 +847,25 @@ class SessionEventRegistry {
     this.hubs.get(sessionId)?.dismissPendingErrors();
   }
 
+  getStatus(sessionId: string): SessionStatus {
+    return this.hubs.get(sessionId)?.getStatus() ?? {
+      isRunning: false,
+      isCompacting: false,
+      compactionReason: null,
+      pendingError: null,
+    };
+  }
+
   getLastTurnChanges(sessionId: string): string {
     return this.hubs.get(sessionId)?.getLastTurnChanges() ?? "";
   }
 
   getLastTurnFiles(sessionId: string): TurnFileDetail[] {
     return this.hubs.get(sessionId)?.getLastTurnFiles() ?? [];
+  }
+
+  getCurrentTurnStartTime(sessionId: string): number {
+    return this.hubs.get(sessionId)?.getCurrentTurnStartTime() ?? 0;
   }
 
   clearLastTurnFiles(sessionId: string): void {

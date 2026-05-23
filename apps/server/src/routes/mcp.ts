@@ -12,15 +12,18 @@ import {
   testMcpConnection,
   getMcpServerStatus,
   getMcpTools,
-  getMcpToolsForSession,
   startMcpServer,
   stopMcpServer,
   setServerEnabled,
 } from "../services/mcp-service.js"
+import { collectCustomTools } from "../services/session-service.js"
+import { getWorkspace } from "@lamda/db"
 import { store } from "../store.js"
 
 async function refreshSessionTools(workspaceId: string) {
-  const tools = await getMcpToolsForSession(workspaceId)
+  const ws = getWorkspace(workspaceId)
+  if (!ws) return
+  const tools = await collectCustomTools(workspaceId, ws.path)
   for (const { handle } of store.getByWorkspaceId(workspaceId)) {
     handle.setCustomTools(tools)
   }

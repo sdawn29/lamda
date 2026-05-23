@@ -15,7 +15,10 @@ import { ThemeProvider } from "./shared/components/theme-provider"
 import { KeyboardShortcutsProvider } from "./shared/components/keyboard-shortcuts-provider"
 import { queryClient } from "./shared/lib/query-client"
 
-import { AppProviders } from "./providers/app-providers"
+import { ErrorToastProvider } from "./features/chat"
+import { initThreadStatusWebSocket } from "./features/chat/thread-status-store"
+
+initThreadStatusWebSocket()
 
 const router = createRouter({ routeTree, history: createHashHistory() })
 
@@ -35,9 +38,9 @@ if (!rootElement.innerHTML) {
       <QueryClientProvider client={queryClient}>
         <KeyboardShortcutsProvider>
           <ThemeProvider>
-            <AppProviders>
+            <ErrorToastProvider>
               <RouterProvider router={router} />
-            </AppProviders>
+            </ErrorToastProvider>
           </ThemeProvider>
         </KeyboardShortcutsProvider>
       </QueryClientProvider>

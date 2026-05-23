@@ -1,83 +1,61 @@
 import { useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useWorkspaces } from "@/features/workspace"
-import { messagesQueryKey } from "../queries"
+import { messagesQueryKey, MESSAGES_PAGE_SIZE, type MessagesInfiniteData } from "../queries"
 import { listMessages } from "../api"
 import { getChatSyncEngine, loadThreadFromStorage } from "./use-chat-sync-engine"
 import { blocksToMessages, type MessageBlock } from "../types"
-import type { Message } from "../types"
 
-interface UsePrefetchThreadsMessagesOptions {
-  /** Only prefetch when this thread is active (optional) */
-  activeThreadId?: string | null
+function makeInfiniteSeed(messages: ReturnType<typeof blocksToMessages>, hasMore: boolean, oldestBlockIndex: number | null): MessagesInfiniteData {
+  return {
+    pages: [{ messages, hasMore, oldestBlockIndex }],
+    pageParams: [undefined],
+  }
 }
 
-/**
- * Prefetches messages for all threads in the workspace context.
- * 
- * This hook should be used at the app root level to ensure all thread messages
- * are cached (both in TanStack Query and localStorage) when the user views the sidebar,
- * making thread switches instant.
- * 
- * Note: This effect uses a ref to track the latest workspaces to avoid
- * restarting prefetches on every render. It handles workspace switches gracefully.
- */
-export function usePrefetchThreadsMessages({
-  activeThreadId: _unusedActiveThreadId,
-}: UsePrefetchThreadsMessagesOptions = {}) {
-  void _unusedActiveThreadId
+export function usePrefetchThreadsMessages() {
   const { data: workspaces = [] } = useWorkspaces()
   const queryClient = useQueryClient()
   const syncEngine = getChatSyncEngine()
-  
-  // Track last workspaces to avoid unnecessary effect runs
   const workspacesRef = useRef(workspaces)
-  const isInitializedRef = useRef(false)
-  
+
   useEffect(() => {
-    // Track if effect should remain active
     let active = true
-    
-    // Skip if no workspaces
     if (workspaces.length === 0) return
-    
-    // Mark as initialized after first run
-    isInitializedRef.current = true
     workspacesRef.current = workspaces
-    
-    const currentWorkspaces = workspaces
-    
-    // Prefetch messages for all threads
-    for (const workspace of currentWorkspaces) {
+
+    for (const workspace of workspaces) {
       for (const thread of workspace.threads) {
         if (!thread.sessionId) continue
-
         const sessionId = thread.sessionId
 
-        // Check if we have local data (instant)
+        // Skip if the cache already has the correct InfiniteData shape.
+        const cached = queryClient.getQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId))
+        if (cached?.pages) continue
+
+        // Seed from localStorage immediately (no network round-trip).
         const localData = loadThreadFromStorage(sessionId)
-        if (localData?.messages && localData.messages.length > 0) {
-          // We have local data, use it immediately and sync in background
-          queryClient.setQueryData(messagesQueryKey(sessionId), localData.messages)
-          
-          // Sync with server in background (non-blocking)
-          // Use active flag to prevent state updates after unmount
+        if (localData?.messages?.length) {
+          const msgs = localData.messages.slice(-MESSAGES_PAGE_SIZE)
+          queryClient.setQueryData(
+            messagesQueryKey(sessionId),
+            makeInfiniteSeed(msgs, localData.messages.length > MESSAGES_PAGE_SIZE, null)
+          )
+
+          // Sync from server in the background so the next mount gets fresh data.
           void (async () => {
             try {
-              const { blocks } = await listMessages(sessionId)
-              // Only update if still active and workspaces haven't changed significantly
+              const { blocks, hasMore } = await listMessages(sessionId, { limit: MESSAGES_PAGE_SIZE })
               if (!active) return
-              
               const serverMessages = blocksToMessages(blocks as MessageBlock[])
+              const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
               syncEngine.saveMessages(sessionId, serverMessages)
-              
-              // Only update query cache if sessionId is still relevant
               const currentWs = workspacesRef.current
-              const isRelevant = currentWs.some(w => 
-                w.threads.some(t => t.sessionId === sessionId)
-              )
-              if (isRelevant) {
-                queryClient.setQueryData(messagesQueryKey(sessionId), serverMessages)
+              if (currentWs.some((w) => w.threads.some((t) => t.sessionId === sessionId))) {
+                queryClient.setQueryData(
+                  messagesQueryKey(sessionId),
+                  makeInfiniteSeed(serverMessages, hasMore, oldestBlockIndex)
+                )
               }
             } catch (e) {
               console.warn("[prefetch] Failed to sync thread:", sessionId, e)
@@ -86,36 +64,26 @@ export function usePrefetchThreadsMessages({
           continue
         }
 
-        // No local data, check query cache
-        const cachedData = queryClient.getQueryData<Message[]>(
-          messagesQueryKey(sessionId)
-        )
-        if (cachedData && cachedData.length > 0) {
-          continue
-        }
-
-        // Start prefetch from server
-        void queryClient.prefetchQuery({
-          queryKey: messagesQueryKey(sessionId),
-          queryFn: async () => {
-            // Check if still relevant
-            if (!active) {
-              throw new Error("Prefetch cancelled - component unmounted")
-            }
-            
-            const { blocks } = await listMessages(sessionId)
+        // No local data — prefetch from server.
+        void (async () => {
+          try {
+            if (!active) return
+            const { blocks, hasMore } = await listMessages(sessionId, { limit: MESSAGES_PAGE_SIZE })
+            if (!active) return
             const messages = blocksToMessages(blocks as MessageBlock[])
-            // Save to localStorage for next time
+            const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
             syncEngine.saveMessages(sessionId, messages)
-            return messages
-          },
-          staleTime: 30 * 60 * 1000,
-        })
+            queryClient.setQueryData(
+              messagesQueryKey(sessionId),
+              makeInfiniteSeed(messages, hasMore, oldestBlockIndex)
+            )
+          } catch (e) {
+            console.warn("[prefetch] Failed to fetch thread:", sessionId, e)
+          }
+        })()
       }
     }
-    
-    return () => {
-      active = false
-    }
+
+    return () => { active = false }
   }, [workspaces, queryClient, syncEngine])
 }

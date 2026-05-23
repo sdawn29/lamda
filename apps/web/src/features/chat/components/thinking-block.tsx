@@ -1,37 +1,28 @@
 import { memo } from "react"
-import ReactMarkdown, { type Components } from "react-markdown"
+import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { markdownComponents } from "./markdown-components"
+import { useWordReveal } from "../hooks/use-word-reveal"
+
+const proseClass =
+  "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.75] prose-headings:my-0 prose-p:leading-[1.75] prose-p:mt-0 prose-p:mb-[0.75em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.75] [&_li]:text-sm [&>*+*]:mt-2 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
 
 export const ThinkingBlock = memo(function ThinkingBlock({
   thinking,
+  isNew = false,
 }: {
   thinking: string
+  isNew?: boolean
 }) {
-  const components: Components = {
-    pre: ({ children }) => <>{children}</>,
-    code: ({ className, children, ...props }) => {
-      const isBlock =
-        String(children).endsWith("\n") || className?.startsWith("language-")
-      if (isBlock) {
-        // Render fenced code blocks as plain text without styling
-        return <code {...props}>{children}</code>
-      }
-      return (
-        <code
-          className="rounded bg-muted/50 px-1 py-0.5 font-mono text-xs"
-          {...props}
-        >
-          {children}
-        </code>
-      )
-    },
-  }
+  const displayContent = useWordReveal(thinking, isNew)
 
   return (
-    <div className="text-xs leading-relaxed text-muted-foreground/55 italic [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {thinking}
-      </ReactMarkdown>
+    <div className="opacity-50">
+      <div className={proseClass}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          {displayContent}
+        </ReactMarkdown>
+      </div>
     </div>
   )
 })

@@ -58,6 +58,10 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "assets/splash.html",
+        "to": "splash.html"
       }
     ],
     "publish": {

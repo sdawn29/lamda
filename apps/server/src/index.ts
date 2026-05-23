@@ -9,6 +9,7 @@ import { handleTerminalConnection } from "./services/terminal-service.js";
 import { handleSessionEventsWs } from "./routes/sessions.js";
 import { handleGlobalEventsWs } from "./routes/health.js";
 import { handleOAuthEventsWs } from "./routes/auth.js";
+import { handleLspWs } from "./routes/lsp.js";
 import { handleSessionCommands } from "./websocket/session-commands.js";
 
 const port = resolvePort();
@@ -42,7 +43,8 @@ bootstrapSessions()
           pathname === "/ws/events" ||
           /^\/ws\/session\/[^/]+\/events$/.test(pathname) ||
           /^\/ws\/session\/[^/]+\/commands$/.test(pathname) ||
-          /^\/ws\/auth\/oauth\/[^/]+\/events$/.test(pathname);
+          /^\/ws\/auth\/oauth\/[^/]+\/events$/.test(pathname) ||
+          /^\/ws\/workspace\/[^/]+\/lsp$/.test(pathname);
 
         if (isKnownWsPath) {
           wss.handleUpgrade(request, socket, head, (ws) => {
@@ -84,6 +86,12 @@ bootstrapSessions()
       const oauthMatch = pathname.match(/^\/ws\/auth\/oauth\/([^/]+)\/events$/);
       if (oauthMatch) {
         handleOAuthEventsWs(ws, oauthMatch[1]);
+        return;
+      }
+
+      const lspMatch = pathname.match(/^\/ws\/workspace\/([^/]+)\/lsp$/);
+      if (lspMatch) {
+        handleLspWs(ws, lspMatch[1]);
         return;
       }
 

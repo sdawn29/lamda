@@ -4,7 +4,7 @@
 
 import { Type } from "typebox";
 import type { McpTool } from "./types.js";
-import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 /**
  * Convert an MCP tool name to a pi-compatible tool name

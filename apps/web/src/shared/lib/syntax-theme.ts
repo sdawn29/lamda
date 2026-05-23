@@ -1,19 +1,19 @@
 /**
- * Jellybeans Neutral — syntax highlighting themes for react-syntax-highlighter.
+ * JetBrains Fleet syntax highlighting themes for react-syntax-highlighter.
  *
- * Provides both Prism and hljs theme objects (dark + light) so every panel
- * (diff, markdown, tool-call) shares the same colour palette.
+ * Dark palette sourced directly from the Fleet color theme JSON.
+ * Light palette derives the same hues darkened for readability on white.
  */
 
 import type { CSSProperties } from "react"
 
 type SyntaxTheme = Record<string, CSSProperties>
 
-// ── Prism (dark) ───────────────────────────────────────────────────────────────
+// ── Prism (dark — Fleet) ───────────────────────────────────────────────────────
 
 export const jellybeansdark: SyntaxTheme = {
   'code[class*="language-"]': {
-    color: "#c8c8c8",
+    color: "#d6d6dd",
     background: "none",
     fontFamily: "var(--font-mono, ui-monospace, monospace)",
     textAlign: "left",
@@ -26,8 +26,8 @@ export const jellybeansdark: SyntaxTheme = {
     hyphens: "none",
   },
   'pre[class*="language-"]': {
-    color: "#c8c8c8",
-    background: "#101010",
+    color: "#d6d6dd",
+    background: "#181818",
     fontFamily: "var(--font-mono, ui-monospace, monospace)",
     textAlign: "left",
     whiteSpace: "pre",
@@ -43,76 +43,77 @@ export const jellybeansdark: SyntaxTheme = {
   },
 
   // Comments
-  comment: { color: "#808080", fontStyle: "italic" },
-  prolog: { color: "#808080", fontStyle: "italic" },
-  doctype: { color: "#808080", fontStyle: "italic" },
-  cdata: { color: "#808080", fontStyle: "italic" },
+  comment: { color: "#6d6d6d", fontStyle: "italic" },
+  prolog: { color: "#6d6d6d", fontStyle: "italic" },
+  doctype: { color: "#6d6d6d", fontStyle: "italic" },
+  cdata: { color: "#6d6d6d", fontStyle: "italic" },
 
-  // Punctuation
-  punctuation: { color: "#ccccca" },
+  // Punctuation & default
+  punctuation: { color: "#d6d6dd" },
 
-  // Namespace
-  namespace: { color: "#e8c888", fontStyle: "italic" },
+  // Namespaces
+  namespace: { color: "#d1d1d1" },
 
-  // Properties / tags / constants / symbols
-  property: { color: "#c4c4c0" },
-  tag: { color: "#8c9ab8" },
-  constant: { color: "#c07868" },
-  symbol: { color: "#96a878" },
-  deleted: { color: "#c07868" },
+  // Properties / object keys
+  property: { color: "#af9cff" },
+  // HTML/JSX tags
+  tag: { color: "#87c3ff" },
+  // Numeric / boolean constants
+  constant: { color: "#ebc88d" },
+  symbol: { color: "#a8cc7c" },
+  deleted: { color: "#f14c4c" },
 
-  // Booleans / numbers
-  boolean: { color: "#c07868" },
-  number: { color: "#c07868" },
+  boolean: { color: "#83d6c5" },
+  number: { color: "#ebc88d" },
 
-  // Selectors / strings / chars
-  selector: { color: "#96a878" },
-  "attr-name": { color: "#e8c888", fontStyle: "italic" },
-  string: { color: "#96a878" },
-  char: { color: "#96a878" },
-  builtin: { color: "#cc8070" },
-  inserted: { color: "#96a878" },
+  // CSS selectors / inserted diff
+  selector: { color: "#83d6c5" },
+  "attr-name": { color: "#aaa0fa" },
+  // Strings (pink/magenta — Fleet's signature string color)
+  string: { color: "#e394dc" },
+  char: { color: "#e394dc" },
+  builtin: { color: "#82d2ce" },
+  inserted: { color: "#15ac91" },
 
-  // Operators / entities / URLs
-  operator: { color: "#96b4c8" },
-  entity: { color: "#96b4c8" },
-  url: { color: "#8ab0c8" },
+  // Operators
+  operator: { color: "#d6d6dd" },
+  entity: { color: "#d6d6dd" },
+  url: { color: "#83d6c5" },
 
-  // At-rules / attr values / keywords
-  atrule: { color: "#8c9ab8" },
-  "attr-value": { color: "#96a878" },
-  keyword: { color: "#8c9ab8" },
+  // At-rules / keywords
+  atrule: { color: "#83d6c5" },
+  "attr-value": { color: "#e394dc" },
+  keyword: { color: "#83d6c5" },
 
-  // Functions / class names
-  function: { color: "#e8c888" },
-  "class-name": { color: "#d8b478" },
+  // Functions (warm orange-yellow)
+  function: { color: "#ebc88d" },
+  // Class / type names (light blue)
+  "class-name": { color: "#87c3ff" },
 
-  // Regex / important / variable
-  regex: { color: "#d8b478" },
-  important: { color: "#c8a848", fontWeight: "bold" },
-  variable: { color: "#beb8d8" },
+  regex: { color: "#d6d6dd" },
+  important: { color: "#83d6c5", fontWeight: "bold" },
+  // Variables (default text)
+  variable: { color: "#d6d6dd" },
 
-  // Template strings
-  "template-string": { color: "#96a878" },
-  "template-punctuation": { color: "#88a478" },
-  interpolation: { color: "#88a478" },
-  "interpolation-punctuation": { color: "#88a478" },
+  // Template literals (same as strings)
+  "template-string": { color: "#e394dc" },
+  "template-punctuation": { color: "#83d6c5" },
+  interpolation: { color: "#d6d6dd" },
+  "interpolation-punctuation": { color: "#83d6c5" },
 
-  // Misc
   bold: { fontWeight: "bold" },
   italic: { fontStyle: "italic" },
 
-  // Language-specific
-  "script-punctuation": { color: "#ccccca" },
-  spread: { color: "#96b4c8" },
-  parameter: { color: "#c8c0e0" },
+  "script-punctuation": { color: "#d6d6dd" },
+  spread: { color: "#d6d6dd" },
+  // Parameters (yellow)
+  parameter: { color: "#f8c762" },
 
-  // Markdown
-  title: { color: "#e8c888", fontWeight: "bold" },
-  "code-snippet": { color: "#96a878" },
+  title: { color: "#d6d6dd", fontWeight: "bold" },
+  "code-snippet": { color: "#e394dc" },
 }
 
-// ── Prism (light) ──────────────────────────────────────────────────────────────
+// ── Prism (light — Fleet-derived) ─────────────────────────────────────────────
 
 export const jellybeanslight: SyntaxTheme = {
   'code[class*="language-"]': {
@@ -130,7 +131,7 @@ export const jellybeanslight: SyntaxTheme = {
   },
   'pre[class*="language-"]': {
     color: "#1a1a1a",
-    background: "#f5f5f0",
+    background: "#ffffff",
     fontFamily: "var(--font-mono, ui-monospace, monospace)",
     textAlign: "left",
     whiteSpace: "pre",
@@ -145,112 +146,111 @@ export const jellybeanslight: SyntaxTheme = {
     overflow: "auto",
   },
 
-  comment: { color: "#808080", fontStyle: "italic" },
-  prolog: { color: "#808080", fontStyle: "italic" },
-  doctype: { color: "#808080", fontStyle: "italic" },
-  cdata: { color: "#808080", fontStyle: "italic" },
+  comment: { color: "#6d6d6d", fontStyle: "italic" },
+  prolog: { color: "#6d6d6d", fontStyle: "italic" },
+  doctype: { color: "#6d6d6d", fontStyle: "italic" },
+  cdata: { color: "#6d6d6d", fontStyle: "italic" },
 
-  punctuation: { color: "#4a4a48" },
+  punctuation: { color: "#1a1a1a" },
+  namespace: { color: "#333333" },
 
-  namespace: { color: "#7a5a18", fontStyle: "italic" },
+  property: { color: "#6438b0" },
+  tag: { color: "#1565c0" },
+  constant: { color: "#8a5a00" },
+  symbol: { color: "#3d7a14" },
+  deleted: { color: "#c01010" },
 
-  property: { color: "#3a3a38" },
-  tag: { color: "#4a5a78" },
-  constant: { color: "#a04838" },
-  symbol: { color: "#4a7a3a" },
-  deleted: { color: "#a04838" },
+  boolean: { color: "#006b5e" },
+  number: { color: "#8a5a00" },
 
-  boolean: { color: "#a04838" },
-  number: { color: "#a04838" },
+  selector: { color: "#006b5e" },
+  "attr-name": { color: "#5540c0" },
+  string: { color: "#9a1a95" },
+  char: { color: "#9a1a95" },
+  builtin: { color: "#00695c" },
+  inserted: { color: "#007a60" },
 
-  selector: { color: "#4a7a3a" },
-  "attr-name": { color: "#7a5a18", fontStyle: "italic" },
-  string: { color: "#4a7a3a" },
-  char: { color: "#4a7a3a" },
-  builtin: { color: "#985040" },
-  inserted: { color: "#4a7a3a" },
+  operator: { color: "#1a1a1a" },
+  entity: { color: "#1a1a1a" },
+  url: { color: "#006b5e" },
 
-  operator: { color: "#4a7a98" },
-  entity: { color: "#4a7a98" },
-  url: { color: "#4a7a98" },
+  atrule: { color: "#006b5e" },
+  "attr-value": { color: "#9a1a95" },
+  keyword: { color: "#006b5e" },
 
-  atrule: { color: "#4a5a78" },
-  "attr-value": { color: "#4a7a3a" },
-  keyword: { color: "#4a5a78" },
+  function: { color: "#7a5000" },
+  "class-name": { color: "#1565c0" },
 
-  function: { color: "#7a5a18" },
-  "class-name": { color: "#8a6828" },
+  regex: { color: "#555555" },
+  important: { color: "#006b5e", fontWeight: "bold" },
+  variable: { color: "#1a1a1a" },
 
-  regex: { color: "#8a6828" },
-  important: { color: "#8a7828", fontWeight: "bold" },
-  variable: { color: "#5a4a7a" },
-
-  "template-string": { color: "#4a7a3a" },
-  "template-punctuation": { color: "#4a6a3a" },
-  interpolation: { color: "#4a6a3a" },
-  "interpolation-punctuation": { color: "#4a6a3a" },
+  "template-string": { color: "#9a1a95" },
+  "template-punctuation": { color: "#006b5e" },
+  interpolation: { color: "#1a1a1a" },
+  "interpolation-punctuation": { color: "#006b5e" },
 
   bold: { fontWeight: "bold" },
   italic: { fontStyle: "italic" },
 
-  "script-punctuation": { color: "#4a4a48" },
-  spread: { color: "#4a7a98" },
-  parameter: { color: "#5a4a7a" },
+  "script-punctuation": { color: "#1a1a1a" },
+  spread: { color: "#1a1a1a" },
+  parameter: { color: "#806000" },
 
-  title: { color: "#7a5a18", fontWeight: "bold" },
-  "code-snippet": { color: "#4a7a3a" },
+  title: { color: "#1a1a1a", fontWeight: "bold" },
+  "code-snippet": { color: "#9a1a95" },
 }
 
-// ── hljs (dark) ────────────────────────────────────────────────────────────────
+// ── hljs (dark — Fleet) ───────────────────────────────────────────────────────
 
 export const jellybeanshljsdark: SyntaxTheme = {
   hljs: {
     display: "block",
     overflowX: "auto",
     padding: "1em",
-    color: "#c8c8c8",
-    background: "#101010",
+    color: "#d6d6dd",
+    background: "#181818",
   },
-  "hljs-comment": { color: "#808080", fontStyle: "italic" },
-  "hljs-quote": { color: "#808080", fontStyle: "italic" },
-  "hljs-keyword": { color: "#8c9ab8" },
-  "hljs-selector-tag": { color: "#8c9ab8" },
-  "hljs-type": { color: "#d8b478" },
-  "hljs-built_in": { color: "#cc8070" },
-  "hljs-literal": { color: "#c07868" },
-  "hljs-number": { color: "#c07868" },
-  "hljs-string": { color: "#96a878" },
-  "hljs-doctag": { color: "#96a878" },
-  "hljs-regexp": { color: "#d8b478" },
-  "hljs-formula": { color: "#d8b478" },
-  "hljs-title": { color: "#e8c888" },
-  "hljs-title.function_": { color: "#e8c888" },
-  "hljs-title.class_": { color: "#d8b478" },
-  "hljs-name": { color: "#8c9ab8" },
-  "hljs-section": { color: "#e8c888" },
-  "hljs-selector-id": { color: "#8ab0c8" },
-  "hljs-selector-class": { color: "#e8c888" },
-  "hljs-variable": { color: "#beb8d8" },
-  "hljs-params": { color: "#c8c0e0" },
-  "hljs-template-variable": { color: "#beb8d8" },
-  "hljs-attr": { color: "#e8c888", fontStyle: "italic" },
-  "hljs-attribute": { color: "#96a878" },
-  "hljs-symbol": { color: "#96a878" },
-  "hljs-bullet": { color: "#e8c888" },
-  "hljs-link": { color: "#8ab0c8", textDecoration: "underline" },
-  "hljs-meta": { color: "#8ab0c8" },
-  "hljs-subst": { color: "#c8c8c8" },
-  "hljs-deletion": { color: "#c07868" },
-  "hljs-addition": { color: "#96a878" },
+  "hljs-comment": { color: "#6d6d6d", fontStyle: "italic" },
+  "hljs-quote": { color: "#6d6d6d", fontStyle: "italic" },
+  "hljs-keyword": { color: "#83d6c5" },
+  "hljs-selector-tag": { color: "#83d6c5" },
+  "hljs-type": { color: "#87c3ff" },
+  "hljs-built_in": { color: "#82d2ce" },
+  "hljs-literal": { color: "#83d6c5" },
+  "hljs-number": { color: "#ebc88d" },
+  "hljs-string": { color: "#e394dc" },
+  "hljs-doctag": { color: "#e394dc" },
+  "hljs-regexp": { color: "#d6d6dd" },
+  "hljs-formula": { color: "#d6d6dd" },
+  "hljs-title": { color: "#ebc88d" },
+  "hljs-title.function_": { color: "#ebc88d" },
+  "hljs-title.class_": { color: "#87c3ff" },
+  "hljs-name": { color: "#87c3ff" },
+  "hljs-section": { color: "#d6d6dd" },
+  "hljs-selector-id": { color: "#aaa0fa" },
+  "hljs-selector-class": { color: "#aaa0fa" },
+  "hljs-variable": { color: "#d6d6dd" },
+  "hljs-params": { color: "#f8c762" },
+  "hljs-template-variable": { color: "#d6d6dd" },
+  "hljs-attr": { color: "#aaa0fa" },
+  "hljs-attribute": { color: "#af9cff" },
+  "hljs-symbol": { color: "#a8cc7c" },
+  "hljs-bullet": { color: "#d6d6dd" },
+  "hljs-link": { color: "#83d6c5", textDecoration: "underline" },
+  "hljs-meta": { color: "#a8cc7c" },
+  "hljs-subst": { color: "#d6d6dd" },
+  "hljs-deletion": { color: "#f14c4c" },
+  "hljs-addition": { color: "#15ac91" },
   "hljs-emphasis": { fontStyle: "italic" },
   "hljs-strong": { fontWeight: "bold" },
-  "hljs-operator": { color: "#96b4c8" },
-  "hljs-punctuation": { color: "#ccccca" },
-  "hljs-property": { color: "#c4c4c0" },
-  "hljs-char.escape_": { color: "#cc8078" },
+  "hljs-operator": { color: "#d6d6dd" },
+  "hljs-punctuation": { color: "#d6d6dd" },
+  "hljs-property": { color: "#af9cff" },
+  "hljs-char.escape_": { color: "#d6d6dd" },
 }
 
-// ── hljs (light) ───────────────────────────────────────────────────────────────
+// ── hljs (light — Fleet-derived) ──────────────────────────────────────────────
 
 export const jellybeanshljslight: SyntaxTheme = {
   hljs: {
@@ -258,43 +258,43 @@ export const jellybeanshljslight: SyntaxTheme = {
     overflowX: "auto",
     padding: "1em",
     color: "#1a1a1a",
-    background: "#f5f5f0",
+    background: "#ffffff",
   },
-  "hljs-comment": { color: "#808080", fontStyle: "italic" },
-  "hljs-quote": { color: "#808080", fontStyle: "italic" },
-  "hljs-keyword": { color: "#4a5a78" },
-  "hljs-selector-tag": { color: "#4a5a78" },
-  "hljs-type": { color: "#8a6828" },
-  "hljs-built_in": { color: "#985040" },
-  "hljs-literal": { color: "#a04838" },
-  "hljs-number": { color: "#a04838" },
-  "hljs-string": { color: "#4a7a3a" },
-  "hljs-doctag": { color: "#4a7a3a" },
-  "hljs-regexp": { color: "#8a6828" },
-  "hljs-formula": { color: "#8a6828" },
-  "hljs-title": { color: "#7a5a18" },
-  "hljs-title.function_": { color: "#7a5a18" },
-  "hljs-title.class_": { color: "#8a6828" },
-  "hljs-name": { color: "#4a5a78" },
-  "hljs-section": { color: "#7a5a18" },
-  "hljs-selector-id": { color: "#4a7a98" },
-  "hljs-selector-class": { color: "#7a5a18" },
-  "hljs-variable": { color: "#5a4a7a" },
-  "hljs-params": { color: "#5a4a7a" },
-  "hljs-template-variable": { color: "#5a4a7a" },
-  "hljs-attr": { color: "#7a5a18", fontStyle: "italic" },
-  "hljs-attribute": { color: "#4a7a3a" },
-  "hljs-symbol": { color: "#4a7a3a" },
-  "hljs-bullet": { color: "#7a5a18" },
-  "hljs-link": { color: "#4a7a98", textDecoration: "underline" },
-  "hljs-meta": { color: "#4a7a98" },
+  "hljs-comment": { color: "#6d6d6d", fontStyle: "italic" },
+  "hljs-quote": { color: "#6d6d6d", fontStyle: "italic" },
+  "hljs-keyword": { color: "#006b5e" },
+  "hljs-selector-tag": { color: "#006b5e" },
+  "hljs-type": { color: "#1565c0" },
+  "hljs-built_in": { color: "#00695c" },
+  "hljs-literal": { color: "#006b5e" },
+  "hljs-number": { color: "#8a5a00" },
+  "hljs-string": { color: "#9a1a95" },
+  "hljs-doctag": { color: "#9a1a95" },
+  "hljs-regexp": { color: "#555555" },
+  "hljs-formula": { color: "#555555" },
+  "hljs-title": { color: "#7a5000" },
+  "hljs-title.function_": { color: "#7a5000" },
+  "hljs-title.class_": { color: "#1565c0" },
+  "hljs-name": { color: "#1565c0" },
+  "hljs-section": { color: "#1a1a1a" },
+  "hljs-selector-id": { color: "#5540c0" },
+  "hljs-selector-class": { color: "#5540c0" },
+  "hljs-variable": { color: "#1a1a1a" },
+  "hljs-params": { color: "#806000" },
+  "hljs-template-variable": { color: "#1a1a1a" },
+  "hljs-attr": { color: "#5540c0" },
+  "hljs-attribute": { color: "#6438b0" },
+  "hljs-symbol": { color: "#3d7a14" },
+  "hljs-bullet": { color: "#1a1a1a" },
+  "hljs-link": { color: "#006b5e", textDecoration: "underline" },
+  "hljs-meta": { color: "#3d7a14" },
   "hljs-subst": { color: "#1a1a1a" },
-  "hljs-deletion": { color: "#a04838" },
-  "hljs-addition": { color: "#4a7a3a" },
+  "hljs-deletion": { color: "#c01010" },
+  "hljs-addition": { color: "#007a60" },
   "hljs-emphasis": { fontStyle: "italic" },
   "hljs-strong": { fontWeight: "bold" },
-  "hljs-operator": { color: "#4a7a98" },
-  "hljs-punctuation": { color: "#4a4a48" },
-  "hljs-property": { color: "#3a3a38" },
-  "hljs-char.escape_": { color: "#985040" },
+  "hljs-operator": { color: "#1a1a1a" },
+  "hljs-punctuation": { color: "#1a1a1a" },
+  "hljs-property": { color: "#6438b0" },
+  "hljs-char.escape_": { color: "#555555" },
 }

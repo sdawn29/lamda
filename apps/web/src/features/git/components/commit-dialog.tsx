@@ -2,40 +2,32 @@ import { useState, useMemo, useRef, useEffect } from "react"
 import {
   GitCommit,
   Loader2,
-  ChevronRight,
-  GitBranch,
   CloudUpload,
   Sparkles,
   Settings2,
-  FileText,
+  ChevronDown,
 } from "lucide-react"
-import { useSettingsModal } from "@/features/settings/context"
+import { useSettingsModal } from "@/features/settings"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
-import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
-import { Dialog, DialogContent, DialogTrigger } from "@/shared/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu"
 import { Textarea } from "@/shared/ui/textarea"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 import { ShortcutKbd } from "@/shared/ui/kbd"
-import { useShortcutHandler, useShortcutBinding } from "@/shared/components/keyboard-shortcuts-provider"
-import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
-import { FileIcon } from "@/shared/ui/file-icon"
-import { DiffView } from "./diff-view"
 import { cn } from "@/shared/lib/utils"
 import { useAppSettings } from "@/features/settings/queries"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
-import { useGitStatus } from "../queries"
-import { useGitFileDiff } from "../queries"
+import { useGitStatus, useAheadBehind } from "../queries"
 import {
   useGenerateCommitMessage,
   useGitCommit,
   useGitPush,
 } from "../mutations"
-import { useBranch } from "../queries"
-
-interface CommitDialogProps {
-  sessionId: string | undefined
-}
 
 interface ChangedFile {
   statusCode: string
@@ -50,127 +42,18 @@ function parseFile(line: string): ChangedFile {
   return { statusCode, filePath, isStaged }
 }
 
-function statusChar(code: string): string {
-  if (code === "??" || code.trim() === "U") return "U"
-  const X = code[0] ?? " "
-  const Y = code[1] ?? " "
-  if (X !== " ") return X
-  return Y
-}
-
-const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
-  M: { label: "M", bg: "bg-yellow-500/15 dark:bg-yellow-400/10", text: "text-yellow-600 dark:text-yellow-400" },
-  A: { label: "A", bg: "bg-green-500/15 dark:bg-green-400/10", text: "text-green-600 dark:text-green-400" },
-  D: { label: "D", bg: "bg-red-500/15 dark:bg-red-400/10", text: "text-red-600 dark:text-red-400" },
-  U: { label: "U", bg: "bg-blue-500/15 dark:bg-blue-400/10", text: "text-blue-600 dark:text-blue-400" },
-  R: { label: "R", bg: "bg-purple-500/15 dark:bg-purple-400/10", text: "text-purple-600 dark:text-purple-400" },
-}
-
-function StatusBadge({ code }: { code: string }) {
-  const c = statusChar(code)
-  const meta = STATUS_META[c] ?? {
-    label: c,
-    bg: "bg-muted",
-    text: "text-muted-foreground",
-  }
-  return (
-    <Badge
-      className={cn(
-        "h-4 w-4 shrink-0 rounded-sm text-[10px] font-semibold leading-none",
-        meta.bg,
-        meta.text
-      )}
-    >
-      {meta.label}
-    </Badge>
-  )
-}
-
-function FileAccordionItem({
-  file,
-  sessionId,
-  dim,
-}: {
-  file: ChangedFile
-  sessionId: string
-  dim?: boolean
-}) {
-  const [expanded, setExpanded] = useState(false)
-
-  const { data: diff, isLoading: diffLoading } = useGitFileDiff(
-    sessionId,
-    file.filePath,
-    file.statusCode,
-    expanded
-  )
-
-  const pathParts = file.filePath.split("/")
-  const fileName = pathParts[pathParts.length - 1] ?? file.filePath
-  const dirPath = pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : null
-
-  return (
-    <div className={cn("mx-1.5 my-1 overflow-hidden rounded-md border border-border/40", dim && "opacity-40")}>
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
-      >
-        <ChevronRight
-          className={cn(
-            "size-3 shrink-0 text-muted-foreground/50 transition-transform duration-150",
-            expanded && "rotate-90"
-          )}
-        />
-        <StatusBadge code={file.statusCode} />
-        <FileIcon filename={fileName} className="size-3 shrink-0" />
-        <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
-          <span className="shrink-0 font-mono text-xs font-medium text-foreground">{fileName}</span>
-          {dirPath && (
-            <span className="truncate font-mono text-[10px] text-muted-foreground/75">
-              {dirPath}
-            </span>
-          )}
-        </span>
-      </button>
-
-      {expanded && (
-        <div className="border-t border-border/20 bg-muted/10 px-2 pb-2">
-          {diffLoading ? (
-            <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
-              <Loader2 className="size-3 animate-spin" />
-              Loading diff…
-            </div>
-          ) : diff != null ? (
-            <DiffView
-              diff={diff}
-              filePath={file.filePath}
-              className="mt-2 rounded-md"
-            />
-          ) : (
-            <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
-              <FileText className="size-3" />
-              No diff available
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function AutoTextarea({
   value,
   onChange,
   placeholder,
   className,
   onKeyDown,
-  autoFocus,
 }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   className?: string
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
-  autoFocus?: boolean
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -187,87 +70,167 @@ function AutoTextarea({
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={onKeyDown}
       placeholder={placeholder}
-      autoFocus={autoFocus}
-      rows={3}
+      rows={2}
       className={cn("resize-none border-0 bg-transparent shadow-none focus-visible:ring-0", className)}
     />
   )
 }
 
-function SectionHeader({
-  label,
-  count,
+// ─── Workflow action button ───────────────────────────────────────────────────
+//
+// Step 1 – staged files exist → split [Commit] [▾ Commit & Push]
+// Step 2 – nothing staged but ahead > 0 → [Push N commits]
+// Otherwise → disabled commit button
+
+function WorkflowButton({
+  staged,
+  ahead,
+  canCommit,
+  committing,
+  pushing,
+  onCommit,
+  onCommitAndPush,
+  onPush,
 }: {
-  label: string
-  count: number
+  staged: number
+  ahead: number | null
+  canCommit: boolean
+  committing: boolean
+  pushing: boolean
+  onCommit: () => void
+  onCommitAndPush: () => void
+  onPush: () => void
 }) {
+  const busy = committing || pushing
+
+  // Step 2: nothing to commit, but unpushed commits exist → show Push
+  if (staged === 0 && (ahead ?? 0) > 0) {
+    const aheadCount = ahead ?? 0
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="sm"
+              onClick={onPush}
+              disabled={busy}
+              className="h-7 gap-1.5 px-3 text-xs"
+            >
+              {pushing ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <CloudUpload className="size-3" />
+              )}
+              Push {aheadCount > 0 ? `${aheadCount} commit${aheadCount === 1 ? "" : "s"}` : ""}
+            </Button>
+          }
+        />
+        <TooltipContent>Push committed changes to remote</TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  // Step 1: staged files → split commit button
   return (
-    <div className="flex items-center gap-2 bg-muted/30 px-3 py-2">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
-        {label}
-      </span>
-      {count > 0 && (
-        <Badge variant="secondary" className="h-4 min-w-4 rounded-full px-1 text-[10px]">
-          {count}
-        </Badge>
-      )}
+    <div className="flex items-center">
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="sm"
+              onClick={onCommit}
+              disabled={!canCommit}
+              className="h-7 gap-1.5 rounded-r-none px-3 text-xs"
+            >
+              {committing ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <GitCommit className="size-3" />
+              )}
+              Commit
+            </Button>
+          }
+        />
+        <TooltipContent>
+          Commit staged changes <ShortcutKbd binding="⌘↵" className="ml-1" />
+        </TooltipContent>
+      </Tooltip>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              size="sm"
+              disabled={!canCommit}
+              className="h-7 rounded-l-none border-l border-l-primary-foreground/20 px-1.5 text-xs"
+            >
+              <ChevronDown className="size-3" />
+              <span className="sr-only">More commit options</span>
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem
+            onClick={onCommitAndPush}
+            disabled={!canCommit}
+            className="flex items-center gap-2"
+          >
+            {pushing ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <CloudUpload className="size-3.5" />
+            )}
+            Commit & Push
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
 
-export function CommitDialog({ sessionId }: CommitDialogProps) {
-  const [open, setOpen] = useState(false)
+// ─── CommitInputSection ───────────────────────────────────────────────────────
+
+export function CommitInputSection({ sessionId }: { sessionId: string }) {
   const [message, setMessage] = useState("")
   const { openSettings } = useSettingsModal()
   const { data: settings } = useAppSettings()
 
-  const { data: statusRaw, isLoading: loading } = useGitStatus(sessionId ?? "")
-  const { data: branchData } = useBranch(sessionId ?? "")
-  const commitMutation = useGitCommit(sessionId ?? "")
-  const generateCommitMessageMutation = useGenerateCommitMessage(sessionId ?? "")
-  const pushMutation = useGitPush(sessionId ?? "")
+  const { data: statusData, isLoading: loading } = useGitStatus(sessionId)
+  const statusRaw = statusData?.raw ?? ""
+  const { data: aheadBehind } = useAheadBehind(sessionId)
+  const ahead = aheadBehind?.ahead ?? null
 
-  const branch = branchData?.branch ?? null
+  const commitMutation = useGitCommit(sessionId)
+  const generateCommitMessageMutation = useGenerateCommitMessage(sessionId)
+  const pushMutation = useGitPush(sessionId)
 
-  const { staged, unstaged } = useMemo<{
-    staged: ChangedFile[]
-    unstaged: ChangedFile[]
-  }>(() => {
-    if (!open || !statusRaw) return { staged: [], unstaged: [] }
-    const all = statusRaw
+  const staged = useMemo(() => {
+    if (!statusRaw) return []
+    return statusRaw
       .split("\n")
       .map((l) => l.trimEnd())
       .filter(Boolean)
       .map(parseFile)
-    return {
-      staged: all.filter((f) => f.isStaged),
-      unstaged: all.filter((f) => !f.isStaged),
-    }
-  }, [open, statusRaw])
+      .filter((f) => f.isStaged)
+  }, [statusRaw])
 
-  const commitError =
-    commitMutation.error instanceof Error ? commitMutation.error.message : null
-  const pushError =
-    pushMutation.error instanceof Error ? pushMutation.error.message : null
+  const commitError = commitMutation.error instanceof Error ? commitMutation.error.message : null
+  const pushError = pushMutation.error instanceof Error ? pushMutation.error.message : null
   const error = commitError ?? pushError
 
   async function handleCommit() {
-    if (!sessionId || !message.trim() || staged.length === 0) return
+    if (!message.trim() || staged.length === 0) return
     const msg = message.trim()
-    setOpen(false)
     setMessage("")
     commitMutation.reset()
     try {
       await commitMutation.mutateAsync(msg)
-    } catch {
-      // error stored in commitMutation.error
-    }
+    } catch {}
   }
 
   async function handleCommitAndPush() {
-    if (!sessionId || !message.trim() || staged.length === 0) return
+    if (!message.trim() || staged.length === 0) return
     const msg = message.trim()
-    setOpen(false)
     setMessage("")
     commitMutation.reset()
     pushMutation.reset()
@@ -278,286 +241,122 @@ export function CommitDialog({ sessionId }: CommitDialogProps) {
     }
     try {
       await pushMutation.mutateAsync()
-    } catch {
-      // error stored in pushMutation.error
-    }
+    } catch {}
   }
 
-  function handleOpenChange(nextOpen: boolean) {
-    setOpen(nextOpen)
-    if (nextOpen) {
-      commitMutation.reset()
-      pushMutation.reset()
-    }
+  async function handlePush() {
+    pushMutation.reset()
+    try {
+      await pushMutation.mutateAsync()
+    } catch {}
   }
 
   async function handleGenerate() {
-    if (!sessionId || generateCommitMessageMutation.isPending) return
+    if (generateCommitMessageMutation.isPending) return
     try {
-      const promptTemplate =
-        settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? undefined
-      const generated =
-        await generateCommitMessageMutation.mutateAsync(promptTemplate)
+      const promptTemplate = settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? undefined
+      const generated = await generateCommitMessageMutation.mutateAsync(promptTemplate)
       setMessage(generated)
-    } catch {
-      // silently ignore — user still has the text field
-    }
-  }
-
-  function handleConfigure() {
-    setOpen(false)
-    openSettings()
+    } catch {}
   }
 
   const committing = commitMutation.isPending
   const generating = generateCommitMessageMutation.isPending
   const pushing = pushMutation.isPending
 
-  useShortcutHandler(
-    SHORTCUT_ACTIONS.OPEN_COMMIT_DIALOG,
-    sessionId ? () => setOpen((v) => !v) : null
-  )
-  const commitBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_COMMIT_DIALOG)
-
   const canCommit =
-    !committing &&
-    !pushing &&
-    !generating &&
-    !!message.trim() &&
-    staged.length > 0 &&
-    !loading
-
-  const hasUnstagedOnly = staged.length === 0 && unstaged.length > 0
+    !committing && !pushing && !generating && !!message.trim() && staged.length > 0 && !loading
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <DialogTrigger
+    <div className="shrink-0 border-b border-border/50 p-2">
+      <div
+        className={cn(
+          "rounded-lg border bg-muted/20 transition-colors",
+          "border-border/50 focus-within:border-border focus-within:bg-muted/30"
+        )}
+      >
+        <AutoTextarea
+          value={message}
+          onChange={setMessage}
+          placeholder="Write a commit message…"
+          className="px-3 pt-2 pb-1 text-xs"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCommit()
+          }}
+        />
+
+        <div className="flex items-center justify-between border-t border-border/30 px-2 py-1">
+          <Tooltip>
+            <TooltipTrigger
               render={
                 <Button
-                  variant="outline"
-                  size="default"
-                  disabled={!sessionId || committing || pushing}
-                />
+                  variant="ghost"
+                  size="xs"
+                  onClick={openSettings}
+                  className="gap-1 text-[11px] text-muted-foreground"
+                >
+                  <Settings2 />
+                  Configure
+                </Button>
               }
-            >
-              {committing || pushing ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <GitCommit />
-              )}
-              Commit
-            </DialogTrigger>
-          }
-        />
-        <TooltipContent>
-          Commit staged changes{" "}
-          <ShortcutKbd binding={commitBinding} className="ml-1" />
-        </TooltipContent>
-      </Tooltip>
-
-      <DialogContent
-        showCloseButton
-        className="flex flex-col gap-0 overflow-hidden bg-background p-0 sm:max-w-lg"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/50 bg-muted/20 px-4 py-3 pr-10">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-muted">
-              <GitCommit className="h-3.5 w-3.5 text-muted-foreground" />
-            </div>
-            <span className="text-sm font-semibold">Commit changes</span>
-          </div>
-          {branch && (
-            <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
-              <GitBranch className="h-3 w-3 shrink-0" />
-              <span className="max-w-40 truncate font-mono">{branch}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Files */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto py-1">
-          {/* Staged section */}
-          <div className="mx-2 mt-1.5 overflow-hidden rounded-lg border border-border/50 last:mb-1.5">
-            <SectionHeader label="Staged" count={staged.length} />
-
-            <div className="max-h-48 overflow-y-auto">
-              {loading && (
-                <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" />
-                  Loading status…
-                </div>
-              )}
-
-              {!loading && staged.length === 0 && (
-                <div className="flex flex-col gap-1 px-4 py-3">
-                  <p className="text-xs text-muted-foreground">
-                    No staged files.
-                  </p>
-                  {hasUnstagedOnly && (
-                    <p className="text-[11px] text-muted-foreground/80">
-                      Stage files from the diff panel to include them in this commit.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {!loading &&
-                sessionId &&
-                staged.map((file, i) => (
-                  <FileAccordionItem key={i} file={file} sessionId={sessionId} />
-                ))}
-            </div>
-          </div>
-
-          {/* Unstaged section */}
-          {unstaged.length > 0 && (
-            <div className="mx-2 mt-1.5 overflow-hidden rounded-lg border border-border/50 last:mb-1.5">
-              <SectionHeader label="Not staged" count={unstaged.length} />
-              <div className="max-h-32 overflow-y-auto">
-                {sessionId &&
-                  unstaged.map((file, i) => (
-                    <FileAccordionItem key={i} file={file} sessionId={sessionId} dim />
-                  ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Message input */}
-        <div className="border-t border-border/50 px-4 pt-3 pb-2">
-          <div
-            className={cn(
-              "rounded-lg border bg-muted/20 transition-colors",
-              "border-border/50 focus-within:border-border focus-within:bg-muted/30"
-            )}
-          >
-            <AutoTextarea
-              value={message}
-              onChange={setMessage}
-              placeholder="Write a commit message…"
-              autoFocus
-              className="min-h-18 px-3 pt-2.5 pb-9"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCommit()
-              }}
             />
+            <TooltipContent>Customize commit message prompt</TooltipContent>
+          </Tooltip>
 
-            {/* Inline toolbar */}
-            <div className="flex items-center justify-between border-t border-border/30 px-2 py-1">
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      onClick={handleConfigure}
-                      className="gap-1 text-[11px] text-muted-foreground"
-                    >
-                      <Settings2 />
-                      Configure
-                    </Button>
-                  }
-                />
-                <TooltipContent>Customize commit message prompt</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      onClick={handleGenerate}
-                      disabled={generating || staged.length === 0}
-                      className="gap-1.5 text-[11px] text-muted-foreground"
-                    >
-                      {generating ? (
-                        <Loader2 className="size-3 animate-spin" />
-                      ) : (
-                        <Sparkles />
-                      )}
-                      {generating ? "Generating…" : "Generate"}
-                    </Button>
-                  }
-                />
-                <TooltipContent>
-                  {staged.length === 0
-                    ? "Stage files first to generate a message"
-                    : "Generate commit message from staged diff"}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={handleGenerate}
+                  disabled={generating || staged.length === 0}
+                  className="gap-1.5 text-[11px] text-muted-foreground"
+                >
+                  {generating ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Sparkles />
+                  )}
+                  {generating ? "Generating…" : "Generate"}
+                </Button>
+              }
+            />
+            <TooltipContent>
+              {staged.length === 0
+                ? "Stage files first to generate a message"
+                : "Generate commit message from staged diff"}
+            </TooltipContent>
+          </Tooltip>
         </div>
+      </div>
 
-        {/* Error */}
-        {error && (
-          <Alert variant="destructive" className="mx-4 mb-2">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+      {error && (
+        <Alert variant="destructive" className="mt-2">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-border/40 px-4 py-2.5">
-          <span className="text-[11px] text-muted-foreground">
-            {staged.length > 0
-              ? `${staged.length} file${staged.length === 1 ? "" : "s"} staged`
-              : "Nothing staged"}
-          </span>
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[11px] text-muted-foreground">
+          {staged.length > 0
+            ? `${staged.length} file${staged.length === 1 ? "" : "s"} staged`
+            : (ahead ?? 0) > 0
+            ? `${ahead} commit${ahead === 1 ? "" : "s"} ahead`
+            : "Nothing staged"}
+        </span>
 
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleCommitAndPush}
-                    disabled={!canCommit}
-                    className="h-7 gap-1.5 px-3 text-xs"
-                  >
-                    {pushing ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      <CloudUpload className="size-3" />
-                    )}
-                    Commit & Push
-                  </Button>
-                }
-              />
-              <TooltipContent>Commit then push to remote</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    size="sm"
-                    onClick={handleCommit}
-                    disabled={!canCommit}
-                    className="h-7 gap-1.5 px-3 text-xs"
-                  >
-                    {committing ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      <GitCommit className="size-3" />
-                    )}
-                    Commit
-                  </Button>
-                }
-              />
-              <TooltipContent>
-                Commit staged changes{" "}
-                <ShortcutKbd binding="⌘↵" className="ml-1" />
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        <WorkflowButton
+          staged={staged.length}
+          ahead={ahead}
+          canCommit={canCommit}
+          committing={committing}
+          pushing={pushing}
+          onCommit={handleCommit}
+          onCommitAndPush={handleCommitAndPush}
+          onPush={handlePush}
+        />
+      </div>
+    </div>
   )
 }

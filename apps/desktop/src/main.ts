@@ -39,6 +39,9 @@ const DEV_ICON_PATH = path.join(
 const PROD_INDEX = isDev
   ? ""
   : path.join(process.resourcesPath, "web", "index.html");
+const SPLASH_HTML_PATH = isDev
+  ? path.join(DEV_MONOREPO_ROOT, "apps", "desktop", "assets", "splash.html")
+  : path.join(process.resourcesPath, "splash.html");
 const EXTERNAL_URL_PROTOCOL_RE = /^(https?:|mailto:)/i;
 
 app.setName(APP_NAME);
@@ -314,7 +317,28 @@ async function waitForDevServer(url: string, timeout = 30_000): Promise<void> {
   );
 }
 
-async function createWindow() {
+async function createSplashWindow(): Promise<BrowserWindow> {
+  const splash = new BrowserWindow({
+    width: 320,
+    height: 380,
+    center: true,
+    frame: false,
+    resizable: false,
+    skipTaskbar: true,
+    show: false,
+    backgroundColor: "#09090b",
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  splash.once("ready-to-show", () => splash.show());
+  void splash.loadFile(SPLASH_HTML_PATH);
+  return splash;
+}
+
+async function createWindow(splash?: BrowserWindow) {
   const preloadPath = await getPreloadPath();
   const win = new BrowserWindow({
     width: 1280,
@@ -324,7 +348,7 @@ async function createWindow() {
     show: false,
     backgroundColor: "#09090b",
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 12, y: 16 },
+    trafficLightPosition: { x: 12, y: 14 },
     webPreferences: {
       contextIsolation: true,
       devTools: true,
@@ -335,6 +359,9 @@ async function createWindow() {
   });
 
   win.once("ready-to-show", () => {
+    if (splash && !splash.isDestroyed()) {
+      splash.close();
+    }
     win.show();
     globalShortcut.register("CommandOrControl+Alt+I", () => {
       const focused = BrowserWindow.getFocusedWindow();
@@ -371,6 +398,8 @@ app.whenReady().then(async () => {
       app.dock?.setIcon(dockIcon);
     }
   }
+
+  const splash = await createSplashWindow();
 
   await startServerAndTrack();
 
@@ -493,7 +522,7 @@ app.whenReady().then(async () => {
     autoUpdater.quitAndInstall();
   });
 
-  await createWindow();
+  await createWindow(splash);
   setupAutoUpdater();
 
   app.on("activate", async () => {

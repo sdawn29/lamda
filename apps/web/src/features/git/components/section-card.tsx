@@ -21,25 +21,33 @@ export const SectionCard = memo(function SectionCard({
   const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <div className={cn("mx-2 mt-1.5 overflow-hidden rounded-lg border border-border/50", className)}>
+    <div
+      className={cn(
+        "mx-2 mt-2 overflow-hidden rounded-md border border-border/60 bg-background/70 shadow-sm",
+        className
+      )}
+    >
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className="flex h-auto w-full items-center justify-start gap-2 bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50"
+        className="flex h-8 w-full items-center gap-2 border-b border-border/35 bg-muted/25 px-2.5 text-left transition-colors hover:bg-muted/40"
       >
         <ChevronRight
           className={cn(
-            "h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
+            "size-3 shrink-0 text-muted-foreground/45 transition-transform duration-150",
             !collapsed && "rotate-90"
           )}
         />
-        <span className="text-[10px] font-semibold tracking-wide text-muted-foreground/60 uppercase">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
           {label}
         </span>
         {isLoading && (
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/40" />
+          <Loader2 className="size-3 animate-spin text-muted-foreground/40" />
         )}
         {!isLoading && count != null && count > 0 && (
-          <Badge variant="secondary" className="h-4 min-w-4 rounded-full px-1 text-[10px]">
+          <Badge
+            variant="secondary"
+            className="h-4 min-w-4 rounded-sm px-1 text-[10px] tabular-nums"
+          >
             {count}
           </Badge>
         )}

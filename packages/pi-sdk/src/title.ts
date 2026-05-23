@@ -2,7 +2,7 @@ import {
   createAgentSession,
   ModelRegistry,
   SessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { buildAuthStorage } from "./auth.js";
 import type { SdkConfig } from "./types.js";
 

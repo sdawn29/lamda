@@ -1,6 +1,8 @@
+import { memo } from "react"
 import { cn } from "@/shared/lib/utils"
-import type { DiffLine, HighlightMap, ThemeStyle } from "./types"
+import type { CharRange, DiffLine, HighlightMap, ThemeStyle, WordDiffMap } from "./types"
 import { getLineTokens, renderTokens } from "./highlight"
+import { renderWithWordDiff } from "./word-diff"
 
 export interface SideBySideRow {
   left: { line: DiffLine; diffIndex: number } | null
@@ -41,14 +43,18 @@ export function buildSideBySideRows(lines: DiffLine[]): SideBySideRow[] {
   return rows
 }
 
-function SideBySideCell({
+const SideBySideCell = memo(function SideBySideCell({
   entry,
   map,
   themeStyle,
+  wordDiffRanges,
+  side,
 }: {
   entry: { line: DiffLine; diffIndex: number } | null
   map: HighlightMap
   themeStyle: ThemeStyle
+  wordDiffRanges?: CharRange[]
+  side: "left" | "right"
 }) {
   if (!entry) {
     return <div className="h-5 min-w-full" />
@@ -60,48 +66,106 @@ function SideBySideCell({
   const isRemoved = line.kind === "removed"
   const isNeutral = line.kind === "context" || isSkipped
   const tokens = getLineTokens(line, diffIndex, map)
+  const lineNum = side === "left" ? line.oldLineNum : line.newLineNum
 
   return (
     <div
       className={cn(
         "flex min-w-full leading-5",
-        isAdded && "bg-green-500/8",
-        isRemoved && "bg-red-500/8"
+        isAdded && "bg-emerald-500/8",
+        isRemoved && "bg-rose-500/8"
       )}
     >
-      <span
+      {/* Gutter */}
+      <div
         className={cn(
-          "sticky left-0 z-10 w-8 shrink-0 border-r pr-2 text-right text-xs select-none",
-          isAdded && "border-green-500/20 text-green-400/50",
-          isRemoved && "border-red-500/20 text-red-400/50",
-          isNeutral && "border-border/40 text-muted-foreground/40",
-          isAdded && "bg-green-50 dark:bg-green-950",
-          isRemoved && "bg-red-50 dark:bg-red-950",
+          "sticky left-0 z-10 flex shrink-0 select-none",
+          isAdded && "bg-emerald-50 dark:bg-emerald-950",
+          isRemoved && "bg-rose-50 dark:bg-rose-950",
           isNeutral && "bg-background"
         )}
       >
-        {isSkipped ? "" : line.lineNum}
-      </span>
+        {/* Color strip */}
+        <span
+          className={cn(
+            "w-0.5 shrink-0",
+            isAdded && "bg-emerald-500/50",
+            isRemoved && "bg-rose-500/50"
+          )}
+        />
+
+        {/* Line number */}
+        <span
+          className={cn(
+            "w-7 shrink-0 border-r pr-1.5 text-right font-mono text-[10px] leading-5",
+            isAdded && "border-emerald-500/20 text-emerald-400/70",
+            isRemoved && "border-rose-500/20 text-rose-400/70",
+            isNeutral && "border-border/40 text-muted-foreground/30"
+          )}
+        >
+          {isSkipped ? "" : lineNum}
+        </span>
+
+        {/* Sign */}
+        <span
+          className={cn(
+            "w-4 shrink-0 text-center font-mono text-[11px] leading-5",
+            isAdded && "text-emerald-500",
+            isRemoved && "text-rose-500",
+            isNeutral && "text-muted-foreground/20"
+          )}
+        >
+          {isAdded ? "+" : isRemoved ? "−" : ""}
+        </span>
+      </div>
+
+      {/* Content */}
       <span
         className={cn(
           "w-max shrink-0 pl-2 whitespace-pre",
-          isSkipped && "text-muted-foreground/40 italic"
+          isSkipped && "font-mono text-[10px] italic text-muted-foreground/40"
         )}
       >
-        {isSkipped ? "⋯" : renderTokens(tokens, themeStyle)}
+        {isSkipped ? (
+          "⋯"
+        ) : wordDiffRanges && wordDiffRanges.length > 0 ? (
+          renderWithWordDiff(line.content, wordDiffRanges).map((part, i) =>
+            part.highlighted ? (
+              <span
+                key={i}
+                className={cn(
+                  "rounded-sm",
+                  isAdded
+                    ? "bg-emerald-500/30 dark:bg-emerald-400/25"
+                    : "bg-rose-500/30 dark:bg-rose-400/25"
+                )}
+              >
+                {part.text}
+              </span>
+            ) : (
+              <span key={i}>{part.text}</span>
+            )
+          )
+        ) : (
+          renderTokens(tokens, themeStyle)
+        )}
       </span>
     </div>
   )
-}
+})
 
 function SideBySideColumn({
   entries,
   map,
   themeStyle,
+  wordDiffMap,
+  side,
 }: {
   entries: Array<{ line: DiffLine; diffIndex: number } | null>
   map: HighlightMap
   themeStyle: ThemeStyle
+  wordDiffMap: WordDiffMap
+  side: "left" | "right"
 }) {
   return (
     <div className="min-w-0 overflow-x-auto">
@@ -112,6 +176,14 @@ function SideBySideColumn({
             entry={entry}
             map={map}
             themeStyle={themeStyle}
+            side={side}
+            wordDiffRanges={
+              entry
+                ? side === "left"
+                  ? wordDiffMap.removed.get(entry.diffIndex)
+                  : wordDiffMap.added.get(entry.diffIndex)
+                : undefined
+            }
           />
         ))}
       </div>
@@ -123,10 +195,12 @@ export function SideBySideView({
   rows,
   map,
   themeStyle,
+  wordDiffMap,
 }: {
   rows: SideBySideRow[]
   map: HighlightMap
   themeStyle: ThemeStyle
+  wordDiffMap: WordDiffMap
 }) {
   return (
     <div className="grid min-w-0 grid-cols-2 divide-x divide-border/30">
@@ -134,11 +208,15 @@ export function SideBySideView({
         entries={rows.map((row) => row.left)}
         map={map}
         themeStyle={themeStyle}
+        wordDiffMap={wordDiffMap}
+        side="left"
       />
       <SideBySideColumn
         entries={rows.map((row) => row.right)}
         map={map}
         themeStyle={themeStyle}
+        wordDiffMap={wordDiffMap}
+        side="right"
       />
     </div>
   )

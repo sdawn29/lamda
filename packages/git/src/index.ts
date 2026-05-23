@@ -353,6 +353,150 @@ export async function gitPush(cwd: string): Promise<void> {
   await execFileAsync("git", ["push"], { cwd, timeout: 30000 });
 }
 
+/** Fetches from the remote without merging: `git fetch`. */
+export async function gitFetch(cwd: string): Promise<void> {
+  await execFileAsync("git", ["fetch"], { cwd, timeout: 30000 });
+}
+
+/** Pulls from the remote (fetch + merge): `git pull`. */
+export async function gitPull(cwd: string): Promise<void> {
+  await execFileAsync("git", ["pull"], { cwd, timeout: 30000 });
+}
+
+/**
+ * Returns structured git log output. Each line is pipe-delimited:
+ * fullSha|shortSha|authorName|authorDate(ISO)|subject
+ */
+export async function gitLog(cwd: string, maxCount = 50): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["log", "--pretty=format:%H|%h|%an|%ai|%s", `-${maxCount}`],
+      { cwd, timeout: 10000 },
+    );
+    return stdout;
+  } catch {
+    return "";
+  }
+}
+
+/** Returns the list of files changed in a single commit with their status codes. */
+export async function gitShowFiles(
+  cwd: string,
+  sha: string,
+): Promise<{ path: string; status: string; added: number; removed: number }[]> {
+  try {
+    const [nameStatusResult, numstatResult] = await Promise.all([
+      execFileAsync("git", ["diff-tree", "--no-commit-id", "-r", "--name-status", sha], {
+        cwd,
+        timeout: 10000,
+      }),
+      execFileAsync("git", ["diff-tree", "--no-commit-id", "-r", "--numstat", sha], {
+        cwd,
+        timeout: 10000,
+      }),
+    ])
+
+    const statMap = new Map<string, { added: number; removed: number }>()
+    for (const line of numstatResult.stdout.trim().split("\n").filter(Boolean)) {
+      const parts = line.split("\t")
+      const added = parseInt(parts[0] ?? "0", 10)
+      const removed = parseInt(parts[1] ?? "0", 10)
+      // for renamed files numstat uses the new path as the last tab-separated field
+      const path = parts.length > 2 ? (parts[parts.length - 1] ?? "") : (parts[1] ?? "")
+      if (path) {
+        statMap.set(path, { added: isNaN(added) ? 0 : added, removed: isNaN(removed) ? 0 : removed })
+      }
+    }
+
+    return nameStatusResult.stdout
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split("\t")
+        const rawStatus = parts[0] ?? "M"
+        // Normalize R100/C100 → R/C; use the new (last) path for renames/copies
+        const status = rawStatus[0] ?? "M"
+        const path = parts.length > 2 ? (parts[parts.length - 1] ?? "") : (parts[1] ?? "")
+        const stat = statMap.get(path) ?? { added: 0, removed: 0 }
+        return { status, path, ...stat }
+      })
+  } catch {
+    return []
+  }
+}
+
+/** Returns the unified diff for a single file within a specific commit. */
+export async function gitShowFileDiff(
+  cwd: string,
+  sha: string,
+  filePath: string,
+): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["diff-tree", "-p", "--no-commit-id", "-U3", sha, "--", filePath],
+      { cwd, timeout: 10000 },
+    )
+    return stdout
+  } catch (err: unknown) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "stdout" in err &&
+      typeof (err as { stdout?: unknown }).stdout === "string"
+    ) {
+      return (err as { stdout: string }).stdout
+    }
+    return ""
+  }
+}
+
+/** Returns the unified diff for a single commit: `git show --unified=3 <sha>`. */
+export async function gitShow(cwd: string, sha: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["show", "--unified=3", sha],
+      { cwd, timeout: 10000 },
+    );
+    return stdout;
+  } catch (err: unknown) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "stdout" in err &&
+      typeof (err as { stdout?: unknown }).stdout === "string"
+    ) {
+      return (err as { stdout: string }).stdout;
+    }
+    return "";
+  }
+}
+
+/**
+ * Returns how many commits the current branch is ahead of and behind its upstream.
+ * Returns null when no upstream is configured.
+ */
+export async function getAheadBehind(
+  cwd: string,
+): Promise<{ ahead: number; behind: number } | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["rev-list", "--left-right", "--count", "@{u}...HEAD"],
+      { cwd, timeout: 5000 },
+    );
+    const parts = stdout.trim().split("\t");
+    const behind = parseInt(parts[0] ?? "0", 10);
+    const ahead = parseInt(parts[1] ?? "0", 10);
+    return { ahead: isNaN(ahead) ? 0 : ahead, behind: isNaN(behind) ? 0 : behind };
+  } catch {
+    return null;
+  }
+}
+
 /** Returns the full staged diff (`git diff --cached`). */
 export async function gitStagedDiff(cwd: string): Promise<string> {
   try {
@@ -364,4 +508,45 @@ export async function gitStagedDiff(cwd: string): Promise<string> {
   } catch {
     return "";
   }
+}
+
+/**
+ * Creates a stash object for the current working tree state WITHOUT modifying
+ * the working tree or index. Returns the stash SHA, or empty string if the
+ * working tree is clean (nothing to checkpoint).
+ */
+export async function gitStashCreate(cwd: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync("git", ["stash", "create"], {
+      cwd,
+      timeout: 10000,
+    });
+    return stdout.trim();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Registers a stash object (from gitStashCreate) into the stash list with a
+ * given message. No-op if sha is empty.
+ */
+export async function gitStashStore(cwd: string, sha: string, message: string): Promise<void> {
+  if (!sha) return;
+  await execFileAsync("git", ["stash", "store", "-m", message, sha], {
+    cwd,
+    timeout: 10000,
+  });
+}
+
+/**
+ * Restores a specific file from the working-tree part of a stash object
+ * (stash^2 = the working tree snapshot). Used to revert individual files
+ * back to their pre-turn state without affecting other files.
+ */
+export async function gitRestoreFileFromRef(cwd: string, ref: string, filePath: string): Promise<void> {
+  await execFileAsync("git", ["checkout", `${ref}^2`, "--", filePath], {
+    cwd,
+    timeout: 10000,
+  });
 }

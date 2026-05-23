@@ -3,14 +3,24 @@
 @plugin "@tailwindcss/typography";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/jetbrains-mono";
-@import "@fontsource-variable/outfit";
-@import "@fontsource-variable/google-sans-flex";
+@import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
 
+@keyframes digit-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0%);
+    opacity: 1;
+  }
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: "Google Sans Flex", sans-serif;
+  --font-sans: "Geist Variable", sans-serif;
   --font-mono: "JetBrains Mono Variable", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -66,40 +76,41 @@
 
 /* ── Jellybeans Light ─────────────────────────────────────────────── */
 :root {
-  /* ── Base: warm off-white page background ── */
+  /* ── Base: warm parchment page background (avg L 238) ── */
   --background: #f3efe8;
-  --foreground: #1a1815;
+  --foreground: #1c1916;
 
-  /* ── Card: near-white — floats above base without a heavy border ── */
-  --card: #fdfbf8;
-  --card-foreground: #1a1815;
+  /* ── Card: elevated warm surface (avg L 230, step −8) ── */
+  --card: #ede7de;
+  --card-foreground: #1c1916;
 
-  /* ── Popover: same as base ── */
-  --popover: #f3efe8;
-  --popover-foreground: #1a1815;
+  /* ── Popover: same as card ── */
+  --popover: #ede7de;
+  --popover-foreground: #1c1916;
 
-  /* ── Secondary: recessed inputs / nested panels ── */
-  --secondary: #ebe7df;
-  --secondary-foreground: #1a1815;
+  /* ── Secondary: recessed inputs / nested panels (avg L 216, step −14) ── */
+  --secondary: #e0d9cf;
+  --secondary-foreground: #1c1916;
 
-  /* ── Muted: disabled / faded areas ── */
-  --muted: #dedad2;
-  --muted-foreground: #6a6560;
+  /* ── Muted: disabled / faded areas (avg L 204, step −12) ── */
+  --muted: #d4cdc4;
+  --muted-foreground: #5c5854;
 
-  /* ── Accent: hover / selection highlight ── */
-  --accent: #d3cfc7;
-  --accent-foreground: #1a1815;
+  /* ── Accent: hover / selection highlight (avg L 192, step −12) ── */
+  --accent: #c8c1b7;
+  --accent-foreground: #1c1916;
 
-  /* ── Primary (jellybeans steel blue, darker) ── */
+  /* ── Primary (jellybeans steel blue) ── */
   --primary: #1a4080;
   --primary-foreground: #f3efe8;
 
   /* ── Destructive (jellybeans error red) ── */
   --destructive: #902020;
 
-  /* ── Border: barely-there separators · Input: form field outlines ── */
-  --border: #e6e1d9;
-  --input: #d4cfc7;
+  /* ── Border: subtle separator between bg and card ── */
+  /* ── Input: outline for form fields (between secondary and muted) ── */
+  --border: #e7e1d8;
+  --input: #dad3ca;
   --ring: #1a4080;
 
   /* ── Charts (jellybeans syntax colors, darkened for light bg) ── */
@@ -112,20 +123,39 @@
   /* ── Radius ── */
   --radius: 0.5rem;
 
-  /* ── Sidebar: clearly distinct from base, no hard border needed ── */
-  --sidebar: #e8e4dd;
-  --sidebar-foreground: #1a1815;
+  /* ── Sidebar: distinct panel, darker than content area (avg L 225) ── */
+  --sidebar: #e8e2d9;
+  --sidebar-foreground: #1c1916;
   --sidebar-primary: #1a4080;
   --sidebar-primary-foreground: #f3efe8;
-  --sidebar-accent: #dedad3;
-  --sidebar-accent-foreground: #1a1815;
-  --sidebar-border: #e0dbd4;
+  --sidebar-accent: #ddd7ce;
+  --sidebar-accent-foreground: #1c1916;
+  --sidebar-border: #d4cec5;
   --sidebar-ring: #1a4080;
 }
 
+/* ── Prose color override (all modes) ────────────────────────────────────
+   Force all prose text to use the theme foreground token so both light and
+   dark modes render consistently against the app's surface colors. ── */
+.prose,
+.prose :is(*:not([class~="prose"] *)) {
+  --tw-prose-body: var(--foreground) !important;
+  --tw-prose-headings: var(--foreground) !important;
+  --tw-prose-lead: var(--foreground) !important;
+  --tw-prose-bold: var(--foreground) !important;
+  --tw-prose-counters: var(--foreground) !important;
+  --tw-prose-bullets: var(--foreground) !important;
+  --tw-prose-quotes: var(--foreground) !important;
+  --tw-prose-quote-borders: var(--foreground) !important;
+  --tw-prose-captions: var(--foreground) !important;
+  --tw-prose-code: var(--foreground) !important;
+  --tw-prose-th-borders: var(--border) !important;
+  --tw-prose-td-borders: var(--border) !important;
+}
+
 /* ── Dark mode prose override ─────────────────────────────────────────────
-   The prose plugin sets colors via CSS custom properties on each element.
-   Override them with !important so they always win over plugin defaults. ── */
+   Keep the dark-mode invert rule so prose-invert continues to work if used
+   standalone outside the app's theming context. ── */
 .dark .prose-invert,
 .dark .prose-invert :is(*:not([class~="prose"] *)) {
   --tw-prose-body: var(--foreground) !important;
@@ -149,27 +179,27 @@
 /* ── Jellybeans Dark ──────────────────────────────────────────────── */
 .dark {
   /* ── Base ── */
-  --background: #121212;
+  --background: #0d0d0d;
   --foreground: #e8e8d3;
 
-  /* ── Surface 1 · card: +6 above base, heavier/darker feel ── */
-  --card: #181818;
+  /* ── Surface 1 · card: darker, denser surface ── */
+  --card: #161616;
   --card-foreground: #e8e8d3;
 
-  /* ── Overlay · popover: same as main background ── */
-  --popover: #121212;
+  /* ── Overlay · popover: matches card ── */
+  --popover: #161616;
   --popover-foreground: #e8e8d3;
 
   /* ── Surface 2 · secondary: recessed inputs/panels ── */
-  --secondary: #1d1d1d;
+  --secondary: #222222;
   --secondary-foreground: #e8e8d3;
 
   /* ── Surface 3 · muted: disabled / faded areas ── */
-  --muted: #242424;
-  --muted-foreground: #888888;
+  --muted: #2b2b2b;
+  --muted-foreground: #9e9e9e;
 
   /* ── Accent · hover / selection highlight ── */
-  --accent: #303030;
+  --accent: #393939;
   --accent-foreground: #e8e8d3;
 
   /* ── Primary (jellybeans keyword steel blue, darker) ── */
@@ -180,8 +210,8 @@
   --destructive: #cc3333;
 
   /* ── Borders: subtle separators · Input: border of form fields ── */
-  --border: #212121;
-  --input: #1f1f1f;
+  --border: #1e1e1e;
+  --input: #252525;
   --ring: #3a6090;
 
   /* ── Charts (jellybeans full syntax palette) ── */
@@ -191,14 +221,14 @@
   --chart-4: #cf6a4c;
   --chart-5: #ffb964;
 
-  /* ── Sidebar: deeper than base · accent jumps to card level for contrast ── */
-  --sidebar: #0c0c0c;
+  /* ── Sidebar: darker than content area ── */
+  --sidebar: #0a0a0a;
   --sidebar-foreground: #e8e8d3;
   --sidebar-primary: #3a6090;
   --sidebar-primary-foreground: #e8e8d3;
-  --sidebar-accent: #181818;
+  --sidebar-accent: #1a1a1a;
   --sidebar-accent-foreground: #e8e8d3;
-  --sidebar-border: #161616;
+  --sidebar-border: #141414;
   --sidebar-ring: #3a6090;
 }
 
@@ -238,9 +268,28 @@
   }
 }
 
+/* ── Chat message entry ────────────────────────────────────────────────────
+   Pure opacity fade with no transform — used by message rows, working
+   blocks, and tool blocks. Slide-based animations were dropped because
+   simultaneous transforms compete visually when several rows mount in the
+   same frame (which is the norm when the WS stream batches events). A
+   per-row `animation-delay` style staggers concurrent mounts so the
+   sequence reads as one row appearing after another. ── */
+@keyframes chat-message-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @layer utilities {
   .animate-thinking-shimmer {
     animation: thinking-shimmer 2.2s linear infinite;
+  }
+  .animate-chat-message-in {
+    animation: chat-message-in 180ms ease-out both;
   }
 }
 
@@ -249,6 +298,9 @@
     animation: none;
     background-image: none;
     color: var(--muted-foreground);
+  }
+  .animate-chat-message-in {
+    animation: none;
   }
 }
 
@@ -439,17 +491,76 @@
   }
 
   [data-slot="sidebar-container"] {
-    top: 3rem;
+    top: 2.75rem; /* h-11 — matches title bar height exactly */
   }
 
-  /* Remove all native scrollbars */
+  /* ── Global scrollbars — thin, themed, subtle ────────────────────────── */
   * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) 22%, transparent) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--muted-foreground) 22%, transparent);
+    border-radius: 99px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
+  }
+
+  *::-webkit-scrollbar-thumb:active {
+    background: color-mix(in srgb, var(--primary) 60%, transparent);
+  }
+
+  .scrollbar-none,
+  .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
 
-  *::-webkit-scrollbar {
+  .scrollbar-none::-webkit-scrollbar,
+  .no-scrollbar::-webkit-scrollbar {
     display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /* ── xterm.js terminal scrollbar — narrower than the global ──────────── */
+  .xterm-viewport {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent) transparent;
+  }
+
+  .xterm-viewport::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .xterm-viewport::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 99px;
+  }
+
+  .xterm-viewport::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+    border-radius: 99px;
+  }
+
+  .xterm-viewport::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+  }
+
+  .xterm-viewport::-webkit-scrollbar-thumb:active {
+    background: color-mix(in srgb, var(--primary) 70%, transparent);
   }
 
   /* Remove the backtick pseudo-elements Tailwind Typography adds around <code> */

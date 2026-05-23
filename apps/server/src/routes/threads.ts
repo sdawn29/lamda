@@ -11,12 +11,14 @@ import {
   listArchivedThreadsWithWorkspace,
   updateThreadTitle,
   updateThreadModel,
+  updateThreadMode,
   updateThreadStopped,
   updateThreadLastAccessed,
 } from "@lamda/db";
+import { createPlanModeTools, isMode, type Mode } from "@lamda/pi-sdk";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
-import { createSessionForThread } from "../services/session-service.js";
+import { collectCustomTools, createSessionForThread } from "../services/session-service.js";
 
 const threads = new Hono();
 
@@ -83,6 +85,34 @@ threads.patch("/thread/:id/model", async (c) => {
   const thread = getThread(threadId);
   if (!thread) return c.json({ error: "Thread not found" }, 404);
   updateThreadModel(threadId, body.modelId ?? null);
+  return c.json({ ok: true });
+});
+
+threads.patch("/thread/:id/mode", async (c) => {
+  const threadId = c.req.param("id");
+  const body = await c.req
+    .json<{ mode?: string }>()
+    .catch((): { mode?: string } => ({}));
+  if (!isMode(body.mode)) {
+    return c.json({ error: "mode must be 'ask', 'plan', or 'code'" }, 400);
+  }
+  const thread = getThread(threadId);
+  if (!thread) return c.json({ error: "Thread not found" }, 404);
+  const mode: Mode = body.mode;
+  updateThreadMode(threadId, mode);
+  const session = store.getByThreadId(threadId);
+  if (session) {
+    const entry = store.get(session.sessionId);
+    if (entry) {
+      const customTools = entry.workspaceId
+        ? await collectCustomTools(entry.workspaceId, entry.cwd, mode)
+        : mode === "plan"
+          ? createPlanModeTools(entry.cwd)
+          : [];
+      session.handle.setCustomTools(customTools);
+    }
+    session.handle.setMode(mode);
+  }
   return c.json({ ok: true });
 });
 

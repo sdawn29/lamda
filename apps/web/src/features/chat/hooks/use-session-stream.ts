@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query"
 
 import { openSessionWebSocket, listRunningTools } from "../api"
 import { subscribeToSessionEvents, type AgentEndMessage } from "../session-events"
-import { messagesQueryKey, chatKeys } from "../queries"
+import { messagesQueryKey, chatKeys, updateLastPageMessages, type MessagesInfiniteData } from "../queries"
 import { createAssistantMessage, createErrorMessage, blockToMessage, parseErrorMessage } from "../types"
 import type { AssistantMessage, Message, ToolMessage } from "../types"
 import { gitKeys } from "@/features/git/queries"
@@ -146,8 +146,8 @@ type QueuedEvent =
   | { kind: "agent_end"; agentMessages: AgentEndMessage[]; meta: TurnMeta | null }
   | { kind: "auto_retry_start"; attempt: number; errorMessage: string }
   | { kind: "auto_retry_end"; success: boolean; finalError?: string; lastPrompt: { text: string; thinkingLevel?: string } | null }
-  | { kind: "compaction_start" }
-  | { kind: "compaction_end"; errorMessage?: string; aborted?: boolean }
+  | { kind: "compaction_start"; reason: "manual" | "threshold" | "overflow" }
+  | { kind: "compaction_end"; reason: "manual" | "threshold" | "overflow"; errorMessage?: string; aborted?: boolean; willRetry?: boolean }
   | { kind: "server_error"; message: string; lastPrompt: { text: string; thinkingLevel?: string } | null }
   | { kind: "transport_error"; lastPrompt: { text: string; thinkingLevel?: string } | null }
 
@@ -212,6 +212,21 @@ function applyQueuedEvent(msgs: Message[], event: QueuedEvent): Message[] {
         duration: event.duration,
         startTime: existing?.startTime,
       }))
+    }
+
+    case "compaction_end": {
+      if (!event.errorMessage && !event.aborted) {
+        return [
+          ...msgs,
+          {
+            role: "compaction" as const,
+            id: crypto.randomUUID(),
+            reason: event.reason,
+            createdAt: Date.now(),
+          },
+        ]
+      }
+      return msgs
     }
 
     case "agent_end": {
@@ -288,9 +303,11 @@ export interface UseSessionStreamOptions {
   onMessageEnd?: () => void
   onIsLoadingChange?: (loading: boolean) => void
   onIsCompactingChange?: (compacting: boolean) => void
+  onCompactionReasonChange?: (reason: "manual" | "threshold" | "overflow" | null) => void
   onPendingErrorChange?: (error: ReturnType<typeof createErrorMessage> | null) => void
   onError?: () => void
   onToolExecutionEnd?: (toolName: string) => void
+  onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
 }
 
 export function useSessionStream({
@@ -299,9 +316,11 @@ export function useSessionStream({
   onMessageEnd,
   onIsLoadingChange,
   onIsCompactingChange,
+  onCompactionReasonChange,
   onPendingErrorChange,
   onError,
   onToolExecutionEnd,
+  onPlanSaved,
 }: UseSessionStreamOptions) {
   const queryClient = useQueryClient()
 
@@ -319,12 +338,17 @@ export function useSessionStream({
   const lastPromptRef = useRef<{ text: string; thinkingLevel?: string } | null>(null)
   const pendingThinkingLevelRef = useRef<string | null>(null)
 
+  // True while an assistant turn is in progress (message_start → agent_end).
+  // Used to suppress spurious transport errors from idle WebSocket closes that
+  // happen after agent_end (e.g. server graceful shutdown between turns).
+  const agentRunningRef = useRef(false)
+
   // Always-current callbacks — stored in a ref so the queue processor (which
   // is stable across renders) always calls the latest versions.
-  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onPendingErrorChange, onError, onToolExecutionEnd })
+  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved })
   useEffect(() => {
-    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onPendingErrorChange, onError, onToolExecutionEnd }
-  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onPendingErrorChange, onError, onToolExecutionEnd])
+    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved }
+  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved])
 
   // ── Queue processor ───────────────────────────────────────────────────────
   //
@@ -342,13 +366,14 @@ export function useSessionStream({
     const sideEffects: Array<() => void> = []
 
     // ── 1. Pure state transitions ───────────────────────────────────────────
-    queryClient.setQueryData<Message[]>(messagesQueryKey(sessionId), (prev) => {
-      let msgs = prev ?? []
-      for (const event of events) {
-        msgs = applyQueuedEvent(msgs, event)
-      }
-      return msgs
-    })
+    queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
+      updateLastPageMessages(prev, (msgs) => {
+        for (const event of events) {
+          msgs = applyQueuedEvent(msgs, event)
+        }
+        return msgs
+      })
+    )
 
     // ── 2. Collect side-effects in event order ──────────────────────────────
     for (const event of events) {
@@ -383,11 +408,12 @@ export function useSessionStream({
             cb.onMessageEnd?.()
             cb.onIsLoadingChange?.(false)
             if (hasError) cb.onError?.()
-            void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+            // Don't invalidate the messages query — the WS stream just wrote
+            // the canonical state into cache; refetching now races with the
+            // server's async DB write and can briefly replay stale rows.
             void queryClient.invalidateQueries({ queryKey: chatKeys.contextUsage(sessionId) })
             void queryClient.invalidateQueries({ queryKey: chatKeys.sessionStats(sessionId) })
-            void queryClient.invalidateQueries({ queryKey: gitKeys.lastTurnChanges(sessionId) })
-            void queryClient.invalidateQueries({ queryKey: gitKeys.lastTurn(sessionId) })
+            void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
             void queryClient.invalidateQueries({ queryKey: gitKeys.session(sessionId) })
             void queryClient.invalidateQueries({ queryKey: ["file-tree"] })
           })
@@ -414,7 +440,7 @@ export function useSessionStream({
                 createErrorMessage("Retry Failed", finalError, {
                   retryable: true,
                   action: lastPrompt
-                    ? { type: "retry", prompt: lastPrompt.text }
+                    ? { type: "retry", prompt: lastPrompt.text, thinkingLevel: lastPrompt.thinkingLevel }
                     : { type: "dismiss" },
                 })
               )
@@ -426,7 +452,10 @@ export function useSessionStream({
           break
 
         case "compaction_start":
-          sideEffects.push(() => cb.onIsCompactingChange?.(true))
+          sideEffects.push(() => {
+            cb.onIsCompactingChange?.(true)
+            cb.onCompactionReasonChange?.(event.reason)
+          })
           break
 
         case "compaction_end":
@@ -434,6 +463,7 @@ export function useSessionStream({
             const { errorMessage } = event
             sideEffects.push(() => {
               cb.onIsCompactingChange?.(false)
+              cb.onCompactionReasonChange?.(null)
               cb.onPendingErrorChange?.(
                 createErrorMessage("Compaction Failed", errorMessage, { action: { type: "dismiss" } })
               )
@@ -442,7 +472,10 @@ export function useSessionStream({
           } else {
             sideEffects.push(() => {
               cb.onIsCompactingChange?.(false)
+              cb.onCompactionReasonChange?.(null)
               cb.onPendingErrorChange?.(null)
+              void queryClient.invalidateQueries({ queryKey: chatKeys.contextUsage(sessionId) })
+              void queryClient.invalidateQueries({ queryKey: chatKeys.sessionStats(sessionId) })
             })
           }
           break
@@ -454,7 +487,7 @@ export function useSessionStream({
               createErrorMessage("Error", message, {
                 retryable: true,
                 action: lastPrompt
-                  ? { type: "retry", prompt: lastPrompt.text }
+                  ? { type: "retry", prompt: lastPrompt.text, thinkingLevel: lastPrompt.thinkingLevel }
                   : { type: "dismiss" },
               })
             )
@@ -473,7 +506,7 @@ export function useSessionStream({
                 "The connection to the server was lost. Please try again.",
                 {
                   action: lastPrompt
-                    ? { type: "retry", prompt: lastPrompt.text }
+                    ? { type: "retry", prompt: lastPrompt.text, thinkingLevel: lastPrompt.thinkingLevel }
                     : { type: "dismiss" },
                 }
               )
@@ -549,6 +582,8 @@ export function useSessionStream({
 
           onAgentStart: () => {
             if (doneFlag.current) return
+            // Invalidate turns so the new in-progress turn shows up immediately
+            void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
             void (async () => {
               try {
                 const { runningTools: blocks } = await listRunningTools(sessionId)
@@ -568,9 +603,14 @@ export function useSessionStream({
           onMessageStart: (data) => {
             if (doneFlag.current) return
             if (data.message?.role !== "assistant") return
+            agentRunningRef.current = true
+            // Preserve thinkingLevel across multiple message_starts within one agent turn.
+            // pendingThinkingLevelRef is only populated for the first LLM call; subsequent
+            // calls (after tool results) must inherit the level set by the user.
+            const inheritedThinkingLevel = turnMetaRef.current?.thinkingLevel
             turnMetaRef.current = {
               startTime: Date.now(),
-              thinkingLevel: pendingThinkingLevelRef.current ?? undefined,
+              thinkingLevel: inheritedThinkingLevel ?? pendingThinkingLevelRef.current ?? undefined,
             }
             pendingThinkingLevelRef.current = null
             enqueue({ kind: "message_start" })
@@ -641,18 +681,33 @@ export function useSessionStream({
 
           onAgentEnd: (data) => {
             if (doneFlag.current) return
+            agentRunningRef.current = false
             // Snapshot and clear turn meta before flushing so the agent_end
             // event carries the final accumulated model/provider/timing.
             const meta = turnMetaRef.current
             turnMetaRef.current = null
-            // Flush immediately — agent_end must settle before the user can
-            // send a follow-up, otherwise the next startUserPrompt() races
-            // with a pending RAF that still holds tool-finalization work.
-            enqueueNow({
+            // Use RAF-batched enqueue (not flushSync) — agent_end has no
+            // downstream race; the next startUserPrompt runs through the
+            // same queue, so ordering is preserved without forcing a
+            // synchronous commit that would block the main thread right
+            // when the assistant text is finishing its reveal.
+            enqueue({
               kind: "agent_end",
               agentMessages: data.messages ?? [],
               meta,
             })
+          },
+
+          onTurnFileChanged: () => {
+            if (doneFlag.current) return
+            // Skip if a fetch is already in-flight — the response will reflect the latest state.
+            if (queryClient.getQueryState(gitKeys.turns(sessionId))?.fetchStatus === "fetching") return
+            void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
+          },
+
+          onPlanSaved: (data) => {
+            if (doneFlag.current) return
+            callbacksRef.current.onPlanSaved?.(data)
           },
 
           onMessageEnd: () => {},
@@ -675,14 +730,14 @@ export function useSessionStream({
             })
           },
 
-          onCompactionStart: () => {
+          onCompactionStart: ({ reason }) => {
             if (doneFlag.current) return
-            enqueue({ kind: "compaction_start" })
+            enqueue({ kind: "compaction_start", reason })
           },
 
-          onCompactionEnd: ({ errorMessage, aborted }) => {
+          onCompactionEnd: ({ reason, errorMessage, aborted, willRetry }) => {
             if (doneFlag.current) return
-            enqueue({ kind: "compaction_end", errorMessage, aborted })
+            enqueue({ kind: "compaction_end", reason, errorMessage, aborted, willRetry })
           },
 
           onServerError: ({ message }) => {
@@ -697,6 +752,11 @@ export function useSessionStream({
 
           onTransportError: () => {
             if (doneFlag.current) return
+            // Suppress false positives: if the WebSocket closes while no agent
+            // turn is in progress (idle close after agent_end), do nothing.
+            // A real mid-turn disconnect will have agentRunningRef=true.
+            if (!agentRunningRef.current) return
+            agentRunningRef.current = false
             doneFlag.current = true
             enqueueNow({
               kind: "transport_error",
@@ -715,6 +775,7 @@ export function useSessionStream({
     const pendingToolStart = pendingToolStartRef.current
     return () => {
       doneFlag.current = true
+      agentRunningRef.current = false
       sessionDoneFlags.delete(sessionId)
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
       eventQueueRef.current = []
@@ -722,7 +783,7 @@ export function useSessionStream({
       unsubscribe?.()
       ws?.close()
     }
-  }, [sessionId, enqueue, enqueueNow])
+  }, [sessionId, enqueue, enqueueNow, queryClient])
 
   return {
     lastPromptRef,

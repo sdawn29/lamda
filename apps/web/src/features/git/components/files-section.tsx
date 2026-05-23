@@ -22,20 +22,22 @@ export const FilesSection = memo(function FilesSection({
   emptyText?: string
 }) {
   return (
-    <SectionCard label={label} count={files.length} className="last:mb-1.5">
+    <SectionCard label={label} count={files.length}>
       {files.length === 0 && emptyText && (
-        <p className="px-4 py-2.5 text-xs text-muted-foreground/40">{emptyText}</p>
+        <p className="px-3 py-2 text-[11px] text-muted-foreground/50">{emptyText}</p>
       )}
-      {files.map((file, i) => (
-        <FileAccordionItem
-          key={i}
-          file={file}
-          sessionId={sessionId}
-          mode={mode}
-          onStageToggle={onStageToggle}
-          onRevert={onRevert}
-        />
-      ))}
+      <div className="divide-y divide-border/25">
+        {files.map((file, i) => (
+          <FileAccordionItem
+            key={i}
+            file={file}
+            sessionId={sessionId}
+            mode={mode}
+            onStageToggle={onStageToggle}
+            onRevert={onRevert}
+          />
+        ))}
+      </div>
     </SectionCard>
   )
 })

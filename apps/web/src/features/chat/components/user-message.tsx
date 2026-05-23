@@ -1,7 +1,13 @@
 import { FileTextIcon, TerminalIcon } from "lucide-react"
 import { Icon } from "@iconify/react"
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
+import { cn } from "@/shared/lib/utils"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/ui/tooltip"
 import { getIconName } from "@/shared/ui/file-icon"
 import type { SlashCommand } from "../api"
 
@@ -20,14 +26,27 @@ function isFileMention(path: string): boolean {
 function FileChip({ filePath }: { filePath: string }) {
   const basename = filePath.split("/").pop() ?? filePath
   return (
-    <span className={CHIP_BASE_CLASS}>
-      <Icon
-        icon={`catppuccin:${getIconName(basename)}`}
-        className="size-3.5 shrink-0"
-        aria-hidden
-      />
-      {basename}
-    </span>
+    <TooltipProvider delay={500}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span className="inline-flex align-middle">
+              <span className={CHIP_BASE_CLASS}>
+                <Icon
+                  icon={`catppuccin:${getIconName(basename)}`}
+                  className="size-3.5 shrink-0"
+                  aria-hidden
+                />
+                {basename}
+              </span>
+            </span>
+          }
+        />
+        <TooltipContent side="top" align="start" sideOffset={8}>
+          <span className="font-mono text-xs break-all">{filePath}</span>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -35,48 +54,92 @@ function FolderChip({ folderPath }: { folderPath: string }) {
   const normalized = folderPath.replace(/\/+$/, "")
   const basename = normalized.split("/").pop() || normalized
   return (
-    <span className={CHIP_BASE_CLASS}>
-      <Icon icon="catppuccin:folder" className="size-3.5 shrink-0" aria-hidden />
-      {basename}
-    </span>
+    <TooltipProvider delay={500}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span className="inline-flex align-middle">
+              <span className={CHIP_BASE_CLASS}>
+                <Icon icon="catppuccin:folder" className="size-3.5 shrink-0" aria-hidden />
+                {basename}
+              </span>
+            </span>
+          }
+        />
+        <TooltipContent side="top" align="start" sideOffset={8}>
+          <span className="font-mono text-xs break-all">{normalized}</span>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
 function SlashCommandChip({ command }: { command: SlashCommand }) {
-  const label = command.source === "skill" ? "Skill" : "Prompt"
+  const isSkill = command.source === "skill"
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <span className="inline-flex align-middle">
-            <span className={CHIP_BASE_CLASS}>
-              {command.source === "skill" ? (
-                <TerminalIcon className="size-3 shrink-0" aria-hidden />
-              ) : (
-                <FileTextIcon className="size-3 shrink-0" aria-hidden />
-              )}
-              <span className="font-mono">/{command.name}</span>
+    <TooltipProvider delay={500}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span className="inline-flex align-middle">
+              <span className={CHIP_BASE_CLASS}>
+                {isSkill ? (
+                  <TerminalIcon className="size-3 shrink-0" aria-hidden />
+                ) : (
+                  <FileTextIcon className="size-3 shrink-0" aria-hidden />
+                )}
+                <span className="font-mono">/{command.name}</span>
+              </span>
             </span>
-          </span>
-        }
-      />
-      <TooltipContent className="max-w-sm flex-col items-start gap-1.5 text-left">
-        <span className="text-[10px] font-semibold tracking-[0.14em] text-background/70 uppercase">
-          {label}
-        </span>
-        <span className="font-mono text-[11px]">/{command.name}</span>
-        {command.description ? (
-          <span className="text-[11px] leading-relaxed text-background/85">
-            {command.description}
-          </span>
-        ) : (
-          <span className="text-[11px] leading-relaxed text-background/70">
-            No description available.
-          </span>
-        )}
-      </TooltipContent>
-    </Tooltip>
+          }
+        />
+        <TooltipContent
+          side="top"
+          align="start"
+          sideOffset={8}
+          className="w-64 flex-col items-start gap-0 overflow-hidden p-0"
+        >
+          {/* Header: icon badge + type label + command name */}
+          <div className="flex items-center gap-2.5 border-b border-foreground/10 px-3 py-2.5">
+            <div
+              className={cn(
+                "flex size-6 shrink-0 items-center justify-center rounded",
+                isSkill
+                  ? "bg-primary/15 text-primary"
+                  : "bg-foreground/10 text-foreground/60"
+              )}
+            >
+              {isSkill ? (
+                <TerminalIcon className="size-3.5" aria-hidden />
+              ) : (
+                <FileTextIcon className="size-3.5" aria-hidden />
+              )}
+            </div>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-[9px] font-semibold tracking-[0.14em] text-foreground/45 uppercase">
+                {isSkill ? "Skill" : "Prompt"}
+              </span>
+              <span className="truncate font-mono text-[11px] font-medium text-foreground">
+                /{command.name}
+              </span>
+            </div>
+          </div>
+          {/* Description */}
+          <div className="px-3 py-2.5">
+            {command.description ? (
+              <p className="text-[11px] leading-relaxed text-foreground/70">
+                {command.description}
+              </p>
+            ) : (
+              <p className="text-[11px] italic text-foreground/40">
+                No description available
+              </p>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 

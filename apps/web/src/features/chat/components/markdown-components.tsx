@@ -32,7 +32,7 @@ function CopyButton({ code }: { code: string }) {
       variant="outline"
       size="icon-sm"
       onClick={handleCopy}
-      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100"
+      className="absolute top-2 right-2 opacity-0 group-hover/codeblock:opacity-100"
       aria-label="Copy code"
     >
       {copied ? <Check /> : <Copy />}
@@ -57,7 +57,7 @@ function CodeBlock({
 
   if (match) {
     return (
-      <div className="group relative my-4 overflow-hidden rounded-lg border border-border">
+      <div className="group/codeblock relative my-4 overflow-hidden rounded-lg border border-border">
         <CopyButton code={code} />
         <Suspense
           fallback={
@@ -80,7 +80,7 @@ function CodeBlock({
 
   // Unlabelled code blocks stay unhighlighted to keep the base chat chunk small.
   return (
-    <div className="group relative my-4 overflow-hidden rounded-lg border border-border">
+    <div className="group/codeblock relative my-4 overflow-hidden rounded-lg border border-border">
       <CopyButton code={code} />
       <pre className="overflow-x-auto bg-transparent px-4 py-3 font-mono text-sm leading-4 text-foreground">
         <code className="text-foreground">{code}</code>
@@ -133,12 +133,18 @@ export const markdownComponents: Components = {
   // ── Links ───────────────────────────────────────────────────────────────────
   // ── Headings ─────────────────────────────────────────────────────────────
   // Render all heading levels as h4 to keep the chat UI compact.
-  h1: ({ children }) => <h4>{children}</h4>,
-  h2: ({ children }) => <h4>{children}</h4>,
-  h3: ({ children }) => <h4>{children}</h4>,
-  h4: ({ children }) => <h4>{children}</h4>,
-  h5: ({ children }) => <h4>{children}</h4>,
-  h6: ({ children }) => <h4>{children}</h4>,
+  h1: ({ children }) => <p>{children}</p>,
+  h2: ({ children }) => <p>{children}</p>,
+  h3: ({ children }) => <p>{children}</p>,
+  h4: ({ children }) => <p>{children}</p>,
+  h5: ({ children }) => <p>{children}</p>,
+  h6: ({ children }) => <p>{children}</p>,
+
+  // ── Bold ────────────────────────────────────────────────────────────────────
+  strong: ({ children }) => <span>{children}</span>,
+
+  // ── Horizontal rule ─────────────────────────────────────────────────────────
+  hr: () => null,
 
   // ── Links ───────────────────────────────────────────────────────────────────
   a: ({ href, children }) => (
@@ -152,3 +158,4 @@ export const markdownComponents: Components = {
     </a>
   ),
 }
+

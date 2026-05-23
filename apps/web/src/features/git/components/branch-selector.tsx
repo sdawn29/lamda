@@ -20,6 +20,7 @@ import {
 import { Input } from "@/shared/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 import { useCreateBranch, useInitializeGitRepository } from "../mutations"
+import { useAheadBehind } from "../queries"
 
 interface BranchSelectorProps {
   branch: string | null
@@ -55,6 +56,7 @@ export function BranchSelector({
   const createBranch = useCreateBranch(sessionId ?? "")
   const initializeRepository = useInitializeGitRepository(sessionId ?? "")
   const hasRepository = branch !== null || branches.length > 0
+  const { data: aheadBehind } = useAheadBehind(sessionId ?? "")
 
   function handleCreate() {
     if (!newBranch.trim() || !sessionId) return
@@ -92,6 +94,16 @@ export function BranchSelector({
               <span>
                 {branch ?? (hasRepository ? "no branch" : "no repository")}
               </span>
+              {aheadBehind && (aheadBehind.ahead ?? 0) > 0 && (
+                <span className="text-[10px] font-medium text-green-600 dark:text-green-400">
+                  ↑{aheadBehind.ahead}
+                </span>
+              )}
+              {aheadBehind && (aheadBehind.behind ?? 0) > 0 && (
+                <span className="text-[10px] font-medium text-amber-500">
+                  ↓{aheadBehind.behind}
+                </span>
+              )}
               <ChevronsUpDownIcon
                 data-icon="inline-end"
                 className="opacity-50"

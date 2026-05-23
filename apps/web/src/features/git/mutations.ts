@@ -15,6 +15,8 @@ import {
   gitStashDrop,
   gitRevertFile,
   gitPush,
+  gitFetch,
+  gitPull,
   gitGenerateCommitMessage,
 } from "./api"
 import {
@@ -140,11 +142,33 @@ export function useGitRevertFile(sessionId: string) {
   })
 }
 
-// ── Push ──────────────────────────────────────────────────────────────────────
+// ── Push / Fetch / Pull ───────────────────────────────────────────────────────
 
 export function useGitPush(sessionId: string) {
   return useMutation({
     mutationFn: () => gitPush(sessionId),
+  })
+}
+
+export function useGitFetch(sessionId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => gitFetch(sessionId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: branchKey(sessionId) })
+      await queryClient.invalidateQueries({ queryKey: gitStatusKey(sessionId) })
+    },
+  })
+}
+
+export function useGitPull(sessionId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => gitPull(sessionId),
+    onSuccess: async () => {
+      await invalidateGitSession(queryClient, sessionId)
+      await invalidateWorkspaceFiles(queryClient)
+    },
   })
 }
 

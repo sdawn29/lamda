@@ -1,13 +1,14 @@
-import { useState, useCallback, useEffect, useRef } from "react"
+import React, { useState, useCallback, useEffect, useRef, memo } from "react"
 import {
   Archive,
   ExternalLink,
-  Folder,
+  FolderPlus,
   FolderOpen,
+  KeyRound,
   Loader2,
+  MessageSquarePlus,
   MoreHorizontal,
   Pin,
-  Plus,
   Search,
   Settings,
   Trash2,
@@ -48,12 +49,15 @@ import {
 import { useOpenPath, useOpenWorkspaceWithApp } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
 import { useWorkspace, useCreateWorkspaceAction } from "../context"
-import { useCommandPalette } from "@/features/command-palette"
 import { useThreadStatus } from "@/features/chat"
 import type { Thread } from "../context"
 import { useSettingsModal } from "@/features/settings"
+import { useMainTabs } from "@/features/main-tabs"
+import { useCommandPalette } from "@/features/command-palette"
 import { ArchivedThreadsDialog } from "./archived-threads-dialog"
 import { CreateWorkspaceDialog } from "./create-workspace-dialog"
+import { WorkspaceEnvDialog } from "./workspace-env-dialog"
+import type { WorkspaceDto } from "../api"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -82,19 +86,20 @@ function useNow() {
   return now
 }
 
-function ThreadRow({
+const ThreadRow = memo(function ThreadRow({
   thread,
   workspaceId,
   isActive,
+  depth = 0,
   onClick,
-  now,
 }: {
   thread: Thread
   workspaceId: string
   isActive: boolean
+  depth?: number
   onClick: () => void
-  now: number
 }) {
+  const now = useNow()
   const [confirming, setConfirming] = useState(false)
   const status = useThreadStatus(thread.id)
   const { archiveThread, pinThread, unpinThread } = useWorkspace()
@@ -128,9 +133,15 @@ function ThreadRow({
     setConfirming(true)
   }, [])
 
+  const isForked = depth > 0
+
   return (
     <>
-      <SidebarMenuSubItem ref={rowRef} className="group/thread">
+      <SidebarMenuSubItem
+        ref={rowRef}
+        className="group/thread"
+        style={isForked ? { marginLeft: `${depth * 12}px`, borderLeft: "1px solid hsl(var(--border) / 0.4)", paddingLeft: "4px" } : undefined}
+      >
         <SidebarMenuSubButton isActive={isActive} onClick={onClick}>
           <span className="flex h-4 w-4 shrink-0 items-center justify-center">
             <span className="flex h-4 w-4 items-center justify-center group-hover/thread:hidden">
@@ -193,28 +204,30 @@ function ThreadRow({
       </AlertDialog>
     </>
   )
-}
+})
 
 export function AppSidebar() {
-  const now = useNow()
-  const { workspaces, createThread, deleteWorkspace } = useWorkspace()
+  const { workspaces, deleteWorkspace, pinWorkspace, unpinWorkspace } = useWorkspace()
   const { handleCreateLocal, handleCreateRemote } = useCreateWorkspaceAction()
   const openPathMutation = useOpenPath()
   const openWithAppMutation = useOpenWorkspaceWithApp()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [expandedThreadLists, setExpandedThreadLists] = useState<
+    Record<string, boolean>
+  >({})
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false)
   const [deletingWorkspace, setDeletingWorkspace] = useState<
     (typeof workspaces)[0] | null
   >(null)
+  const [envWorkspace, setEnvWorkspace] = useState<WorkspaceDto | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const navigate = useNavigate()
   const { openSettings } = useSettingsModal()
-  const { openPalette } = useCommandPalette()
-  const openCommandPaletteBinding = useShortcutBinding(
-    SHORTCUT_ACTIONS.OPEN_COMMAND_PALETTE
-  )
+  const openPalette = useCommandPalette((state) => state.openPalette)
+  const { pendingThreadIds } = useMainTabs()
+
 
   async function handleConfirmDelete() {
     if (!deletingWorkspace) return
@@ -246,42 +259,31 @@ export function AppSidebar() {
   useShortcutHandler(
     SHORTCUT_ACTIONS.NEW_THREAD,
     activeWorkspace
-      ? async () => {
-          const thread = await createThread(activeWorkspace.id)
-          setCollapsed((prev) => ({ ...prev, [activeWorkspace.id]: false }))
-          navigate({
-            to: "/workspace/$threadId",
-            params: { threadId: thread.id },
-          })
+      ? () => {
+          navigate({ to: "/new", search: { ws: activeWorkspace.id } })
         }
-      : null
+      : () => {
+          navigate({ to: "/new", search: {} })
+        }
   )
   useShortcutHandler(SHORTCUT_ACTIONS.OPEN_SETTINGS, openSettings)
 
   const newWorkspaceBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_WORKSPACE)
   const newThreadBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_THREAD)
+  const openPaletteBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_COMMAND_PALETTE)
   const openSettingsBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_SETTINGS)
 
-  // Collect all pinned threads across all workspaces
+  // Collect all pinned threads across all workspaces, excluding pending ones
   const pinnedThreads = workspaces.flatMap((ws) =>
     ws.threads
-      .filter((t) => t.isPinned)
+      .filter((t) => t.isPinned && !pendingThreadIds.has(t.id))
       .map((t) => ({ ...t, workspaceId: ws.id, workspaceName: ws.name }))
   )
 
   return (
     <Sidebar collapsible="offcanvas">
-      <SidebarHeader className="mt-10 px-4 pb-0">
-        <button
-          onClick={openPalette}
-          className="flex h-8 w-full items-center gap-2 rounded-md border border-input bg-muted/20 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/40 dark:bg-muted/30 dark:hover:bg-muted/50"
-        >
-          <Search className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1 truncate text-left">Search</span>
-          <ShortcutKbd binding={openCommandPaletteBinding} />
-        </button>
-      </SidebarHeader>
-      <SidebarContent>
+      <SidebarHeader className="h-11 shrink-0 p-0" />
+      <SidebarContent className="overflow-hidden">
         {/* Pinned threads section */}
         {pinnedThreads.length > 0 && (
           <SidebarGroup>
@@ -294,13 +296,12 @@ export function AppSidebar() {
                     thread={thread}
                     workspaceId={thread.workspaceId}
                     isActive={activeThreadId === thread.id}
-                    now={now}
-                    onClick={() =>
+                    onClick={() => {
                       navigate({
                         to: "/workspace/$threadId",
                         params: { threadId: thread.id },
                       })
-                    }
+                    }}
                   />
                 ))}
               </SidebarMenu>
@@ -308,25 +309,65 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
+        {workspaces.length > 0 && (
+          <div className="px-2 pb-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-full gap-2 text-xs"
+              onClick={() =>
+                navigate({
+                  to: "/new",
+                  search: activeWorkspace ? { ws: activeWorkspace.id } : {},
+                })
+              }
+            >
+              <MessageSquarePlus className="size-3.5" />
+              New Thread
+              <ShortcutKbd
+                binding={newThreadBinding}
+                className="ml-auto opacity-55"
+              />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-full gap-2 text-xs"
+              onClick={openPalette}
+            >
+              <Search className="size-3.5" />
+              Search
+              <ShortcutKbd
+                binding={openPaletteBinding}
+                className="ml-auto opacity-55"
+              />
+            </Button>
+          </div>
+        )}
+
+        <SidebarGroup className="group/workspaces flex min-h-0 flex-1 flex-col">
+          <SidebarGroupLabel className="text-[10px]">WORKSPACES</SidebarGroupLabel>
           <Tooltip>
             <TooltipTrigger
               render={
                 <SidebarGroupAction
+                  className="invisible group-hover/workspaces:visible"
                   onClick={() => setCreateWorkspaceOpen(true)}
                 >
-                  <Plus />
+                  <FolderPlus className="h-3.5 w-3.5 text-muted-foreground/60 transition-colors hover:text-foreground" />
                   <span className="sr-only">New workspace</span>
                 </SidebarGroupAction>
               }
             />
             <TooltipContent side="right">
               New workspace{" "}
-              <ShortcutKbd binding={newWorkspaceBinding} className="ml-1" />
+              <ShortcutKbd
+                binding={newWorkspaceBinding}
+                className="ml-1 opacity-55"
+              />
             </TooltipContent>
           </Tooltip>
-          <SidebarGroupContent>
+          <SidebarGroupContent className="min-h-0 overflow-y-auto">
             <SidebarMenu>
               {workspaces.length === 0 ? (
                 <div className="my-3 flex flex-col items-center gap-2.5 px-2 text-center">
@@ -342,12 +383,18 @@ export function AppSidebar() {
                     className="h-7 gap-1.5 text-xs"
                     onClick={() => setCreateWorkspaceOpen(true)}
                   >
-                    <Plus className="h-3 w-3" />
+                    <FolderPlus className="h-3 w-3" />
                     Add workspace
                   </Button>
                 </div>
               ) : (
-                workspaces.map((ws) => (
+                [...workspaces]
+                  .sort((a, b) => {
+                    if (a.isPinned && !b.isPinned) return -1
+                    if (!a.isPinned && b.isPinned) return 1
+                    return a.createdAt - b.createdAt
+                  })
+                  .map((ws) => (
                   <SidebarMenuItem key={ws.id} className="group/ws">
                     <SidebarMenuButton
                       onClick={() => {
@@ -358,14 +405,6 @@ export function AppSidebar() {
                       }}
                       tooltip={ws.name}
                     >
-                      <span className="relative h-4 w-4 shrink-0">
-                        <Folder
-                          className={`absolute inset-0 h-4 w-4 transition-[opacity,transform] duration-150 group-hover/ws:scale-75 ${collapsed[ws.id] ? "opacity-100" : "opacity-0"}`}
-                        />
-                        <FolderOpen
-                          className={`absolute inset-0 h-4 w-4 transition-[opacity,transform] duration-150 ${collapsed[ws.id] ? "opacity-0" : "opacity-100"}`}
-                        />
-                      </span>
                       <span className="text-foreground/80">{ws.name}</span>
                     </SidebarMenuButton>
 
@@ -376,19 +415,18 @@ export function AppSidebar() {
                           <SidebarMenuAction
                             showOnHover
                             className="right-7"
-                            onClick={async () => {
-                              const thread = await createThread(ws.id)
+                            onClick={() => {
                               setCollapsed((prev) => ({
                                 ...prev,
                                 [ws.id]: false,
                               }))
                               navigate({
-                                to: "/workspace/$threadId",
-                                params: { threadId: thread.id },
+                                to: "/new",
+                                search: { ws: ws.id },
                               })
                             }}
                           >
-                            <Plus />
+                            <MessageSquarePlus className="h-3.5 w-3.5 text-muted-foreground/60 transition-colors hover:text-foreground" />
                             <span className="sr-only">New thread</span>
                           </SidebarMenuAction>
                         }
@@ -397,7 +435,7 @@ export function AppSidebar() {
                         New thread{" "}
                         <ShortcutKbd
                           binding={newThreadBinding}
-                          className="ml-1"
+                          className="ml-1 opacity-55"
                         />
                       </TooltipContent>
                     </Tooltip>
@@ -408,7 +446,7 @@ export function AppSidebar() {
                         showOnHover
                         render={<DropdownMenuTrigger />}
                       >
-                        <MoreHorizontal />
+                        <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground/60 transition-colors hover:text-foreground" />
                         <span className="sr-only">Workspace options</span>
                       </SidebarMenuAction>
                       <DropdownMenuContent align="end">
@@ -428,6 +466,22 @@ export function AppSidebar() {
                           <ExternalLink className="mr-2 h-4 w-4" />
                           Open in Editor
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setEnvWorkspace(ws)}>
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          Environment Variables
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (ws.isPinned) {
+                              void unpinWorkspace(ws.id)
+                            } else {
+                              void pinWorkspace(ws.id)
+                            }
+                          }}
+                        >
+                          <Pin className="mr-2 h-4 w-4" />
+                          {ws.isPinned ? "Unpin Workspace" : "Pin Workspace"}
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
                           onClick={() => {
@@ -441,28 +495,83 @@ export function AppSidebar() {
                       </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {!collapsed[ws.id] &&
-                      ws.threads.filter((t) => !t.isPinned).length > 0 && (
+                    {!collapsed[ws.id] && (
+                      ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id)).length > 0 ? (
                         <SidebarMenuSub className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
-                          {ws.threads
-                            .filter((t) => !t.isPinned)
-                            .map((thread) => (
-                              <ThreadRow
-                                key={thread.id}
-                                thread={thread}
-                                workspaceId={ws.id}
-                                isActive={activeThreadId === thread.id}
-                                now={now}
-                                onClick={() =>
-                                  navigate({
-                                    to: "/workspace/$threadId",
-                                    params: { threadId: thread.id },
-                                  })
-                                }
-                              />
-                            ))}
+                          {(() => {
+                            const visibleThreads = ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id))
+                            const visibleIds = new Set(visibleThreads.map((t) => t.id))
+                            const childrenMap = new Map<string, Thread[]>()
+                            const rootThreads: Thread[] = []
+                            for (const t of visibleThreads) {
+                              if (t.forkedFromId && visibleIds.has(t.forkedFromId)) {
+                                const siblings = childrenMap.get(t.forkedFromId) ?? []
+                                siblings.push(t)
+                                childrenMap.set(t.forkedFromId, siblings)
+                              } else {
+                                rootThreads.push(t)
+                              }
+                            }
+                            rootThreads.sort((a, b) => b.createdAt - a.createdAt)
+                            const renderThread = (thread: Thread, depth: number): React.ReactNode[] => {
+                              const children = (childrenMap.get(thread.id) ?? []).slice().sort((a, b) => b.createdAt - a.createdAt)
+                              return [
+                                <ThreadRow
+                                  key={thread.id}
+                                  thread={thread}
+                                  workspaceId={ws.id}
+                                  isActive={activeThreadId === thread.id}
+                                  depth={depth}
+                                  onClick={() => {
+                                    navigate({
+                                      to: "/workspace/$threadId",
+                                      params: { threadId: thread.id },
+                                    })
+                                  }}
+                                />,
+                                ...children.flatMap((child) => renderThread(child, depth + 1)),
+                              ]
+                            }
+                            const flattened = rootThreads.flatMap((thread) =>
+                              renderThread(thread, 0)
+                            )
+                            const isExpanded = expandedThreadLists[ws.id] ?? false
+                            const visibleThreadRows = isExpanded
+                              ? flattened
+                              : flattened.slice(0, 5)
+
+                            return (
+                              <>
+                                {visibleThreadRows}
+                                {flattened.length > 5 && (
+                                  <SidebarMenuSubItem>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="ml-[1.625rem] h-auto px-1 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                                      onClick={() =>
+                                        setExpandedThreadLists((prev) => ({
+                                          ...prev,
+                                          [ws.id]: !isExpanded,
+                                        }))
+                                      }
+                                    >
+                                      {isExpanded ? "Show less" : "Show more"}
+                                    </Button>
+                                  </SidebarMenuSubItem>
+                                )}
+                              </>
+                            )
+                          })()}
                         </SidebarMenuSub>
-                      )}
+                      ) : (
+                        <div className="animate-in mx-2 my-1 rounded-md px-2 py-1.5 text-center duration-150 fade-in-0 slide-in-from-top-1">
+                          <span className="text-[11px] text-muted-foreground/60">
+                            No threads
+                          </span>
+                        </div>
+                      )
+                    )}
                   </SidebarMenuItem>
                 ))
               )}
@@ -496,7 +605,10 @@ export function AppSidebar() {
           />
           <TooltipContent side="right">
             Settings{" "}
-            <ShortcutKbd binding={openSettingsBinding} className="ml-1" />
+            <ShortcutKbd
+              binding={openSettingsBinding}
+              className="ml-1 opacity-55"
+            />
           </TooltipContent>
         </Tooltip>
       </SidebarFooter>
@@ -545,6 +657,14 @@ export function AppSidebar() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {envWorkspace && (
+        <WorkspaceEnvDialog
+          workspace={envWorkspace}
+          open={!!envWorkspace}
+          onOpenChange={(open) => { if (!open) setEnvWorkspace(null) }}
+        />
+      )}
     </Sidebar>
   )
 }

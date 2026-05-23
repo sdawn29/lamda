@@ -1,12 +1,34 @@
-import { memo } from "react"
+import { memo, useState } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { AlertCircleIcon, RotateCwIcon, XIcon } from "lucide-react"
+import type { PluggableList } from "unified"
+import {
+  AlertCircleIcon,
+  GitForkIcon,
+  SparklesIcon,
+  Undo2,
+  Loader2,
+} from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/shared/ui/alert-dialog"
+
+const remarkPlugins: PluggableList = [remarkGfm]
+
+const proseClass =
+  "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.4] prose-headings:my-0 prose-p:leading-[1.6] prose-p:mt-0 prose-p:mb-[0.75em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.6] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
 
 import { ToolCallBlock } from "./tool-call-block"
 import { markdownComponents } from "./markdown-components"
 import { UserMessageContent } from "./user-message"
-import { ThinkingBlock } from "./thinking-block"
 import { CopyButton } from "@/shared/components/copy-button"
 import { Button } from "@/shared/ui/button"
 import { getProviderMeta } from "@/shared/lib/provider-meta"
@@ -14,13 +36,13 @@ import { formatDuration, formatTime } from "@/shared/lib/formatters"
 import type { SlashCommand } from "../api"
 import {
   type AssistantMessage,
-  type ErrorAction,
-  type ErrorMessage,
+  type CompactionMessage,
   type Message,
   type UserMessage,
   type AbortMessage,
 } from "../types"
 import { cn } from "@/shared/lib/utils"
+import { useWordReveal } from "../hooks/use-word-reveal"
 
 function assistantCopyText(
   message: AssistantMessage,
@@ -59,49 +81,66 @@ interface AssistantMessageBlockProps {
   message: AssistantMessage
   showThinking: boolean
   isNew?: boolean
+  entryDelayMs?: number
+  isLastInTurn?: boolean
+  turnMessages?: AssistantMessage[]
 }
 
-function AssistantMessageBlock({
+const THINKING_LEVEL_LABELS: Record<string, string> = {
+  low: "Low",
+  medium: "Med",
+  high: "High",
+  xhigh: "Max",
+}
+
+const AssistantMessageBlock = memo(function AssistantMessageBlock({
   message,
   showThinking,
   isNew = true,
+  entryDelayMs = 0,
+  isLastInTurn = true,
+  turnMessages,
 }: AssistantMessageBlockProps) {
-  const hasThinking = showThinking && message.thinking.trim().length > 0
   const hasContent = message.content.length > 0
   const hasError = !!message.errorMessage
+  const displayContent = useWordReveal(message.content, isNew)
 
-  if (!hasThinking && !hasContent && !hasError) return null
+  if (!hasContent && !hasError) return null
 
   const providerMeta = message.provider
     ? getProviderMeta(message.provider)
     : null
-  const THINKING_LEVEL_LABELS: Record<string, string> = {
-    low: "Low",
-    medium: "Med",
-    high: "High",
-    xhigh: "Max",
-  }
   const thinkingLabel = message.thinkingLevel
     ? (THINKING_LEVEL_LABELS[message.thinkingLevel] ?? message.thinkingLevel)
     : null
-  const hasMeta = !!(message.model ?? message.responseTime != null)
+  const hasMeta = !!(
+    message.model ||
+    thinkingLabel ||
+    message.responseTime != null
+  )
 
-  const proseClass =
-    "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground leading-[1.55] prose-p:mb-0 prose-p:mt-0 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
-
+  // Wrapper-only fade — content updates (word reveal) shouldn't restart the
+  // entry animation, so we apply the class to a stable outer wrapper that
+  // only changes when the message identity changes.
   return (
     <div
       className={cn(
         "group flex flex-col gap-2",
-        isNew && "animate-in duration-300 fade-in-0 slide-in-from-bottom-1"
+        isNew && "animate-chat-message-in"
       )}
+      style={
+        isNew && entryDelayMs > 0
+          ? { animationDelay: `${entryDelayMs}ms` }
+          : undefined
+      }
     >
-      {hasThinking && <ThinkingBlock thinking={message.thinking} />}
-
       {hasContent && (
         <div className={proseClass}>
-          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {message.content}
+          <Markdown
+            remarkPlugins={remarkPlugins}
+            components={markdownComponents}
+          >
+            {displayContent}
           </Markdown>
         </div>
       )}
@@ -120,7 +159,7 @@ function AssistantMessageBlock({
         </div>
       )}
 
-      {!hasError && (
+      {isLastInTurn && !hasError && (
         <div className="flex items-center gap-3">
           {hasMeta && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -147,18 +186,37 @@ function AssistantMessageBlock({
           {message.createdAt != null && (
             <TimeStamp timestamp={message.createdAt} />
           )}
-          <CopyButton text={assistantCopyText(message, showThinking)} />
+          <CopyButton
+            text={
+              turnMessages
+                ? turnMessages
+                    .map((m) => assistantCopyText(m, showThinking))
+                    .filter(Boolean)
+                    .join("\n\n")
+                : assistantCopyText(message, showThinking)
+            }
+          />
         </div>
       )}
     </div>
   )
-}
+})
 
 export function getMessageKey(message: Message, index: number): string {
-  if (message.role === "error" || message.role === "abort") return message.id
-  return message.role === "tool"
-    ? message.toolCallId
-    : `${message.role}-${index}`
+  if (
+    message.role === "error" ||
+    message.role === "abort" ||
+    message.role === "compaction"
+  )
+    return message.id
+  if (message.role === "tool") return `tool-${message.toolCallId}`
+  // Prefer DB id when present — stable across prepends & remounts.
+  if (message.role === "user" && message.id) return `user-${message.id}`
+  // Streaming messages have no id yet — fall back to createdAt + role, then index.
+  // createdAt is sufficiently unique for messages that have it; index covers
+  // the in-flight optimistic / streaming message that has neither id nor createdAt.
+  if (message.createdAt != null) return `${message.role}-t${message.createdAt}`
+  return `${message.role}-i${index}`
 }
 
 export function estimateMessageSize(message: Message): number {
@@ -171,97 +229,27 @@ export function estimateMessageSize(message: Message): number {
   }
 
   const contentLength =
-    message.role === "error"
-      ? (message as ErrorMessage).message.length
-      : (message as AssistantMessage).content.length +
-        (message as AssistantMessage).thinking.length
+    (message as AssistantMessage).content.length +
+    (message as AssistantMessage).thinking.length
   if (contentLength > 1_200) return 320
   if (contentLength > 400) return 220
   if (contentLength > 120) return 144
   return 104
 }
 
-function ErrorBlock({
-  message,
-  onAction,
-  isNew = true,
-}: {
-  message: ErrorMessage
-  onAction?: (action: ErrorAction, id: string) => void
-  isNew?: boolean
-}) {
-  const { action } = message
-  const canRetry = action?.type === "retry" && !!action.prompt
-  const canDismiss = !!onAction && !!action && action.type !== "continue"
-
-  return (
-    <div
-      className={cn(
-        "group flex flex-col",
-        isNew && "animate-in duration-300 fade-in-0 slide-in-from-bottom-1"
-      )}
-    >
-      <div className="rounded-lg border border-border/50 px-3 py-2.5">
-        <div className="flex items-start gap-2">
-          <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/70" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <span className="text-xs font-medium text-foreground">
-                {message.title}
-              </span>
-              {message.retryCount != null && (
-                <span className="text-[10px] text-muted-foreground/60">
-                  attempt {message.retryCount}
-                </span>
-              )}
-            </div>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              {message.message}
-            </p>
-            {canDismiss && canRetry && (
-              <div className="mt-2 flex gap-1.5">
-                <Button
-                  size="xs"
-                  variant="destructive"
-                  onClick={() => onAction(action!, message.id)}
-                >
-                  <RotateCwIcon />
-                  Retry
-                </Button>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  className="text-muted-foreground/60 hover:text-foreground/80"
-                  onClick={() => onAction({ type: "dismiss" }, message.id)}
-                >
-                  Dismiss
-                </Button>
-              </div>
-            )}
-          </div>
-          {canDismiss && !canRetry && (
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              className="-mt-0.5 shrink-0 text-muted-foreground/40 hover:text-muted-foreground"
-              onClick={() => onAction({ type: "dismiss" }, message.id)}
-            >
-              <XIcon />
-              <span className="sr-only">Dismiss</span>
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export interface MessageRowProps {
   message: Message
   commandsByName: ReadonlyMap<string, SlashCommand>
   showThinking: boolean
-  onAction?: (action: ErrorAction, id: string) => void
   isNewMessage?: boolean
+  /** Stagger offset (ms) applied as CSS animation-delay when isNewMessage is true. */
+  entryDelayMs?: number
+  isLastInTurn?: boolean
+  turnMessages?: AssistantMessage[]
+  rootPath?: string
+  onFork?: (blockId: string) => Promise<void>
+  onRevert?: (blockId: string) => Promise<void>
+  isReverting?: boolean
 }
 
 function AbortBlock({ message: _ }: { message: AbortMessage }) {
@@ -277,64 +265,184 @@ function AbortBlock({ message: _ }: { message: AbortMessage }) {
   )
 }
 
+const COMPACTION_LABEL: Record<CompactionMessage["reason"], string> = {
+  manual: "Context compacted",
+  threshold: "Context compacted",
+  overflow: "Context window freed",
+}
+
+function CompactionBlock({ message }: { message: CompactionMessage }) {
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <div className="h-px flex-1 bg-border/40" />
+      <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1 text-[11px] text-muted-foreground/60">
+        <SparklesIcon className="h-3 w-3 text-primary/50" />
+        <span>{COMPACTION_LABEL[message.reason]}</span>
+      </div>
+      <div className="h-px flex-1 bg-border/40" />
+    </div>
+  )
+}
+
 export const MessageRow = memo(function MessageRow({
   message,
   commandsByName,
   showThinking,
-  onAction,
   isNewMessage = true,
+  entryDelayMs = 0,
+  isLastInTurn = true,
+  turnMessages,
+  rootPath,
+  onFork,
+  onRevert,
+  isReverting = false,
 }: MessageRowProps) {
+  const [isForking, setIsForking] = useState(false)
+  const [confirmRevertOpen, setConfirmRevertOpen] = useState(false)
+
   if (message.role === "tool") {
-    return <ToolCallBlock msg={message} isNew={isNewMessage} />
+    return (
+      <ToolCallBlock
+        msg={message}
+        isNew={isNewMessage}
+        entryDelayMs={entryDelayMs}
+        rootPath={rootPath}
+      />
+    )
   }
 
   if (message.role === "abort") {
     return <AbortBlock message={message} />
   }
 
+  if (message.role === "compaction") {
+    return <CompactionBlock message={message as CompactionMessage} />
+  }
+
   if (message.role === "user") {
+    const userMsg = message as UserMessage
+    const canFork = !!onFork && !!userMsg.id
+    const canRevert = !!onRevert && !!userMsg.id
+
+    const handleFork = async () => {
+      if (!canFork || isForking) return
+      setIsForking(true)
+      try {
+        await onFork(userMsg.id!)
+      } finally {
+        setIsForking(false)
+      }
+    }
+
+    const handleConfirmRevert = async () => {
+      if (!canRevert) return
+      setConfirmRevertOpen(false)
+      await onRevert(userMsg.id!)
+    }
+
     return (
-      <div
-        className={cn(
-          "group flex flex-col items-end gap-1.5 self-end",
-          isNewMessage &&
-            "animate-in duration-200 fade-in-0 slide-in-from-bottom-2"
-        )}
-      >
+      <>
         <div
-          className="rounded-xl bg-muted px-4 py-2.5 text-sm"
-          data-selectable
-        >
-          <UserMessageContent
-            content={message.content}
-            commandsByName={commandsByName}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <CopyButton text={message.content} />
-          {(message as UserMessage).createdAt != null && (
-            <TimeStamp timestamp={(message as UserMessage).createdAt!} />
+          className={cn(
+            "group flex flex-col items-end gap-1.5 self-end",
+            isNewMessage && "animate-chat-message-in"
           )}
+          style={
+            isNewMessage && entryDelayMs > 0
+              ? { animationDelay: `${entryDelayMs}ms` }
+              : undefined
+          }
+        >
+          <div
+            className="max-w-3/4 rounded-xl bg-muted px-4 py-2.5 text-sm wrap-break-word whitespace-pre-wrap"
+            data-selectable
+          >
+            <UserMessageContent
+              content={message.content}
+              commandsByName={commandsByName}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            {canRevert && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setConfirmRevertOpen(true)}
+                disabled={isReverting}
+                aria-label="Revert conversation to before this message"
+                className="opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+              >
+                {isReverting ? <Loader2 className="animate-spin" /> : <Undo2 />}
+              </Button>
+            )}
+            {canFork && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleFork}
+                disabled={isForking}
+                aria-label="Fork conversation from here"
+                className="opacity-0 group-hover:opacity-100"
+              >
+                {isForking ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <GitForkIcon />
+                )}
+              </Button>
+            )}
+            <CopyButton text={message.content} />
+            {userMsg.createdAt != null && (
+              <TimeStamp timestamp={userMsg.createdAt} />
+            )}
+          </div>
         </div>
-      </div>
+
+        <AlertDialog
+          open={confirmRevertOpen}
+          onOpenChange={setConfirmRevertOpen}
+        >
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogMedia className="bg-destructive/10">
+                <Undo2 className="text-destructive" />
+              </AlertDialogMedia>
+              <AlertDialogTitle>
+                Revert to before this message?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                This message and all subsequent conversation and code changes
+                will be undone. The message text will be restored to your input
+                box.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={handleConfirmRevert}
+              >
+                Revert
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     )
   }
 
-  if (message.role === "error") {
-    return (
-      <ErrorBlock
-        message={message as ErrorMessage}
-        onAction={onAction}
-        isNew={isNewMessage}
-      />
-    )
-  }
+  if (message.role === "error") return null
 
   return (
     <AssistantMessageBlock
       message={message}
       showThinking={showThinking}
       isNew={isNewMessage}
+      entryDelayMs={entryDelayMs}
+      isLastInTurn={isLastInTurn}
+      turnMessages={turnMessages}
     />
   )
 })

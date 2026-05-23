@@ -1,4 +1,4 @@
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, asc, gte, and, inArray } from "drizzle-orm";
 import { db } from "../client.js";
 import { agentTurns, agentTurnFiles } from "../schema.js";
 
@@ -11,8 +11,10 @@ export interface AgentTurnFileSummary {
 export interface AgentTurnSummary {
   id: number;
   sessionId: string;
+  threadId: string;
   startedAt: number;
   endedAt: number;
+  checkpointSha: string;
   files: AgentTurnFileSummary[];
 }
 
@@ -29,6 +31,7 @@ export function insertAgentTurn(data: {
   threadId: string;
   startedAt: number;
   endedAt: number;
+  checkpointSha: string;
   files: AgentTurnFileDetail[];
 }): void {
   const [turn] = db
@@ -38,6 +41,7 @@ export function insertAgentTurn(data: {
       threadId: data.threadId,
       startedAt: data.startedAt,
       endedAt: data.endedAt,
+      checkpointSha: data.checkpointSha,
     })
     .returning()
     .all();
@@ -58,14 +62,9 @@ export function insertAgentTurn(data: {
     .run();
 }
 
-export function listAgentTurns(threadId: string): AgentTurnSummary[] {
-  const turns = db
-    .select()
-    .from(agentTurns)
-    .where(eq(agentTurns.threadId, threadId))
-    .orderBy(desc(agentTurns.id))
-    .all();
-
+function buildTurnSummaries(
+  turns: { id: number; sessionId: string; threadId: string; startedAt: number; endedAt: number; checkpointSha: string }[]
+): AgentTurnSummary[] {
   if (turns.length === 0) return [];
 
   const turnIds = turns.map((t) => t.id);
@@ -89,10 +88,34 @@ export function listAgentTurns(threadId: string): AgentTurnSummary[] {
   return turns.map((t) => ({
     id: t.id,
     sessionId: t.sessionId,
+    threadId: t.threadId,
     startedAt: t.startedAt,
     endedAt: t.endedAt,
+    checkpointSha: t.checkpointSha,
     files: filesByTurn.get(t.id) ?? [],
   }));
+}
+
+export function listAgentTurns(threadId: string): AgentTurnSummary[] {
+  const turns = db
+    .select()
+    .from(agentTurns)
+    .where(eq(agentTurns.threadId, threadId))
+    .orderBy(desc(agentTurns.id))
+    .all();
+
+  return buildTurnSummaries(turns);
+}
+
+export function listAgentTurnsBySession(sessionId: string): AgentTurnSummary[] {
+  const turns = db
+    .select()
+    .from(agentTurns)
+    .where(eq(agentTurns.sessionId, sessionId))
+    .orderBy(desc(agentTurns.id))
+    .all();
+
+  return buildTurnSummaries(turns);
 }
 
 export function getAgentTurnFiles(turnId: number): AgentTurnFileDetail[] {
@@ -108,4 +131,43 @@ export function getAgentTurnFiles(turnId: number): AgentTurnFileDetail[] {
       preContent: f.preContent,
       wasCreatedByTurn: f.wasCreatedByTurn,
     }));
+}
+
+export function getAgentTurn(turnId: number): AgentTurnSummary | null {
+  const turn = db
+    .select()
+    .from(agentTurns)
+    .where(eq(agentTurns.id, turnId))
+    .get();
+
+  if (!turn) return null;
+
+  return buildTurnSummaries([turn])[0] ?? null;
+}
+
+// Returns all turns for a session with id >= fromTurnId, sorted oldest first.
+export function getAgentTurnsFromId(sessionId: string, fromTurnId: number): AgentTurnSummary[] {
+  const turns = db
+    .select()
+    .from(agentTurns)
+    .where(and(eq(agentTurns.sessionId, sessionId), gte(agentTurns.id, fromTurnId)))
+    .orderBy(asc(agentTurns.id))
+    .all();
+
+  return buildTurnSummaries(turns);
+}
+
+// Deletes a turn and all subsequent turns for a session (id >= fromTurnId).
+export function deleteAgentTurnsFrom(sessionId: string, fromTurnId: number): void {
+  const turnIds = db
+    .select({ id: agentTurns.id })
+    .from(agentTurns)
+    .where(and(eq(agentTurns.sessionId, sessionId), gte(agentTurns.id, fromTurnId)))
+    .all()
+    .map((t) => t.id);
+
+  if (turnIds.length === 0) return;
+
+  db.delete(agentTurnFiles).where(inArray(agentTurnFiles.turnId, turnIds)).run();
+  db.delete(agentTurns).where(inArray(agentTurns.id, turnIds)).run();
 }

@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react"
+import React, { useEffect } from "react"
+import { create } from "zustand"
 
 interface CommandPaletteContextValue {
   open: boolean
@@ -6,22 +7,33 @@ interface CommandPaletteContextValue {
   closePalette: () => void
 }
 
-const CommandPaletteContext = createContext<CommandPaletteContextValue | null>(null)
+interface CommandPaletteStore extends CommandPaletteContextValue {
+  initialized: boolean
+  setInitialized: (value: boolean) => void
+}
+
+const useCommandPaletteStore = create<CommandPaletteStore>((set) => ({
+  initialized: false,
+  open: false,
+  openPalette: () => set({ open: true }),
+  closePalette: () => set({ open: false }),
+  setInitialized: (value) => set({ initialized: value }),
+}))
 
 export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const openPalette = useCallback(() => setOpen(true), [])
-  const closePalette = useCallback(() => setOpen(false), [])
-  const value = useMemo(() => ({ open, openPalette, closePalette }), [open, openPalette, closePalette])
-  return (
-    <CommandPaletteContext.Provider value={value}>
-      {children}
-    </CommandPaletteContext.Provider>
-  )
+  const setInitialized = useCommandPaletteStore((state) => state.setInitialized)
+  useEffect(() => {
+    setInitialized(true)
+    return () => setInitialized(false)
+  }, [setInitialized])
+  return <>{children}</>
 }
 
 export function useCommandPalette() {
-  const ctx = useContext(CommandPaletteContext)
-  if (!ctx) throw new Error("useCommandPalette must be used within CommandPaletteProvider")
-  return ctx
+  const initialized = useCommandPaletteStore((state) => state.initialized)
+  const open = useCommandPaletteStore((state) => state.open)
+  const openPalette = useCommandPaletteStore((state) => state.openPalette)
+  const closePalette = useCommandPaletteStore((state) => state.closePalette)
+  if (!initialized) throw new Error("useCommandPalette must be used within CommandPaletteProvider")
+  return { open, openPalette, closePalette }
 }

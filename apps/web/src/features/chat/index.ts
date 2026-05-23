@@ -1,12 +1,13 @@
 export { ChatView } from "./components/chat-view"
+export { NewThreadView } from "./components/new-thread-view"
 export { useChatStream } from "./use-chat-stream"
 export {
-  ThreadStatusProvider,
   useThreadStatus,
   useSetThreadStatus,
   useSetActiveThreadId,
-} from "./thread-status-context"
-export type { ThreadStatus } from "./thread-status-context"
+  initThreadStatusWebSocket,
+} from "./thread-status-store"
+export type { ThreadStatus } from "./thread-status-store"
 export { ErrorToastProvider, useErrorToast } from "./contexts/error-toast-context"
 export { useApiErrorToasts } from "./hooks/use-api-error-toasts"
 // Queries

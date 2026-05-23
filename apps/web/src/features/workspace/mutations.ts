@@ -8,6 +8,9 @@ import {
   type CreateWorkspaceBody,
   deleteWorkspace as apiDeleteWorkspace,
   updateWorkspaceOpenWithApp as apiUpdateWorkspaceOpenWithApp,
+  updateWorkspaceEnv as apiUpdateWorkspaceEnv,
+  pinWorkspace as apiPinWorkspace,
+  unpinWorkspace as apiUnpinWorkspace,
   createThread as apiCreateThread,
   deleteThread as apiDeleteThread,
   archiveThread as apiArchiveThread,
@@ -16,9 +19,11 @@ import {
   unpinThread as apiUnpinThread,
   updateThreadTitle as apiUpdateThreadTitle,
   updateThreadModel as apiUpdateThreadModel,
+  updateThreadMode as apiUpdateThreadMode,
   updateThreadStopped as apiUpdateThreadStopped,
   updateThreadLastAccessed as apiUpdateThreadLastAccessed,
   resetAllData,
+  type Mode,
   type WorkspaceDto,
 } from "./api"
 import { workspacesQueryKey } from "./queries"
@@ -30,6 +35,7 @@ import {
 } from "@/features/chat/api"
 import { chatKeys } from "@/features/chat/queries"
 import { gitKeys } from "@/features/git/queries"
+import { useMainTabsStore } from "@/features/main-tabs/store"
 
 function setWorkspacesData(
   queryClient: QueryClient,
@@ -98,6 +104,10 @@ export function useDeleteWorkspace() {
       removeSessionQueries(
         queryClient,
         workspace.threads.map((thread) => thread.sessionId)
+      )
+      useMainTabsStore.getState().closeWorkspaceTabs(
+        workspace.path,
+        workspace.threads.map((t) => t.id)
       )
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
@@ -185,7 +195,7 @@ export function useUpdateThreadTitle() {
       // No invalidation needed — optimistic update keeps cache consistent.
       // Invalidation would re-fetch all workspaces and trigger unnecessary re-renders.
     },
-    onError: (_error, _variables) => {
+    onError: () => {
       // On error, invalidate to restore server state (title may not have been saved)
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
@@ -244,6 +254,58 @@ export function useUpdateWorkspaceOpenWithApp() {
   })
 }
 
+export function useUpdateWorkspaceEnv() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ workspaceId, env }: { workspaceId: string; env: Record<string, string> }) =>
+      apiUpdateWorkspaceEnv(workspaceId, env),
+    onMutate: ({ workspaceId, env }) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((ws) =>
+          ws.id !== workspaceId ? ws : { ...ws, env }
+        )
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function usePinWorkspace() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (workspaceId: string) => apiPinWorkspace(workspaceId),
+    onMutate: (workspaceId) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((ws) =>
+          ws.id !== workspaceId ? ws : { ...ws, isPinned: true }
+        )
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function useUnpinWorkspace() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (workspaceId: string) => apiUnpinWorkspace(workspaceId),
+    onMutate: (workspaceId) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((ws) =>
+          ws.id !== workspaceId ? ws : { ...ws, isPinned: false }
+        )
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
 export function useUpdateThreadModel() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -255,6 +317,27 @@ export function useUpdateThreadModel() {
           ...ws,
           threads: ws.threads.map((t) =>
             t.id !== threadId ? t : { ...t, modelId }
+          ),
+        }))
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function useUpdateThreadMode() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ threadId, mode }: { threadId: string; mode: Mode }) =>
+      apiUpdateThreadMode(threadId, mode),
+    onMutate: ({ threadId, mode }) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((ws) => ({
+          ...ws,
+          threads: ws.threads.map((t) =>
+            t.id !== threadId ? t : { ...t, mode }
           ),
         }))
       )
@@ -310,6 +393,7 @@ export function useArchiveThread() {
       )
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
       queryClient.invalidateQueries({ queryKey: ["threads", "archived"] })
+      useMainTabsStore.getState().closeTab(`thread-${threadId}`)
     },
   })
 }

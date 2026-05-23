@@ -1,2 +1,2 @@
-export { CommandPaletteProvider, useCommandPalette } from "./context"
+export { useCommandPalette } from "./store"
 export { CommandPalette } from "./components/command-palette"

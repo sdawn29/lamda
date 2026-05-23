@@ -14,10 +14,11 @@ export async function bootstrapSessions(): Promise<void> {
 
   const tasks = workspaceList.flatMap((ws) =>
     ws.threads.map(async (thread) => {
+      const mode = thread.mode as "ask" | "plan" | "code" | undefined;
       const handle = thread.sessionFile
-        ? await openManagedSession(thread.sessionFile, { cwd: ws.path })
-        : await createManagedSession({ cwd: ws.path });
-      store.create(handle, ws.path, thread.id);
+        ? await openManagedSession(thread.sessionFile, { cwd: ws.path, mode })
+        : await createManagedSession({ cwd: ws.path, mode });
+      store.create(handle, ws.path, thread.id, ws.id);
     }),
   );
 

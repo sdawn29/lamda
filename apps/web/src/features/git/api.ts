@@ -2,9 +2,12 @@ import { apiFetch } from "@/shared/lib/client"
 
 const base = (sessionId: string) => `/session/${sessionId}/git`
 
-export async function gitStatus(sessionId: string): Promise<string> {
-  const { raw } = await apiFetch<{ raw: string }>(`${base(sessionId)}/status`)
-  return raw
+export async function gitStatus(
+  sessionId: string
+): Promise<{ raw: string; isGitRepo: boolean }> {
+  return apiFetch<{ raw: string; isGitRepo: boolean }>(
+    `${base(sessionId)}/status`
+  )
 }
 
 export async function gitDiffStat(
@@ -121,6 +124,14 @@ export function gitPush(sessionId: string): Promise<void> {
   return apiFetch<void>(`${base(sessionId)}/push`, { method: "POST" })
 }
 
+export function gitFetch(sessionId: string): Promise<void> {
+  return apiFetch<void>(`${base(sessionId)}/fetch`, { method: "POST" })
+}
+
+export function gitPull(sessionId: string): Promise<void> {
+  return apiFetch<void>(`${base(sessionId)}/pull`, { method: "POST" })
+}
+
 export async function gitClone(url: string, path: string): Promise<void> {
   return apiFetch<void>("/git/clone", {
     method: "POST",
@@ -144,29 +155,101 @@ export async function gitGenerateCommitMessage(
   return message
 }
 
-export async function getLastTurnChanges(sessionId: string): Promise<string> {
-  const { raw } = await apiFetch<{ raw: string }>(
-    `${base(sessionId)}/last-turn-changes`
+export interface LogEntry {
+  sha: string
+  shortSha: string
+  author: string
+  date: string
+  subject: string
+}
+
+export async function gitLog(sessionId: string, limit = 50): Promise<LogEntry[]> {
+  const { entries } = await apiFetch<{ entries: LogEntry[] }>(
+    `${base(sessionId)}/log?limit=${limit}`
   )
-  return raw
+  return entries
 }
 
-// ── Last turn ─────────────────────────────────────────────────────────────────
-
-export interface LastTurnFile {
-  filePath: string
-  postStatusCode: string
-  wasCreatedByTurn: boolean
-  preContent: string | null
+export async function gitShow(sessionId: string, sha: string): Promise<string> {
+  const { diff } = await apiFetch<{ diff: string }>(
+    `${base(sessionId)}/show?sha=${encodeURIComponent(sha)}`
+  )
+  return diff
 }
 
-export async function getLastTurn(sessionId: string): Promise<LastTurnFile[]> {
-  const { files } = await apiFetch<{ files: LastTurnFile[] }>(
-    `${base(sessionId)}/last-turn`
+export interface CommitFile {
+  path: string
+  status: string
+  added: number
+  removed: number
+}
+
+export async function gitShowFiles(sessionId: string, sha: string): Promise<CommitFile[]> {
+  const { files } = await apiFetch<{ files: CommitFile[] }>(
+    `${base(sessionId)}/show-files?sha=${encodeURIComponent(sha)}`
   )
   return files
 }
 
-export function revertLastTurn(sessionId: string): Promise<void> {
-  return apiFetch<void>(`${base(sessionId)}/last-turn/revert`, { method: "POST" })
+export async function gitShowFileDiff(sessionId: string, sha: string, filePath: string): Promise<string> {
+  const params = new URLSearchParams({ sha, file: filePath })
+  const { diff } = await apiFetch<{ diff: string }>(
+    `${base(sessionId)}/show-file-diff?${params}`
+  )
+  return diff
 }
+
+export async function getAheadBehind(
+  sessionId: string
+): Promise<{ ahead: number | null; behind: number | null }> {
+  return apiFetch<{ ahead: number | null; behind: number | null }>(
+    `${base(sessionId)}/ahead-behind`
+  )
+}
+
+// ── Turn checkpoints (multi-turn history) ─────────────────────────────────────
+
+export interface TurnFileSummary {
+  filePath: string
+  postStatusCode: string
+  wasCreatedByTurn: boolean
+}
+
+export interface TurnSummary {
+  id: number
+  sessionId: string
+  threadId: string
+  startedAt: number
+  endedAt: number
+  checkpointSha: string
+  files: TurnFileSummary[]
+  inProgress: boolean
+}
+
+export interface TurnFileDetail {
+  filePath: string
+  postStatusCode: string
+  preStatusCode: string
+  wasCreatedByTurn: boolean
+  preContent: string | null
+}
+
+export async function listTurns(sessionId: string): Promise<TurnSummary[]> {
+  const { turns } = await apiFetch<{ turns: TurnSummary[] }>(
+    `${base(sessionId)}/turns`
+  )
+  return turns
+}
+
+export async function getTurnFiles(sessionId: string, turnId: number): Promise<TurnFileDetail[]> {
+  const { files } = await apiFetch<{ files: TurnFileDetail[] }>(
+    `${base(sessionId)}/turns/${turnId}/files`
+  )
+  return files
+}
+
+export function revertToTurn(sessionId: string, turnId: number): Promise<void> {
+  return apiFetch<void>(`${base(sessionId)}/turns/${turnId}/revert`, { method: "POST" })
+}
+
+

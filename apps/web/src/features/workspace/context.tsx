@@ -1,20 +1,23 @@
-import { createContext, useCallback, useContext, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, type ReactNode } from "react"
 import { useNavigate } from "@tanstack/react-router"
+import { create } from "zustand"
 
 import { useWorkspaces } from "./queries"
 import {
-  useCreateWorkspace as useCreateWorkspaceMutation,
-  useDeleteWorkspace as useDeleteWorkspaceMutation,
-  useCreateThread as useCreateThreadMutation,
-  useDeleteThread as useDeleteThreadMutation,
   useArchiveThread as useArchiveThreadMutation,
-  usePinThread as usePinThreadMutation,
-  useUnpinThread as useUnpinThreadMutation,
-  useUpdateThreadTitle,
-  useResetAll as useResetAllMutation,
   useCloneRepository,
+  useCreateThread as useCreateThreadMutation,
+  useCreateWorkspace as useCreateWorkspaceMutation,
+  useDeleteThread as useDeleteThreadMutation,
+  useDeleteWorkspace as useDeleteWorkspaceMutation,
+  usePinThread as usePinThreadMutation,
+  usePinWorkspace as usePinWorkspaceMutation,
+  useResetAll as useResetAllMutation,
+  useUnpinThread as useUnpinThreadMutation,
+  useUnpinWorkspace as useUnpinWorkspaceMutation,
+  useUpdateThreadTitle,
 } from "./mutations"
-import { type WorkspaceDto, type ThreadDto } from "./api"
+import { type ThreadDto, type WorkspaceDto } from "./api"
 
 export type Workspace = WorkspaceDto
 export type Thread = ThreadDto
@@ -30,13 +33,33 @@ interface WorkspaceContextValue {
   archiveThread: (workspaceId: string, threadId: string) => Promise<void>
   pinThread: (workspaceId: string, threadId: string) => Promise<void>
   unpinThread: (workspaceId: string, threadId: string) => Promise<void>
+  pinWorkspace: (workspaceId: string) => Promise<void>
+  unpinWorkspace: (workspaceId: string) => Promise<void>
   setThreadTitle: (workspaceId: string, threadId: string, title: string) => void
   resetAll: () => Promise<void>
 }
 
-const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
+interface WorkspaceUiStore {
+  isProviderMounted: boolean
+  setProviderMounted: (value: boolean) => void
+}
+
+const useWorkspaceUiStore = create<WorkspaceUiStore>((set) => ({
+  isProviderMounted: false,
+  setProviderMounted: (value) => set({ isProviderMounted: value }),
+}))
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
+  // Keep provider for tree-compatibility; no network state mirroring to avoid loops.
+  const setProviderMounted = useWorkspaceUiStore((state) => state.setProviderMounted)
+  useEffect(() => {
+    setProviderMounted(true)
+    return () => setProviderMounted(false)
+  }, [setProviderMounted])
+  return <>{children}</>
+}
+
+export function useWorkspace(): WorkspaceContextValue {
   const { data: workspaces = [], isLoading } = useWorkspaces()
 
   const createWorkspaceMutation = useCreateWorkspaceMutation()
@@ -46,16 +69,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const archiveThreadMutation = useArchiveThreadMutation()
   const pinThreadMutation = usePinThreadMutation()
   const unpinThreadMutation = useUnpinThreadMutation()
+  const pinWorkspaceMutation = usePinWorkspaceMutation()
+  const unpinWorkspaceMutation = useUnpinWorkspaceMutation()
   const updateTitleMutation = useUpdateThreadTitle()
   const resetAllMutation = useResetAllMutation()
   const cloneRepositoryMutation = useCloneRepository()
 
   const createWorkspace = useCallback(
     async (name: string, path: string): Promise<Workspace> => {
-      const { workspace } = await createWorkspaceMutation.mutateAsync({
-        name,
-        path,
-      })
+      const { workspace } = await createWorkspaceMutation.mutateAsync({ name, path })
       return workspace
     },
     [createWorkspaceMutation]
@@ -97,26 +119,40 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   )
 
   const archiveThread = useCallback(
-    async (_workspaceId: string, threadId: string): Promise<void> => {
-      await archiveThreadMutation.mutateAsync({ workspaceId: _workspaceId, threadId })
+    async (workspaceId: string, threadId: string): Promise<void> => {
+      await archiveThreadMutation.mutateAsync({ workspaceId, threadId })
     },
     [archiveThreadMutation]
   )
 
   const pinThread = useCallback(
-    async (_workspaceId: string, threadId: string): Promise<void> => {
+    async (workspaceId: string, threadId: string): Promise<void> => {
       await pinThreadMutation.mutateAsync(threadId)
-      void _workspaceId // reserved for future use
+      void workspaceId
     },
     [pinThreadMutation]
   )
 
   const unpinThread = useCallback(
-    async (_workspaceId: string, threadId: string): Promise<void> => {
+    async (workspaceId: string, threadId: string): Promise<void> => {
       await unpinThreadMutation.mutateAsync(threadId)
-      void _workspaceId // reserved for future use
+      void workspaceId
     },
     [unpinThreadMutation]
+  )
+
+  const pinWorkspace = useCallback(
+    async (workspaceId: string): Promise<void> => {
+      await pinWorkspaceMutation.mutateAsync(workspaceId)
+    },
+    [pinWorkspaceMutation]
+  )
+
+  const unpinWorkspace = useCallback(
+    async (workspaceId: string): Promise<void> => {
+      await unpinWorkspaceMutation.mutateAsync(workspaceId)
+    },
+    [unpinWorkspaceMutation]
   )
 
   const setThreadTitle = useCallback(
@@ -130,34 +166,40 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     await resetAllMutation.mutateAsync()
   }, [resetAllMutation])
 
-  return (
-    <WorkspaceContext
-      value={{
-        workspaces,
-        isLoading,
-        createWorkspace,
-        cloneRepository,
-        deleteWorkspace,
-        createThread,
-        deleteThread,
-        archiveThread,
-        pinThread,
-        unpinThread,
-        setThreadTitle,
-        resetAll,
-      }}
-    >
-      {children}
-    </WorkspaceContext>
+  return useMemo(
+    () => ({
+      workspaces,
+      isLoading,
+      createWorkspace,
+      cloneRepository,
+      deleteWorkspace,
+      createThread,
+      deleteThread,
+      archiveThread,
+      pinThread,
+      unpinThread,
+      pinWorkspace,
+      unpinWorkspace,
+      setThreadTitle,
+      resetAll,
+    }),
+    [
+      workspaces,
+      isLoading,
+      createWorkspace,
+      cloneRepository,
+      deleteWorkspace,
+      createThread,
+      deleteThread,
+      archiveThread,
+      pinThread,
+      unpinThread,
+      pinWorkspace,
+      unpinWorkspace,
+      setThreadTitle,
+      resetAll,
+    ]
   )
-}
-
-export function useWorkspace() {
-  const context = useContext(WorkspaceContext)
-  if (!context) {
-    throw new Error("useWorkspace must be used within a WorkspaceProvider")
-  }
-  return context
 }
 
 export function useCreateWorkspaceAction() {
@@ -168,13 +210,7 @@ export function useCreateWorkspaceAction() {
     async (path: string) => {
       const folderName = path.split(/[/\\]/).pop() || path
       const workspace = await createWorkspace(folderName, path)
-      const firstThread = workspace.threads[0]
-      if (firstThread) {
-        navigate({
-          to: "/workspace/$threadId",
-          params: { threadId: firstThread.id },
-        })
-      }
+      navigate({ to: "/new", search: { ws: workspace.id } })
     },
     [createWorkspace, navigate]
   )
@@ -182,13 +218,7 @@ export function useCreateWorkspaceAction() {
   const handleCreateRemote = useCallback(
     async (url: string, path: string) => {
       const workspace = await cloneRepository(url, path)
-      const firstThread = workspace.threads[0]
-      if (firstThread) {
-        navigate({
-          to: "/workspace/$threadId",
-          params: { threadId: firstThread.id },
-        })
-      }
+      navigate({ to: "/new", search: { ws: workspace.id } })
     },
     [cloneRepository, navigate]
   )

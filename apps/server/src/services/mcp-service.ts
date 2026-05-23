@@ -1,5 +1,5 @@
 import { McpClient, createMcpClient, mcpToolToPiTool } from "@lamda/mcp"
-import type { ToolDefinition } from "@mariozechner/pi-coding-agent"
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent"
 import type { McpServerConfig } from "@lamda/mcp"
 import {
   getMcpServers,
@@ -28,6 +28,15 @@ interface ClientEntry {
 }
 
 const clientPool = new Map<string, Map<string, ClientEntry>>()
+
+// Sweep pools whose workspace no longer has any MCP servers in the DB.
+setInterval(() => {
+  for (const workspaceId of clientPool.keys()) {
+    if (getMcpServers(workspaceId).length === 0) {
+      removeAllClients(workspaceId)
+    }
+  }
+}, 15 * 60 * 1000).unref()
 
 function getClientEntry(workspaceId: string, config: McpServerConfig): ClientEntry {
   let pool = clientPool.get(workspaceId) ?? new Map()

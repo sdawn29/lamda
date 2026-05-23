@@ -1,12 +1,5 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react"
+import { useEffect, useMemo, useRef, type ReactNode } from "react"
+import { create } from "zustand"
 
 export interface TerminalTab {
   id: string
@@ -24,6 +17,20 @@ function makeDefaultState(): WorkspaceTerminalState {
   return { isOpen: false, tabs: [], activeTabId: null }
 }
 
+interface TerminalStore {
+  initialized: boolean
+  states: Map<string, WorkspaceTerminalState>
+  setInitialized: (value: boolean) => void
+  setStates: (updater: (prev: Map<string, WorkspaceTerminalState>) => Map<string, WorkspaceTerminalState>) => void
+}
+
+const useTerminalStore = create<TerminalStore>((set) => ({
+  initialized: false,
+  states: new Map(),
+  setInitialized: (value) => set({ initialized: value }),
+  setStates: (updater) => set((state) => ({ states: updater(state.states) })),
+}))
+
 interface TerminalContextValue {
   getState: (workspaceId: string) => WorkspaceTerminalState
   getAllStates: () => Map<string, WorkspaceTerminalState>
@@ -37,160 +44,160 @@ interface TerminalContextValue {
   killAll: (workspaceId: string) => void
 }
 
-const TerminalContext = createContext<TerminalContextValue | null>(null)
-
 export function TerminalProvider({ children }: { children: ReactNode }) {
-  const [states, setStates] = useState<Map<string, WorkspaceTerminalState>>(
-    () => new Map()
-  )
-
-  // Per-workspace tab counters (only incremented when a tab is actually created)
   const tabCounters = useRef<Map<string, number>>(new Map())
+  const states = useTerminalStore((state) => state.states)
+  const setInitialized = useTerminalStore((state) => state.setInitialized)
+  const setStates = useTerminalStore((state) => state.setStates)
 
-  const getState = useCallback(
-    (workspaceId: string) => states.get(workspaceId) ?? makeDefaultState(),
-    [states]
-  )
+  useEffect(() => {
+    setInitialized(true)
+    return () => setInitialized(false)
+  }, [setInitialized])
 
-  const getAllStates = useCallback(() => states, [states])
+  const getState = (workspaceId: string): WorkspaceTerminalState =>
+    states.get(workspaceId) ?? makeDefaultState()
 
-  const update = useCallback(
-    (workspaceId: string, fn: (prev: WorkspaceTerminalState) => WorkspaceTerminalState) => {
-      setStates((prev) => {
-        const current = prev.get(workspaceId) ?? makeDefaultState()
-        const next = fn(current)
-        const m = new Map(prev)
-        m.set(workspaceId, next)
-        return m
-      })
-    },
-    []
-  )
+  const getAllStates = () => states
 
-  const makeTab = useCallback((workspaceId: string, cwd: string): TerminalTab => {
+  const update = (
+    workspaceId: string,
+    fn: (prev: WorkspaceTerminalState) => WorkspaceTerminalState
+  ) => {
+    setStates((prevStates) => {
+      const current = prevStates.get(workspaceId) ?? makeDefaultState()
+      const next = fn(current)
+      const map = new Map(prevStates)
+      map.set(workspaceId, next)
+      return map
+    })
+  }
+
+  const makeTab = (workspaceId: string, cwd: string): TerminalTab => {
     const counter = (tabCounters.current.get(workspaceId) ?? 0) + 1
     tabCounters.current.set(workspaceId, counter)
     return { id: crypto.randomUUID(), title: `Terminal ${counter}`, cwd }
-  }, [])
+  }
 
-  // `states` is in the dep arrays of open/toggle so the callbacks close over the current
-  // map and can read it synchronously — no ref needed, no render-time mutations.
-  const open = useCallback(
-    (workspaceId: string, cwd: string) => {
-      const current = states.get(workspaceId) ?? makeDefaultState()
-      if (current.tabs.length > 0) {
-        update(workspaceId, (prev) => ({ ...prev, isOpen: true }))
-      } else {
-        const tab = makeTab(workspaceId, cwd)
-        update(workspaceId, () => ({ isOpen: true, tabs: [tab], activeTabId: tab.id }))
-      }
-    },
-    [states, update, makeTab]
-  )
-
-  const toggle = useCallback(
-    (workspaceId: string, cwd: string) => {
-      const current = states.get(workspaceId) ?? makeDefaultState()
-      if (current.isOpen) {
-        update(workspaceId, (prev) => ({ ...prev, isOpen: false }))
-      } else if (current.tabs.length > 0) {
-        update(workspaceId, (prev) => ({ ...prev, isOpen: true }))
-      } else {
-        const tab = makeTab(workspaceId, cwd)
-        update(workspaceId, () => ({ isOpen: true, tabs: [tab], activeTabId: tab.id }))
-      }
-    },
-    [states, update, makeTab]
-  )
-
-  const close = useCallback(
-    (workspaceId: string) => {
-      update(workspaceId, (prev) => ({ ...prev, isOpen: false }))
-    },
-    [update]
-  )
-
-  const addTab = useCallback(
-    (workspaceId: string, cwd: string): string => {
+  const open = (workspaceId: string, cwd: string) => {
+    const current = states.get(workspaceId) ?? makeDefaultState()
+    if (current.tabs.length > 0) {
+      update(workspaceId, (prev) => ({ ...prev, isOpen: true }))
+    } else {
       const tab = makeTab(workspaceId, cwd)
-      update(workspaceId, (prev) => ({
-        ...prev,
-        tabs: [...prev.tabs, tab],
-        activeTabId: tab.id,
-      }))
-      return tab.id
-    },
-    [update, makeTab]
-  )
+      update(workspaceId, () => ({ isOpen: true, tabs: [tab], activeTabId: tab.id }))
+    }
+  }
 
-  const closeTab = useCallback(
-    (workspaceId: string, tabId: string) => {
-      update(workspaceId, (prev) => {
-        const idx = prev.tabs.findIndex((t) => t.id === tabId)
-        if (idx === -1) return prev
-        const next = prev.tabs.filter((t) => t.id !== tabId)
-        if (next.length === 0) return { ...prev, tabs: [], isOpen: false, activeTabId: null }
-        const newActive =
-          prev.activeTabId === tabId ? next[idx > 0 ? idx - 1 : 0].id : prev.activeTabId
-        return { ...prev, tabs: next, activeTabId: newActive }
-      })
-    },
-    [update]
-  )
+  const toggle = (workspaceId: string, cwd: string) => {
+    const current = states.get(workspaceId) ?? makeDefaultState()
+    if (current.isOpen) {
+      update(workspaceId, (prev) => ({ ...prev, isOpen: false }))
+    } else if (current.tabs.length > 0) {
+      update(workspaceId, (prev) => ({ ...prev, isOpen: true }))
+    } else {
+      const tab = makeTab(workspaceId, cwd)
+      update(workspaceId, () => ({ isOpen: true, tabs: [tab], activeTabId: tab.id }))
+    }
+  }
 
-  const setActiveTab = useCallback(
-    (workspaceId: string, tabId: string) => {
-      update(workspaceId, (prev) => ({ ...prev, activeTabId: tabId }))
-    },
-    [update]
-  )
+  const close = (workspaceId: string) => {
+    update(workspaceId, (prev) => ({ ...prev, isOpen: false }))
+  }
 
-  const renameTab = useCallback(
-    (workspaceId: string, tabId: string, title: string) => {
-      update(workspaceId, (prev) => ({
-        ...prev,
-        tabs: prev.tabs.map((t) => (t.id === tabId ? { ...t, title } : t)),
-      }))
-    },
-    [update]
-  )
+  const addTab = (workspaceId: string, cwd: string): string => {
+    const tab = makeTab(workspaceId, cwd)
+    update(workspaceId, (prev) => ({
+      ...prev,
+      tabs: [...prev.tabs, tab],
+      activeTabId: tab.id,
+    }))
+    return tab.id
+  }
 
-  const killAll = useCallback(
-    (workspaceId: string) => {
-      tabCounters.current.delete(workspaceId)
-      update(workspaceId, () => makeDefaultState())
-    },
-    [update]
-  )
+  const closeTab = (workspaceId: string, tabId: string) => {
+    update(workspaceId, (prev) => {
+      const idx = prev.tabs.findIndex((tab) => tab.id === tabId)
+      if (idx === -1) return prev
+      const tabs = prev.tabs.filter((tab) => tab.id !== tabId)
+      if (tabs.length === 0) return { ...prev, tabs: [], isOpen: false, activeTabId: null }
+      const activeTabId =
+        prev.activeTabId === tabId ? tabs[idx > 0 ? idx - 1 : 0].id : prev.activeTabId
+      return { ...prev, tabs, activeTabId }
+    })
+  }
 
-  const value = useMemo(
-    () => ({
-      getState,
-      getAllStates,
-      toggle,
-      open,
-      close,
-      addTab,
-      closeTab,
-      setActiveTab,
-      renameTab,
-      killAll,
-    }),
-    [getState, getAllStates, toggle, open, close, addTab, closeTab, setActiveTab, renameTab, killAll]
-  )
+  const setActiveTab = (workspaceId: string, tabId: string) => {
+    update(workspaceId, (prev) => ({ ...prev, activeTabId: tabId }))
+  }
 
-  return <TerminalContext value={value}>{children}</TerminalContext>
+  const renameTab = (workspaceId: string, tabId: string, title: string) => {
+    update(workspaceId, (prev) => ({
+      ...prev,
+      tabs: prev.tabs.map((tab) => (tab.id === tabId ? { ...tab, title } : tab)),
+    }))
+  }
+
+  const killAll = (workspaceId: string) => {
+    tabCounters.current.delete(workspaceId)
+    update(workspaceId, () => makeDefaultState())
+  }
+
+  const value: TerminalContextValue = {
+    getState,
+    getAllStates,
+    toggle,
+    open,
+    close,
+    addTab,
+    closeTab,
+    setActiveTab,
+    renameTab,
+    killAll,
+  }
+
+  return <TerminalContextBridge value={value}>{children}</TerminalContextBridge>
+}
+
+interface TerminalContextBridgeProps {
+  value: TerminalContextValue
+  children: ReactNode
+}
+
+interface TerminalBridgeStore {
+  value: TerminalContextValue | null
+  setValue: (value: TerminalContextValue | null) => void
+}
+
+const useTerminalBridgeStore = create<TerminalBridgeStore>((set) => ({
+  value: null,
+  setValue: (value) => set({ value }),
+}))
+
+function TerminalContextBridge({ value, children }: TerminalContextBridgeProps) {
+  const setValue = useTerminalBridgeStore((state) => state.setValue)
+
+  useEffect(() => {
+    setValue(value)
+    return () => setValue(null)
+  }, [setValue, value])
+
+  return <>{children}</>
 }
 
 export function useTerminal() {
-  const ctx = useContext(TerminalContext)
-  if (!ctx) throw new Error("useTerminal must be used within TerminalProvider")
-  return ctx
+  const initialized = useTerminalStore((state) => state.initialized)
+  const value = useTerminalBridgeStore((state) => state.value)
+  if (!initialized || !value) {
+    throw new Error("useTerminal must be used within TerminalProvider")
+  }
+  return value
 }
 
 export function useTerminalForWorkspace(workspaceId: string, cwd: string) {
   const ctx = useTerminal()
-  const state = ctx.getState(workspaceId)
+  const state = useTerminalStore((store) => store.states.get(workspaceId) ?? makeDefaultState())
+
   return useMemo(
     () => ({
       isOpen: state.isOpen,
@@ -205,7 +212,6 @@ export function useTerminalForWorkspace(workspaceId: string, cwd: string) {
       renameTab: (tabId: string, title: string) => ctx.renameTab(workspaceId, tabId, title),
       killAll: () => ctx.killAll(workspaceId),
     }),
-     
     [ctx, workspaceId, cwd, state]
   )
 }

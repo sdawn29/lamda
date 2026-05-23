@@ -1,11 +1,5 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useReducer,
-  type ReactNode,
-} from "react"
+import { useEffect, type ReactNode } from "react"
+import { create } from "zustand"
 
 export interface DiffPanelTab {
   id: string
@@ -14,7 +8,14 @@ export interface DiffPanelTab {
   filePath?: string
 }
 
+const SOURCE_CONTROL_TAB: DiffPanelTab = {
+  id: "tab-source-control",
+  title: "Changes",
+  type: "source-control",
+}
+
 interface DiffPanelState {
+  initialized: boolean
   isOpen: boolean
   isFullscreen: boolean
   tabs: DiffPanelTab[]
@@ -22,80 +23,55 @@ interface DiffPanelState {
   pendingTabId: string | null
   currentWorkspacePath: string | null
   workspaceTabs: Record<string, DiffPanelTab[]>
+  setInitialized: (value: boolean) => void
+  toggle: () => void
+  open: () => void
+  close: () => void
+  toggleFullscreen: () => void
+  addTab: (tab: Omit<DiffPanelTab, "id">) => void
+  closeTab: (id: string) => void
+  setActiveTab: (id: string) => void
+  clearPendingTab: () => void
+  renameTab: (id: string, title: string) => void
+  setCurrentWorkspace: (path: string | null) => void
 }
 
-type DiffPanelAction =
-  | { type: "OPEN" }
-  | { type: "CLOSE" }
-  | { type: "TOGGLE" }
-  | { type: "TOGGLE_FULLSCREEN" }
-  | { type: "ADD_TAB"; payload: Omit<DiffPanelTab, "id"> }
-  | { type: "CLOSE_TAB"; payload: string }
-  | { type: "SET_ACTIVE_TAB"; payload: string }
-  | { type: "CLEAR_PENDING_TAB" }
-  | { type: "RENAME_TAB"; payload: { id: string; title: string } }
-  | { type: "SET_WORKSPACE"; payload: string | null }
-
-const SOURCE_CONTROL_TAB: DiffPanelTab = {
-  id: "tab-source-control",
-  title: "Changes",
-  type: "source-control",
-}
-
-const initialState: DiffPanelState = {
+const useDiffPanelStore = create<DiffPanelState>((set) => ({
+  initialized: false,
   isOpen: false,
   isFullscreen: false,
   tabs: [SOURCE_CONTROL_TAB],
-  activeTabId: "tab-source-control",
+  activeTabId: SOURCE_CONTROL_TAB.id,
   pendingTabId: null,
   currentWorkspacePath: null,
   workspaceTabs: {},
-}
+  setInitialized: (value) => set({ initialized: value }),
+  toggle: () =>
+    set((state) => ({
+      isOpen: !state.isOpen,
+      isFullscreen: !state.isOpen ? state.isFullscreen : false,
+    })),
+  open: () => set({ isOpen: true }),
+  close: () => set({ isOpen: false, isFullscreen: false }),
+  toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
+  addTab: (tab) =>
+    set((state) => {
+      if (tab.type === "source-control") return state
 
-function diffPanelReducer(state: DiffPanelState, action: DiffPanelAction): DiffPanelState {
-  switch (action.type) {
-    case "OPEN":
-      return { ...state, isOpen: true }
-
-    case "CLOSE":
-      return { ...state, isOpen: false, isFullscreen: false }
-
-    case "TOGGLE":
-      return {
-        ...state,
-        isOpen: !state.isOpen,
-        isFullscreen: !state.isOpen ? state.isFullscreen : false,
-      }
-
-    case "TOGGLE_FULLSCREEN":
-      return { ...state, isFullscreen: !state.isFullscreen }
-
-    case "ADD_TAB": {
-      const tab = action.payload
-      if (tab.type === "source-control") {
-        return state
-      }
-
-      // Check if file already exists
       if (tab.filePath) {
-        const existingTab = state.tabs.find((t) => t.filePath === tab.filePath)
+        const existingTab = state.tabs.find((item) => item.filePath === tab.filePath)
         if (existingTab) {
-          return {
-            ...state,
-            activeTabId: existingTab.id,
-            pendingTabId: existingTab.id,
-          }
+          return { activeTabId: existingTab.id, pendingTabId: existingTab.id }
         }
       }
 
       const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       const newTab = { ...tab, id }
-      const newTabs = [...state.tabs, newTab]
+      const tabs = [...state.tabs, newTab]
 
-      // Save to workspace tabs
       let workspaceTabs = state.workspaceTabs
       if (state.currentWorkspacePath) {
-        const fileTabs = newTabs.filter((t) => t.type === "file")
+        const fileTabs = tabs.filter((item) => item.type === "file")
         workspaceTabs = {
           ...state.workspaceTabs,
           [state.currentWorkspacePath]: fileTabs,
@@ -103,81 +79,56 @@ function diffPanelReducer(state: DiffPanelState, action: DiffPanelAction): DiffP
       }
 
       return {
-        ...state,
-        tabs: newTabs,
+        tabs,
         activeTabId: id,
         pendingTabId: id,
         workspaceTabs,
       }
-    }
+    }),
+  closeTab: (id) =>
+    set((state) => {
+      const tab = state.tabs.find((item) => item.id === id)
+      if (tab?.type === "source-control") return state
 
-    case "CLOSE_TAB": {
-      const id = action.payload
-      const tab = state.tabs.find((t) => t.id === id)
-
-      // Prevent closing Source Control tab
-      if (tab?.type === "source-control") {
-        return state
-      }
-
-      const newTabs = state.tabs.filter((t) => t.id !== id)
-
-      // If no tabs left, reset to Source Control
-      if (newTabs.length === 0) {
+      const tabs = state.tabs.filter((item) => item.id !== id)
+      if (tabs.length === 0) {
         return {
-          ...state,
           tabs: [SOURCE_CONTROL_TAB],
           activeTabId: SOURCE_CONTROL_TAB.id,
         }
       }
 
-      // If closing active tab, switch to adjacent tab
-      let newActiveTabId = state.activeTabId
+      let activeTabId = state.activeTabId
       if (state.activeTabId === id) {
-        const closedIndex = state.tabs.findIndex((t) => t.id === id)
+        const closedIndex = state.tabs.findIndex((item) => item.id === id)
         const newActiveIndex = Math.max(0, closedIndex - 1)
-        newActiveTabId = newTabs[newActiveIndex].id
+        activeTabId = tabs[newActiveIndex].id
       }
 
-      // Update workspace tabs
       let workspaceTabs = state.workspaceTabs
       if (state.currentWorkspacePath) {
-        const fileTabs = newTabs.filter((t) => t.type === "file")
+        const fileTabs = tabs.filter((item) => item.type === "file")
         workspaceTabs = {
           ...state.workspaceTabs,
           [state.currentWorkspacePath]: fileTabs,
         }
       }
 
-      return {
-        ...state,
-        tabs: newTabs,
-        activeTabId: newActiveTabId,
-        workspaceTabs,
-      }
-    }
-
-    case "SET_ACTIVE_TAB":
-      return { ...state, activeTabId: action.payload }
-
-    case "CLEAR_PENDING_TAB":
-      return { ...state, pendingTabId: null }
-
-    case "RENAME_TAB":
-      return {
-        ...state,
-        tabs: state.tabs.map((t) =>
-          t.id === action.payload.id ? { ...t, title: action.payload.title } : t
-        ),
-      }
-
-    case "SET_WORKSPACE": {
-      const path = action.payload
-
-      // Save current file tabs before switching
+      return { tabs, activeTabId, workspaceTabs }
+    }),
+  setActiveTab: (id) => set({ activeTabId: id }),
+  clearPendingTab: () => set({ pendingTabId: null }),
+  renameTab: (id, title) =>
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === id ? { ...tab, title } : tab
+      ),
+    })),
+  setCurrentWorkspace: (path) =>
+    set((state) => {
       let workspaceTabs = state.workspaceTabs
       if (state.currentWorkspacePath) {
-        const fileTabs = state.tabs.filter((t) => t.type === "file")
+        const fileTabs = state.tabs.filter((tab) => tab.type === "file")
         if (fileTabs.length > 0) {
           workspaceTabs = {
             ...state.workspaceTabs,
@@ -186,12 +137,10 @@ function diffPanelReducer(state: DiffPanelState, action: DiffPanelAction): DiffP
         }
       }
 
-      // Switch to new workspace
       if (path) {
         const savedTabs = workspaceTabs[path] || []
         if (savedTabs.length > 0) {
           return {
-            ...state,
             workspaceTabs,
             currentWorkspacePath: path,
             tabs: [SOURCE_CONTROL_TAB, ...savedTabs],
@@ -201,18 +150,13 @@ function diffPanelReducer(state: DiffPanelState, action: DiffPanelAction): DiffP
       }
 
       return {
-        ...state,
         workspaceTabs,
         currentWorkspacePath: path,
         tabs: [SOURCE_CONTROL_TAB],
         activeTabId: SOURCE_CONTROL_TAB.id,
       }
-    }
-
-    default:
-      return state
-  }
-}
+    }),
+}))
 
 interface DiffPanelContextValue {
   isOpen: boolean
@@ -233,50 +177,56 @@ interface DiffPanelContextValue {
   setCurrentWorkspace: (path: string | null) => void
 }
 
-const DiffPanelContext = createContext<DiffPanelContextValue | null>(null)
-
 export function DiffPanelProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(diffPanelReducer, initialState)
+  const setInitialized = useDiffPanelStore((state) => state.setInitialized)
 
-  const toggle = useCallback(() => dispatch({ type: "TOGGLE" }), [])
-  const open = useCallback(() => dispatch({ type: "OPEN" }), [])
-  const close = useCallback(() => dispatch({ type: "CLOSE" }), [])
-  const toggleFullscreen = useCallback(() => dispatch({ type: "TOGGLE_FULLSCREEN" }), [])
-  const addTab = useCallback((tab: Omit<DiffPanelTab, "id">) => dispatch({ type: "ADD_TAB", payload: tab }), [])
-  const closeTab = useCallback((id: string) => dispatch({ type: "CLOSE_TAB", payload: id }), [])
-  const setActiveTab = useCallback((id: string) => dispatch({ type: "SET_ACTIVE_TAB", payload: id }), [])
-  const clearPendingTab = useCallback(() => dispatch({ type: "CLEAR_PENDING_TAB" }), [])
-  const renameTab = useCallback((id: string, title: string) => dispatch({ type: "RENAME_TAB", payload: { id, title } }), [])
-  const setCurrentWorkspace = useCallback((path: string | null) => dispatch({ type: "SET_WORKSPACE", payload: path }), [])
+  useEffect(() => {
+    setInitialized(true)
+    return () => setInitialized(false)
+  }, [setInitialized])
 
-  const value = useMemo(
-    () => ({
-      isOpen: state.isOpen,
-      toggle,
-      open,
-      close,
-      isFullscreen: state.isFullscreen,
-      toggleFullscreen,
-      tabs: state.tabs,
-      activeTabId: state.activeTabId,
-      pendingTabId: state.pendingTabId,
-      addTab,
-      closeTab,
-      setActiveTab,
-      clearPendingTab,
-      renameTab,
-      currentWorkspacePath: state.currentWorkspacePath,
-      setCurrentWorkspace,
-    }),
-    [state, toggle, open, close, toggleFullscreen, addTab, closeTab, setActiveTab, clearPendingTab, renameTab, setCurrentWorkspace]
-  )
-
-  return <DiffPanelContext value={value}>{children}</DiffPanelContext>
+  return <>{children}</>
 }
 
-export function useDiffPanel() {
-  const ctx = useContext(DiffPanelContext)
-  if (!ctx)
+export function useDiffPanel(): DiffPanelContextValue {
+  const initialized = useDiffPanelStore((state) => state.initialized)
+  const isOpen = useDiffPanelStore((state) => state.isOpen)
+  const toggle = useDiffPanelStore((state) => state.toggle)
+  const open = useDiffPanelStore((state) => state.open)
+  const close = useDiffPanelStore((state) => state.close)
+  const isFullscreen = useDiffPanelStore((state) => state.isFullscreen)
+  const toggleFullscreen = useDiffPanelStore((state) => state.toggleFullscreen)
+  const tabs = useDiffPanelStore((state) => state.tabs)
+  const activeTabId = useDiffPanelStore((state) => state.activeTabId)
+  const pendingTabId = useDiffPanelStore((state) => state.pendingTabId)
+  const addTab = useDiffPanelStore((state) => state.addTab)
+  const closeTab = useDiffPanelStore((state) => state.closeTab)
+  const setActiveTab = useDiffPanelStore((state) => state.setActiveTab)
+  const clearPendingTab = useDiffPanelStore((state) => state.clearPendingTab)
+  const renameTab = useDiffPanelStore((state) => state.renameTab)
+  const currentWorkspacePath = useDiffPanelStore((state) => state.currentWorkspacePath)
+  const setCurrentWorkspace = useDiffPanelStore((state) => state.setCurrentWorkspace)
+
+  if (!initialized) {
     throw new Error("useDiffPanel must be used within DiffPanelProvider")
-  return ctx
+  }
+
+  return {
+    isOpen,
+    toggle,
+    open,
+    close,
+    isFullscreen,
+    toggleFullscreen,
+    tabs,
+    activeTabId,
+    pendingTabId,
+    addTab,
+    closeTab,
+    setActiveTab,
+    clearPendingTab,
+    renameTab,
+    currentWorkspacePath,
+    setCurrentWorkspace,
+  }
 }

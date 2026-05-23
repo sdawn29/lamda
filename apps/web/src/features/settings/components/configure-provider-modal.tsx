@@ -2,7 +2,7 @@ import { Key } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/shared/ui/dialog"
 import { Tabs, TabsContent } from "@/shared/ui/tabs"
 import { cn } from "@/shared/lib/utils"
-import { useConfigureProvider, type ConfigureProviderTab } from "../configure-provider-context"
+import { useConfigureProvider, type ConfigureProviderTab } from "../configure-provider-store"
 import { SubscriptionsCard, ApiKeysCard } from "./provider-cards"
 
 const TABS: { id: ConfigureProviderTab; label: string }[] = [

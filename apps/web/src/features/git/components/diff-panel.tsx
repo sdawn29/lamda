@@ -2,117 +2,258 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
-  lazy,
   memo,
-  Suspense,
 } from "react"
 import {
   Archive,
   Check,
+  ChevronDown,
+  ChevronRight,
   Columns2,
   AlignLeft,
+  FolderGit2,
+  GitCommit,
   GitCompare,
   History,
   Loader2,
+  GitBranch,
   PackageMinus,
   PackagePlus,
-  Plus,
   Undo2,
   X,
-  ArrowUpDown,
-  ExternalLink,
   Maximize2,
   Minimize2,
+  CloudDownload,
+  RefreshCw,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
-import { Icon } from "@iconify/react"
-import { getIconName } from "@/shared/ui/file-icon"
+import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
-import { FileSearchModal } from "@/features/file-tree"
-import { useDiffPanel, type DiffPanelTab } from "../context"
-import { useWorkspace } from "@/features/workspace"
-import { useGitStatus, useLastTurn, useRevertLastTurn } from "../queries"
+import { useDiffPanel } from "../store"
+import { useMainTabs, useMainTabsStore } from "@/features/main-tabs"
+import { useGitDiffStat, useGitStatus, useTurns, useTurnDiffStat, useRevertToTurn, type TurnSummary } from "../queries"
 import {
   useGitStage,
   useGitStageAll,
   useGitStashMutations,
   useGitRevertFile,
+  useGitFetch,
+  useGitPull,
+  useInitializeGitRepository,
 } from "../mutations"
 import { type ChangedFile, parseStatusLine } from "./status-badge"
 import { type DiffMode } from "./diff-view"
+import { CommitInputSection } from "./commit-dialog"
 import { StashInputBar } from "./stash-input-bar"
 import { StashSection } from "./stash-section"
 import { FilesSection } from "./files-section"
+import { HistoryView } from "./history-view"
 import { FileListItem } from "./file-list-item"
 import { FileHeader } from "./file-header"
 import { SORT_OPTIONS, type SortMode, applySortMode } from "./sort-utils"
 import { cn } from "@/shared/lib/utils"
-import { useTheme } from "@/shared/components/theme-provider"
 import {
   useShortcutHandler,
   useShortcutBinding,
 } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { ShortcutKbd } from "@/shared/ui/kbd"
-import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 import { getServerUrl } from "@/shared/lib/client"
+import { LANGUAGE_MAP } from "@/shared/lib/language-map"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
+import {
+  LspCodeViewer,
+  ProblemsStrip,
+  OutlinePanel,
+  useFileDiagnostics,
+  useLspConnection,
+  useOpenDocument,
+  useResolveWorkspaceId,
+  useDocumentSymbols,
+} from "@/features/lsp"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
-const PrismCode = lazy(() =>
-  import("@/features/chat/components/prism-code").then((m) => ({
-    default: m.default,
-  }))
-)
-
 interface DiffPanelProps {
   sessionId: string
+  workspaceSessionId?: string
   openWithAppId?: string | null
+  isEmbedded?: boolean
+  onClose?: () => void
 }
 
-const LANGUAGE_MAP: Record<string, string> = {
-  ts: "typescript",
-  tsx: "tsx",
-  mts: "typescript",
-  cts: "typescript",
-  js: "javascript",
-  jsx: "jsx",
-  mjs: "javascript",
-  cjs: "javascript",
-  mjsx: "jsx",
-  cjsx: "jsx",
-  py: "python",
-  rb: "ruby",
-  rs: "rust",
-  yml: "yaml",
-  md: "markdown",
+// ─── Turn History View ────────────────────────────────────────────────────────
+
+type ContentView = "turn" | "all" | "history"
+
+function formatTurnTime(ts: number): string {
+  if (!ts) return "In progress"
+  const diff = Date.now() - ts
+  if (diff < 60_000) return "just now"
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+  return new Date(ts).toLocaleDateString()
 }
 
-// ─── Last Turn View ───────────────────────────────────────────────────────────
-
-type ContentView = "turn" | "all"
-
-const LastTurnView = memo(function LastTurnView({
+const TurnItem = memo(function TurnItem({
+  turn,
+  turnNumber,
   sessionId,
   mode,
-  files,
+  isExpanded,
+  onToggle,
+  revertMutation,
+}: {
+  turn: TurnSummary
+  turnNumber: number
+  sessionId: string
+  mode: DiffMode
+  isExpanded: boolean
+  onToggle: () => void
+  revertMutation: ReturnType<typeof useRevertToTurn>
+}) {
+  const files: ChangedFile[] = useMemo(
+    () =>
+      turn.files
+        .map((f) => parseStatusLine(`${f.postStatusCode} ${f.filePath}`))
+        .filter(Boolean),
+    [turn.files]
+  )
+
+  const isReverting = revertMutation.isPending
+
+  return (
+    <div className="mx-2 mt-1.5 overflow-hidden rounded-lg border border-border/50">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex h-7 w-full items-center gap-1.5 bg-muted/30 px-2.5 transition-colors hover:bg-muted/50"
+      >
+        <ChevronRight
+          className={cn(
+            "h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
+            isExpanded && "rotate-90"
+          )}
+        />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+          Turn {turnNumber}
+        </span>
+        {turn.checkpointSha && (
+          <span
+            className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground/60"
+            title={`Checkpoint: ${turn.checkpointSha}`}
+          >
+            checkpoint
+          </span>
+        )}
+        {files.length > 0 && (
+          <Badge
+            variant="secondary"
+            className="h-4 min-w-4 rounded-full px-1 text-[10px] tabular-nums"
+          >
+            {files.length}
+          </Badge>
+        )}
+        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">
+          {formatTurnTime(turn.inProgress ? turn.startedAt : turn.endedAt)}
+        </span>
+        {!turn.inProgress && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={isReverting}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    revertMutation.mutate(turn.id)
+                  }}
+                  className="shrink-0 text-muted-foreground/50 hover:text-destructive"
+                >
+                  {isReverting ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Undo2 className="h-3 w-3" />
+                  )}
+                </Button>
+              }
+            />
+            <TooltipContent side="left">Revert to before this turn</TooltipContent>
+          </Tooltip>
+        )}
+      </button>
+
+      {isExpanded && files.length > 0 && (
+        <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
+          <div className="divide-y divide-border/20">
+            {files.map((file) => (
+              <FileListItem
+                key={file.filePath}
+                file={file}
+                sessionId={sessionId}
+                mode={mode}
+                showActions={false}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isExpanded && files.length === 0 && (
+        <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
+          <p className="px-3 py-1.5 text-[11px] text-muted-foreground/40">No file changes recorded</p>
+        </div>
+      )}
+    </div>
+  )
+})
+
+const TurnHistoryView = memo(function TurnHistoryView({
+  sessionId,
+  mode,
+  turns,
   isLoading,
 }: {
   sessionId: string
   mode: DiffMode
-  files: ChangedFile[]
+  turns: TurnSummary[]
   isLoading: boolean
 }) {
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(
+    () => new Set(turns[0] ? [turns[0].id] : [])
+  )
+  const [prevTopId, setPrevTopId] = useState<number | undefined>(turns[0]?.id)
+
+  // Auto-expand newest turn — derived state during render (React-recommended pattern)
+  const topId = turns[0]?.id
+  if (topId !== undefined && topId !== prevTopId) {
+    setPrevTopId(topId)
+    setExpandedIds((prev) => new Set([...prev, topId]))
+  }
+
+  const revertMutation = useRevertToTurn(sessionId)
+
+  const toggleTurn = useCallback((id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
   if (isLoading) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -124,33 +265,220 @@ const LastTurnView = memo(function LastTurnView({
     )
   }
 
-  if (files.length === 0) {
+  if (turns.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-4 py-12 text-center">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
           <History className="h-5 w-5 text-muted-foreground/40" />
         </div>
         <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground/60">No changes from last turn</p>
+          <p className="text-xs font-medium text-muted-foreground/60">No turns yet</p>
           <p className="text-[10px] leading-relaxed text-muted-foreground/40">
-            Files modified by the agent will appear here
+            Each agent turn creates a checkpoint you can revert to
           </p>
         </div>
       </div>
     )
   }
 
+  const totalTurns = turns.filter((t) => !t.inProgress).length
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto py-0.5">
-      {files.map((file) => (
-        <FileListItem
-          key={file.filePath}
-          file={file}
-          sessionId={sessionId}
-          mode={mode}
-          showActions={false}
-        />
-      ))}
+    <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+      {turns.map((turn, index) => {
+        // Turn number: most recent completed turn = totalTurns, going down
+        const turnNumber = turn.inProgress
+          ? totalTurns + 1
+          : totalTurns - (index - (turns[0]?.inProgress ? 1 : 0))
+        return (
+          <TurnItem
+            key={turn.id}
+            turn={turn}
+            turnNumber={turnNumber}
+            sessionId={sessionId}
+            mode={mode}
+            isExpanded={expandedIds.has(turn.id)}
+            onToggle={() => toggleTurn(turn.id)}
+            revertMutation={revertMutation}
+          />
+        )
+      })}
+    </div>
+  )
+})
+
+// ─── Source Control Toolbar ───────────────────────────────────────────────────
+
+const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
+  workspaceSessionId,
+  view,
+  mode,
+  setMode,
+  sortMode,
+  setSortMode,
+  setStashInputOpen,
+}: {
+  workspaceSessionId: string
+  view: ContentView
+  mode: DiffMode
+  setMode: (m: DiffMode) => void
+  sortMode: SortMode
+  setSortMode: (s: SortMode) => void
+  setStashInputOpen: (open: boolean) => void
+}) {
+  const { data: statusData } = useGitStatus(workspaceSessionId)
+  const { hasStaged, hasUnstaged, hasChanges } = useMemo(() => {
+    const all = (statusData?.raw ?? "")
+      .split("\n")
+      .map((l: string) => l.trimEnd())
+      .filter(Boolean)
+      .map(parseStatusLine)
+    return {
+      hasStaged: all.some((f: ChangedFile) => f.isStaged),
+      hasUnstaged: all.some((f: ChangedFile) => !f.isStaged),
+      hasChanges: all.length > 0,
+    }
+  }, [statusData])
+
+  const { stageAll, unstageAll } = useGitStageAll(workspaceSessionId)
+  const bulkWorking = stageAll.isPending || unstageAll.isPending
+  const fetch = useGitFetch(workspaceSessionId)
+  const pull = useGitPull(workspaceSessionId)
+  const remoteWorking = fetch.isPending || pull.isPending
+
+  return (
+    <div className="flex shrink-0 items-center gap-0.5">
+      <div className="mx-1 h-4 w-px bg-border/50" />
+
+      {/* Git actions dropdown */}
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground/70 hover:text-foreground"
+                  >
+                    <GitBranch />
+                    <span className="sr-only">Git actions</span>
+                  </Button>
+                }
+              />
+            }
+          />
+          <TooltipContent>Git actions</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            onClick={() => fetch.mutate()}
+            disabled={remoteWorking}
+            className="flex items-center gap-2"
+          >
+            {fetch.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Fetch
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => pull.mutate()}
+            disabled={remoteWorking}
+            className="flex items-center gap-2"
+          >
+            {pull.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <CloudDownload className="h-3.5 w-3.5" />
+            )}
+            Pull
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => stageAll.mutateAsync()}
+            disabled={bulkWorking || !hasUnstaged || view === "turn"}
+            className="flex items-center gap-2"
+          >
+            {stageAll.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <PackagePlus className="h-3.5 w-3.5" />
+            )}
+            Stage all
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => unstageAll.mutateAsync()}
+            disabled={bulkWorking || !hasStaged || view === "turn"}
+            className="flex items-center gap-2"
+          >
+            {unstageAll.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <PackageMinus className="h-3.5 w-3.5" />
+            )}
+            Unstage all
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => setStashInputOpen(true)}
+            disabled={!hasChanges || view === "turn"}
+            className="flex items-center gap-2"
+          >
+            <Archive className="h-3.5 w-3.5" />
+            Stash changes
+          </DropdownMenuItem>
+          {view !== "turn" && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                  Sort by
+                </DropdownMenuLabel>
+                {SORT_OPTIONS.map((opt) => (
+                  <DropdownMenuItem
+                    key={opt.value}
+                    onClick={() => setSortMode(opt.value)}
+                    className="flex items-center justify-between"
+                  >
+                    {opt.label}
+                    {sortMode === opt.value && (
+                      <Check className="ml-2 h-3 w-3 text-muted-foreground" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <div className="mx-0.5 h-4 w-px bg-border/50" />
+
+      {/* Diff mode */}
+      <div className="inline-flex h-7 items-center rounded-md border border-border/70 bg-muted/30 p-0.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setMode("inline")}
+          data-active={mode === "inline"}
+          className="h-6 rounded-sm px-1.5 text-muted-foreground/75 hover:text-foreground data-[active=true]:bg-background data-[active=true]:text-foreground data-[active=true]:shadow-xs"
+        >
+          <AlignLeft className="h-3.5 w-3.5" />
+          <span className="sr-only">Inline</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setMode("side-by-side")}
+          data-active={mode === "side-by-side"}
+          className="h-6 rounded-sm px-1.5 text-muted-foreground/75 hover:text-foreground data-[active=true]:bg-background data-[active=true]:text-foreground data-[active=true]:shadow-xs"
+        >
+          <Columns2 className="h-3.5 w-3.5" />
+          <span className="sr-only">Side-by-side</span>
+        </Button>
+      </div>
     </div>
   )
 })
@@ -159,30 +487,34 @@ const LastTurnView = memo(function LastTurnView({
 
 const SourceControlContent = memo(function SourceControlContent({
   sessionId,
+  workspaceSessionId,
+  view,
+  mode,
+  sortMode,
+  stashInputOpen,
+  setStashInputOpen,
 }: {
   sessionId: string
+  workspaceSessionId: string
+  view: ContentView
+  mode: DiffMode
+  sortMode: SortMode
+  stashInputOpen: boolean
+  setStashInputOpen: (open: boolean) => void
 }) {
-  const [view, setView] = useState<ContentView>("turn")
-  const [mode, setMode] = useState<DiffMode>("inline")
-  const [sortMode, setSortMode] = useState<SortMode>("name")
-  const [stashInputOpen, setStashInputOpen] = useState(false)
-
-  const { data: lastTurnData = [], isLoading: lastTurnLoading } = useLastTurn(sessionId)
-  const revertLastTurn = useRevertLastTurn(sessionId)
-  const lastTurnFiles = useMemo(
-    () => lastTurnData.map((f) => parseStatusLine(`${f.postStatusCode} ${f.filePath}`)).filter(Boolean),
-    [lastTurnData]
-  )
-  const hasLastTurnFiles = lastTurnFiles.length > 0
+  const { data: turnsData = [], isLoading: turnsLoading } = useTurns(sessionId)
 
   const {
-    data: statusRaw,
+    data: statusData,
     isLoading: loading,
     error: statusError,
-  } = useGitStatus(sessionId)
+  } = useGitStatus(workspaceSessionId)
+
+  const isGitRepo = statusData?.isGitRepo !== false
+  const statusRaw = statusData?.raw ?? ""
 
   const { staged, unstaged } = useMemo(() => {
-    const all = (statusRaw ?? "")
+    const all = statusRaw
       .split("\n")
       .map((l: string) => l.trimEnd())
       .filter(Boolean)
@@ -199,18 +531,13 @@ const SourceControlContent = memo(function SourceControlContent({
     }
   }, [statusRaw, sortMode])
 
-  const files = useMemo(() => [...staged, ...unstaged], [staged, unstaged])
   const error = statusError instanceof Error ? statusError.message : null
 
-  const { stage, unstage } = useGitStage(sessionId)
-  const { stageAll, unstageAll } = useGitStageAll(sessionId)
-  const { stash } = useGitStashMutations(sessionId)
-  const revertFile = useGitRevertFile(sessionId)
+  const initRepo = useInitializeGitRepository(workspaceSessionId)
 
-  const bulkWorking = stageAll.isPending || unstageAll.isPending
-  const hasStaged = staged.length > 0
-  const hasUnstaged = unstaged.length > 0
-  const hasChanges = files.length > 0
+  const { stage, unstage } = useGitStage(workspaceSessionId)
+  const { stash } = useGitStashMutations(workspaceSessionId)
+  const revertFile = useGitRevertFile(workspaceSessionId)
 
   const handleStageToggle = useCallback(
     async (file: ChangedFile) => {
@@ -222,14 +549,6 @@ const SourceControlContent = memo(function SourceControlContent({
     },
     [stage, unstage]
   )
-
-  const handleStageAll = useCallback(async () => {
-    await stageAll.mutateAsync()
-  }, [stageAll])
-
-  const handleUnstageAll = useCallback(async () => {
-    await unstageAll.mutateAsync()
-  }, [unstageAll])
 
   const handleRevert = useCallback(
     async (file: ChangedFile) => {
@@ -247,220 +566,19 @@ const SourceControlContent = memo(function SourceControlContent({
         // keep input bar open on failure
       }
     },
-    [stash]
+    [stash, setStashInputOpen]
   )
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Toolbar */}
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/50 bg-muted/20 px-2">
-        {/* Segmented view control */}
-        <div className="flex items-center rounded-md border border-border/50 bg-muted/50 p-0.5">
-          <button
-            onClick={() => setView("turn")}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium transition-all duration-150",
-              view === "turn"
-                ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
-                : "text-muted-foreground hover:text-foreground/70"
-            )}
-          >
-            <History className="h-3 w-3" />
-            This Turn
-          </button>
-          <button
-            onClick={() => setView("all")}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium transition-all duration-150",
-              view === "all"
-                ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
-                : "text-muted-foreground hover:text-foreground/70"
-            )}
-          >
-            <GitCompare className="h-3 w-3" />
-            All Changes
-          </button>
-        </div>
-
-        <div className="flex-1" />
-
-        {/* This Turn only: revert last turn */}
-        {view === "turn" && hasLastTurnFiles && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => revertLastTurn.mutate()}
-                  disabled={revertLastTurn.isPending}
-                  className="text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 disabled:opacity-35"
-                >
-                  {revertLastTurn.isPending ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Undo2 />
-                  )}
-                  <span className="sr-only">Revert last turn</span>
-                </Button>
-              }
-            />
-            <TooltipContent>Revert last turn changes</TooltipContent>
-          </Tooltip>
-        )}
-
-        {/* All Changes only: git actions */}
-        {view === "all" && (
-          <>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={handleStageAll}
-                    disabled={bulkWorking || !hasUnstaged}
-                    className="text-muted-foreground/70 hover:text-foreground disabled:opacity-35"
-                  >
-                    {stageAll.isPending ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <PackagePlus />
-                    )}
-                    <span className="sr-only">Stage all</span>
-                  </Button>
-                }
-              />
-              <TooltipContent>Stage all changes</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={handleUnstageAll}
-                    disabled={bulkWorking || !hasStaged}
-                    className="text-muted-foreground/70 hover:text-foreground disabled:opacity-35"
-                  >
-                    {unstageAll.isPending ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <PackageMinus />
-                    )}
-                    <span className="sr-only">Unstage all</span>
-                  </Button>
-                }
-              />
-              <TooltipContent>Unstage all changes</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => setStashInputOpen(true)}
-                    disabled={!hasChanges}
-                    className="text-muted-foreground/70 hover:text-foreground disabled:opacity-35"
-                  >
-                    <Archive />
-                    <span className="sr-only">Stash changes</span>
-                  </Button>
-                }
-              />
-              <TooltipContent>Stash all changes</TooltipContent>
-            </Tooltip>
-
-            <div className="mx-0.5 h-4 w-px bg-border/50" />
-
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          data-active={sortMode !== "name"}
-                          className="text-muted-foreground/70 data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-                        />
-                      }
-                    >
-                      <ArrowUpDown />
-                      <span className="sr-only">Sort files</span>
-                    </DropdownMenuTrigger>
-                  }
-                />
-                <TooltipContent>Sort files</TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="w-44">
-                {SORT_OPTIONS.map((opt) => (
-                  <DropdownMenuItem
-                    key={opt.value}
-                    onClick={() => setSortMode(opt.value)}
-                    className="flex items-center justify-between"
-                  >
-                    {opt.label}
-                    {sortMode === opt.value && (
-                      <Check className="ml-2 h-3 w-3 text-muted-foreground" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <div className="mx-0.5 h-4 w-px bg-border/50" />
-          </>
-        )}
-
-        {/* View mode — always visible */}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setMode("inline")}
-                data-active={mode === "inline"}
-                className="text-muted-foreground/70 hover:text-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-              >
-                <AlignLeft />
-                <span className="sr-only">Inline view</span>
-              </Button>
-            }
-          />
-          <TooltipContent>Inline diff</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setMode("side-by-side")}
-                data-active={mode === "side-by-side"}
-                className="text-muted-foreground/70 hover:text-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-              >
-                <Columns2 />
-                <span className="sr-only">Side-by-side</span>
-              </Button>
-            }
-          />
-          <TooltipContent>Side-by-side diff</TooltipContent>
-        </Tooltip>
-      </div>
-
-      {/* Content — switches between views */}
       <div className="flex min-h-0 flex-1 flex-col">
         {view === "turn" ? (
-          <LastTurnView sessionId={sessionId} mode={mode} files={lastTurnFiles} isLoading={lastTurnLoading} />
+          <TurnHistoryView sessionId={sessionId} mode={mode} turns={turnsData} isLoading={turnsLoading} />
+        ) : view === "history" ? (
+          <HistoryView sessionId={workspaceSessionId} />
         ) : (
           <>
+            <CommitInputSection sessionId={workspaceSessionId} />
             <div className="min-h-0 flex-1 overflow-y-auto">
               {stashInputOpen && (
                 <StashInputBar
@@ -469,7 +587,37 @@ const SourceControlContent = memo(function SourceControlContent({
                 />
               )}
 
-              {loading && files.length === 0 && (
+              {!loading && !isGitRepo && (
+                <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                    <FolderGit2 className="h-5 w-5 text-muted-foreground/40" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground/60">Not a git repository</p>
+                    <p className="text-[10px] leading-relaxed text-muted-foreground/40">
+                      This folder is not tracked by git
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => initRepo.mutate()}
+                    disabled={initRepo.isPending}
+                  >
+                    {initRepo.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <FolderGit2 className="h-3 w-3" />
+                    )}
+                    Initialize Repository
+                  </Button>
+                </div>
+              )}
+
+              {isGitRepo && (
+                <>
+              {loading && staged.length === 0 && unstaged.length === 0 && (
                 <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
                   <Loader2 className="size-3 animate-spin" />
                   Loading status…
@@ -482,7 +630,7 @@ const SourceControlContent = memo(function SourceControlContent({
                 </Alert>
               )}
 
-              {!loading && !error && files.length === 0 && (
+              {!loading && !error && staged.length === 0 && unstaged.length === 0 && (
                 <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                     <GitCompare className="h-5 w-5 text-muted-foreground/40" />
@@ -498,7 +646,7 @@ const SourceControlContent = memo(function SourceControlContent({
                 <FilesSection
                   label="Staged"
                   files={staged}
-                  sessionId={sessionId}
+                  sessionId={workspaceSessionId}
                   mode={mode}
                   onStageToggle={handleStageToggle}
                   onRevert={handleRevert}
@@ -510,15 +658,17 @@ const SourceControlContent = memo(function SourceControlContent({
                 <FilesSection
                   label="Changes"
                   files={unstaged}
-                  sessionId={sessionId}
+                  sessionId={workspaceSessionId}
                   mode={mode}
                   onStageToggle={handleStageToggle}
                   onRevert={handleRevert}
                 />
               )}
+                </>
+              )}
             </div>
 
-            <StashSection sessionId={sessionId} />
+            <StashSection sessionId={workspaceSessionId} />
           </>
         )}
       </div>
@@ -552,11 +702,13 @@ const FileContent = memo(function FileContent({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [serverUrl, setServerUrl] = useState<string>("")
-  const { addTab, open: openPanel } = useDiffPanel()
+  const { addFileTab } = useMainTabs()
   const [markdownPreview, setMarkdownPreview] = useState(false)
   const [htmlPreview, setHtmlPreview] = useState(true)
-  const { resolvedTheme } = useTheme()
-  const isDark = resolvedTheme === "dark"
+  const [scrollToLine, setScrollToLine] = useState<number | null>(null)
+
+  const workspaceId = useResolveWorkspaceId(workspacePath)
+  const lsp = useLspConnection(workspaceId)
 
   // Get available apps for default editor selection
   const { data: platform } = useElectronPlatform()
@@ -586,6 +738,12 @@ const FileContent = memo(function FileContent({
   const isHtml = fileExtension === "html" || fileExtension === "htm"
   const isPdf = fileExtension === "pdf"
 
+  const isCodeView = !isImage && !isPdf && !markdownPreview && !(isHtml && htmlPreview)
+  const lspFilePath = isCodeView ? filePath : null
+  useOpenDocument(lsp, lspFilePath, isCodeView ? content : null)
+  const diagnostics = useFileDiagnostics(lsp, lspFilePath)
+  const symbols = useDocumentSymbols(lsp, lspFilePath, isCodeView)
+
   const markdownLinkComponents = useMemo(
     () => ({
       a: ({ href, children }: React.ComponentProps<"a">) => {
@@ -610,10 +768,8 @@ const FileContent = memo(function FileContent({
           <button
             type="button"
             onClick={() => {
-              openPanel()
-              addTab({
+              addFileTab({
                 title: linkFileName,
-                type: "file",
                 filePath: resolvedPath,
               })
             }}
@@ -639,7 +795,7 @@ const FileContent = memo(function FileContent({
         )
       },
     }),
-    [filePath, serverUrl, addTab, openPanel]
+    [filePath, serverUrl, addFileTab]
   )
 
   // Enable rich text preview by default for markdown/html files
@@ -693,7 +849,7 @@ const FileContent = memo(function FileContent({
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border/50 bg-muted/20">
+        <div className="bg-transparent">
           <FileHeader
             pathParts={pathParts}
             filePath={filePath}
@@ -713,7 +869,7 @@ const FileContent = memo(function FileContent({
   if (error) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border/50 bg-muted/20">
+        <div className="bg-transparent">
           <FileHeader
             pathParts={pathParts}
             filePath={filePath}
@@ -731,7 +887,7 @@ const FileContent = memo(function FileContent({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border/50 bg-muted/20">
+      <div className="bg-transparent">
         <FileHeader
           pathParts={pathParts}
           filePath={filePath}
@@ -749,6 +905,18 @@ const FileContent = memo(function FileContent({
           isPdf={isPdf}
         />
       </div>
+      {isCodeView && (
+        <>
+          <ProblemsStrip
+            diagnostics={diagnostics}
+            onJumpToLine={(line) => setScrollToLine(line)}
+          />
+          <OutlinePanel
+            symbols={symbols}
+            onJumpToLine={(line) => setScrollToLine(line)}
+          />
+        </>
+      )}
       <div className="flex min-h-0 flex-1 flex-col p-2">
         <div
           className={cn(
@@ -790,22 +958,18 @@ const FileContent = memo(function FileContent({
               {content ?? ""}
             </ReactMarkdown>
           ) : (
-            <Suspense
-              fallback={
-                <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" />
-                  Loading…
-                </div>
+            <LspCodeViewer
+              code={content ?? ""}
+              language={language}
+              fontSize="0.75rem"
+              diagnostics={diagnostics}
+              connection={lsp}
+              filePath={lspFilePath}
+              onOpenFile={(target, title) =>
+                addFileTab({ title, filePath: target, workspacePath })
               }
-            >
-              <PrismCode
-                code={content ?? ""}
-                language={language}
-                style={isDark ? jellybeansdark : jellybeanslight}
-                showLineNumbers
-                fontSize="0.75rem"
-              />
-            </Suspense>
+              scrollToLine={scrollToLine}
+            />
           )}
         </div>
       </div>
@@ -813,249 +977,209 @@ const FileContent = memo(function FileContent({
   )
 })
 
-// ─── Tab Content Router ───────────────────────────────────────────────────────
-
-function TabContent({
-  tab,
-  sessionId,
-  openWithAppId,
-  workspacePath,
-}: {
-  tab: DiffPanelTab
-  sessionId: string
-  openWithAppId?: string | null
-  workspacePath?: string
-}) {
-  if (tab.type === "source-control") {
-    return <SourceControlContent sessionId={sessionId} />
-  }
-  if (tab.type === "file" && tab.filePath) {
-    return (
-      <FileContent
-        filePath={tab.filePath}
-        openWithAppId={openWithAppId}
-        workspacePath={workspacePath}
-      />
-    )
-  }
-  return (
-    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-      Unknown tab type
-    </div>
-  )
-}
-
 // ─── Main DiffPanel ────────────────────────────────────────────────────────────
 
 export const DiffPanel = memo(function DiffPanel({
   sessionId,
+  workspaceSessionId: workspaceSessionIdProp,
   openWithAppId,
+  isEmbedded = false,
+  onClose,
 }: DiffPanelProps) {
+  const workspaceSessionId = workspaceSessionIdProp ?? sessionId
+
   const {
-    close,
+    close: closeDiffPanel,
     toggleFullscreen,
     isFullscreen,
-    tabs,
-    activeTabId,
-    pendingTabId,
-    addTab,
-    closeTab,
-    setActiveTab,
-    clearPendingTab,
     currentWorkspacePath,
   } = useDiffPanel()
-  const { workspaces } = useWorkspace()
-  const currentWorkspaceId = workspaces.find(
-    (ws) => ws.path === currentWorkspacePath
-  )?.id
-  const [showAddMenu, setShowAddMenu] = useState(false)
-  const [fileSearchOpen, setFileSearchOpen] = useState(false)
-  const tabRefs = useRef<Map<string, HTMLElement>>(new Map())
+
+  const activeFileTab = useMainTabsStore((s) => {
+    if (!s.activeTabId) return null
+    const tab = s.tabs.find((t) => t.id === s.activeTabId)
+    return tab?.type === "file" ? tab : null
+  })
+  const clearActiveTab = useMainTabsStore((s) => s.clearActiveTab)
+
+  const close = onClose ?? closeDiffPanel
+
+  const { data: diffStat } = useGitDiffStat(workspaceSessionId)
+  const { data: turnsData = [] } = useTurns(sessionId)
+
+  // Source-control tab state (lifted so toolbar and content share it)
+  const [scView, setScView] = useState<ContentView>("turn")
+  const [scMode, setScMode] = useState<DiffMode>("inline")
+  const [scSortMode, setScSortMode] = useState<SortMode>("name")
+  const [scStashInputOpen, setScStashInputOpen] = useState(false)
+  const activeTurnId = turnsData[0]?.id
+  const { data: turnDiffStat } = useTurnDiffStat(
+    sessionId,
+    activeTurnId,
+    scView === "turn" && activeTurnId !== undefined
+  )
+  const visibleDiffStat =
+    scView === "all" ? diffStat : scView === "turn" ? turnDiffStat : undefined
 
   useShortcutHandler(SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF, toggleFullscreen)
   const fullscreenBinding = useShortcutBinding(
     SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF
   )
 
-  const activeTab = useMemo(
-    () => tabs.find((t) => t.id === activeTabId),
-    [tabs, activeTabId]
-  )
-
-  // Focus the active tab whenever activeTabId changes
-  useEffect(() => {
-    if (activeTabId) {
-      // Focus the newly added or active tab
-      const tabEl = tabRefs.current.get(activeTabId)
-      if (tabEl) {
-        tabEl.scrollIntoView({ block: "nearest", inline: "nearest" })
-        tabEl.focus()
-      }
-      // Clear pending tab after focus
-      if (pendingTabId === activeTabId) {
-        clearPendingTab()
-      }
-    }
-  }, [activeTabId, pendingTabId, clearPendingTab])
-
-  const handleAddFileTab = useCallback(() => {
-    setShowAddMenu(false)
-    setFileSearchOpen(true)
-  }, [])
-
-  const handleFileSelect = useCallback(
-    (relativePath: string) => {
-      const filePath = currentWorkspacePath
-        ? `${currentWorkspacePath}/${relativePath}`
-        : relativePath
-      const fileName = relativePath.split(/[/\\]/).pop() || relativePath
-      addTab({ title: fileName, type: "file", filePath })
-    },
-    [addTab, currentWorkspacePath]
-  )
+  const selectScView = (view: ContentView) => {
+    clearActiveTab()
+    setScView(view)
+  }
 
   return (
     <>
-      {currentWorkspaceId && (
-        <FileSearchModal
-          open={fileSearchOpen}
-          onOpenChange={setFileSearchOpen}
-          workspaceId={currentWorkspaceId}
-          onSelect={handleFileSelect}
-        />
-      )}
-      <div className="flex h-full w-full flex-col bg-background">
-        {/* Tab bar */}
-        <div className="flex h-10 shrink-0 items-center gap-1 border-b bg-muted/20 px-2">
-          <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1">
-            {tabs.map((tab) => {
-              const isActive = tab.id === activeTabId
-              return (
-                <div
-                  key={tab.id}
-                  role="tab"
-                  aria-selected={isActive}
-                  ref={(el) => {
-                    if (el) {
-                      tabRefs.current.set(tab.id, el)
-                    } else {
-                      tabRefs.current.delete(tab.id)
-                    }
-                  }}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    "group relative flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md text-xs select-none transition-all duration-150",
-                    tab.type === "source-control" ? "px-3" : "pl-3 pr-1.5",
-                    isActive
-                      ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground/70"
-                  )}
+      <div className="flex h-full w-full flex-col bg-transparent">
+        {/* Tab bar — only shown when viewing source control */}
+        {!activeFileTab && (
+          <div className="flex h-9 shrink-0 items-center gap-0.5 bg-transparent px-1">
+            {/* View selector for source-control content */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 gap-1.5 px-2 text-xs font-medium text-muted-foreground/80 hover:text-foreground"
+                  >
+                    {scView === "turn" ? (
+                      <History className="h-3 w-3" />
+                    ) : scView === "history" ? (
+                      <GitCommit className="h-3 w-3" />
+                    ) : (
+                      <GitCompare className="h-3 w-3" />
+                    )}
+                    {scView === "turn" ? "This Turn" : scView === "history" ? "History" : "All Changes"}
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="start" className="w-40">
+                <DropdownMenuItem
+                  onClick={() => selectScView("turn")}
+                  className="flex items-center gap-2"
                 >
-                  {tab.type === "source-control" ? (
-                    <GitCompare className="size-3.5 shrink-0" />
-                  ) : (
-                    <Icon
-                      icon={`catppuccin:${getIconName(tab.title)}`}
-                      className="size-3.5 shrink-0"
-                      aria-hidden
-                    />
+                  <History className="h-3.5 w-3.5" />
+                  This Turn
+                  {scView === "turn" && (
+                    <Check className="ml-auto h-3 w-3 text-muted-foreground" />
                   )}
-                  <span className="max-w-30 truncate">{tab.title}</span>
-                  {tab.type !== "source-control" && (
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label={`Close ${tab.title}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        closeTab(tab.id)
-                      }}
-                      className={cn(
-                        "ml-auto shrink-0",
-                        isActive
-                          ? "opacity-60 hover:opacity-100"
-                          : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100"
-                      )}
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </Button>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => selectScView("all")}
+                  className="flex items-center gap-2"
+                >
+                  <GitCompare className="h-3.5 w-3.5" />
+                  All Changes
+                  {scView === "all" && (
+                    <Check className="ml-auto h-3 w-3 text-muted-foreground" />
                   )}
-                </div>
-              )
-            })}
-
-            {/* Add tab dropdown */}
-            <DropdownMenu open={showAddMenu} onOpenChange={setShowAddMenu}>
-              <DropdownMenuTrigger className="flex h-7 items-center rounded-md px-2 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground">
-                <Plus className="h-3.5 w-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-44">
-                <DropdownMenuItem onClick={handleAddFileTab}>
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Open File
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => selectScView("history")}
+                  className="flex items-center gap-2"
+                >
+                  <GitCommit className="h-3.5 w-3.5" />
+                  History
+                  {scView === "history" && (
+                    <Check className="ml-auto h-3 w-3 text-muted-foreground" />
+                  )}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
 
-          {/* Right side buttons */}
-          <div className="flex shrink-0 items-center gap-0.5 px-1">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={toggleFullscreen}
-                    className="text-muted-foreground/60 hover:text-foreground"
-                  >
-                    {isFullscreen ? <Minimize2 /> : <Maximize2 />}
-                    <span className="sr-only">
-                      {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-                    </span>
-                  </Button>
-                }
-              />
-              <TooltipContent>
-                {isFullscreen ? "Exit fullscreen" : "Fullscreen"}{" "}
-                <ShortcutKbd binding={fullscreenBinding} className="ml-1" />
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={close}
-                    className="text-muted-foreground/60 hover:text-foreground"
-                  >
-                    <X />
-                    <span className="sr-only">Close panel</span>
-                  </Button>
-                }
-              />
-              <TooltipContent>Close panel</TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
+            {visibleDiffStat &&
+              (visibleDiffStat.additions > 0 || visibleDiffStat.deletions > 0) && (
+              <span className="flex animate-in items-center gap-1 font-mono text-[11px] leading-none duration-200 fade-in-0 zoom-in-90">
+                <span className="text-emerald-500">+{visibleDiffStat.additions}</span>
+                <span className="text-rose-500">-{visibleDiffStat.deletions}</span>
+              </span>
+            )}
 
-        {/* Tab content */}
+            <div className="flex-1" />
+
+            {/* Git actions + diff mode — not in history view */}
+            {scView !== "history" && (
+              <SourceControlToolbarSection
+                workspaceSessionId={workspaceSessionId}
+                view={scView}
+                mode={scMode}
+                setMode={setScMode}
+                sortMode={scSortMode}
+                setSortMode={setScSortMode}
+                setStashInputOpen={setScStashInputOpen}
+              />
+            )}
+
+            {/* Right side buttons */}
+            <div className="flex shrink-0 items-center gap-0.5 px-0.5">
+              {!isEmbedded && (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={toggleFullscreen}
+                        className="text-muted-foreground/60 hover:text-foreground"
+                      >
+                        {isFullscreen ? <Minimize2 /> : <Maximize2 />}
+                        <span className="sr-only">
+                          {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                        </span>
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>
+                    {isFullscreen ? "Exit fullscreen" : "Fullscreen"}{" "}
+                    <ShortcutKbd binding={fullscreenBinding} className="ml-1" />
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {!isEmbedded && (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={close}
+                        className="text-muted-foreground/60 hover:text-foreground"
+                      >
+                        <X />
+                        <span className="sr-only">Close panel</span>
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>Close panel</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
         <div className="min-h-0 flex-1 overflow-hidden">
-          {activeTab ? (
-            <TabContent
-              tab={activeTab}
-              sessionId={sessionId}
+          {activeFileTab ? (
+            <FileContent
+              filePath={activeFileTab.filePath}
               openWithAppId={openWithAppId}
-              workspacePath={currentWorkspacePath ?? undefined}
+              workspacePath={currentWorkspacePath ?? activeFileTab.workspacePath}
             />
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                <GitCompare className="h-5 w-5 text-muted-foreground/50" />
-              </div>
-              <p className="text-xs">Select or add a tab to view content</p>
-            </div>
+            <SourceControlContent
+              sessionId={sessionId}
+              workspaceSessionId={workspaceSessionId}
+              view={scView}
+              mode={scMode}
+              sortMode={scSortMode}
+              stashInputOpen={scStashInputOpen}
+              setStashInputOpen={setScStashInputOpen}
+            />
           )}
         </div>
       </div>

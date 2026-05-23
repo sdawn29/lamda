@@ -22,6 +22,7 @@ import {
   DollarSign,
   Gauge,
   FolderOpen,
+  Code2,
 } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/shared/ui/alert"
@@ -78,7 +79,7 @@ import {
   eventToBinding,
   type ShortcutAction,
 } from "@/shared/lib/keyboard-shortcuts"
-import { useConfigureProvider } from "../configure-provider-context"
+import { useConfigureProvider } from "../configure-provider-store"
 import { cn } from "@/shared/lib/utils"
 import {
   useElectronUpdateStatus,
@@ -87,6 +88,7 @@ import {
   useInstallUpdate,
   type ElectronUpdateStatus,
 } from "@/features/electron"
+import { LspSettingsCard } from "@/features/lsp"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -186,6 +188,24 @@ const SECTIONS: SettingsSection[] = [
     ],
   },
   {
+    id: "lsp",
+    label: "LSP Config",
+    icon: Code2,
+    description: "Language server availability and commands",
+    keywords: [
+      "lsp",
+      "language server",
+      "diagnostics",
+      "hover",
+      "definition",
+      "typescript",
+      "python",
+      "rust",
+      "go",
+      "path",
+    ],
+  },
+  {
     id: "retry",
     label: "Retry",
     icon: Gauge,
@@ -234,7 +254,7 @@ const SECTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Interface", ids: ["appearance", "chat"] },
   { label: "AI Providers", ids: ["subscriptions", "api-keys"] },
   { label: "Customization", ids: ["git", "shortcuts"] },
-  { label: "System", ids: ["retry", "updates", "data"] },
+  { label: "System", ids: ["lsp", "retry", "updates", "data"] },
 ]
 
 function sectionMatches(section: SettingsSection, query: string): boolean {
@@ -459,7 +479,8 @@ export function SettingsPage() {
         {/* Footer */}
         <div className="mt-auto border-t px-3 py-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="font-mono font-medium">λ Code</span>
+            <span className="font-black" style={{ color: "#d4a017" }}>Λ</span>
+            <span className="font-medium">Lamda</span>
             {import.meta.env.DEV ? (
               <Badge variant="outline" className="ml-auto">
                 dev
@@ -600,6 +621,24 @@ export function SettingsPage() {
                   description="Customize bindings for all actions. Click a binding to record a new one."
                 />
                 <KeyboardShortcutsCard />
+              </section>
+            )}
+
+            {/* ── LSP Config ── */}
+            {visibleSections.some((s) => s.id === "lsp") && (
+              <section
+                id="lsp"
+                ref={(el) => {
+                  sectionRefs.current["lsp"] = el
+                }}
+                className="scroll-mt-8"
+              >
+                <SectionHeader
+                  icon={Code2}
+                  title="LSP Config"
+                  description="Review language server commands and install status."
+                />
+                <LspSettingsCard />
               </section>
             )}
 

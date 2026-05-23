@@ -1,31 +1,40 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { lazy, Suspense, useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 
-import { ChatView, useSetActiveThreadId } from "@/features/chat"
-import { useWorkspace } from "@/features/workspace"
+import { useSetActiveThreadId, ChatView } from "@/features/chat"
+import { useWorkspace, useWorkspaces } from "@/features/workspace"
 import { useDiffPanel } from "@/features/git"
-import { useFileTree } from "@/features/file-tree"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
 import { useUpdateThreadLastAccessed } from "@/features/workspace/mutations"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/shared/ui/resizable"
-import { cn } from "@/shared/lib/utils"
+import { Skeleton } from "@/shared/ui/skeleton"
 
-const DiffPanel = lazy(() =>
-  import("@/features/git").then((module) => ({
-    default: module.DiffPanel,
-  }))
-)
-
-const FileTree = lazy(() =>
-  import("@/features/file-tree").then((module) => ({
-    default: module.FileTree,
-  }))
-)
+function ChatViewSkeleton() {
+  return (
+    <div className="relative flex h-full flex-col overflow-hidden">
+      <div className="flex w-full flex-1 flex-col overflow-hidden pt-6 pb-4">
+        <div className="mx-auto w-full max-w-3xl space-y-6 px-6">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+          <div className="space-y-2 pl-8">
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-4/6" />
+            <Skeleton className="h-4 w-3/6" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/3" />
+          </div>
+        </div>
+      </div>
+      <div className="mx-auto w-full max-w-3xl shrink-0 px-6 py-2">
+        <Skeleton className="h-20 w-full rounded-xl" />
+      </div>
+    </div>
+  )
+}
 
 export const Route = createFileRoute("/workspace/$threadId")({
   component: WorkspaceThreadRoute,
@@ -34,27 +43,13 @@ export const Route = createFileRoute("/workspace/$threadId")({
 function WorkspaceThreadRoute() {
   const { threadId } = Route.useParams()
   const { workspaces, isLoading } = useWorkspace()
+  const { isFetching } = useWorkspaces()
   const navigate = useNavigate()
-  const {
-    isOpen: diffOpen,
-    isFullscreen: diffFullscreen,
-    setCurrentWorkspace,
-  } = useDiffPanel()
-  const { isOpen: fileTreeOpen } = useFileTree()
+  const { setCurrentWorkspace } = useDiffPanel()
   const { mutate: updateSetting } = useUpdateAppSetting()
   const { mutate: updateLastAccessed } = useUpdateThreadLastAccessed()
   const setActiveThreadId = useSetActiveThreadId()
 
-  // Set active thread when viewing this thread
-  useEffect(() => {
-    setActiveThreadId(threadId)
-    return () => {
-      // Clear active thread when navigating away
-      setActiveThreadId(null)
-    }
-  }, [threadId, setActiveThreadId])
-
-  // Find current workspace
   const foundWorkspace = useMemo(
     () => workspaces.find((ws) => ws.threads.some((t) => t.id === threadId)),
     [workspaces, threadId]
@@ -64,17 +59,23 @@ function WorkspaceThreadRoute() {
     [foundWorkspace, threadId]
   )
 
-  // Set workspace path in diff panel context for breadcrumb navigation
+  useEffect(() => {
+    setActiveThreadId(threadId)
+    return () => {
+      setActiveThreadId(null)
+    }
+  }, [threadId, setActiveThreadId])
+
   const currentPathRef = useRef<string | null>(null)
   useEffect(() => {
     const newPath = foundWorkspace?.path ?? null
     if (newPath !== currentPathRef.current) {
       currentPathRef.current = newPath
-      setCurrentWorkspace(newPath)
+      setCurrentWorkspace(newPath ?? "")
     }
-    return () => {
-      currentPathRef.current = null
-    }
+    // Do not reset currentPathRef on cleanup — the same component instance is reused
+    // when switching threads, so resetting would cause setCurrentWorkspace to fire
+    // again even when the workspace hasn't changed.
   }, [foundWorkspace?.path, setCurrentWorkspace])
 
   useEffect(() => {
@@ -86,81 +87,23 @@ function WorkspaceThreadRoute() {
   }, [threadId, updateSetting, updateLastAccessed])
 
   useEffect(() => {
-    if (!isLoading && !foundThread) {
+    if (!isLoading && !isFetching && !foundThread) {
       navigate({ to: "/" })
     }
-  }, [isLoading, foundThread, navigate])
+  }, [isLoading, isFetching, foundThread, navigate])
 
-  if (!foundWorkspace || !foundThread || !foundThread.sessionId) {
-    return null
-  }
-
-  if (diffFullscreen) {
-    return (
-      <div className="flex h-full border-t">
-        <div className="flex min-w-0 flex-1">
-          <Suspense fallback={<div className="h-full flex-1 bg-muted/10" />}>
-            <DiffPanel
-              sessionId={foundThread.sessionId}
-              openWithAppId={foundWorkspace.openWithAppId}
-            />
-          </Suspense>
-        </div>
-        {fileTreeOpen && (
-          <div className="h-full w-56 shrink-0 border-l border-sidebar-border">
-            <Suspense fallback={<div className="h-full w-full bg-background" />}>
-              <FileTree
-                workspaceId={foundWorkspace.id}
-                workspacePath={foundWorkspace.path}
-              />
-            </Suspense>
-          </div>
-        )}
-      </div>
-    )
+  if (!foundThread?.sessionId) {
+    return <ChatViewSkeleton />
   }
 
   return (
-    <div className={cn("flex h-full border-t", diffFullscreen && "h-full")}>
-      <ResizablePanelGroup orientation="horizontal" className="flex-1">
-        <ResizablePanel defaultSize={diffOpen ? "50" : "100"} minSize="50">
-          <ChatView
-            sessionId={foundThread.sessionId}
-            workspaceId={foundWorkspace.id}
-            threadId={foundThread.id}
-            initialModelId={foundThread.modelId}
-            initialIsStopped={foundThread.isStopped}
-          />
-        </ResizablePanel>
-        {diffOpen && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize="45" minSize="40">
-              <Suspense
-                fallback={
-                  <div className="h-full border-l border-border/60 bg-muted/10" />
-                }
-              >
-                <DiffPanel
-                  sessionId={foundThread.sessionId}
-                  openWithAppId={foundWorkspace.openWithAppId}
-                />
-              </Suspense>
-            </ResizablePanel>
-          </>
-        )}
-      </ResizablePanelGroup>
-
-      {fileTreeOpen && (
-        <div className="h-full w-56 shrink-0 border-l border-sidebar-border">
-          <Suspense fallback={<div className="h-full w-full bg-background" />}>
-            <FileTree
-              workspaceId={foundWorkspace.id}
-              workspacePath={foundWorkspace.path}
-            />
-          </Suspense>
-        </div>
-      )}
-    </div>
+    <ChatView
+      sessionId={foundThread.sessionId}
+      workspaceId={foundWorkspace!.id}
+      threadId={foundThread.id}
+      initialModelId={foundThread.modelId}
+      initialMode={foundThread.mode ?? "code"}
+      initialIsStopped={foundThread.isStopped}
+    />
   )
 }

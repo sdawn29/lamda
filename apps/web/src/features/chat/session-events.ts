@@ -64,6 +64,19 @@ export interface SessionTurnEndEvent {}
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface SessionAgentStartEvent {}
 
+export interface SessionTurnFileChangedEvent {
+  filePath: string;
+  postStatusCode: string;
+  wasCreatedByTurn: boolean;
+}
+
+export interface SessionPlanSavedEvent {
+  /** Absolute path on the server's filesystem. */
+  filePath: string;
+  /** Workspace-relative forward-slash path (always starts with `.agents/plans/`). */
+  relativePath: string;
+}
+
 export interface SessionAgentEndEvent {
   messages?: AgentEndMessage[];
 }
@@ -96,6 +109,8 @@ export interface SessionEventHandlers {
   onTurnEnd: (event: SessionTurnEndEvent) => void;
   onAgentStart: (event: SessionAgentStartEvent) => void;
   onAgentEnd: (event: SessionAgentEndEvent) => void;
+  onTurnFileChanged?: (event: SessionTurnFileChangedEvent) => void;
+  onPlanSaved?: (event: SessionPlanSavedEvent) => void;
   onQueueUpdate: (event: SessionQueueUpdateEvent) => void;
   onAutoRetryStart: (event: SessionAutoRetryStartEvent) => void;
   onAutoRetryEnd: (event: SessionAutoRetryEndEvent) => void;
@@ -152,6 +167,12 @@ export function subscribeToSessionEvents(
         case "agent_end":
           handlers.onAgentEnd(data as unknown as SessionAgentEndEvent)
           break
+        case "turn_file_changed":
+          handlers.onTurnFileChanged?.(data as unknown as SessionTurnFileChangedEvent)
+          break
+        case "plan_saved":
+          handlers.onPlanSaved?.(data as unknown as SessionPlanSavedEvent)
+          break
         case "queue_update":
           handlers.onQueueUpdate(data as unknown as SessionQueueUpdateEvent)
           break
@@ -181,7 +202,19 @@ export function subscribeToSessionEvents(
     }
   }
 
+  // Unclean close (network drop, server crash) — fire transport error only if the
+  // WebSocket was terminated without a proper close handshake.  Clean closes
+  // (code 1000, e.g. from our own cleanup calling ws.close()) set wasClean=true
+  // and are silently ignored here; the doneFlag guard in the handler catches any
+  // edge cases.
+  const handleClose = (event: CloseEvent) => {
+    if (!event.wasClean) {
+      handlers.onTransportError?.(event)
+    }
+  }
+
   ws.addEventListener("message", handleMessage)
+  ws.addEventListener("close", handleClose)
 
   if (handlers.onTransportError) {
     ws.addEventListener("error", handlers.onTransportError)
@@ -189,6 +222,7 @@ export function subscribeToSessionEvents(
 
   return () => {
     ws.removeEventListener("message", handleMessage)
+    ws.removeEventListener("close", handleClose)
     if (handlers.onTransportError) {
       ws.removeEventListener("error", handlers.onTransportError)
     }
