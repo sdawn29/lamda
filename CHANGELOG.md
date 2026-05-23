@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](../../releases/tag/v0.4.0) — 2026-05-23
+
+### Features
+
+* **layout:** update sidebar and panel styles for improved UI consistency
+* **chat:** add file comment context functionality
+* **session:** refactor session management to use openSessionForThread and createSessionForThread
+* **models:** integrate getSupportedThinkingLevels for enhanced model reasoning
+
+### Code Refactoring
+
+* rename diff panel to review panel and update related hooks and shortcuts
+
 ## [0.3.0](../../releases/tag/v0.3.0) — 2026-05-23
 
 ### Features
