@@ -2,6 +2,7 @@ import {
   AuthStorage,
   ModelRegistry,
 } from "@earendil-works/pi-coding-agent";
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import type { ModelInfo } from "./types.js";
 
 // Cached instances for getAvailableModels()
@@ -14,13 +15,9 @@ export function invalidateModelCache(): void {
 }
 
 /**
- * All possible thinking levels supported by pi
- */
-const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh"] as const;
-
-/**
  * Returns all models available to the pi-coding-agent SDK.
- * Uses cached instances to avoid repeated initialization.
+ * Uses ModelRegistry.getAvailable() to filter to models with auth configured,
+ * and getSupportedThinkingLevels() to compute per-model thinking levels.
  */
 export function getAvailableModels(): ModelInfo[] {
   if (!cachedAuthStorage) {
@@ -32,13 +29,15 @@ export function getAvailableModels(): ModelInfo[] {
 
   return cachedModelRegistry.getAvailable().map((m) => {
     const reasoning = m.reasoning ?? false;
+    const thinkingLevels = reasoning
+      ? getSupportedThinkingLevels(m).filter((level) => level !== "off")
+      : [];
     return {
       id: m.id,
       name: m.name,
       provider: m.provider,
       reasoning,
-      // For reasoning-capable models, provide all available thinking levels
-      thinkingLevels: reasoning ? [...THINKING_LEVELS] : [],
+      thinkingLevels,
     };
   });
 }
