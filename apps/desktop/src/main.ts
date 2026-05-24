@@ -341,8 +341,8 @@ async function createSplashWindow(): Promise<BrowserWindow> {
 async function createWindow(splash?: BrowserWindow) {
   const preloadPath = await getPreloadPath();
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: 1400,
+    height: 900,
     minWidth: 680,
     minHeight: 480,
     show: false,

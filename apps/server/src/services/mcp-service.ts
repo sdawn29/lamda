@@ -194,7 +194,9 @@ export async function getMcpServerStatus(workspaceId: string) {
       const entry = getClientEntry(workspaceId, config)
 
       if (!entry.client.isConnected(s.name)) {
-        await entry.client.connect(config)
+        // Fire connection in background — don't block the status response
+        entry.client.connect(config).catch((e) => console.warn(`[MCP] background connect error for "${s.name}":`, e))
+        return { name: s.name, connected: false, toolCount: 0, enabled: s.enabled }
       }
       const tools = await entry.client.listTools()
       return { name: s.name, connected: true, toolCount: tools.length, enabled: s.enabled }

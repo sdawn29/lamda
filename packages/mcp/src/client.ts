@@ -57,6 +57,7 @@ interface ServerConnection {
  */
 export class McpClient {
   private servers: Map<string, ServerConnection> = new Map();
+  private connecting: Map<string, Promise<void>> = new Map();
   private eventHandlers: McpEventHandler[] = [];
   private eventHandlersByType: Map<string, McpEventHandler[]> = new Map();
 
@@ -65,10 +66,21 @@ export class McpClient {
    */
   async connect(config: McpServerConfig): Promise<void> {
     if (this.servers.has(config.name)) {
-      console.warn(`MCP server "${config.name}" already connected`);
       return;
     }
 
+    // Coalesce concurrent connect() calls — return the in-flight promise instead of spawning again
+    const inflight = this.connecting.get(config.name);
+    if (inflight) return inflight;
+
+    const promise = this._doConnect(config).finally(() => {
+      this.connecting.delete(config.name);
+    });
+    this.connecting.set(config.name, promise);
+    return promise;
+  }
+
+  private async _doConnect(config: McpServerConfig): Promise<void> {
     try {
       // In a packaged Electron app, macOS provides only a minimal PATH
       // (/usr/bin:/bin:/usr/sbin:/sbin). Use the login-shell PATH so that

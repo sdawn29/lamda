@@ -16,16 +16,7 @@ import type {
   UserMessage,
 } from "../types"
 import { WorkingBlock, type WorkingMessage } from "./working-block"
-import {
-  ArrowDownIcon,
-  Code2Icon,
-  BugIcon,
-  TestTubeIcon,
-  PlugZapIcon,
-  Wand2Icon,
-  FileSearchIcon,
-  GitBranchIcon,
-} from "lucide-react"
+import { ArrowDownIcon, PlugZapIcon } from "lucide-react"
 
 import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
@@ -91,44 +82,12 @@ import {
 import { getNextMode } from "./mode-combobox"
 
 const PLAN_DIR_PREFIX = ".agents/plans/"
+
 import { FileChangesCard } from "./file-changes-card"
 import { forkSession, listMessages } from "../api"
 import { blocksToMessages, type MessageBlock } from "../types"
 import { workspaceKeys } from "@/features/workspace/queries"
 import { MESSAGES_PAGE_SIZE, type MessagesInfiniteData } from "../queries"
-
-const PROMPT_SUGGESTIONS = [
-  {
-    icon: Code2Icon,
-    text: "Explain this codebase",
-    description: "Walk me through the project structure and key patterns",
-  },
-  {
-    icon: BugIcon,
-    text: "Debug an issue",
-    description: "Describe a bug and let me investigate the root cause",
-  },
-  {
-    icon: TestTubeIcon,
-    text: "Write tests",
-    description: "Add unit, integration, or end-to-end test coverage",
-  },
-  {
-    icon: Wand2Icon,
-    text: "Refactor code",
-    description: "Improve readability, structure, or performance",
-  },
-  {
-    icon: FileSearchIcon,
-    text: "Find something",
-    description: "Locate a function, component, or pattern",
-  },
-  {
-    icon: GitBranchIcon,
-    text: "Review changes",
-    description: "Explain recent git changes in plain language",
-  },
-] as const
 
 type MessageGroup =
   | {
@@ -1158,58 +1117,6 @@ export function ChatView({
           onScroll={handleScroll}
           className="flex w-full flex-1 flex-col overflow-y-auto pt-4 pb-4 [overflow-anchor:none] [scrollbar-gutter:stable]"
         >
-          {visibleMessages.length === 0 && !isLoading && !isLoadingMessages && (
-            <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-8 px-6 text-center select-none">
-              <div className="flex flex-col items-center gap-3">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-[#1c1c1e] shadow-md ring-1 ring-white/5">
-                  <span
-                    className="text-3xl leading-none font-black"
-                    style={{ color: "#d4a017" }}
-                  >
-                    Λ
-                  </span>
-                </div>
-                <div className="space-y-1.5">
-                  <p className="text-lg font-semibold tracking-tight">
-                    How can I help?
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Use{" "}
-                    <kbd className="rounded border border-border/60 bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground">
-                      @
-                    </kbd>{" "}
-                    for files and{" "}
-                    <kbd className="rounded border border-border/60 bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground">
-                      /
-                    </kbd>{" "}
-                    for commands
-                  </p>
-                </div>
-              </div>
-              <div className="grid w-full max-w-lg grid-cols-3 gap-2">
-                {PROMPT_SUGGESTIONS.map(({ icon: Icon, text, description }) => (
-                  <button
-                    key={text}
-                    type="button"
-                    onClick={() => chatTextboxRef.current?.setValue(text)}
-                    className="group flex flex-col items-start gap-2 rounded-xl border bg-card/60 p-3 text-left transition-colors hover:border-primary/20 hover:bg-card"
-                  >
-                    <div className="flex size-7 items-center justify-center rounded-lg bg-primary/8 text-primary/70 transition-colors group-hover:bg-primary/15">
-                      <Icon className="size-3.5" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] leading-tight font-medium text-foreground/80">
-                        {text}
-                      </p>
-                      <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
-                        {description}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           <div ref={messagesContainerRef}>
             {/* Spinner while loading older history */}
             {isFetchingPreviousPage && (
