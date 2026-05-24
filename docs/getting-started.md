@@ -86,7 +86,7 @@ See [providers.md](providers.md) for the full list of supported providers.
 
 | Location | Description |
 |----------|-------------|
-| `~/.lamda-code/db.sqlite` | SQLite database with workspaces, threads, messages |
+| `~/.lamda-code/db-v2.sqlite` | SQLite database with workspaces, threads, messages |
 | `~/.pi/agent/auth.json` | API keys and provider credentials |
 | `~/.lamda-code/logs/` | Application logs |
 

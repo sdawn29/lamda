@@ -83,6 +83,14 @@ The status section shows four categories:
 2. Click the **Unstage** button (minus icon)
 3. File returns to Unstaged section
 
+### Stage Individual Hunks
+
+For fine-grained control, stage or unstage individual diff hunks within a file:
+
+1. Expand the file diff by clicking it
+2. Each hunk shows **Stage Hunk** / **Unstage Hunk** buttons
+3. Click to stage only the lines you want
+
 ### Stage All Changes
 
 1. Click **Stage All** at the bottom of Unstaged section

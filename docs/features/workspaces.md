@@ -113,12 +113,56 @@ Pinned threads appear at the top of their workspace:
 
 Pinned threads show a 📌 icon.
 
+### Forking a Thread
+
+Fork creates a new thread branched from any earlier point in the conversation:
+
+1. In the chat panel, hover over a user message
+2. Click the **Fork** button
+3. A new thread is created with history up to that message
+4. The git working tree is restored to that checkpoint
+5. The new thread opens in a new tab
+
+See [Chat Interface](chat.md) for full details.
+
 ### Switching Threads
 
 Click any thread in the sidebar to switch to it:
 - Chat history loads automatically
 - Git status updates to workspace state
 - Terminal starts in workspace directory
+
+## Workspace Pinning
+
+Workspaces can be pinned to keep them at the top of the sidebar:
+
+1. Right-click on a workspace
+2. Select **Pin Workspace**
+
+Pinned workspaces appear before unpinned ones and show a 📌 icon.
+
+## Workspace Tasks
+
+Tasks are custom shell command shortcuts that run inside the workspace directory. They appear as quick-launch buttons in the workspace panel.
+
+### Adding a Task
+
+1. Open the workspace's **Tasks** section
+2. Click **+ Add Task**
+3. Enter an optional icon emoji and the shell command (e.g., `npm test`)
+4. Click **Save**
+
+### Running a Task
+
+Click the task button to execute the command in a new terminal tab. The terminal opens in the workspace root directory.
+
+### Managing Tasks
+
+Right-click a task for **Edit** and **Delete** options.
+
+Tasks are persisted per workspace in the SQLite database.
+
+---
 
 ## Workspace Settings
 
@@ -179,7 +223,7 @@ Press the keyboard shortcut for sidebar toggle, then:
 
 ### Database Location
 
-SQLite database stored at: `~/.lamda-code/db.sqlite`
+SQLite database stored at: `~/.lamda-code/db-v2.sqlite`
 
 ### Exporting Data
 

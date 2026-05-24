@@ -83,7 +83,7 @@ Each configured provider shows:
 
 ### Where Keys are Stored
 
-API keys are stored in: `~/.pi/agent/auth.json`
+API keys are stored in `~/.pi/agent/auth.json`
 
 With file permissions `0600` (user read/write only).
 

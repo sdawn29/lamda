@@ -47,7 +47,24 @@ Content-Type: application/json
 }
 ```
 
-Events stream via `GET /session/:id/events`.
+Events stream via the session WebSocket channel.
+
+---
+
+### Get Session Status
+
+```http
+GET /session/:id/status
+```
+
+**Response**:
+```json
+{
+  "status": "idle"
+}
+```
+
+Status values: `"idle"`, `"running"`, `"error"`
 
 ---
 
@@ -61,6 +78,23 @@ POST /session/:id/abort
 ```json
 {
   "aborted": true
+}
+```
+
+---
+
+### Dismiss Error
+
+```http
+POST /session/:id/dismiss-error
+```
+
+Clears the current error state without aborting the session.
+
+**Response** `200 OK`:
+```json
+{
+  "ok": true
 }
 ```
 
@@ -96,12 +130,9 @@ Follow-up messages wait until the agent is idle.
 
 ---
 
-### Session Events (SSE)
+### Session Events (WebSocket)
 
-```http
-GET /session/:id/events
-Last-Event-ID: optional-last-event-id
-```
+Session events are streamed via WebSocket. Connect to the server's WebSocket endpoint and subscribe to the session channel.
 
 **Event Types:**
 
@@ -235,6 +266,71 @@ Returns tool blocks that were running when the session was interrupted.
 
 ---
 
+### Get Workspace Files
+
+```http
+GET /session/:id/workspace-files
+```
+
+Returns the indexed file list for the session's workspace.
+
+**Response**:
+```json
+{
+  "files": [
+    { "relativePath": "src/index.ts", "name": "index.ts", "isDirectory": false },
+    { "relativePath": "src/components", "name": "components", "isDirectory": true }
+  ]
+}
+```
+
+---
+
+### Revert to Message
+
+```http
+POST /session/:id/revert-to-message
+Content-Type: application/json
+
+{
+  "messageBlockId": "block-abc123"
+}
+```
+
+Truncates the thread history at the given message block and restores the git working tree to the checkpoint recorded at that agent turn.
+
+**Response** `200 OK`:
+```json
+{
+  "ok": true
+}
+```
+
+---
+
+### Fork Session
+
+```http
+POST /session/:id/fork
+Content-Type: application/json
+
+{
+  "messageBlockId": "block-abc123"
+}
+```
+
+Creates a new thread by copying messages up to the given block, restores the git state to that checkpoint, and returns the new thread and session IDs.
+
+**Response** `200 OK`:
+```json
+{
+  "threadId": "thread-xyz",
+  "sessionId": "session-xyz"
+}
+```
+
+---
+
 ### Delete Session
 
 ```http
@@ -242,6 +338,80 @@ DELETE /session/:id
 ```
 
 **Response**: `204 No Content`
+
+---
+
+## Tasks
+
+Workspace tasks are user-defined shell command shortcuts stored per workspace.
+
+### List Tasks
+
+```http
+GET /tasks/:workspaceId
+```
+
+**Response**:
+```json
+{
+  "tasks": [
+    { "id": "task1", "icon": "🧪", "command": "npm test", "createdAt": 1716000000 }
+  ]
+}
+```
+
+---
+
+### Create Task
+
+```http
+POST /tasks/:workspaceId
+Content-Type: application/json
+
+{
+  "icon": "🧪",
+  "command": "npm test"
+}
+```
+
+**Response** `201 Created`:
+```json
+{
+  "task": { "id": "task1", "icon": "🧪", "command": "npm test", "createdAt": 1716000000 }
+}
+```
+
+---
+
+### Update Task
+
+```http
+PATCH /tasks/:workspaceId/:id
+Content-Type: application/json
+
+{
+  "icon": "🔨",
+  "command": "npm run build"
+}
+```
+
+**Response**:
+```json
+{ "success": true }
+```
+
+---
+
+### Delete Task
+
+```http
+DELETE /tasks/:workspaceId/:id
+```
+
+**Response**:
+```json
+{ "success": true }
+```
 
 ---
 
@@ -670,6 +840,27 @@ Content-Type: application/json
   "ref": "stash@{0}"
 }
 ```
+
+---
+
+## LSP (Language Server Protocol)
+
+Connect via WebSocket to `/ws/workspace/:workspaceId/lsp`.
+
+**Client → Server:**
+```json
+{ "kind": "open",    "id": 1, "filePath": "src/index.ts", "content": "..." }
+{ "kind": "close",   "id": 2, "filePath": "src/index.ts" }
+{ "kind": "request", "id": 3, "filePath": "src/index.ts", "method": "textDocument/hover", "params": {...} }
+```
+
+**Server → Client:**
+```json
+{ "kind": "response",    "id": 3, "result": {...} }
+{ "kind": "diagnostics", "filePath": "src/index.ts", "diagnostics": [...] }
+```
+
+Diagnostics are pushed for all open documents whenever the language server reports changes.
 
 ---
 

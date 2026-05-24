@@ -14,6 +14,7 @@ Welcome to **lamda**, a local-first desktop coding workspace for running Pi codi
 | Chat | [Chat Guide](features/chat.md) | Communicating with the AI agent |
 | Git | [Git Guide](features/git.md) | Version control workflow |
 | Terminal | [Terminal Guide](features/terminal.md) | Embedded shell access |
+| Tasks | [Tasks Guide](features/tasks.md) | Workspace shell command shortcuts |
 | Settings | [Settings Guide](features/settings.md) | Configuration and preferences |
 | MCP | [MCP Guide](features/mcp.md) | Model Context Protocol servers |
 | **Reference** | | |
@@ -31,11 +32,18 @@ Welcome to **lamda**, a local-first desktop coding workspace for running Pi codi
 | Feature | Description |
 |---------|-------------|
 | **Chat Interface** | Real-time streaming conversations with the Pi coding agent |
-| **Git Integration** | View diffs, stage files, commit changes, manage branches and stashes |
+| **Thread Modes** | Code, Ask, and Plan modes control agent behaviour per thread |
+| **Thread Forking** | Branch any conversation at any earlier message |
+| **Git Integration** | View diffs, hunk-level staging, commit, branches, stashes, and revert |
+| **Review Panel** | Side-by-side diff viewer with last-turn file change tracking |
 | **Embedded Terminal** | Multi-tab terminal with WebSocket PTY backend |
+| **File Tabs** | Open source files in tabs alongside chat threads |
+| **Command Palette** | Keyboard-driven command and file search (`Cmd/Ctrl + K`) |
 | **Workspaces** | Organize multiple repositories with multiple conversation threads |
+| **Workspace Tasks** | One-click shell command shortcuts per workspace |
+| **LSP Integration** | Live diagnostics (errors and warnings) in the file viewer |
 | **MCP Support** | Connect to Model Context Protocol servers for extended capabilities |
-| **Local-First** | All data stored locally in SQLite |
+| **Local-First** | All data stored locally in SQLite (`~/.lamda-code/db-v2.sqlite`) |
 | **Multiple Providers** | Support for Anthropic, OpenAI, DeepSeek, Google Gemini, and more |
 
 ---
@@ -93,9 +101,10 @@ When you launch lamda, you'll see:
 The chat interface is your primary way to interact with the Pi coding agent:
 
 - **Send messages** — Type prompts and get AI responses with real-time streaming
+- **Thread modes** — Choose `code`, `ask`, or `plan` per thread
+- **Thread forking** — Branch from any earlier message to explore alternatives
 - **Tool execution** — Watch the agent use tools (read files, edit code, run commands)
 - **Thinking visibility** — Toggle whether to show the agent's thinking process
-- **Slash commands** — Use `/search`, `/file`, `/terminal` for quick actions
 - **Context usage** — Monitor token usage and context window
 
 ### [Git Integration](features/git.md)
@@ -103,11 +112,11 @@ The chat interface is your primary way to interact with the Pi coding agent:
 Full git workflow support directly in the app:
 
 - **View changes** — See unstaged, staged, and untracked file changes
-- **Stage/unstage** — Selectively stage files for commit
+- **Stage/unstage** — Selectively stage files or individual diff hunks
 - **Commit** — Write commit messages (with conventional commit support)
 - **Branches** — Switch branches, create new branches
 - **Stashes** — Temporarily store changes, then restore them
-- **Revert** — Discard changes to files
+- **Revert** — Discard changes to files or restore to an earlier agent turn
 
 ### [Terminal](features/terminal.md)
 
@@ -126,7 +135,16 @@ Organize your work by repository:
 - **Clone repository** — Clone from git URL
 - **Multiple threads** — Multiple conversation threads per workspace
 - **Archive threads** — Keep threads for reference without cluttering
-- **Pin threads** — Pin important threads to the top
+- **Pin threads and workspaces** — Pin important items to the top
+- **Fork threads** — Branch a conversation at any earlier message
+
+### [Tasks](features/tasks.md)
+
+User-defined shell command shortcuts per workspace:
+
+- **One-click execution** — Run common commands without typing
+- **Custom icons** — Emoji icons for quick visual recognition
+- **Per-workspace** — Each workspace has its own task list
 
 ### [Settings](features/settings.md)
 
@@ -181,14 +199,21 @@ npm install
 
 ## 📊 Project Status
 
-> **Status**: Early open-source release. Functional but evolving.
+> **Status**: Early open-source release. Functional but evolving. Current version: **v0.4.0**
 
-- ✅ Chat with streaming responses
-- ✅ Git workflow (status, diff, staging, commit, branches, stashes)
-- ✅ Embedded terminal
-- ✅ Workspace/thread management
+- ✅ Chat with real-time streaming via WebSocket
+- ✅ Thread modes: code, ask, plan
+- ✅ Thread forking with git state restoration
+- ✅ Git workflow (status, diff, hunk staging, commit, branches, stashes, revert)
+- ✅ Embedded terminal with multi-tab support
+- ✅ Workspace/thread management with pinning and archiving
+- ✅ Workspace tasks (custom shell command shortcuts)
+- ✅ File tabs and file tree browser
+- ✅ Command palette (`Cmd/Ctrl + K`)
+- ✅ LSP diagnostics in the file viewer
 - ✅ MCP server integration
-- ✅ Multiple AI providers
+- ✅ Multiple AI providers (20+)
+- ✅ State management via Zustand
 - ⚠️ No automated test suite yet
 - ⚠️ macOS `arm64` packaging only (for now)
 

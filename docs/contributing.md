@@ -51,7 +51,10 @@ lamda/
 ├── packages/
 │   ├── db/            # Drizzle ORM + SQLite
 │   ├── git/           # Git CLI wrappers
-│   └── pi-sdk/        # Pi agent SDK wrapper
+│   ├── lsp/           # Language Server Protocol integration
+│   ├── mcp/           # MCP client management
+│   ├── pi-sdk/        # Pi agent SDK wrapper
+│   └── subagent/      # Subagent utilities
 ├── docs/              # Documentation
 └── AGENTS.md          # AI agent context
 ```
@@ -75,7 +78,7 @@ lamda/
 ### New UI Components
 
 1. Add to appropriate feature module in `apps/web/src/features/`
-2. Follow existing patterns (TanStack Query for data, Context for UI state)
+2. Follow existing patterns (TanStack Query for server state, Zustand for UI state)
 3. Use shared components from `apps/web/src/shared/ui/`
 
 ### New Packages

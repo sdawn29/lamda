@@ -122,6 +122,34 @@ Control when thinking blocks are shown:
 2. Find **Thinking Visibility**
 3. Choose: **Show** (default) or **Hide**
 
+## Thread Modes
+
+Each thread operates in a mode that controls the agent's behaviour. Select the mode in the input bar before sending a message.
+
+| Mode | Description |
+|------|-------------|
+| **Code** | Default. Full editing permissions — the agent reads, writes, and edits files. |
+| **Ask** | Read-only. The agent answers questions and explores code without making changes. |
+| **Plan** | The agent proposes a step-by-step plan and waits for approval before executing. |
+
+The mode is stored per thread and can be changed at any time between turns.
+
+---
+
+## Forking a Thread
+
+Fork lets you branch the conversation at any earlier user message and explore an alternative approach without losing the original history.
+
+1. Hover over any user message
+2. Click the **Fork** button that appears
+3. A new thread is created with history copied up to that message
+4. The git working tree is restored to the state it was in at that point
+5. The new thread opens automatically
+
+Forked threads show their source in the sidebar.
+
+---
+
 ## Model Selection
 
 Switch between different AI models:
