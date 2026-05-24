@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, memo } from "react"
 import {
-  Archive,
   Check,
   ChevronDown,
   ChevronRight,
@@ -47,7 +46,6 @@ import {
 import {
   useGitStage,
   useGitStageAll,
-  useGitStashMutations,
   useGitRevertFile,
   useGitFetch,
   useGitPull,
@@ -56,8 +54,6 @@ import {
 import { type ChangedFile, parseStatusLine } from "./status-badge"
 import { type DiffMode } from "./diff-view"
 import { CommitInputSection } from "./commit-dialog"
-import { StashInputBar } from "./stash-input-bar"
-import { StashSection } from "./stash-section"
 import { FilesSection } from "./files-section"
 import { HistoryView } from "./history-view"
 import { FileListItem } from "./file-list-item"
@@ -324,7 +320,6 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
   setMode,
   sortMode,
   setSortMode,
-  setStashInputOpen,
 }: {
   workspaceSessionId: string
   view: ContentView
@@ -332,10 +327,9 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
   setMode: (m: DiffMode) => void
   sortMode: SortMode
   setSortMode: (s: SortMode) => void
-  setStashInputOpen: (open: boolean) => void
 }) {
   const { data: statusData } = useGitStatus(workspaceSessionId)
-  const { hasStaged, hasUnstaged, hasChanges } = useMemo(() => {
+  const { hasStaged, hasUnstaged } = useMemo(() => {
     const all = (statusData?.raw ?? "")
       .split("\n")
       .map((l: string) => l.trimEnd())
@@ -344,7 +338,6 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
     return {
       hasStaged: all.some((f: ChangedFile) => f.isStaged),
       hasUnstaged: all.some((f: ChangedFile) => !f.isStaged),
-      hasChanges: all.length > 0,
     }
   }, [statusData])
 
@@ -429,14 +422,6 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
             )}
             Unstage all
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => setStashInputOpen(true)}
-            disabled={!hasChanges || view === "turn"}
-            className="flex items-center gap-2"
-          >
-            <Archive className="h-3.5 w-3.5" />
-            Stash changes
-          </DropdownMenuItem>
           {view !== "turn" && (
             <>
               <DropdownMenuSeparator />
@@ -499,16 +484,12 @@ const SourceControlContent = memo(function SourceControlContent({
   view,
   mode,
   sortMode,
-  stashInputOpen,
-  setStashInputOpen,
 }: {
   sessionId: string
   workspaceSessionId: string
   view: ContentView
   mode: DiffMode
   sortMode: SortMode
-  stashInputOpen: boolean
-  setStashInputOpen: (open: boolean) => void
 }) {
   const { data: turnsData = [], isLoading: turnsLoading } = useTurns(sessionId)
 
@@ -544,7 +525,6 @@ const SourceControlContent = memo(function SourceControlContent({
   const initRepo = useInitializeGitRepository(workspaceSessionId)
 
   const { stage, unstage } = useGitStage(workspaceSessionId)
-  const { stash } = useGitStashMutations(workspaceSessionId)
   const revertFile = useGitRevertFile(workspaceSessionId)
 
   const handleStageToggle = useCallback(
@@ -565,18 +545,6 @@ const SourceControlContent = memo(function SourceControlContent({
     [revertFile]
   )
 
-  const handleStashConfirm = useCallback(
-    async (message: string) => {
-      try {
-        await stash.mutateAsync(message || undefined)
-        setStashInputOpen(false)
-      } catch {
-        // keep input bar open on failure
-      }
-    },
-    [stash, setStashInputOpen]
-  )
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex min-h-0 flex-1 flex-col">
@@ -593,13 +561,6 @@ const SourceControlContent = memo(function SourceControlContent({
           <>
             <CommitInputSection sessionId={workspaceSessionId} />
             <div className="min-h-0 flex-1 overflow-y-auto">
-              {stashInputOpen && (
-                <StashInputBar
-                  onConfirm={handleStashConfirm}
-                  onCancel={() => setStashInputOpen(false)}
-                />
-              )}
-
               {!loading && !isGitRepo && (
                 <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
@@ -692,7 +653,6 @@ const SourceControlContent = memo(function SourceControlContent({
               )}
             </div>
 
-            <StashSection sessionId={workspaceSessionId} />
           </>
         )}
       </div>
@@ -1051,7 +1011,6 @@ export const ReviewPanel = memo(function ReviewPanel({
   const [scView, setScView] = useState<ContentView>("turn")
   const [scMode, setScMode] = useState<DiffMode>("inline")
   const [scSortMode, setScSortMode] = useState<SortMode>("name")
-  const [scStashInputOpen, setScStashInputOpen] = useState(false)
   const activeTurnId = turnsData[0]?.id
   const { data: turnDiffStat } = useTurnDiffStat(
     sessionId,
@@ -1160,7 +1119,6 @@ export const ReviewPanel = memo(function ReviewPanel({
                 setMode={setScMode}
                 sortMode={scSortMode}
                 setSortMode={setScSortMode}
-                setStashInputOpen={setScStashInputOpen}
               />
             )}
 
@@ -1228,8 +1186,6 @@ export const ReviewPanel = memo(function ReviewPanel({
               view={scView}
               mode={scMode}
               sortMode={scSortMode}
-              stashInputOpen={scStashInputOpen}
-              setStashInputOpen={setScStashInputOpen}
             />
           )}
         </div>
