@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0](../../releases/tag/v0.5.0) — 2026-05-24
+
+### Features
+
+* **SourceControl:** remove stash functionality from toolbar and content sections
+* **docs:** update README and API documentation; add workspace tasks guide
+* **window:** increase splash window dimensions for improved visibility
+* **ThreadRow:** align thread timestamp to the right for better layout
+
 ## [0.4.0](../../releases/tag/v0.4.0) — 2026-05-23
 
 ### Features
