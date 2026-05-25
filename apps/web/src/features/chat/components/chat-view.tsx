@@ -440,7 +440,6 @@ export function ChatView({
     visibleMessages,
     hasConversationHistory,
     isLoading,
-    isLoadingMessages,
     isCompacting,
     compactionReason,
     pendingError,
