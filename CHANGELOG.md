@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](../../releases/tag/v0.6.0) — 2026-05-26
+
+### Features
+
+* **plan:** enhance plan mode with persistent markdown saving, auto-switching to code mode, and inline review capabilities
+* **ChatView:** remove unused isLoadingMessages prop from ChatView component
+
 ## [0.5.0](../../releases/tag/v0.5.0) — 2026-05-24
 
 ### Features
