@@ -20,7 +20,9 @@ bootstrapSessions()
       { fetch: app.fetch, port, hostname: "127.0.0.1" },
       (info) => {
         // Must be first stdout write — apps/desktop/src/main.ts reads this to learn the port
-        process.stdout.write(JSON.stringify({ ready: true, port: info.port }) + "\n");
+        process.stdout.write(
+          JSON.stringify({ ready: true, port: info.port }) + "\n",
+        );
         console.error(`[server] listening on http://127.0.0.1:${info.port}`);
       },
     );
@@ -56,47 +58,54 @@ bootstrapSessions()
       },
     );
 
-    wss.on("connection", (ws: WebSocket, request: import("node:http").IncomingMessage) => {
-      const url = new URL(request.url ?? "/", "http://localhost");
-      const pathname = url.pathname;
+    wss.on(
+      "connection",
+      (ws: WebSocket, request: import("node:http").IncomingMessage) => {
+        const url = new URL(request.url ?? "/", "http://localhost");
+        const pathname = url.pathname;
 
-      if (pathname === "/terminal") {
-        handleTerminalConnection(ws, request);
-        return;
-      }
+        if (pathname === "/terminal") {
+          handleTerminalConnection(ws, request);
+          return;
+        }
 
-      if (pathname === "/ws/events") {
-        handleGlobalEventsWs(ws);
-        return;
-      }
+        if (pathname === "/ws/events") {
+          handleGlobalEventsWs(ws);
+          return;
+        }
 
-      const sessionMatch = pathname.match(/^\/ws\/session\/([^/]+)\/events$/);
-      if (sessionMatch) {
-        const lastEventId = url.searchParams.get("lastEventId") ?? undefined;
-        handleSessionEventsWs(ws, sessionMatch[1], lastEventId);
-        return;
-      }
+        const sessionMatch = pathname.match(/^\/ws\/session\/([^/]+)\/events$/);
+        if (sessionMatch) {
+          const lastEventId = url.searchParams.get("lastEventId") ?? undefined;
+          handleSessionEventsWs(ws, sessionMatch[1], lastEventId);
+          return;
+        }
 
-      const sessionCmdMatch = pathname.match(/^\/ws\/session\/([^/]+)\/commands$/);
-      if (sessionCmdMatch) {
-        handleSessionCommands(ws, sessionCmdMatch[1]);
-        return;
-      }
+        const sessionCmdMatch = pathname.match(
+          /^\/ws\/session\/([^/]+)\/commands$/,
+        );
+        if (sessionCmdMatch) {
+          handleSessionCommands(ws, sessionCmdMatch[1]);
+          return;
+        }
 
-      const oauthMatch = pathname.match(/^\/ws\/auth\/oauth\/([^/]+)\/events$/);
-      if (oauthMatch) {
-        handleOAuthEventsWs(ws, oauthMatch[1]);
-        return;
-      }
+        const oauthMatch = pathname.match(
+          /^\/ws\/auth\/oauth\/([^/]+)\/events$/,
+        );
+        if (oauthMatch) {
+          handleOAuthEventsWs(ws, oauthMatch[1]);
+          return;
+        }
 
-      const lspMatch = pathname.match(/^\/ws\/workspace\/([^/]+)\/lsp$/);
-      if (lspMatch) {
-        handleLspWs(ws, lspMatch[1]);
-        return;
-      }
+        const lspMatch = pathname.match(/^\/ws\/workspace\/([^/]+)\/lsp$/);
+        if (lspMatch) {
+          handleLspWs(ws, lspMatch[1]);
+          return;
+        }
 
-      ws.close();
-    });
+        ws.close();
+      },
+    );
   })
   .catch((err) => {
     console.error("[bootstrap] fatal error:", err);

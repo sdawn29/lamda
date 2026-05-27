@@ -4,27 +4,27 @@
  * - "streaming": agent is actively processing (isStreaming: true)
  * - "idle": agent is not running (isStreaming: false)
  */
-export type ThreadStatus = "streaming" | "idle"
+export type ThreadStatus = "streaming" | "idle";
 
-export type ThreadStatusEvent = { threadId: string; status: ThreadStatus }
+export type ThreadStatusEvent = { threadId: string; status: ThreadStatus };
 
-type Subscriber = (event: ThreadStatusEvent) => void
+type Subscriber = (event: ThreadStatusEvent) => void;
 
 class ThreadStatusBroadcaster {
-  private subscribers = new Set<Subscriber>()
+  private subscribers = new Set<Subscriber>();
 
   subscribe(fn: Subscriber): () => void {
-    this.subscribers.add(fn)
-    return () => this.subscribers.delete(fn)
+    this.subscribers.add(fn);
+    return () => this.subscribers.delete(fn);
   }
 
   broadcast(threadId: string, status: ThreadStatus) {
     for (const fn of this.subscribers) {
       try {
-        fn({ threadId, status })
+        fn({ threadId, status });
       } catch {}
     }
   }
 }
 
-export const threadStatusBroadcaster = new ThreadStatusBroadcaster()
+export const threadStatusBroadcaster = new ThreadStatusBroadcaster();

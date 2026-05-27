@@ -6,6 +6,8 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog"
 import { Button } from "@/shared/ui/button"
+import { Input } from "@/shared/ui/input"
+import { Textarea } from "@/shared/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -13,12 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupText,
-  InputGroupInput,
-} from "@/shared/ui/input-group"
 import { FieldError } from "@/shared/ui/field"
 import { TASK_ICONS, TaskIcon, type TaskIconId } from "../icons"
 import type { WorkspaceTask } from "../types"
@@ -32,18 +28,19 @@ interface TaskFormDialogProps {
 
 export function TaskFormDialog({ open, onOpenChange, task, onSave }: TaskFormDialogProps) {
   const [icon, setIcon] = useState<TaskIconId>("terminal")
+  const [name, setName] = useState("")
   const [command, setCommand] = useState("")
   const [errors, setErrors] = useState<{ command?: string }>({})
 
   const syncFromTask = () => {
     setIcon((task?.icon as TaskIconId) ?? "terminal")
+    setName(task?.name ?? "")
     setCommand(task?.command ?? "")
     setErrors({})
   }
 
   useEffect(() => {
     if (open) syncFromTask()
-    // Keep local form state aligned with the selected task while dialog is open.
   }, [open, task])
 
   const handleOpenChange = (next: boolean) => {
@@ -56,7 +53,7 @@ export function TaskFormDialog({ open, onOpenChange, task, onSave }: TaskFormDia
       setErrors({ command: "Command is required" })
       return
     }
-    onSave({ icon, command: command.trim() })
+    onSave({ icon, name: name.trim() || null, command: command.trim() })
     handleOpenChange(false)
   }
 
@@ -95,31 +92,38 @@ export function TaskFormDialog({ open, onOpenChange, task, onSave }: TaskFormDia
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="task-command" className="text-xs font-medium">
-              Command
+            <label htmlFor="task-name" className="text-xs font-medium">
+              Name
             </label>
-            <InputGroup aria-invalid={errors.command ? true : undefined}>
-              <InputGroupAddon>
-                <InputGroupText className="font-mono text-muted-foreground/60 select-none">
-                  $
-                </InputGroupText>
-              </InputGroupAddon>
-              <InputGroupInput
-                id="task-command"
-                autoFocus
-                placeholder="npm run dev"
-                value={command}
-                onChange={(e) => {
-                  setCommand(e.target.value)
-                  setErrors({})
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSave()
-                }}
-                aria-invalid={!!errors.command}
-                className="font-mono"
-              />
-            </InputGroup>
+            <Input
+              id="task-name"
+              autoFocus
+              placeholder="Start dev server"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-8 text-xs"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="task-command" className="text-xs font-medium">
+              Command <span className="text-destructive">*</span>
+            </label>
+            <Textarea
+              id="task-command"
+              placeholder="npm run dev"
+              value={command}
+              onChange={(e) => {
+                setCommand(e.target.value)
+                setErrors({})
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSave()
+              }}
+              aria-invalid={!!errors.command}
+              className="min-h-[72px] resize-none font-mono text-xs"
+              rows={3}
+            />
             {errors.command && <FieldError>{errors.command}</FieldError>}
           </div>
         </div>

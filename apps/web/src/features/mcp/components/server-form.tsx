@@ -11,7 +11,6 @@ import {
   FileJson,
   Settings2,
   Wrench,
-  Zap,
   Play,
   Square,
   AlertTriangle,
@@ -695,9 +694,8 @@ export function ServerListItem({
             {tools.map((tool) => (
               <div
                 key={tool.name}
-                className="my-1 flex items-start gap-2.5 rounded-md border border-border/40 bg-muted/10 px-2.5 py-2 first:mt-0 last:mb-0"
+                className="my-1 flex items-center gap-2.5 rounded-md border border-border/40 bg-muted/10 px-2.5 py-2 first:mt-0 last:mb-0"
               >
-                <Zap className="mt-0.5 h-3 w-3 shrink-0 text-primary/50" />
                 <div className="min-w-0">
                   <code className="font-mono text-[10px] font-semibold text-foreground/80">
                     {tool.name}

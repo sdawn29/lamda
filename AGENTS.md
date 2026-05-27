@@ -77,23 +77,23 @@ lamda/
 
 Detailed AGENTS.md files for complex web feature modules:
 
-| Feature | Path | Complexity |
-|---------|------|-------------|
-| [Chat](apps/web/src/features/chat/AGENTS.md) | `web/src/features/chat/` | 34 files, streaming architecture |
-| [Git](apps/web/src/features/git/AGENTS.md) | `web/src/features/git/` | 26 files, diff + staging workflow |
-| [MCP](apps/web/src/features/mcp/AGENTS.md) | `web/src/features/mcp/` | MCP server integration |
-| [Routes (server)](apps/server/src/routes/AGENTS.md) | `server/src/routes/` | REST endpoints: sessions, threads, git, files |
-| [Layout](apps/web/src/features/layout/AGENTS.md) | `web/src/features/layout/` | Title bar, navigation, panel toggles, editor integration |
-| [Terminal](apps/web/src/features/terminal/AGENTS.md) | `web/src/features/terminal/` | xterm.js + WebSocket PTY |
-| [Settings](apps/web/src/features/settings/AGENTS.md) | `web/src/features/settings/` | Provider config, API keys |
-| [Workspace](apps/web/src/features/workspace/AGENTS.md) | `web/src/features/workspace/` | 9 files, workspace/thread lifecycle |
-| [File Tree](apps/web/src/features/file-tree/AGENTS.md) | `web/src/features/file-tree/` | 4 files, file navigation |
-| [Electron](apps/web/src/features/electron/AGENTS.md) | `web/src/features/electron/` | 5 files, desktop integration |
-| [Command Palette](apps/web/src/features/command-palette/AGENTS.md) | `web/src/features/command-palette/` | 3 files, Cmd+K command interface |
-| [Main Tabs](apps/web/src/features/main-tabs/AGENTS.md) | `web/src/features/main-tabs/` | 4 files, tab management |
-| [Tasks](apps/web/src/features/tasks/AGENTS.md) | `web/src/features/tasks/` | 4 files, workspace tasks |
-| [File Opening](apps/web/src/features/file-opening/AGENTS.md) | `web/src/features/file-opening/` | File open dialog + editor integration |
-| [Tree View](apps/web/src/features/tree-view/AGENTS.md) | `web/src/features/tree-view/` | Planned: virtualized tree (stub) |
-| [Shared](apps/web/src/shared/AGENTS.md) | `web/src/shared/` | 54+ files, UI components + utilities |
-| [Routes](apps/web/src/routes/AGENTS.md) | `web/src/routes/` | TanStack Router file-based routing |
-| [Providers](apps/web/src/providers/AGENTS.md) | `web/src/providers/` | AppProviders composition layer |
+| Feature                                                            | Path                                | Complexity                                               |
+| ------------------------------------------------------------------ | ----------------------------------- | -------------------------------------------------------- |
+| [Chat](apps/web/src/features/chat/AGENTS.md)                       | `web/src/features/chat/`            | 34 files, streaming architecture                         |
+| [Git](apps/web/src/features/git/AGENTS.md)                         | `web/src/features/git/`             | 26 files, diff + staging workflow                        |
+| [MCP](apps/web/src/features/mcp/AGENTS.md)                         | `web/src/features/mcp/`             | MCP server integration                                   |
+| [Routes (server)](apps/server/src/routes/AGENTS.md)                | `server/src/routes/`                | REST endpoints: sessions, threads, git, files            |
+| [Layout](apps/web/src/features/layout/AGENTS.md)                   | `web/src/features/layout/`          | Title bar, navigation, panel toggles, editor integration |
+| [Terminal](apps/web/src/features/terminal/AGENTS.md)               | `web/src/features/terminal/`        | xterm.js + WebSocket PTY                                 |
+| [Settings](apps/web/src/features/settings/AGENTS.md)               | `web/src/features/settings/`        | Provider config, API keys                                |
+| [Workspace](apps/web/src/features/workspace/AGENTS.md)             | `web/src/features/workspace/`       | 9 files, workspace/thread lifecycle                      |
+| [File Tree](apps/web/src/features/file-tree/AGENTS.md)             | `web/src/features/file-tree/`       | 4 files, file navigation                                 |
+| [Electron](apps/web/src/features/electron/AGENTS.md)               | `web/src/features/electron/`        | 5 files, desktop integration                             |
+| [Command Palette](apps/web/src/features/command-palette/AGENTS.md) | `web/src/features/command-palette/` | 3 files, Cmd+K command interface                         |
+| [Main Tabs](apps/web/src/features/main-tabs/AGENTS.md)             | `web/src/features/main-tabs/`       | 4 files, tab management                                  |
+| [Tasks](apps/web/src/features/tasks/AGENTS.md)                     | `web/src/features/tasks/`           | 4 files, workspace tasks                                 |
+| [File Opening](apps/web/src/features/file-opening/AGENTS.md)       | `web/src/features/file-opening/`    | File open dialog + editor integration                    |
+| [Tree View](apps/web/src/features/tree-view/AGENTS.md)             | `web/src/features/tree-view/`       | Planned: virtualized tree (stub)                         |
+| [Shared](apps/web/src/shared/AGENTS.md)                            | `web/src/shared/`                   | 54+ files, UI components + utilities                     |
+| [Routes](apps/web/src/routes/AGENTS.md)                            | `web/src/routes/`                   | TanStack Router file-based routing                       |
+| [Providers](apps/web/src/providers/AGENTS.md)                      | `web/src/providers/`                | AppProviders composition layer                           |

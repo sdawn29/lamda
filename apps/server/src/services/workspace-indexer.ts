@@ -9,9 +9,7 @@ import {
 import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
 import { gitStatusBroadcaster } from "../git-status-broadcaster.js";
 
-const EXCLUDED_DIRS = new Set([
-  ".git",
-]);
+const EXCLUDED_DIRS = new Set([".git"]);
 
 const FLUSH_DEBOUNCE_MS = 150;
 
@@ -35,14 +33,17 @@ class WorkspaceIndexer {
   private workspaces = new Map<string, WorkspaceState>();
 
   constructor() {
-    setInterval(() => {
-      const now = Date.now();
-      for (const [wsId, state] of this.workspaces) {
-        if (now - state.lastAccessedAt > IDLE_WORKSPACE_TTL_MS) {
-          this.stopIndexing(wsId);
+    setInterval(
+      () => {
+        const now = Date.now();
+        for (const [wsId, state] of this.workspaces) {
+          if (now - state.lastAccessedAt > IDLE_WORKSPACE_TTL_MS) {
+            this.stopIndexing(wsId);
+          }
         }
-      }
-    }, 10 * 60 * 1000).unref();
+      },
+      10 * 60 * 1000,
+    ).unref();
   }
 
   /**
@@ -97,16 +98,22 @@ class WorkspaceIndexer {
     if (state.flushTimer) clearTimeout(state.flushTimer);
     if (state.gitStatusTimer) clearTimeout(state.gitStatusTimer);
     if (state.watcher) {
-      try { state.watcher.close(); } catch {}
+      try {
+        state.watcher.close();
+      } catch {}
     }
     if (state.gitWatcher) {
-      try { state.gitWatcher.close(); } catch {}
+      try {
+        state.gitWatcher.close();
+      } catch {}
     }
     this.workspaces.delete(workspaceId);
     // Shut down any LSP servers spawned for this workspace.
     void import("./language-service.js")
       .then((m) => m.shutdownWorkspace(workspaceId))
-      .catch((err) => console.warn(`[workspace-indexer] LSP shutdown failed:`, err));
+      .catch((err) =>
+        console.warn(`[workspace-indexer] LSP shutdown failed:`, err),
+      );
   }
 
   async reindex(workspaceId: string): Promise<void> {
@@ -156,7 +163,10 @@ class WorkspaceIndexer {
         },
       );
       watcher.on("error", (err) => {
-        console.error(`[workspace-indexer] watcher error for ${workspaceId}:`, err);
+        console.error(
+          `[workspace-indexer] watcher error for ${workspaceId}:`,
+          err,
+        );
       });
       state.watcher = watcher;
     } catch (err) {
@@ -182,7 +192,10 @@ class WorkspaceIndexer {
     }
   }
 
-  private scheduleGitStatusBroadcast(workspaceId: string, state: WorkspaceState): void {
+  private scheduleGitStatusBroadcast(
+    workspaceId: string,
+    state: WorkspaceState,
+  ): void {
     if (state.gitStatusTimer) return;
     state.gitStatusTimer = setTimeout(() => {
       state.gitStatusTimer = null;
@@ -199,12 +212,18 @@ class WorkspaceIndexer {
     state.flushTimer = setTimeout(() => {
       state.flushTimer = null;
       this.flush(workspaceId, state).catch((err) =>
-        console.error(`[workspace-indexer] flush failed for ${workspaceId}:`, err),
+        console.error(
+          `[workspace-indexer] flush failed for ${workspaceId}:`,
+          err,
+        ),
       );
     }, delay);
   }
 
-  private async flush(workspaceId: string, state: WorkspaceState): Promise<void> {
+  private async flush(
+    workspaceId: string,
+    state: WorkspaceState,
+  ): Promise<void> {
     if (state.flushInProgress) {
       this.scheduleFlush(workspaceId, state, FLUSH_DEBOUNCE_MS);
       return;
@@ -231,16 +250,25 @@ class WorkspaceIndexer {
     }
   }
 
-  private async fullScan(workspaceId: string, state: WorkspaceState): Promise<boolean> {
+  private async fullScan(
+    workspaceId: string,
+    state: WorkspaceState,
+  ): Promise<boolean> {
     if (state.scanInProgress) return false;
     state.scanInProgress = true;
     try {
       const newIndex = new Map<string, WorkspaceFileEntry>();
       let raw: import("node:fs").Dirent[];
       try {
-        raw = await readdir(state.path, { withFileTypes: true, recursive: true });
+        raw = await readdir(state.path, {
+          withFileTypes: true,
+          recursive: true,
+        });
       } catch (err) {
-        console.error(`[workspace-indexer] readdir failed for ${state.path}:`, err);
+        console.error(
+          `[workspace-indexer] readdir failed for ${state.path}:`,
+          err,
+        );
         return false;
       }
 
@@ -249,9 +277,17 @@ class WorkspaceIndexer {
         const rel = relative(state.path, fullPath).split(sep).join("/");
         if (!rel || this.isExcluded(rel)) continue;
         if (entry.isDirectory()) {
-          newIndex.set(rel, { relativePath: rel, name: entry.name, isDirectory: true });
+          newIndex.set(rel, {
+            relativePath: rel,
+            name: entry.name,
+            isDirectory: true,
+          });
         } else if (entry.isFile()) {
-          newIndex.set(rel, { relativePath: rel, name: entry.name, isDirectory: false });
+          newIndex.set(rel, {
+            relativePath: rel,
+            name: entry.name,
+            isDirectory: false,
+          });
         }
       }
 
@@ -262,7 +298,10 @@ class WorkspaceIndexer {
       }
       return changed;
     } catch (err) {
-      console.error(`[workspace-indexer] full scan failed for ${workspaceId}:`, err);
+      console.error(
+        `[workspace-indexer] full scan failed for ${workspaceId}:`,
+        err,
+      );
       return false;
     } finally {
       state.scanInProgress = false;
@@ -322,15 +361,22 @@ class WorkspaceIndexer {
   ): Promise<boolean> {
     let entries: import("node:fs").Dirent[];
     try {
-      entries = await readdir(fullDirPath, { withFileTypes: true, recursive: true });
+      entries = await readdir(fullDirPath, {
+        withFileTypes: true,
+        recursive: true,
+      });
     } catch {
       return false;
     }
     let changed = false;
     for (const entry of entries) {
       const childFullPath = join(entry.parentPath, entry.name);
-      const childRelInDir = relative(fullDirPath, childFullPath).split(sep).join("/");
-      const childRel = childRelInDir ? `${relDirPath}/${childRelInDir}` : relDirPath;
+      const childRelInDir = relative(fullDirPath, childFullPath)
+        .split(sep)
+        .join("/");
+      const childRel = childRelInDir
+        ? `${relDirPath}/${childRelInDir}`
+        : relDirPath;
       if (this.isExcluded(childRel)) continue;
       const isDir = entry.isDirectory();
       const isFile = entry.isFile();
@@ -368,7 +414,11 @@ function indexesEqual(
   if (a.size !== b.size) return false;
   for (const [key, value] of a) {
     const other = b.get(key);
-    if (!other || other.isDirectory !== value.isDirectory || other.name !== value.name) {
+    if (
+      !other ||
+      other.isDirectory !== value.isDirectory ||
+      other.name !== value.name
+    ) {
       return false;
     }
   }

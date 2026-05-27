@@ -13,9 +13,20 @@ class SessionStore {
   private sessions = new Map<string, StoredSession>();
   private threadIndex = new Map<string, string>(); // threadId → sessionId
 
-  create(handle: ManagedSessionHandle, cwd: string, threadId: string, workspaceId?: string): string {
+  create(
+    handle: ManagedSessionHandle,
+    cwd: string,
+    threadId: string,
+    workspaceId?: string,
+  ): string {
     const id = randomUUID();
-    this.sessions.set(id, { handle, createdAt: Date.now(), cwd, threadId, workspaceId });
+    this.sessions.set(id, {
+      handle,
+      createdAt: Date.now(),
+      cwd,
+      threadId,
+      workspaceId,
+    });
     this.threadIndex.set(threadId, id);
     return id;
   }
@@ -46,14 +57,17 @@ class SessionStore {
     return { sessionId, handle: entry.handle };
   }
 
-  getByWorkspaceId(workspaceId: string): Array<{ sessionId: string; handle: ManagedSessionHandle }> {
-    const result: Array<{ sessionId: string; handle: ManagedSessionHandle }> = []
+  getByWorkspaceId(
+    workspaceId: string,
+  ): Array<{ sessionId: string; handle: ManagedSessionHandle }> {
+    const result: Array<{ sessionId: string; handle: ManagedSessionHandle }> =
+      [];
     for (const [sessionId, entry] of this.sessions) {
       if (entry.workspaceId === workspaceId) {
-        result.push({ sessionId, handle: entry.handle })
+        result.push({ sessionId, handle: entry.handle });
       }
     }
-    return result
+    return result;
   }
 
   replaceHandle(id: string, newHandle: ManagedSessionHandle): boolean {

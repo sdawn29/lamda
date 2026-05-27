@@ -53,11 +53,20 @@ auth.post("/auth/oauth/:providerId/login", async (c) => {
     .login(providerId, {
       signal: login.abortController.signal,
       onAuth: (info) =>
-        emit({ type: "auth_url", url: info.url, instructions: info.instructions }),
+        emit({
+          type: "auth_url",
+          url: info.url,
+          instructions: info.instructions,
+        }),
       onProgress: (message) => emit({ type: "progress", message }),
       onPrompt: (prompt) => {
         const promptId = randomUUID();
-        emit({ type: "prompt", promptId, message: prompt.message, placeholder: prompt.placeholder });
+        emit({
+          type: "prompt",
+          promptId,
+          message: prompt.message,
+          placeholder: prompt.placeholder,
+        });
         return new Promise<string>((resolve) => {
           login.promptResolvers.set(promptId, resolve);
         });
@@ -71,7 +80,10 @@ auth.post("/auth/oauth/:providerId/login", async (c) => {
     })
     .catch((err: unknown) => {
       if (!login.abortController.signal.aborted) {
-        emit({ type: "error", message: err instanceof Error ? err.message : String(err) });
+        emit({
+          type: "error",
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
       activeLogins.delete(loginId);
     });
@@ -152,7 +164,9 @@ auth.put("/providers", async (c) => {
 export function handleOAuthEventsWs(ws: WebSocket, loginId: string) {
   const login = activeLogins.get(loginId);
   if (!login) {
-    ws.send(JSON.stringify({ type: "error", message: "Login session not found" }));
+    ws.send(
+      JSON.stringify({ type: "error", message: "Login session not found" }),
+    );
     ws.close();
     return;
   }

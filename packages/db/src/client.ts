@@ -117,6 +117,7 @@ function createDb() {
     CREATE TABLE IF NOT EXISTS workspace_tasks (
       id           TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      name         TEXT,
       icon         TEXT,
       command      TEXT NOT NULL,
       created_at   INTEGER NOT NULL
@@ -189,6 +190,16 @@ function createDb() {
     const turnCols = sqlite.prepare("PRAGMA table_info(agent_turns)").all() as { name: string }[];
     if (!turnCols.some((col) => col.name === "checkpoint_sha")) {
       sqlite.exec(`ALTER TABLE agent_turns ADD COLUMN checkpoint_sha TEXT NOT NULL DEFAULT ''`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
+  // Migration: Add name column to workspace_tasks table.
+  try {
+    const taskCols = sqlite.prepare("PRAGMA table_info(workspace_tasks)").all() as { name: string }[];
+    if (!taskCols.some((col) => col.name === "name")) {
+      sqlite.exec(`ALTER TABLE workspace_tasks ADD COLUMN name TEXT`);
     }
   } catch {
     // Safe to ignore — column may already exist.

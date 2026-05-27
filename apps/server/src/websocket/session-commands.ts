@@ -142,7 +142,12 @@ async function handlePrompt(
   msg: PromptMessage,
 ) {
   if (!msg.text) {
-    send(ws, { type: "ack", clientId: msg.id, operation: "prompt", accepted: false });
+    send(ws, {
+      type: "ack",
+      clientId: msg.id,
+      operation: "prompt",
+      accepted: false,
+    });
     return;
   }
 
@@ -150,7 +155,12 @@ async function handlePrompt(
   insertUserBlock(entry.threadId, msg.text);
 
   // Acknowledge immediately
-  send(ws, { type: "ack", clientId: msg.id, operation: "prompt", accepted: true });
+  send(ws, {
+    type: "ack",
+    clientId: msg.id,
+    operation: "prompt",
+    accepted: true,
+  });
 
   // Run the prompt
   const run = async () => {
@@ -160,7 +170,13 @@ async function handlePrompt(
       }
       if (msg.thinkingLevel) {
         entry.handle.setThinkingLevel(
-          msg.thinkingLevel as "off" | "minimal" | "low" | "medium" | "high" | "xhigh",
+          msg.thinkingLevel as
+            | "off"
+            | "minimal"
+            | "low"
+            | "medium"
+            | "high"
+            | "xhigh",
         );
         sessionEvents.setNextThinkingLevel(sessionId, msg.thinkingLevel);
       }
@@ -176,7 +192,9 @@ async function handlePrompt(
       }));
 
       const promptOptions: PromptOptions | undefined =
-        images || msg.streamingBehavior !== undefined || msg.expandPromptTemplates !== undefined
+        images ||
+        msg.streamingBehavior !== undefined ||
+        msg.expandPromptTemplates !== undefined
           ? {
               images,
               streamingBehavior: msg.streamingBehavior,
@@ -253,7 +271,12 @@ async function handleAbort(
     send(ws, { type: "ack", operation: "abort", accepted: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    send(ws, { type: "ack", operation: "abort", accepted: false, error: message });
+    send(ws, {
+      type: "ack",
+      operation: "abort",
+      accepted: false,
+      error: message,
+    });
   }
 }
 
@@ -268,11 +291,20 @@ async function handleCompact(
     send(ws, { type: "ack", operation: "compact", accepted: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    send(ws, { type: "ack", operation: "compact", accepted: false, error: message });
+    send(ws, {
+      type: "ack",
+      operation: "compact",
+      accepted: false,
+      error: message,
+    });
   }
 }
 
-async function handleGitCommand(ws: WebSocket, sessionId: string, msg: GitCommandMessage) {
+async function handleGitCommand(
+  ws: WebSocket,
+  sessionId: string,
+  msg: GitCommandMessage,
+) {
   const cwd = gitCwd(sessionId);
   if (!cwd) {
     send(ws, { type: "server_error", message: "Session not found" });
@@ -284,92 +316,184 @@ async function handleGitCommand(ws: WebSocket, sessionId: string, msg: GitComman
       case "git:stage": {
         const m = msg as GitStageMessage;
         await gitStage(cwd, m.filePath);
-        send(ws, { type: "git:result", sessionId, operation: "git:stage", success: true });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:stage",
+          success: true,
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:unstage": {
         const m = msg as GitUnstageMessage;
         await gitUnstage(cwd, m.filePath);
-        send(ws, { type: "git:result", sessionId, operation: "git:unstage", success: true });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:unstage",
+          success: true,
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:stage-all": {
-        send(ws, { type: "git:progress", sessionId, operation: "staging", current: 0, total: 1 });
+        send(ws, {
+          type: "git:progress",
+          sessionId,
+          operation: "staging",
+          current: 0,
+          total: 1,
+        });
         await gitStageAll(cwd);
-        send(ws, { type: "git:result", sessionId, operation: "git:stage-all", success: true });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:stage-all",
+          success: true,
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:unstage-all": {
         await gitUnstageAll(cwd);
-        send(ws, { type: "git:result", sessionId, operation: "git:unstage-all", success: true });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:unstage-all",
+          success: true,
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:commit": {
         const m = msg as GitCommitMessage;
-        send(ws, { type: "git:progress", sessionId, operation: "committing", current: 0, total: 1 });
+        send(ws, {
+          type: "git:progress",
+          sessionId,
+          operation: "committing",
+          current: 0,
+          total: 1,
+        });
         const output = await gitCommit(cwd, m.message);
-        send(ws, { type: "git:result", sessionId, operation: "git:commit", success: true, data: { output } });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:commit",
+          success: true,
+          data: { output },
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:checkout": {
         const m = msg as GitCheckoutMessage;
-        send(ws, { type: "git:progress", sessionId, operation: "checkout", current: 0, total: 1 });
+        send(ws, {
+          type: "git:progress",
+          sessionId,
+          operation: "checkout",
+          current: 0,
+          total: 1,
+        });
         await checkoutBranch(cwd, m.branch);
-        send(ws, { type: "git:result", sessionId, operation: "git:checkout", success: true, data: { branch: await getCurrentBranch(cwd) } });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:checkout",
+          success: true,
+          data: { branch: await getCurrentBranch(cwd) },
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:branch": {
         const m = msg as GitBranchMessage;
         await createBranch(cwd, m.branch);
-        send(ws, { type: "git:result", sessionId, operation: "git:branch", success: true, data: { branch: await getCurrentBranch(cwd) } });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:branch",
+          success: true,
+          data: { branch: await getCurrentBranch(cwd) },
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:push": {
-        send(ws, { type: "git:progress", sessionId, operation: "pushing", current: 0, total: 1 });
+        send(ws, {
+          type: "git:progress",
+          sessionId,
+          operation: "pushing",
+          current: 0,
+          total: 1,
+        });
         await gitPush(cwd);
-        send(ws, { type: "git:result", sessionId, operation: "git:push", success: true });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:push",
+          success: true,
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:stash": {
         const m = msg as GitStashMessage;
         await gitStash(cwd, m.message);
-        send(ws, { type: "git:result", sessionId, operation: "git:stash", success: true });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:stash",
+          success: true,
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:stash-pop": {
         const m = msg as GitStashPopMessage;
         await gitStashPop(cwd, m.ref);
-        send(ws, { type: "git:result", sessionId, operation: "git:stash-pop", success: true });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:stash-pop",
+          success: true,
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:stash-apply": {
         const m = msg as GitStashApplyMessage;
         await gitStashApply(cwd, m.ref);
-        send(ws, { type: "git:result", sessionId, operation: "git:stash-apply", success: true });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:stash-apply",
+          success: true,
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:stash-drop": {
         const m = msg as GitStashDropMessage;
         await gitStashDrop(cwd, m.ref);
-        send(ws, { type: "git:result", sessionId, operation: "git:stash-drop", success: true });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:stash-drop",
+          success: true,
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
       case "git:revert-file": {
         const m = msg as GitRevertFileMessage;
         await gitRevertFile(cwd, m.filePath, "");
-        send(ws, { type: "git:result", sessionId, operation: "git:revert-file", success: true });
+        send(ws, {
+          type: "git:result",
+          sessionId,
+          operation: "git:revert-file",
+          success: true,
+        });
         broadcastGitStatus(ws, sessionId, cwd);
         break;
       }
@@ -391,11 +515,21 @@ async function handleGitCommand(ws: WebSocket, sessionId: string, msg: GitComman
     }
   } catch (err) {
     const error = parseGitError(err, "Operation failed");
-    send(ws, { type: "git:result", sessionId, operation: msg.type, success: false, error });
+    send(ws, {
+      type: "git:result",
+      sessionId,
+      operation: msg.type,
+      success: false,
+      error,
+    });
   }
 }
 
-async function broadcastGitStatus(ws: WebSocket, sessionId: string, cwd: string) {
+async function broadcastGitStatus(
+  ws: WebSocket,
+  sessionId: string,
+  cwd: string,
+) {
   try {
     const status = await gitStatus(cwd);
     send(ws, { type: "git:status", sessionId, status });

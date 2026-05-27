@@ -40,25 +40,31 @@ type DiagnosticsCallback = (params: PublishDiagnosticsParams) => void;
 const diagnosticsSubscribers = new Map<string, Set<DiagnosticsCallback>>();
 
 // Idle sweep every 15 minutes, matching mcp-service.
-setInterval(() => {
-  for (const workspaceId of Array.from(pool.keys())) {
-    if (diagnosticsSubscribers.get(workspaceId)?.size) continue;
-    const entries = pool.get(workspaceId);
-    if (!entries) continue;
-    let anyOpen = false;
-    for (const e of entries.values()) {
-      if (e.openFiles.size > 0) {
-        anyOpen = true;
-        break;
+setInterval(
+  () => {
+    for (const workspaceId of Array.from(pool.keys())) {
+      if (diagnosticsSubscribers.get(workspaceId)?.size) continue;
+      const entries = pool.get(workspaceId);
+      if (!entries) continue;
+      let anyOpen = false;
+      for (const e of entries.values()) {
+        if (e.openFiles.size > 0) {
+          anyOpen = true;
+          break;
+        }
+      }
+      if (!anyOpen) {
+        void shutdownWorkspace(workspaceId).catch((err) =>
+          console.warn(
+            `[lsp] idle-sweep shutdown failed for ${workspaceId}:`,
+            err,
+          ),
+        );
       }
     }
-    if (!anyOpen) {
-      void shutdownWorkspace(workspaceId).catch((err) =>
-        console.warn(`[lsp] idle-sweep shutdown failed for ${workspaceId}:`, err),
-      );
-    }
-  }
-}, 15 * 60 * 1000).unref();
+  },
+  15 * 60 * 1000,
+).unref();
 
 function getWorkspacePath(workspaceId: string): string | null {
   const ws = getWorkspace(workspaceId);
@@ -69,7 +75,10 @@ function resolveAbsolutePath(workspaceRoot: string, filePath: string): string {
   return isAbsolute(filePath) ? filePath : join(workspaceRoot, filePath);
 }
 
-function emitDiagnostics(workspaceId: string, params: PublishDiagnosticsParams) {
+function emitDiagnostics(
+  workspaceId: string,
+  params: PublishDiagnosticsParams,
+) {
   const subs = diagnosticsSubscribers.get(workspaceId);
   if (!subs) return;
   for (const cb of subs) {
@@ -162,7 +171,10 @@ export async function openDocument(
   return { ok: true, languageId: entry.languageId };
 }
 
-export async function closeDocument(workspaceId: string, filePath: string): Promise<void> {
+export async function closeDocument(
+  workspaceId: string,
+  filePath: string,
+): Promise<void> {
   const workspacePath = getWorkspacePath(workspaceId);
   if (!workspacePath) return;
   const absPath = resolveAbsolutePath(workspacePath, filePath);
@@ -231,9 +243,11 @@ export async function shutdownWorkspace(workspaceId: string): Promise<void> {
   diagnosticsSubscribers.delete(workspaceId);
   await Promise.all(
     Array.from(workspacePool.values()).map((entry) =>
-      entry.client.shutdown().catch((err) =>
-        console.warn(`[lsp] shutdown for ${entry.languageId} threw:`, err),
-      ),
+      entry.client
+        .shutdown()
+        .catch((err) =>
+          console.warn(`[lsp] shutdown for ${entry.languageId} threw:`, err),
+        ),
     ),
   );
 }
@@ -260,7 +274,8 @@ export async function getLspToolsForSession(
   workspaceId: string,
   workspacePath: string,
 ): Promise<ToolDefinition[]> {
-  const resolvePath = (file: string) => resolveAbsolutePath(workspacePath, file);
+  const resolvePath = (file: string) =>
+    resolveAbsolutePath(workspacePath, file);
 
   const helpers: LspToolHelpers = {
     async prepare(file) {
@@ -284,7 +299,11 @@ export async function getLspToolsForSession(
       const entry = await getEntryForFile(workspaceId, absPath);
       if (!entry) return [];
       const diags = await entry.client.waitForDiagnostics(absPath);
-      return diags.map((d) => ({ message: d.message, severity: d.severity, range: d.range }));
+      return diags.map((d) => ({
+        message: d.message,
+        severity: d.severity,
+        range: d.range,
+      }));
     },
   };
 

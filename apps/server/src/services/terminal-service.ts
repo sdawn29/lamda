@@ -44,7 +44,9 @@ export function handleTerminalConnection(
         try {
           const wsEnv = JSON.parse(ws.env) as Record<string, string>;
           Object.assign(ptyEnv, wsEnv);
-        } catch { /* ignore malformed JSON */ }
+        } catch {
+          /* ignore malformed JSON */
+        }
       }
     }
 
@@ -101,7 +103,9 @@ export function handleTerminalConnection(
   ptyProcess.onData((data) => {
     outputBuffer += data;
     scheduleFlush(
-      outputBuffer.length >= TERMINAL_OUTPUT_FLUSH_THRESHOLD ? 0 : TERMINAL_OUTPUT_BATCH_MS,
+      outputBuffer.length >= TERMINAL_OUTPUT_FLUSH_THRESHOLD
+        ? 0
+        : TERMINAL_OUTPUT_BATCH_MS,
     );
   });
 
@@ -133,7 +137,8 @@ export function handleTerminalConnection(
         rows?: number;
       };
       if (msg.type === "input" && msg.data) ptyProcess.write(msg.data);
-      else if (msg.type === "resize" && msg.cols && msg.rows) ptyProcess.resize(msg.cols, msg.rows);
+      else if (msg.type === "resize" && msg.cols && msg.rows)
+        ptyProcess.resize(msg.cols, msg.rows);
     } catch {
       ptyProcess.write(str);
     }

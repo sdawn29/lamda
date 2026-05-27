@@ -73,10 +73,20 @@ export function usePrefetchThreadsMessages() {
             const messages = blocksToMessages(blocks as MessageBlock[])
             const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
             syncEngine.saveMessages(sessionId, messages)
-            queryClient.setQueryData(
-              messagesQueryKey(sessionId),
-              makeInfiniteSeed(messages, hasMore, oldestBlockIndex)
-            )
+            const currentWs = workspacesRef.current
+            if (currentWs.some((w) => w.threads.some((t) => t.sessionId === sessionId))) {
+              // Guard: re-check the cache before writing. If an optimistic message was
+              // seeded while this fetch was in-flight (e.g. new-thread-view seeds the
+              // user message before navigating), the server response may be empty or
+              // stale and must not overwrite the optimistic data.
+              const existingCached = queryClient.getQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId))
+              const existingCount = (existingCached?.pages ?? []).flatMap((p) => p.messages).length
+              if (existingCount > messages.length) return
+              queryClient.setQueryData(
+                messagesQueryKey(sessionId),
+                makeInfiniteSeed(messages, hasMore, oldestBlockIndex)
+              )
+            }
           } catch (e) {
             console.warn("[prefetch] Failed to fetch thread:", sessionId, e)
           }

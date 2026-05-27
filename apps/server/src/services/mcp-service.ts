@@ -1,6 +1,6 @@
-import { McpClient, createMcpClient, mcpToolToPiTool } from "@lamda/mcp"
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent"
-import type { McpServerConfig } from "@lamda/mcp"
+import { McpClient, createMcpClient, mcpToolToPiTool } from "@lamda/mcp";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { McpServerConfig } from "@lamda/mcp";
 import {
   getMcpServers,
   getEnabledMcpServers,
@@ -9,62 +9,72 @@ import {
   deleteMcpServer,
   setMcpServerEnabled,
   getMcpServer,
-} from "@lamda/db"
+} from "@lamda/db";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface McpSettings {
-  servers: McpServerConfig[]
+  servers: McpServerConfig[];
 }
 
 // ── Client Pool (in-memory for connection state) ───────────────────────────────
 
 interface ClientEntry {
-  client: McpClient
-  config: McpServerConfig
-  enabled: boolean
+  client: McpClient;
+  config: McpServerConfig;
+  enabled: boolean;
   /** Whether the server was manually stopped (don't auto-connect) */
-  manuallyStopped: boolean
+  manuallyStopped: boolean;
 }
 
-const clientPool = new Map<string, Map<string, ClientEntry>>()
+const clientPool = new Map<string, Map<string, ClientEntry>>();
 
 // Sweep pools whose workspace no longer has any MCP servers in the DB.
-setInterval(() => {
-  for (const workspaceId of clientPool.keys()) {
-    if (getMcpServers(workspaceId).length === 0) {
-      removeAllClients(workspaceId).catch((e) => console.error("[MCP] sweep cleanup error:", e))
+setInterval(
+  () => {
+    for (const workspaceId of clientPool.keys()) {
+      if (getMcpServers(workspaceId).length === 0) {
+        removeAllClients(workspaceId).catch((e) =>
+          console.error("[MCP] sweep cleanup error:", e),
+        );
+      }
     }
-  }
-}, 15 * 60 * 1000).unref()
+  },
+  15 * 60 * 1000,
+).unref();
 
-function getClientEntry(workspaceId: string, config: McpServerConfig): ClientEntry {
-  let pool = clientPool.get(workspaceId) ?? new Map()
-  let entry = pool.get(config.name)
+function getClientEntry(
+  workspaceId: string,
+  config: McpServerConfig,
+): ClientEntry {
+  let pool = clientPool.get(workspaceId) ?? new Map();
+  let entry = pool.get(config.name);
   if (!entry) {
-    const client = createMcpClient()
-    entry = { client, config, enabled: true, manuallyStopped: false }
-    pool.set(config.name, entry)
-    clientPool.set(workspaceId, pool)
+    const client = createMcpClient();
+    entry = { client, config, enabled: true, manuallyStopped: false };
+    pool.set(config.name, entry);
+    clientPool.set(workspaceId, pool);
   }
-  return entry
+  return entry;
 }
 
 async function removeAllClients(workspaceId: string): Promise<void> {
-  const pool = clientPool.get(workspaceId)
-  clientPool.delete(workspaceId)
+  const pool = clientPool.get(workspaceId);
+  clientPool.delete(workspaceId);
   if (pool) {
-    await Promise.all(Array.from(pool.values()).map((entry) => entry.client.disconnectAll()))
+    await Promise.all(
+      Array.from(pool.values()).map((entry) => entry.client.disconnectAll()),
+    );
   }
 }
 
 async function removeClient(workspaceId: string, name: string): Promise<void> {
-  const pool = clientPool.get(workspaceId)
+  const pool = clientPool.get(workspaceId);
   if (pool) {
-    const entry = pool.get(name)
+    const entry = pool.get(name);
     if (entry) {
-      pool.delete(name)
-      await entry.client.disconnectAll()
+      pool.delete(name);
+      await entry.client.disconnectAll();
     }
   }
 }
@@ -72,101 +82,124 @@ async function removeClient(workspaceId: string, name: string): Promise<void> {
 // ── Settings Management ──────────────────────────────────────────────────────
 
 export function getMcpSettings(workspaceId: string): McpSettings {
-  const dbServers = getMcpServers(workspaceId)
+  const dbServers = getMcpServers(workspaceId);
   return {
     servers: dbServers.map(dbToMcpConfig),
-  }
+  };
 }
 
-export function saveMcpSettings(workspaceId: string, settings: McpSettings): void {
-  const pool = clientPool.get(workspaceId)
+export function saveMcpSettings(
+  workspaceId: string,
+  settings: McpSettings,
+): void {
+  const pool = clientPool.get(workspaceId);
   if (pool) {
-    const newNames = new Set(settings.servers.map((s) => s.name))
+    const newNames = new Set(settings.servers.map((s) => s.name));
     for (const [name, entry] of pool) {
       if (!newNames.has(name)) {
         // Server was removed — disconnect and evict from pool immediately
-        pool.delete(name)
-        entry.client.disconnectAll().catch((e) => console.error(`[MCP] error disconnecting removed server "${name}":`, e))
+        pool.delete(name);
+        entry.client
+          .disconnectAll()
+          .catch((e) =>
+            console.error(
+              `[MCP] error disconnecting removed server "${name}":`,
+              e,
+            ),
+          );
       } else {
         // Reset manuallyStopped so re-saved servers reconnect on next use
-        entry.manuallyStopped = false
+        entry.manuallyStopped = false;
       }
     }
   }
-  saveMcpServers(workspaceId, settings.servers)
+  saveMcpServers(workspaceId, settings.servers);
 }
 
 export async function deleteMcpSettings(workspaceId: string): Promise<void> {
-  await removeAllClients(workspaceId)
-  const servers = getMcpServers(workspaceId)
+  await removeAllClients(workspaceId);
+  const servers = getMcpServers(workspaceId);
   for (const s of servers) {
-    deleteMcpServer(workspaceId, s.name)
+    deleteMcpServer(workspaceId, s.name);
   }
 }
 
 // ── Server Control (start/stop) ───────────────────────────────────────────────
 
-export async function startMcpServer(workspaceId: string, name: string): Promise<{ success: boolean; error?: string; toolCount?: number }> {
-  const server = getMcpServer(workspaceId, name)
+export async function startMcpServer(
+  workspaceId: string,
+  name: string,
+): Promise<{ success: boolean; error?: string; toolCount?: number }> {
+  const server = getMcpServer(workspaceId, name);
   if (!server) {
-    return { success: false, error: "Server not found" }
+    return { success: false, error: "Server not found" };
   }
 
-  const config = dbToMcpConfig(server)
-  const entry = getClientEntry(workspaceId, config)
+  const config = dbToMcpConfig(server);
+  const entry = getClientEntry(workspaceId, config);
 
   // Clear manually stopped flag when starting
-  entry.manuallyStopped = false
-  entry.enabled = true
+  entry.manuallyStopped = false;
+  entry.enabled = true;
 
   if (entry.client.isConnected(name)) {
-    return { success: true, toolCount: (await entry.client.listTools()).length }
+    return {
+      success: true,
+      toolCount: (await entry.client.listTools()).length,
+    };
   }
 
   try {
-    await entry.client.connect(config)
-    const tools = await entry.client.listTools()
-    return { success: true, toolCount: tools.length }
+    await entry.client.connect(config);
+    const tools = await entry.client.listTools();
+    return { success: true, toolCount: tools.length };
   } catch (e) {
-    return { success: false, error: String(e) }
+    return { success: false, error: String(e) };
   }
 }
 
-export async function stopMcpServer(workspaceId: string, name: string): Promise<{ success: boolean; error?: string }> {
-  const pool = clientPool.get(workspaceId)
+export async function stopMcpServer(
+  workspaceId: string,
+  name: string,
+): Promise<{ success: boolean; error?: string }> {
+  const pool = clientPool.get(workspaceId);
   if (!pool) {
-    return { success: true }
+    return { success: true };
   }
 
-  const entry = pool.get(name)
+  const entry = pool.get(name);
   if (!entry) {
-    return { success: true }
+    return { success: true };
   }
 
   try {
     // Disconnect the specific server
-    await entry.client.disconnect(name)
+    await entry.client.disconnect(name);
     // Mark as manually stopped so status doesn't auto-reconnect
-    entry.manuallyStopped = true
-    return { success: true }
+    entry.manuallyStopped = true;
+    return { success: true };
   } catch (e) {
-    console.error(`[MCP] Error stopping server ${name}:`, e)
+    console.error(`[MCP] Error stopping server ${name}:`, e);
     // Even if disconnect throws, mark as stopped
-    entry.manuallyStopped = true
-    return { success: true }
+    entry.manuallyStopped = true;
+    return { success: true };
   }
 }
 
-export function setServerEnabled(workspaceId: string, name: string, enabled: boolean): void {
-  setMcpServerEnabled(workspaceId, name, enabled)
-  const pool = clientPool.get(workspaceId)
+export function setServerEnabled(
+  workspaceId: string,
+  name: string,
+  enabled: boolean,
+): void {
+  setMcpServerEnabled(workspaceId, name, enabled);
+  const pool = clientPool.get(workspaceId);
   if (pool) {
-    const entry = pool.get(name)
+    const entry = pool.get(name);
     if (entry) {
-      entry.enabled = enabled
+      entry.enabled = enabled;
       // Reset manually stopped when enabling
       if (enabled) {
-        entry.manuallyStopped = false
+        entry.manuallyStopped = false;
       }
     }
   }
@@ -175,110 +208,163 @@ export function setServerEnabled(workspaceId: string, name: string, enabled: boo
 // ── Server Status ────────────────────────────────────────────────────────────
 
 export async function getMcpServerStatus(workspaceId: string) {
-  const servers = getMcpServers(workspaceId)
-  return Promise.all(servers.map(async (s) => {
-    try {
-      // Peek at the existing pool entry without creating one for disabled/stopped servers
-      const existingEntry = clientPool.get(workspaceId)?.get(s.name)
+  const servers = getMcpServers(workspaceId);
+  return Promise.all(
+    servers.map(async (s) => {
+      try {
+        // Peek at the existing pool entry without creating one for disabled/stopped servers
+        const existingEntry = clientPool.get(workspaceId)?.get(s.name);
 
-      if (!s.enabled || existingEntry?.manuallyStopped) {
-        // Disconnect if somehow still running after being manually stopped
-        if (existingEntry?.client.isConnected(s.name) && existingEntry.manuallyStopped) {
-          await existingEntry.client.disconnect(s.name)
+        if (!s.enabled || existingEntry?.manuallyStopped) {
+          // Disconnect if somehow still running after being manually stopped
+          if (
+            existingEntry?.client.isConnected(s.name) &&
+            existingEntry.manuallyStopped
+          ) {
+            await existingEntry.client.disconnect(s.name);
+          }
+          return {
+            name: s.name,
+            connected: false,
+            toolCount: 0,
+            enabled: s.enabled,
+          };
         }
-        return { name: s.name, connected: false, toolCount: 0, enabled: s.enabled }
-      }
 
-      // Only now create/fetch the pool entry for enabled servers
-      const config = dbToMcpConfig(s)
-      const entry = getClientEntry(workspaceId, config)
+        // Only now create/fetch the pool entry for enabled servers
+        const config = dbToMcpConfig(s);
+        const entry = getClientEntry(workspaceId, config);
 
-      if (!entry.client.isConnected(s.name)) {
-        // Fire connection in background — don't block the status response
-        entry.client.connect(config).catch((e) => console.warn(`[MCP] background connect error for "${s.name}":`, e))
-        return { name: s.name, connected: false, toolCount: 0, enabled: s.enabled }
+        if (!entry.client.isConnected(s.name)) {
+          // Fire connection in background — don't block the status response
+          entry.client
+            .connect(config)
+            .catch((e) =>
+              console.warn(
+                `[MCP] background connect error for "${s.name}":`,
+                e,
+              ),
+            );
+          return {
+            name: s.name,
+            connected: false,
+            toolCount: 0,
+            enabled: s.enabled,
+          };
+        }
+        const tools = await entry.client.listTools();
+        return {
+          name: s.name,
+          connected: true,
+          toolCount: tools.length,
+          enabled: s.enabled,
+        };
+      } catch (e) {
+        return {
+          name: s.name,
+          connected: false,
+          toolCount: 0,
+          error: String(e),
+          enabled: s.enabled,
+        };
       }
-      const tools = await entry.client.listTools()
-      return { name: s.name, connected: true, toolCount: tools.length, enabled: s.enabled }
-    } catch (e) {
-      return { name: s.name, connected: false, toolCount: 0, error: String(e), enabled: s.enabled }
-    }
-  }))
+    }),
+  );
 }
 
 export async function getMcpTools(workspaceId: string) {
-  const dbServers = getEnabledMcpServers(workspaceId)
-  const tools: Array<{ name: string; description?: string; serverName: string }> = []
+  const dbServers = getEnabledMcpServers(workspaceId);
+  const tools: Array<{
+    name: string;
+    description?: string;
+    serverName: string;
+  }> = [];
 
   for (const s of dbServers) {
     try {
-      const config = dbToMcpConfig(s)
-      const entry = getClientEntry(workspaceId, config)
-      
+      const config = dbToMcpConfig(s);
+      const entry = getClientEntry(workspaceId, config);
+
       // Don't connect servers that were manually stopped
       if (entry.manuallyStopped) {
-        continue
+        continue;
       }
-      
+
       if (!entry.client.isConnected(s.name)) {
-        await entry.client.connect(config)
+        await entry.client.connect(config);
       }
-      const mcpTools = await entry.client.listTools()
+      const mcpTools = await entry.client.listTools();
       for (const tool of mcpTools) {
-        tools.push({ name: tool.name, description: tool.description, serverName: s.name })
+        tools.push({
+          name: tool.name,
+          description: tool.description,
+          serverName: s.name,
+        });
       }
     } catch (e) {
-      console.warn(`[MCP] Failed to list tools from ${s.name}:`, e)
+      console.warn(`[MCP] Failed to list tools from ${s.name}:`, e);
     }
   }
 
-  return tools
+  return tools;
 }
 
 export async function testMcpConnection(server: McpServerConfig) {
-  const client = createMcpClient()
+  const client = createMcpClient();
   try {
-    await client.connect(server)
-    const tools = await client.listTools()
-    return { success: true, toolCount: tools.length, tools: tools.map((t) => ({ name: t.name, description: t.description })) }
+    await client.connect(server);
+    const tools = await client.listTools();
+    return {
+      success: true,
+      toolCount: tools.length,
+      tools: tools.map((t) => ({ name: t.name, description: t.description })),
+    };
   } catch (e) {
-    return { success: false, toolCount: 0, error: String(e) }
+    return { success: false, toolCount: 0, error: String(e) };
   } finally {
-    await client.disconnectAll()
+    await client.disconnectAll();
   }
 }
 
 // ── Tool Conversion for pi ───────────────────────────────────────────────────
 
-export async function getMcpToolsForSession(workspaceId: string): Promise<ToolDefinition[]> {
-  const dbServers = getEnabledMcpServers(workspaceId)
-  const tools: ToolDefinition[] = []
+export async function getMcpToolsForSession(
+  workspaceId: string,
+): Promise<ToolDefinition[]> {
+  const dbServers = getEnabledMcpServers(workspaceId);
+  const tools: ToolDefinition[] = [];
 
   for (const s of dbServers) {
     try {
-      const config = dbToMcpConfig(s)
-      const entry = getClientEntry(workspaceId, config)
-      
+      const config = dbToMcpConfig(s);
+      const entry = getClientEntry(workspaceId, config);
+
       // Don't connect servers that were manually stopped
       if (entry.manuallyStopped) {
-        continue
+        continue;
       }
-      
+
       if (!entry.client.isConnected(s.name)) {
-        await entry.client.connect(config)
+        await entry.client.connect(config);
       }
-      const mcpTools = await entry.client.listTools()
+      const mcpTools = await entry.client.listTools();
 
       for (const tool of mcpTools) {
-        tools.push(mcpToolToPiTool(tool, async (name, params) => {
-          const result = await entry.client.callTool(name, params)
-          return { success: result.success, content: result.content as Array<{ type: "text"; text: string }>, error: result.error }
-        }))
+        tools.push(
+          mcpToolToPiTool(tool, async (name, params) => {
+            const result = await entry.client.callTool(name, params);
+            return {
+              success: result.success,
+              content: result.content as Array<{ type: "text"; text: string }>,
+              error: result.error,
+            };
+          }),
+        );
       }
     } catch (e) {
-      console.error(`[MCP] Failed to load tools from ${s.name}:`, e)
+      console.error(`[MCP] Failed to load tools from ${s.name}:`, e);
     }
   }
 
-  return tools
+  return tools;
 }

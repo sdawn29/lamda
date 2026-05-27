@@ -21,7 +21,15 @@ import { workspaceIndexer } from "../services/workspace-indexer.js";
 const workspaces = new Hono();
 
 function mapThread(
-  t: { id: string; title: string | null; modelId: string | null; isStopped: boolean; createdAt: number; isPinned: boolean; forkedFromId?: string | null },
+  t: {
+    id: string;
+    title: string | null;
+    modelId: string | null;
+    isStopped: boolean;
+    createdAt: number;
+    isPinned: boolean;
+    forkedFromId?: string | null;
+  },
   workspaceId: string,
 ) {
   const session = store.getByThreadId(t.id);
@@ -39,20 +47,36 @@ function mapThread(
 }
 
 function parseEnv(env: string | null | undefined): Record<string, string> {
-  if (!env) return {}
-  try { return JSON.parse(env) as Record<string, string> } catch { return {} }
+  if (!env) return {};
+  try {
+    return JSON.parse(env) as Record<string, string>;
+  } catch {
+    return {};
+  }
 }
 
-async function createTasksFromPackageScripts(workspaceId: string, workspacePath: string) {
+async function createTasksFromPackageScripts(
+  workspaceId: string,
+  workspacePath: string,
+) {
   try {
-    const packageJsonText = await readFile(join(workspacePath, "package.json"), "utf8");
-    const packageJson = JSON.parse(packageJsonText) as { scripts?: Record<string, unknown> };
+    const packageJsonText = await readFile(
+      join(workspacePath, "package.json"),
+      "utf8",
+    );
+    const packageJson = JSON.parse(packageJsonText) as {
+      scripts?: Record<string, unknown>;
+    };
     const scripts = packageJson.scripts;
     if (!scripts) return;
 
     for (const [scriptName, scriptCommand] of Object.entries(scripts)) {
       if (typeof scriptCommand !== "string" || !scriptCommand.trim()) continue;
-      createWorkspaceTask(workspaceId, { icon: "terminal", command: `npm run ${scriptName}` });
+      createWorkspaceTask(workspaceId, {
+        name: scriptName,
+        icon: "terminal",
+        command: `npm run ${scriptName}`,
+      });
     }
   } catch {
     // Skip auto-task creation when package.json is missing or invalid.
@@ -76,18 +100,34 @@ workspaces.get("/workspaces", (c) => {
 workspaces.post("/workspace", async (c) => {
   const body = await c.req
     .json<{ name?: string; path?: string; provider?: string; model?: string }>()
-    .catch((): { name?: string; path?: string; provider?: string; model?: string } => ({}));
+    .catch(
+      (): {
+        name?: string;
+        path?: string;
+        provider?: string;
+        model?: string;
+      } => ({}),
+    );
   if (!body.name || !body.path)
     return c.json({ error: "name and path are required" }, 400);
 
   const existing = getWorkspaceByPath(body.path);
   if (existing) {
-    const wsWithThreads = listWorkspacesWithThreads().find((w) => w.id === existing.id);
-    const threads = (wsWithThreads?.threads ?? []).map((t) => mapThread(t, existing.id));
+    const wsWithThreads = listWorkspacesWithThreads().find(
+      (w) => w.id === existing.id,
+    );
+    const threads = (wsWithThreads?.threads ?? []).map((t) =>
+      mapThread(t, existing.id),
+    );
     return c.json(
       {
         error: "A workspace already exists for this path",
-        workspace: { ...existing, openWithAppId: existing.openWithAppId ?? null, env: parseEnv(existing.env), threads },
+        workspace: {
+          ...existing,
+          openWithAppId: existing.openWithAppId ?? null,
+          env: parseEnv(existing.env),
+          threads,
+        },
       },
       409,
     );
@@ -139,9 +179,9 @@ workspaces.post("/workspace/:id/reindex", async (c) => {
   const workspaceId = c.req.param("id");
   const ws = getWorkspace(workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
-  workspaceIndexer.reindex(workspaceId).catch((err) =>
-    console.error("[workspace-indexer] reindex failed:", err)
-  );
+  workspaceIndexer
+    .reindex(workspaceId)
+    .catch((err) => console.error("[workspace-indexer] reindex failed:", err));
   return c.json({ ok: true });
 });
 

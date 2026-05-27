@@ -23,12 +23,15 @@ routes/
 ## Key Patterns
 
 ### Session Context
+
 All `/session/:id/*` routes use `store.get(id)` to retrieve session entry, then access:
+
 - `entry.handle` — Pi agent SDK handle
 - `entry.threadId` — Database thread ID
 - `store.getCwd(id)` or `gitCwd(id)` — Working directory for git/file ops
 
 ### Error Handling
+
 ```typescript
 function parseGitError(err: unknown, fallback: string): string {
   const raw = err instanceof Error ? err.message : String(err);
@@ -42,7 +45,9 @@ function parseGitError(err: unknown, fallback: string): string {
 ```
 
 ### SSE Streaming
+
 Sessions use Hono's `streamSSE` with write queue pattern:
+
 ```typescript
 const response = streamSSE(c, async (stream) => {
   let writeQueue = Promise.resolve();
@@ -57,86 +62,90 @@ const response = streamSSE(c, async (stream) => {
 
 ### sessions.ts
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| POST | `/session` | Create new workspace + thread + session |
-| DELETE | `/session/:id` | Dispose session |
-| POST | `/session/:id/prompt` | Send user prompt to agent |
-| POST | `/session/:id/abort` | Abort running agent |
-| POST | `/session/:id/steer` | Queue steering message |
-| POST | `/session/:id/follow-up` | Queue follow-up message |
-| GET | `/session/:id/events` | SSE event stream |
-| GET | `/session/:id/messages` | Get all message blocks |
-| GET | `/session/:id/running-tools` | Get running tool blocks |
-| GET | `/session/:id/commands` | List available commands |
-| GET | `/session/:id/thinking-levels` | List available thinking levels |
-| GET | `/session/:id/context-usage` | Get context usage stats |
-| GET | `/session/:id/stats` | Get session stats (tokens, costs) |
-| POST | `/session/:id/compact` | Compact conversation context |
-| GET | `/session/:id/workspace-files` | List workspace files |
+| Method | Endpoint                       | Purpose                                 |
+| ------ | ------------------------------ | --------------------------------------- |
+| POST   | `/session`                     | Create new workspace + thread + session |
+| DELETE | `/session/:id`                 | Dispose session                         |
+| POST   | `/session/:id/prompt`          | Send user prompt to agent               |
+| POST   | `/session/:id/abort`           | Abort running agent                     |
+| POST   | `/session/:id/steer`           | Queue steering message                  |
+| POST   | `/session/:id/follow-up`       | Queue follow-up message                 |
+| GET    | `/session/:id/events`          | SSE event stream                        |
+| GET    | `/session/:id/messages`        | Get all message blocks                  |
+| GET    | `/session/:id/running-tools`   | Get running tool blocks                 |
+| GET    | `/session/:id/commands`        | List available commands                 |
+| GET    | `/session/:id/thinking-levels` | List available thinking levels          |
+| GET    | `/session/:id/context-usage`   | Get context usage stats                 |
+| GET    | `/session/:id/stats`           | Get session stats (tokens, costs)       |
+| POST   | `/session/:id/compact`         | Compact conversation context            |
+| GET    | `/session/:id/workspace-files` | List workspace files                    |
 
 ### threads.ts
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| POST | `/workspace/:workspaceId/thread` | Create new thread |
-| DELETE | `/thread/:id` | Delete thread |
-| PATCH | `/thread/:id/title` | Update thread title |
-| PATCH | `/thread/:id/model` | Update thread model |
-| PATCH | `/thread/:id/stopped` | Update stopped status |
-| PATCH | `/thread/:id/last-accessed` | Update last accessed timestamp |
-| PATCH | `/thread/:id/archive` | Archive thread |
-| PATCH | `/thread/:id/unarchive` | Unarchive thread |
-| PATCH | `/thread/:id/pin` | Pin thread |
-| PATCH | `/thread/:id/unpin` | Unpin thread |
-| GET | `/threads/archived` | List all archived threads |
+| Method | Endpoint                         | Purpose                        |
+| ------ | -------------------------------- | ------------------------------ |
+| POST   | `/workspace/:workspaceId/thread` | Create new thread              |
+| DELETE | `/thread/:id`                    | Delete thread                  |
+| PATCH  | `/thread/:id/title`              | Update thread title            |
+| PATCH  | `/thread/:id/model`              | Update thread model            |
+| PATCH  | `/thread/:id/stopped`            | Update stopped status          |
+| PATCH  | `/thread/:id/last-accessed`      | Update last accessed timestamp |
+| PATCH  | `/thread/:id/archive`            | Archive thread                 |
+| PATCH  | `/thread/:id/unarchive`          | Unarchive thread               |
+| PATCH  | `/thread/:id/pin`                | Pin thread                     |
+| PATCH  | `/thread/:id/unpin`              | Unpin thread                   |
+| GET    | `/threads/archived`              | List all archived threads      |
 
 ### workspaces.ts
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| GET | `/workspaces` | List all workspaces with threads |
-| POST | `/workspace` | Create workspace |
-| GET | `/workspace/:id` | Get workspace by ID |
-| PATCH | `/workspace/:id` | Update workspace |
-| DELETE | `/workspace/:id` | Delete workspace |
+| Method | Endpoint         | Purpose                          |
+| ------ | ---------------- | -------------------------------- |
+| GET    | `/workspaces`    | List all workspaces with threads |
+| POST   | `/workspace`     | Create workspace                 |
+| GET    | `/workspace/:id` | Get workspace by ID              |
+| PATCH  | `/workspace/:id` | Update workspace                 |
+| DELETE | `/workspace/:id` | Delete workspace                 |
 
 ### git.ts
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| GET | `/session/:id/branch` | Get current branch |
-| GET | `/session/:id/branches` | List all branches |
-| POST | `/session/:id/checkout` | Checkout branch |
-| POST | `/session/:id/branch` | Create branch |
-| POST | `/session/:id/git/init` | Initialize git repo |
-| GET | `/session/:id/git/status` | Get git status |
-| GET | `/session/:id/git/diff-stat` | Get diff statistics |
-| GET | `/session/:id/git/diff` | Get file diff |
-| POST | `/session/:id/git/commit` | Commit changes |
-| POST | `/session/:id/git/generate-commit-message` | AI-generated commit message |
-| POST | `/session/:id/git/push` | Push to remote |
-| POST | `/session/:id/git/stage` | Stage file |
-| POST | `/session/:id/git/unstage` | Unstage file |
-| POST | `/session/:id/git/stage-all` | Stage all changes |
-| POST | `/session/:id/git/unstage-all` | Unstage all changes |
-| POST | `/session/:id/git/revert-file` | Revert file to HEAD |
-| POST | `/session/:id/git/stash` | Stash changes |
-| GET | `/session/:id/git/stash-list` | List stashes |
-| POST | `/session/:id/git/stash-pop` | Pop stash |
-| POST | `/session/:id/git/stash-apply` | Apply stash |
-| POST | `/session/:id/git/stash-drop` | Drop stash |
+| Method | Endpoint                                   | Purpose                     |
+| ------ | ------------------------------------------ | --------------------------- |
+| GET    | `/session/:id/branch`                      | Get current branch          |
+| GET    | `/session/:id/branches`                    | List all branches           |
+| POST   | `/session/:id/checkout`                    | Checkout branch             |
+| POST   | `/session/:id/branch`                      | Create branch               |
+| POST   | `/session/:id/git/init`                    | Initialize git repo         |
+| GET    | `/session/:id/git/status`                  | Get git status              |
+| GET    | `/session/:id/git/diff-stat`               | Get diff statistics         |
+| GET    | `/session/:id/git/diff`                    | Get file diff               |
+| POST   | `/session/:id/git/commit`                  | Commit changes              |
+| POST   | `/session/:id/git/generate-commit-message` | AI-generated commit message |
+| POST   | `/session/:id/git/push`                    | Push to remote              |
+| POST   | `/session/:id/git/stage`                   | Stage file                  |
+| POST   | `/session/:id/git/unstage`                 | Unstage file                |
+| POST   | `/session/:id/git/stage-all`               | Stage all changes           |
+| POST   | `/session/:id/git/unstage-all`             | Unstage all changes         |
+| POST   | `/session/:id/git/revert-file`             | Revert file to HEAD         |
+| POST   | `/session/:id/git/stash`                   | Stash changes               |
+| GET    | `/session/:id/git/stash-list`              | List stashes                |
+| POST   | `/session/:id/git/stash-pop`               | Pop stash                   |
+| POST   | `/session/:id/git/stash-apply`             | Apply stash                 |
+| POST   | `/session/:id/git/stash-drop`              | Drop stash                  |
 
 ### file.ts
+
 File read/write operations (uses `@lamda/db` for file content storage).
 
 ### settings.ts
+
 Settings CRUD operations.
 
 ### auth.ts
+
 API key management (reads from `~/.pi/agent/auth.json`).
 
 ### health.ts
+
 Health check endpoints for monitoring.
 
 ## WebSocket Command Protocol
@@ -145,46 +154,60 @@ Sessions also support a unified WebSocket command channel at `/ws/session/:id/co
 
 ### Client → Server Messages
 
-| Message Type | Payload | Description |
-|--------------|---------|-------------|
-| `prompt` | `{text, provider?, model?, thinkingLevel?, images?, streamingBehavior?}` | Send prompt |
-| `steer` | `{text}` | Queue steering message |
-| `follow-up` | `{text}` | Queue follow-up message |
-| `abort` | `{}` | Abort current operation |
-| `compact` | `{}` | Trigger context compaction |
-| `git:stage` | `{filePath}` | Stage file |
-| `git:unstage` | `{filePath}` | Unstage file |
-| `git:stage-all` | `{}` | Stage all changes |
-| `git:unstage-all` | `{}` | Unstage all changes |
-| `git:commit` | `{message}` | Commit staged changes |
-| `git:checkout` | `{branch}` | Checkout branch |
-| `git:branch` | `{branch}` | Create new branch |
-| `git:push` | `{}` | Push to remote |
-| `git:stash` | `{message?}` | Stash changes |
-| `git:stash-pop` | `{ref}` | Pop stash |
-| `git:stash-apply` | `{ref}` | Apply stash |
-| `git:stash-drop` | `{ref}` | Drop stash |
-| `git:revert-file` | `{filePath}` | Revert file to HEAD |
-| `git:init` | `{}` | Initialize git repository |
-| `workspace:reindex` | `{}` | Trigger workspace reindex |
+| Message Type        | Payload                                                                  | Description                |
+| ------------------- | ------------------------------------------------------------------------ | -------------------------- |
+| `prompt`            | `{text, provider?, model?, thinkingLevel?, images?, streamingBehavior?}` | Send prompt                |
+| `steer`             | `{text}`                                                                 | Queue steering message     |
+| `follow-up`         | `{text}`                                                                 | Queue follow-up message    |
+| `abort`             | `{}`                                                                     | Abort current operation    |
+| `compact`           | `{}`                                                                     | Trigger context compaction |
+| `git:stage`         | `{filePath}`                                                             | Stage file                 |
+| `git:unstage`       | `{filePath}`                                                             | Unstage file               |
+| `git:stage-all`     | `{}`                                                                     | Stage all changes          |
+| `git:unstage-all`   | `{}`                                                                     | Unstage all changes        |
+| `git:commit`        | `{message}`                                                              | Commit staged changes      |
+| `git:checkout`      | `{branch}`                                                               | Checkout branch            |
+| `git:branch`        | `{branch}`                                                               | Create new branch          |
+| `git:push`          | `{}`                                                                     | Push to remote             |
+| `git:stash`         | `{message?}`                                                             | Stash changes              |
+| `git:stash-pop`     | `{ref}`                                                                  | Pop stash                  |
+| `git:stash-apply`   | `{ref}`                                                                  | Apply stash                |
+| `git:stash-drop`    | `{ref}`                                                                  | Drop stash                 |
+| `git:revert-file`   | `{filePath}`                                                             | Revert file to HEAD        |
+| `git:init`          | `{}`                                                                     | Initialize git repository  |
+| `workspace:reindex` | `{}`                                                                     | Trigger workspace reindex  |
 
 ### Server → Client Messages
 
-| Message Type | Payload | Description |
-|--------------|---------|-------------|
-| `ack` | `{clientId?, operation, accepted}` | Command acknowledgment |
-| `git:result` | `{sessionId, operation, success, error?, data?}` | Git operation result |
-| `git:status` | `{sessionId, status}` | Git status update |
-| `git:progress` | `{sessionId, operation, current, total}` | Progress update |
-| `server_error` | `{message}` | Error response |
-| `workspace:progress` | `{workspaceId, operation, current, total}` | Indexing progress |
+| Message Type         | Payload                                          | Description            |
+| -------------------- | ------------------------------------------------ | ---------------------- |
+| `ack`                | `{clientId?, operation, accepted}`               | Command acknowledgment |
+| `git:result`         | `{sessionId, operation, success, error?, data?}` | Git operation result   |
+| `git:status`         | `{sessionId, status}`                            | Git status update      |
+| `git:progress`       | `{sessionId, operation, current, total}`         | Progress update        |
+| `server_error`       | `{message}`                                      | Error response         |
+| `workspace:progress` | `{workspaceId, operation, current, total}`       | Indexing progress      |
 
 ### TypeScript Types
 
 Defined in `src/websocket/types.ts`:
+
 ```typescript
-export type ClientMessage = PromptMessage | SteerMessage | FollowUpMessage | AbortMessage | CompactMessage | GitCommandMessage | WorkspaceCommandMessage
-export type ServerMessage = ServerErrorMessage | GitStatusMessage | GitProgressMessage | GitResultMessage | WorkspaceProgressMessage | CommandAckMessage
+export type ClientMessage =
+  | PromptMessage
+  | SteerMessage
+  | FollowUpMessage
+  | AbortMessage
+  | CompactMessage
+  | GitCommandMessage
+  | WorkspaceCommandMessage;
+export type ServerMessage =
+  | ServerErrorMessage
+  | GitStatusMessage
+  | GitProgressMessage
+  | GitResultMessage
+  | WorkspaceProgressMessage
+  | CommandAckMessage;
 ```
 
 ## Conventions

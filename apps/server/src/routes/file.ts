@@ -14,12 +14,12 @@ const BINARY_MIME_TYPES: Record<string, string> = {
   ".tiff": "image/tiff",
   ".tif": "image/tiff",
   ".avif": "image/avif",
-}
+};
 
 const TEXT_MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".htm": "text/html; charset=utf-8",
-}
+};
 
 const file = new Hono();
 
@@ -46,7 +46,10 @@ file.get("/file", async (c) => {
     if (err.code === "EISDIR") {
       return c.json({ error: "path is a directory, not a file" }, 400);
     }
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
   }
 });
 

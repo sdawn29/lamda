@@ -11,6 +11,7 @@ import {
   useParams,
   useNavigate,
   useLocation,
+  useSearch,
 } from "@tanstack/react-router"
 import { Button } from "@/shared/ui/button"
 import { Toggle } from "@/shared/ui/toggle"
@@ -79,15 +80,22 @@ export function TitleBar() {
     )
   }, [activeTabFile, workspaces])
 
-  const effectiveWorkspacePath = urlActiveWorkspace?.path ?? fileWorkspace?.path
+  // On /new the URL has ?ws=<id>; use it to drive action buttons when no thread is active
+  const { ws: newThreadWsId } = useSearch({ strict: false }) as { ws?: string }
+  const actionWorkspace =
+    urlActiveWorkspace ??
+    (newThreadWsId ? workspaces.find((w) => w.id === newThreadWsId) : undefined)
+
+  const effectiveWorkspacePath =
+    actionWorkspace?.path ?? fileWorkspace?.path
 
   const {
     isOpen: terminalOpen,
     toggle: toggleTerminal,
     runCommand: runTerminalCommand,
   } = useTerminalForWorkspace(
-    urlActiveWorkspace?.id ?? "",
-    urlActiveWorkspace?.path ?? ""
+    actionWorkspace?.id ?? "",
+    actionWorkspace?.path ?? ""
   )
   const { data: platform } = useElectronPlatform()
   const { data: isFullscreen = false } = useElectronFullscreen()
@@ -98,7 +106,7 @@ export function TitleBar() {
   const renameInputRef = useRef<HTMLInputElement>(null)
   const [mcpDialogOpen, setMcpDialogOpen] = useState(false)
   const { data: mcpServerStatus } = useMcpServerStatus(
-    urlActiveWorkspace?.id ?? ""
+    actionWorkspace?.id ?? ""
   )
   const mcpConnectedCount =
     mcpServerStatus?.filter((s) => s.connected).length ?? 0
@@ -272,7 +280,7 @@ export function TitleBar() {
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
         <TasksDropdown
-          workspaceId={urlActiveWorkspace?.id ?? ""}
+          workspaceId={actionWorkspace?.id ?? ""}
           onRunTask={runTerminalCommand}
         />
 
@@ -299,9 +307,9 @@ export function TitleBar() {
         </Tooltip>
 
         <OpenWithButton
-          workspaceId={urlActiveWorkspace?.id}
-          workspacePath={urlActiveWorkspace?.path}
-          openWithAppId={urlActiveWorkspace?.openWithAppId}
+          workspaceId={actionWorkspace?.id}
+          workspacePath={actionWorkspace?.path}
+          openWithAppId={actionWorkspace?.openWithAppId}
         />
 
         <Tooltip>
@@ -329,7 +337,7 @@ export function TitleBar() {
       <McpDialog
         open={mcpDialogOpen}
         onOpenChange={setMcpDialogOpen}
-        workspaceId={urlActiveWorkspace?.id}
+        workspaceId={actionWorkspace?.id}
       />
 
     </div>

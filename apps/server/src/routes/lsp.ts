@@ -71,7 +71,11 @@ export function handleLspWs(ws: WebSocket, workspaceId: string) {
     try {
       msg = JSON.parse(raw.toString()) as ClientMsg;
     } catch (err) {
-      send(ws, { kind: "response", id: 0, error: `Invalid JSON: ${String(err)}` });
+      send(ws, {
+        kind: "response",
+        id: 0,
+        error: `Invalid JSON: ${String(err)}`,
+      });
       return;
     }
 
@@ -114,7 +118,11 @@ async function handleMessage(
       // see existing errors without waiting for a publish.
       const existing = getCurrentDiagnostics(workspaceId, msg.filePath);
       if (existing.length > 0) {
-        send(ws, { kind: "diagnostics", filePath: msg.filePath, diagnostics: existing });
+        send(ws, {
+          kind: "diagnostics",
+          filePath: msg.filePath,
+          diagnostics: existing,
+        });
       }
       return;
     }
@@ -125,7 +133,12 @@ async function handleMessage(
       return;
     }
     case "request": {
-      const result = await requestForFile(workspaceId, msg.filePath, msg.method, msg.params);
+      const result = await requestForFile(
+        workspaceId,
+        msg.filePath,
+        msg.method,
+        msg.params,
+      );
       send(ws, { kind: "response", id: msg.id, result });
       return;
     }

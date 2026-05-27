@@ -167,13 +167,13 @@ Server                    External
 
 ```typescript
 // apps/server/src/routes/sessions.ts
-import { Hono } from 'hono';
-import { sessionService } from '../services/session-service';
+import { Hono } from "hono";
+import { sessionService } from "../services/session-service";
 
 const router = new Hono();
 
-router.post('/:id/prompt', async (c) => {
-  const id = c.req.param('id');
+router.post("/:id/prompt", async (c) => {
+  const id = c.req.param("id");
   const body = await c.req.json();
   // ... handler
 });
@@ -195,7 +195,7 @@ export function useChat(sessionId: string) {
 
 ```typescript
 // apps/server/src/services/session-service.ts
-import type { ManagedSessionHandle } from '@mariozechner/pi-coding-agent';
+import type { ManagedSessionHandle } from "@mariozechner/pi-coding-agent";
 
 const sessions = new Map<string, ManagedSessionHandle>();
 
@@ -206,12 +206,12 @@ export async function createSession(/* ... */) {
 
 ## Quick Navigation
 
-| Need to find | Look in |
-|--------------|---------|
+| Need to find     | Look in                                    |
+| ---------------- | ------------------------------------------ |
 | React components | `apps/web/src/features/<name>/components/` |
-| API handlers | `apps/server/src/routes/` |
-| Business logic | `apps/server/src/services/` |
-| Database schema | `packages/db/schema/` |
-| Git operations | `packages/git/src/` |
-| Type definitions | Feature module `types.ts` |
-| Tests | Currently none (per AGENTS.md) |
+| API handlers     | `apps/server/src/routes/`                  |
+| Business logic   | `apps/server/src/services/`                |
+| Database schema  | `packages/db/schema/`                      |
+| Git operations   | `packages/git/src/`                        |
+| Type definitions | Feature module `types.ts`                  |
+| Tests            | Currently none (per AGENTS.md)             |

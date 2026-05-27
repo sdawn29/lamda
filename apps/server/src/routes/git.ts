@@ -34,7 +34,12 @@ import {
   gitRestoreFileFromRef,
 } from "@lamda/git";
 import { generateCommitMessage } from "@lamda/pi-sdk";
-import { listAgentTurnsBySession, getAgentTurnFiles, getAgentTurnsFromId, deleteAgentTurnsFrom } from "@lamda/db";
+import {
+  listAgentTurnsBySession,
+  getAgentTurnFiles,
+  getAgentTurnsFromId,
+  deleteAgentTurnsFrom,
+} from "@lamda/db";
 import { store } from "../store.js";
 import { gitCwd } from "../services/session-service.js";
 import { sessionEvents } from "../session-events.js";
@@ -117,7 +122,10 @@ git.post("/session/:id/git/init", async (c) => {
       branches: await listBranches(cwd),
     });
   } catch (err) {
-    return c.json({ error: parseGitError(err, "Repository initialization failed") }, 500);
+    return c.json(
+      { error: parseGitError(err, "Repository initialization failed") },
+      500,
+    );
   }
 });
 
@@ -150,7 +158,10 @@ git.get("/session/:id/git/diff", async (c) => {
   try {
     return c.json({ diff: await gitFileDiff(cwd, file, status) });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
   }
 });
 
@@ -162,7 +173,10 @@ git.post("/session/:id/git/commit", async (c) => {
   try {
     return c.json({ output: await gitCommit(cwd, body.message) });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
   }
 });
 
@@ -173,8 +187,14 @@ git.post("/session/:id/git/generate-commit-message", async (c) => {
     .json<{ promptTemplate?: string }>()
     .catch((): { promptTemplate?: string } => ({}));
   const diff = await gitStagedDiff(cwd);
-  if (!diff.trim()) return c.json({ error: "No staged changes to generate a message for" }, 400);
-  return c.json({ message: await generateCommitMessage(diff, { cwd }, body.promptTemplate) });
+  if (!diff.trim())
+    return c.json(
+      { error: "No staged changes to generate a message for" },
+      400,
+    );
+  return c.json({
+    message: await generateCommitMessage(diff, { cwd }, body.promptTemplate),
+  });
 });
 
 git.post("/session/:id/git/push", async (c) => {
@@ -184,7 +204,10 @@ git.post("/session/:id/git/push", async (c) => {
     await gitPush(cwd);
     return new Response(null, { status: 204 });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
   }
 });
 
@@ -326,7 +349,10 @@ git.post("/session/:id/git/stash-pop", async (c) => {
     await gitStashPop(cwd, body.ref);
     return new Response(null, { status: 204 });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
   }
 });
 
@@ -339,7 +365,10 @@ git.post("/session/:id/git/stash-apply", async (c) => {
     await gitStashApply(cwd, body.ref);
     return new Response(null, { status: 204 });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
   }
 });
 
@@ -352,7 +381,10 @@ git.post("/session/:id/git/stash-drop", async (c) => {
     await gitStashDrop(cwd, body.ref);
     return new Response(null, { status: 204 });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
   }
 });
 
@@ -369,31 +401,32 @@ git.get("/session/:id/git/turns", (c) => {
   // Without this guard, lastTurnFiles still contains the just-completed turn's
   // files and we'd emit a phantom live turn alongside its DB counterpart.
   const currentTurnStartTime = sessionEvents.getCurrentTurnStartTime(id);
-  const liveFiles = currentTurnStartTime > 0 ? sessionEvents.getLastTurnFiles(id) : [];
+  const liveFiles =
+    currentTurnStartTime > 0 ? sessionEvents.getLastTurnFiles(id) : [];
   const turns = listAgentTurnsBySession(id);
 
-  const liveTurn = liveFiles.length > 0
-    ? [{
-        id: 0,
-        sessionId: id,
-        threadId: "",
-        startedAt: currentTurnStartTime,
-        endedAt: 0,
-        checkpointSha: "",
-        files: liveFiles.map((f) => ({
-          filePath: f.filePath,
-          postStatusCode: f.postStatusCode,
-          wasCreatedByTurn: f.wasCreatedByTurn,
-        })),
-        inProgress: true,
-      }]
-    : [];
+  const liveTurn =
+    liveFiles.length > 0
+      ? [
+          {
+            id: 0,
+            sessionId: id,
+            threadId: "",
+            startedAt: currentTurnStartTime,
+            endedAt: 0,
+            checkpointSha: "",
+            files: liveFiles.map((f) => ({
+              filePath: f.filePath,
+              postStatusCode: f.postStatusCode,
+              wasCreatedByTurn: f.wasCreatedByTurn,
+            })),
+            inProgress: true,
+          },
+        ]
+      : [];
 
   return c.json({
-    turns: [
-      ...liveTurn,
-      ...turns.map((t) => ({ ...t, inProgress: false })),
-    ],
+    turns: [...liveTurn, ...turns.map((t) => ({ ...t, inProgress: false }))],
   });
 });
 
@@ -434,7 +467,8 @@ git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
   // turnId=0 → revert the in-progress / most-recent turn using in-memory data
   if (turnIdParam === "0") {
     const files = sessionEvents.getLastTurnFiles(id);
-    if (!files.length) return c.json({ error: "No current turn to revert" }, 404);
+    if (!files.length)
+      return c.json({ error: "No current turn to revert" }, 404);
 
     for (const file of files) {
       const fullPath = join(cwd, file.filePath);
@@ -446,17 +480,26 @@ git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
           await fs.writeFile(fullPath, file.preContent, "utf8");
           await gitUnstage(cwd, file.filePath).catch(() => {});
         } else {
-          await gitRevertFile(cwd, file.filePath, file.postStatusCode).catch((err) => {
-            errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
-          });
+          await gitRevertFile(cwd, file.filePath, file.postStatusCode).catch(
+            (err) => {
+              errors.push(
+                `${file.filePath}: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            },
+          );
         }
       } catch (err) {
-        errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
+        errors.push(
+          `${file.filePath}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
     if (errors.length > 0) {
-      return c.json({ error: `Some files could not be reverted: ${errors.join("; ")}` }, 500);
+      return c.json(
+        { error: `Some files could not be reverted: ${errors.join("; ")}` },
+        500,
+      );
     }
     sessionEvents.clearLastTurnFiles(id);
     return new Response(null, { status: 204 });
@@ -471,7 +514,10 @@ git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
 
   // For each file, the target state is the preContent of the EARLIEST turn that
   // touched it — that represents the state before any of these turns ran.
-  const fileTargetMap = new Map<string, ReturnType<typeof getAgentTurnFiles>[number]>();
+  const fileTargetMap = new Map<
+    string,
+    ReturnType<typeof getAgentTurnFiles>[number]
+  >();
   const earliestCheckpointSha = turnsToRevert[0]?.checkpointSha ?? "";
 
   for (const turn of turnsToRevert) {
@@ -483,7 +529,8 @@ git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
     }
   }
 
-  if (fileTargetMap.size === 0) return c.json({ error: "Turn has no file changes to revert" }, 404);
+  if (fileTargetMap.size === 0)
+    return c.json({ error: "Turn has no file changes to revert" }, 404);
 
   for (const [, file] of fileTargetMap) {
     const fullPath = join(cwd, file.filePath);
@@ -493,31 +540,48 @@ git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
         await gitUnstage(cwd, file.filePath).catch(() => {});
       } else if (earliestCheckpointSha) {
         // Restore from the pre-turn stash checkpoint of the earliest turn being reverted.
-        await gitRestoreFileFromRef(cwd, earliestCheckpointSha, file.filePath).catch(async () => {
+        await gitRestoreFileFromRef(
+          cwd,
+          earliestCheckpointSha,
+          file.filePath,
+        ).catch(async () => {
           if (file.preContent !== null) {
             await fs.writeFile(fullPath, file.preContent, "utf8");
             await gitUnstage(cwd, file.filePath).catch(() => {});
           } else {
-            await gitRevertFile(cwd, file.filePath, file.postStatusCode).catch((err) => {
-              errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
-            });
+            await gitRevertFile(cwd, file.filePath, file.postStatusCode).catch(
+              (err) => {
+                errors.push(
+                  `${file.filePath}: ${err instanceof Error ? err.message : String(err)}`,
+                );
+              },
+            );
           }
         });
       } else if (file.preContent !== null) {
         await fs.writeFile(fullPath, file.preContent, "utf8");
         await gitUnstage(cwd, file.filePath).catch(() => {});
       } else {
-        await gitRevertFile(cwd, file.filePath, file.postStatusCode).catch((err) => {
-          errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
-        });
+        await gitRevertFile(cwd, file.filePath, file.postStatusCode).catch(
+          (err) => {
+            errors.push(
+              `${file.filePath}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          },
+        );
       }
     } catch (err) {
-      errors.push(`${file.filePath}: ${err instanceof Error ? err.message : String(err)}`);
+      errors.push(
+        `${file.filePath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
   if (errors.length > 0) {
-    return c.json({ error: `Some files could not be reverted: ${errors.join("; ")}` }, 500);
+    return c.json(
+      { error: `Some files could not be reverted: ${errors.join("; ")}` },
+      500,
+    );
   }
 
   // Remove this turn and all subsequent turns from the DB so they disappear from the sidebar.

@@ -11,7 +11,7 @@ Hono API server that manages Pi coding agent sessions, handles workspace/thread 
 | Action    | Command                                |
 | --------- | -------------------------------------- |
 | Dev       | `npm run dev -w @lamda/server`         |
-| Build     | `npm run build -w @lamda/server`        |
+| Build     | `npm run build -w @lamda/server`       |
 | Start     | `npm run start -w @lamda/server`       |
 | Typecheck | `npm run check-types -w @lamda/server` |
 
@@ -41,31 +41,31 @@ Hono server (default port 3001) with three layers:
 
 ### Routes (src/routes/)
 
-| Method   | Path                              | Description                                              |
-| -------- | --------------------------------- | -------------------------------------------------------- |
-| `GET`    | `/health`                         | Health check with uptime                                 |
-| `GET`    | `/models`                         | List available AI models                                 |
-| `POST`   | `/title`                          | Generate a thread title from a message                   |
-| `GET`    | `/workspaces`                     | List all workspaces with their threads                   |
-| `POST`   | `/workspace`                      | Create workspace + initial thread + Pi session            |
-| `DELETE` | `/workspace/:id`                 | Delete workspace and all associated sessions              |
-| `POST`   | `/workspace/:workspaceId/thread` | Create new thread + Pi session in workspace                |
-| `DELETE` | `/thread/:id`                     | Delete thread and its session                             |
+| Method   | Path                             | Description                                              |
+| -------- | -------------------------------- | -------------------------------------------------------- |
+| `GET`    | `/health`                        | Health check with uptime                                 |
+| `GET`    | `/models`                        | List available AI models                                 |
+| `POST`   | `/title`                         | Generate a thread title from a message                   |
+| `GET`    | `/workspaces`                    | List all workspaces with their threads                   |
+| `POST`   | `/workspace`                     | Create workspace + initial thread + Pi session           |
+| `DELETE` | `/workspace/:id`                 | Delete workspace and all associated sessions             |
+| `POST`   | `/workspace/:workspaceId/thread` | Create new thread + Pi session in workspace              |
+| `DELETE` | `/thread/:id`                    | Delete thread and its session                            |
 | `PATCH`  | `/thread/:id/title`              | Update thread title                                      |
-| `POST`   | `/session`                        | Legacy: create standalone session                        |
-| `DELETE` | `/session/:id`                    | Delete session                                           |
-| `POST`   | `/session/:id/prompt`            | Send user prompt to agent (returns 202, fire-and-forget)  |
+| `POST`   | `/session`                       | Legacy: create standalone session                        |
+| `DELETE` | `/session/:id`                   | Delete session                                           |
+| `POST`   | `/session/:id/prompt`            | Send user prompt to agent (returns 202, fire-and-forget) |
 | `POST`   | `/session/:id/steer`             | Queue steering message (interrupts after tool calls)     |
 | `POST`   | `/session/:id/follow-up`         | Queue follow-up message (waits for idle)                 |
 | `POST`   | `/session/:id/abort`             | Abort current agent operation                            |
 | `GET`    | `/session/:id/commands`          | Get available slash commands                             |
-| `GET`    | `/session/:id/thinking-levels`   | Get available thinking levels                           |
+| `GET`    | `/session/:id/thinking-levels`   | Get available thinking levels                            |
 | `GET`    | `/session/:id/context-usage`     | Get current context window usage                         |
-| `GET`    | `/session/:id/stats`             | Get session statistics (messages, tokens, cost)        |
+| `GET`    | `/session/:id/stats`             | Get session statistics (messages, tokens, cost)          |
 | `POST`   | `/session/:id/compact`           | Trigger context window compaction                        |
-| `GET`    | `/session/:id/branch`           | Get current git branch for session's cwd                  |
-| `GET`    | `/session/:id/branches`         | List all git branches for session's cwd                  |
-| `POST`   | `/session/:id/checkout`         | Checkout a git branch                                    |
+| `GET`    | `/session/:id/branch`            | Get current git branch for session's cwd                 |
+| `GET`    | `/session/:id/branches`          | List all git branches for session's cwd                  |
+| `POST`   | `/session/:id/checkout`          | Checkout a git branch                                    |
 | `GET`    | `/session/:id/messages`          | Get persisted message blocks for session                 |
 | `GET`    | `/session/:id/running-tools`     | Get running tools for state restoration                  |
 | `GET`    | `/session/:id/events`            | SSE stream of agent events                               |
@@ -76,19 +76,20 @@ Hono server (default port 3001) with three layers:
 
 ### WebSocket Endpoints (src/websocket/)
 
-| Path | Purpose |
-|------|---------|
-| `/terminal` | PTY terminal sessions via node-pty |
-| `/ws/events` | Global events (server status, OAuth) |
-| `/ws/session/:id/events` | Session event stream (alternative to SSE) |
-| `/ws/session/:id/commands` | Unified command channel (prompt, git ops) |
-| `/ws/auth/oauth/:provider/events` | OAuth flow events |
+| Path                              | Purpose                                   |
+| --------------------------------- | ----------------------------------------- |
+| `/terminal`                       | PTY terminal sessions via node-pty        |
+| `/ws/events`                      | Global events (server status, OAuth)      |
+| `/ws/session/:id/events`          | Session event stream (alternative to SSE) |
+| `/ws/session/:id/commands`        | Unified command channel (prompt, git ops) |
+| `/ws/auth/oauth/:provider/events` | OAuth flow events                         |
 
 ### Unified Command Protocol (WebSocket)
 
 All session operations can be sent via `/ws/session/:id/commands`:
 
 **Client → Server Messages:**
+
 - `prompt` — Send user prompt (with optional images, model, thinking level)
 - `steer` — Queue steering message
 - `follow-up` — Queue follow-up message
@@ -98,6 +99,7 @@ All session operations can be sent via `/ws/session/:id/commands`:
 - `workspace:reindex` — Trigger workspace file reindex
 
 **Server → Client Messages:**
+
 - `ack` — Command acknowledgment
 - `git:result` — Git operation result
 - `git:status` — Git status update (after operations)
@@ -107,14 +109,14 @@ All session operations can be sent via `/ws/session/:id/commands`:
 
 ### Core Services
 
-| Service | File | Responsibility |
-|---------|------|----------------|
-| Session | `session-service.ts` | Session lifecycle, pi-sdk wrapper |
-| Terminal | `terminal-service.ts` | PTY management, WebSocket streaming |
-| Auth | `auth-service.ts` | API key resolution |
-| Indexer | `workspace-indexer.ts` | Workspace file indexing |
-| WebSocket | `websocket/session-commands.ts` | Unified command handler |
-| Broadcasters | `thread-status-broadcaster.ts`, `workspace-index-broadcaster.ts` | Event distribution |
+| Service      | File                                                             | Responsibility                      |
+| ------------ | ---------------------------------------------------------------- | ----------------------------------- |
+| Session      | `session-service.ts`                                             | Session lifecycle, pi-sdk wrapper   |
+| Terminal     | `terminal-service.ts`                                            | PTY management, WebSocket streaming |
+| Auth         | `auth-service.ts`                                                | API key resolution                  |
+| Indexer      | `workspace-indexer.ts`                                           | Workspace file indexing             |
+| WebSocket    | `websocket/session-commands.ts`                                  | Unified command handler             |
+| Broadcasters | `thread-status-broadcaster.ts`, `workspace-index-broadcaster.ts` | Event distribution                  |
 
 ## Conventions
 

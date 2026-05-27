@@ -7,7 +7,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from "react"
-import { Outlet, useParams, useRouter } from "@tanstack/react-router"
+import { Outlet, useParams, useRouter, useSearch } from "@tanstack/react-router"
 import { ChevronLeft, ChevronRight, PanelRight } from "lucide-react"
 
 import { AppSidebar, useWorkspace } from "@/features/workspace"
@@ -310,9 +310,16 @@ export function WorkspaceLayout() {
 
   usePrefetchThreadsMessages()
 
+  const { ws: newThreadWsId } = useSearch({ strict: false }) as { ws?: string }
+
   const activeWorkspace = workspaces.find((ws) =>
     ws.threads.some((t) => t.id === activeThreadId)
   )
+
+  // On /new, fall back to the ?ws= workspace so the right sidebar can open
+  const rsWorkspace =
+    activeWorkspace ??
+    (newThreadWsId ? workspaces.find((w) => w.id === newThreadWsId) : undefined)
 
   const terminalHost =
     activeWorkspace ??
@@ -333,14 +340,18 @@ export function WorkspaceLayout() {
     (s) => s.tabs.length > 0
   )
 
-  // Session derivation for the right sidebar — always follows the active thread
+  // Session derivation for the right sidebar — follows the active thread, or any
+  // thread from the /new-page workspace (git state is workspace-level).
   const activeThread = activeWorkspace?.threads.find(
     (t) => t.id === activeThreadId
   )
-  const rsSessionId = activeThread?.sessionId ?? null
-  const rsWorkspaceId = activeWorkspace?.id
-  const rsWorkspacePath = activeWorkspace?.path
-  const rsOpenWithAppId = activeWorkspace?.openWithAppId ?? null
+  const rsSessionId =
+    activeThread?.sessionId ??
+    rsWorkspace?.threads.find((t) => t.sessionId)?.sessionId ??
+    null
+  const rsWorkspaceId = rsWorkspace?.id
+  const rsWorkspacePath = rsWorkspace?.path
+  const rsOpenWithAppId = rsWorkspace?.openWithAppId ?? null
   const rsReady = !!rsSessionId
 
   // Workspace-stable session for git queries — only changes when the workspace changes,
@@ -352,8 +363,8 @@ export function WorkspaceLayout() {
   const [rsTrackedWorkspaceId, setRsTrackedWorkspaceId] = useState<
     string | undefined
   >(undefined)
-  if (activeWorkspace?.id !== rsTrackedWorkspaceId) {
-    setRsTrackedWorkspaceId(activeWorkspace?.id)
+  if (rsWorkspace?.id !== rsTrackedWorkspaceId) {
+    setRsTrackedWorkspaceId(rsWorkspace?.id)
     setRsWorkspaceSessionId(rsSessionId)
   } else if (!rsWorkspaceSessionId && rsSessionId) {
     setRsWorkspaceSessionId(rsSessionId)
@@ -383,7 +394,7 @@ export function WorkspaceLayout() {
           >
             {/* Left column: TitleBar + content + terminal */}
             <div className="flex h-full min-w-0 flex-col overflow-hidden">
-              {!isEmptyState && <TitleBar />}
+              <TitleBar />
               <UpdateBanner />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="min-h-0 flex-1 overflow-hidden">

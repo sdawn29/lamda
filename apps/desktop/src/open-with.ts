@@ -12,7 +12,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-const { app, nativeImage } = createRequire(import.meta.url)("electron") as typeof import("electron");
+const { app, nativeImage } = createRequire(import.meta.url)(
+  "electron",
+) as typeof import("electron");
 
 const execFileAsync = promisify(execFile);
 

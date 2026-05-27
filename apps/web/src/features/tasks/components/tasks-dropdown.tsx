@@ -82,8 +82,8 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
                 onClick={() => onRunTask(task.command)}
               >
                 <TaskIcon id={task.icon} className="shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                  {task.command}
+                <span className="min-w-0 flex-1 truncate text-xs">
+                  {task.name || task.command}
                 </span>
                 <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
                   <button

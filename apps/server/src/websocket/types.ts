@@ -3,7 +3,10 @@
  * All session commands go through the WebSocket channel at /ws/session/:id/events
  */
 
-import { type PromptOptions as SdkPromptOptions, type ImageContent as SdkImageContent } from "@lamda/pi-sdk";
+import {
+  type PromptOptions as SdkPromptOptions,
+  type ImageContent as SdkImageContent,
+} from "@lamda/pi-sdk";
 
 // Re-export types for convenience
 export type PromptOptions = SdkPromptOptions;
@@ -132,8 +135,7 @@ export interface GitInitMessage {
   type: "git:init";
 }
 
-export type WorkspaceCommandMessage =
-  | WorkspaceReindexMessage;
+export type WorkspaceCommandMessage = WorkspaceReindexMessage;
 
 export interface WorkspaceReindexMessage {
   type: "workspace:reindex";

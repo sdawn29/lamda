@@ -114,6 +114,7 @@ export const workspaceTasks = sqliteTable("workspace_tasks", {
   workspaceId: text("workspace_id")
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text("name"),
   icon: text("icon"),
   command: text("command").notNull(),
   createdAt: integer("created_at").notNull(),

@@ -11,7 +11,8 @@ settings.put("/settings/:key", async (c) => {
   const body = await c.req
     .json<{ value?: string }>()
     .catch((): { value?: string } => ({}));
-  if (body.value === undefined) return c.json({ error: "value is required" }, 400);
+  if (body.value === undefined)
+    return c.json({ error: "value is required" }, 400);
   upsertSetting(key, body.value);
   return c.json({ ok: true });
 });

@@ -1,11 +1,26 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { insertUserBlock, insertAssistantStartBlock, insertToolBlock, appendAssistantTextDelta, appendAssistantThinkingDelta, finalizeAssistantBlock, updateToolBlockResult, updateToolBlockPartialResult, listRunningToolBlocks, insertAgentTurn, insertCompactionBlock } from "@lamda/db";
+import {
+  insertUserBlock,
+  insertAssistantStartBlock,
+  insertToolBlock,
+  appendAssistantTextDelta,
+  appendAssistantThinkingDelta,
+  finalizeAssistantBlock,
+  updateToolBlockResult,
+  updateToolBlockPartialResult,
+  listRunningToolBlocks,
+  insertAgentTurn,
+  insertCompactionBlock,
+} from "@lamda/db";
 import type { ManagedSessionHandle, SessionEvent } from "@lamda/pi-sdk";
 import { PLAN_DIR } from "@lamda/pi-sdk";
 import { gitStatus, gitStashCreate, gitStashStore } from "@lamda/git";
-import { threadStatusBroadcaster, type ThreadStatus } from "./thread-status-broadcaster.js";
+import {
+  threadStatusBroadcaster,
+  type ThreadStatus,
+} from "./thread-status-broadcaster.js";
 
 const MAX_RECENT_EVENTS = 512;
 
@@ -41,7 +56,11 @@ type PlanSavedEvent = {
   /** Workspace-relative path (always forward-slash, starts with `.agents/plans/`). */
   relativePath: string;
 };
-type HubEvent = SessionEvent | ServerErrorEvent | TurnFileChangedEvent | PlanSavedEvent;
+type HubEvent =
+  | SessionEvent
+  | ServerErrorEvent
+  | TurnFileChangedEvent
+  | PlanSavedEvent;
 
 type SessionEventRecord = {
   id: number;
@@ -146,12 +165,15 @@ class SessionEventHub {
 
   private scheduleIdleDispose() {
     if (this.idleTimer || this.disposed) return;
-    this.idleTimer = setTimeout(() => {
-      this.idleTimer = null;
-      if (this.subscribers.size === 0 && !this.disposed) {
-        this.onIdle?.();
-      }
-    }, 10 * 60 * 1000);
+    this.idleTimer = setTimeout(
+      () => {
+        this.idleTimer = null;
+        if (this.subscribers.size === 0 && !this.disposed) {
+          this.onIdle?.();
+        }
+      },
+      10 * 60 * 1000,
+    );
   }
 
   private cancelIdleDispose() {
@@ -222,7 +244,11 @@ class SessionEventHub {
   private maybeEmitPlanSaved(event: SessionEvent): void {
     if (!this.cwd || this.disposed) return;
     if (event.type !== "tool_execution_end") return;
-    const msg = event as { toolCallId: string; toolName?: string; isError?: boolean };
+    const msg = event as {
+      toolCallId: string;
+      toolName?: string;
+      isError?: boolean;
+    };
     if (msg.isError) return;
 
     // Tool name may arrive on the event or only on the earlier _start.
@@ -250,7 +276,9 @@ class SessionEventHub {
     try {
       const raw = await Promise.race([
         gitStatus(this.cwd),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3_000)),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 3_000),
+        ),
       ]);
       if (!this.preTurnStatusMap || this.disposed) return;
       const postMap = this.parseStatusToMap(raw);
@@ -260,7 +288,12 @@ class SessionEventHub {
         if (preStatusCode !== postStatusCode) {
           const wasCreatedByTurn = !this.preTurnStatusMap.has(filePath);
           this.currentTurnEmittedFiles.add(filePath);
-          this.emit({ type: "turn_file_changed", filePath, postStatusCode, wasCreatedByTurn });
+          this.emit({
+            type: "turn_file_changed",
+            filePath,
+            postStatusCode,
+            wasCreatedByTurn,
+          });
         }
       }
     } catch {
@@ -274,20 +307,22 @@ class SessionEventHub {
     this.preTurnCheckpointSha = "";
     const timeoutMs = 5_000;
     const deadline = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("git-status timeout")), timeoutMs)
+      setTimeout(() => reject(new Error("git-status timeout")), timeoutMs),
     );
     try {
       const [raw, checkpointSha] = await Promise.all([
         Promise.race([gitStatus(this.cwd), deadline]),
         // Create a non-destructive git stash checkpoint of current state.
         // gitStashCreate returns empty string if working tree is clean — that's fine.
-        gitStashCreate(this.cwd).then(async (sha) => {
-          if (sha) {
-            const label = `asphalt-checkpoint:${this.sessionId}:${Date.now()}`;
-            await gitStashStore(this.cwd!, sha, label).catch(() => {});
-          }
-          return sha;
-        }).catch(() => ""),
+        gitStashCreate(this.cwd)
+          .then(async (sha) => {
+            if (sha) {
+              const label = `asphalt-checkpoint:${this.sessionId}:${Date.now()}`;
+              await gitStashStore(this.cwd!, sha, label).catch(() => {});
+            }
+            return sha;
+          })
+          .catch(() => ""),
       ]);
 
       this.preTurnStatusMap = this.parseStatusToMap(raw);
@@ -299,20 +334,22 @@ class SessionEventHub {
       const MAX_FILE_BYTES = 512 * 1024;
       const contents = new Map<string, string>();
       await Promise.all(
-        Array.from(this.preTurnStatusMap.entries()).map(async ([filePath, rawStatus]) => {
-          // Skip deleted files — they can't be read from disk
-          if (rawStatus.includes("D")) return;
-          const fullPath = join(this.cwd!, filePath);
-          try {
-            const buf = await readFile(fullPath);
-            if (buf.length > MAX_FILE_BYTES) return;
-            // Skip binary files (contain null bytes)
-            if (buf.includes(0)) return;
-            contents.set(filePath, buf.toString("utf8"));
-          } catch {
-            // Unreadable file — skip, will fall back to git restore
-          }
-        })
+        Array.from(this.preTurnStatusMap.entries()).map(
+          async ([filePath, rawStatus]) => {
+            // Skip deleted files — they can't be read from disk
+            if (rawStatus.includes("D")) return;
+            const fullPath = join(this.cwd!, filePath);
+            try {
+              const buf = await readFile(fullPath);
+              if (buf.length > MAX_FILE_BYTES) return;
+              // Skip binary files (contain null bytes)
+              if (buf.includes(0)) return;
+              contents.set(filePath, buf.toString("utf8"));
+            } catch {
+              // Unreadable file — skip, will fall back to git restore
+            }
+          },
+        ),
       );
       this.preTurnFileContents = contents;
     } catch {
@@ -346,8 +383,16 @@ class SessionEventHub {
         if (preStatusCode !== postStatusCode) {
           changedLines.push(`${postStatusCode} ${filePath}`);
           const wasCreatedByTurn = !pre.has(filePath);
-          const preContent = wasCreatedByTurn ? null : (preContents.get(filePath) ?? null);
-          turnFiles.push({ filePath, postStatusCode, preStatusCode, preContent, wasCreatedByTurn });
+          const preContent = wasCreatedByTurn
+            ? null
+            : (preContents.get(filePath) ?? null);
+          turnFiles.push({
+            filePath,
+            postStatusCode,
+            preStatusCode,
+            preContent,
+            wasCreatedByTurn,
+          });
           processedFiles.add(filePath);
         }
       }
@@ -358,7 +403,10 @@ class SessionEventHub {
       // status code comparison above misses this; content comparison catches it.
       await Promise.all(
         Array.from(preContents.entries())
-          .filter(([filePath]) => !processedFiles.has(filePath) && postMap.has(filePath))
+          .filter(
+            ([filePath]) =>
+              !processedFiles.has(filePath) && postMap.has(filePath),
+          )
           .map(async ([filePath, preContent]) => {
             const postStatusCode = postMap.get(filePath)!;
             const fullPath = join(this.cwd!, filePath);
@@ -377,7 +425,7 @@ class SessionEventHub {
             } catch {
               // unreadable — skip
             }
-          })
+          }),
       );
 
       this.lastTurnChangedRaw = changedLines.join("\n");
@@ -537,7 +585,9 @@ class SessionEventHub {
       parsedLastEventId >= currentRunStartId &&
       parsedLastEventId <= currentRunEndId
     ) {
-      return this.currentRunEvents.filter((record) => record.id > parsedLastEventId);
+      return this.currentRunEvents.filter(
+        (record) => record.id > parsedLastEventId,
+      );
     }
     return this.recentEvents.filter((record) => record.id > parsedLastEventId);
   }
@@ -603,7 +653,8 @@ class SessionEventHub {
         this.turnContext = {
           assistantBlockId: blockId,
           startTime: Date.now(),
-          thinkingLevel: inheritedThinkingLevel ?? this.pendingThinkingLevel ?? undefined,
+          thinkingLevel:
+            inheritedThinkingLevel ?? this.pendingThinkingLevel ?? undefined,
         };
         this.pendingThinkingLevel = null;
       }
@@ -625,10 +676,16 @@ class SessionEventHub {
 
       const blockId = this.turnContext.assistantBlockId;
 
-      if (assistantEvent.type === "text_delta" && typeof assistantEvent.delta === "string") {
+      if (
+        assistantEvent.type === "text_delta" &&
+        typeof assistantEvent.delta === "string"
+      ) {
         this.textDeltaBuffer += assistantEvent.delta;
         this.scheduleDeltaFlush(blockId);
-      } else if (assistantEvent.type === "thinking_delta" && typeof assistantEvent.delta === "string") {
+      } else if (
+        assistantEvent.type === "thinking_delta" &&
+        typeof assistantEvent.delta === "string"
+      ) {
         this.thinkingDeltaBuffer += assistantEvent.delta;
         this.scheduleDeltaFlush(blockId);
       }
@@ -645,7 +702,11 @@ class SessionEventHub {
 
     // tool_execution_start - create tool block
     if (event.type === "tool_execution_start") {
-      const msg = event as { toolCallId: string; toolName: string; args: unknown };
+      const msg = event as {
+        toolCallId: string;
+        toolName: string;
+        args: unknown;
+      };
       this.toolMetaMap.set(msg.toolCallId, {
         toolCallId: msg.toolCallId,
         toolName: msg.toolName,
@@ -657,7 +718,7 @@ class SessionEventHub {
         this.threadId,
         msg.toolCallId,
         msg.toolName,
-        JSON.stringify(msg.args ?? {})
+        JSON.stringify(msg.args ?? {}),
       );
       this.currentToolBlocks.set(msg.toolCallId, {
         toolBlockId: blockId,
@@ -701,7 +762,7 @@ class SessionEventHub {
       if (toolContext && msg.partialResult !== undefined) {
         updateToolBlockPartialResult(
           toolContext.toolBlockId,
-          JSON.stringify(msg.partialResult)
+          JSON.stringify(msg.partialResult),
         );
       }
       return;
@@ -709,7 +770,11 @@ class SessionEventHub {
 
     // compaction_end - persist a marker so the divider survives page refresh
     if (event.type === "compaction_end") {
-      const ce = event as { reason: "manual" | "threshold" | "overflow"; aborted?: boolean; errorMessage?: string };
+      const ce = event as {
+        reason: "manual" | "threshold" | "overflow";
+        aborted?: boolean;
+        errorMessage?: string;
+      };
       if (!ce.aborted && !ce.errorMessage) {
         insertCompactionBlock(this.threadId, ce.reason);
       }
@@ -724,10 +789,22 @@ class SessionEventHub {
 
       if (this.turnContext) {
         const responseTime = Date.now() - this.turnContext.startTime;
-        const agentEndMsg = event as { messages?: { role: string; stopReason?: string; errorMessage?: string }[] };
-        const assistantError = agentEndMsg.messages?.slice().reverse().find(
-          (m) => m.role === "assistant" && m.stopReason === "error" && !!m.errorMessage
-        );
+        const agentEndMsg = event as {
+          messages?: {
+            role: string;
+            stopReason?: string;
+            errorMessage?: string;
+          }[];
+        };
+        const assistantError = agentEndMsg.messages
+          ?.slice()
+          .reverse()
+          .find(
+            (m) =>
+              m.role === "assistant" &&
+              m.stopReason === "error" &&
+              !!m.errorMessage,
+          );
         finalizeAssistantBlock(this.turnContext.assistantBlockId!, {
           responseTime,
           model: this.turnContext.model,
@@ -777,27 +854,46 @@ class SessionEventHub {
       this.isCompacting = false;
       this.compactionReason = null;
       if (!ce.aborted && ce.errorMessage) {
-        this.pendingErrorState = { title: "Compaction Failed", message: ce.errorMessage, retryable: false };
+        this.pendingErrorState = {
+          title: "Compaction Failed",
+          message: ce.errorMessage,
+          retryable: false,
+        };
       } else if (!ce.aborted) {
         this.pendingErrorState = null;
         // Prune compaction events from currentRunEvents so mid-turn reconnects
         // (parsedLastEventId === null + runInProgress) don't re-fire the success toast.
         this.currentRunEvents = this.currentRunEvents.filter(
-          (r) => r.event.type !== "compaction_start" && r.event.type !== "compaction_end",
+          (r) =>
+            r.event.type !== "compaction_start" &&
+            r.event.type !== "compaction_end",
         );
       }
     } else if (event.type === "server_error") {
       const se = event as { message: string };
-      this.pendingErrorState = { title: "Error", message: se.message, retryable: true };
+      this.pendingErrorState = {
+        title: "Error",
+        message: se.message,
+        retryable: true,
+      };
     } else if (event.type === "auto_retry_start") {
       const ar = event as { attempt: number; errorMessage: string };
-      this.pendingErrorState = { title: "Retrying", message: ar.errorMessage, retryable: true, retryCount: ar.attempt };
+      this.pendingErrorState = {
+        title: "Retrying",
+        message: ar.errorMessage,
+        retryable: true,
+        retryCount: ar.attempt,
+      };
     } else if (event.type === "auto_retry_end") {
       const ar = event as { success: boolean; finalError?: string };
       if (ar.success) {
         this.pendingErrorState = null;
       } else if (ar.finalError) {
-        this.pendingErrorState = { title: "Retry Failed", message: ar.finalError, retryable: true };
+        this.pendingErrorState = {
+          title: "Retry Failed",
+          message: ar.finalError,
+          retryable: true,
+        };
       }
     }
 
@@ -819,7 +915,12 @@ class SessionEventHub {
 class SessionEventRegistry {
   private hubs = new Map<string, SessionEventHub>();
 
-  ensure(sessionId: string, threadId: string, handle: ManagedSessionHandle, cwd?: string | null) {
+  ensure(
+    sessionId: string,
+    threadId: string,
+    handle: ManagedSessionHandle,
+    cwd?: string | null,
+  ) {
     const existing = this.hubs.get(sessionId);
     if (existing) {
       existing.ensureStarted();
@@ -827,8 +928,13 @@ class SessionEventRegistry {
     }
 
     const hub = new SessionEventHub(
-      sessionId, threadId, handle, cwd ?? null,
-      () => { this.hubs.delete(sessionId); },
+      sessionId,
+      threadId,
+      handle,
+      cwd ?? null,
+      () => {
+        this.hubs.delete(sessionId);
+      },
     );
     this.hubs.set(sessionId, hub);
     hub.ensureStarted();
@@ -848,12 +954,14 @@ class SessionEventRegistry {
   }
 
   getStatus(sessionId: string): SessionStatus {
-    return this.hubs.get(sessionId)?.getStatus() ?? {
-      isRunning: false,
-      isCompacting: false,
-      compactionReason: null,
-      pendingError: null,
-    };
+    return (
+      this.hubs.get(sessionId)?.getStatus() ?? {
+        isRunning: false,
+        isCompacting: false,
+        compactionReason: null,
+        pendingError: null,
+      }
+    );
   }
 
   getLastTurnChanges(sessionId: string): string {

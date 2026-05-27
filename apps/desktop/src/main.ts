@@ -23,7 +23,8 @@ import {
 } from "./open-with.js";
 
 const require = createRequire(import.meta.url);
-const { autoUpdater } = require("electron-updater") as typeof import("electron-updater");
+const { autoUpdater } =
+  require("electron-updater") as typeof import("electron-updater");
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -59,7 +60,13 @@ type UpdateStatus =
   | { phase: "idle" }
   | { phase: "checking" }
   | { phase: "available"; version: string; releaseNotes: string | null }
-  | { phase: "downloading"; version: string; percent: number; bytesPerSecond: number; total: number }
+  | {
+      phase: "downloading";
+      version: string;
+      percent: number;
+      bytesPerSecond: number;
+      total: number;
+    }
   | { phase: "ready"; version: string }
   | { phase: "error"; message: string };
 
@@ -105,7 +112,8 @@ function setupAutoUpdater() {
     setUpdateStatus({
       phase: "available",
       version: info.version,
-      releaseNotes: typeof info.releaseNotes === "string" ? info.releaseNotes : null,
+      releaseNotes:
+        typeof info.releaseNotes === "string" ? info.releaseNotes : null,
     });
   });
 
@@ -471,32 +479,38 @@ app.whenReady().then(async () => {
     },
   );
 
-  ipcMain.handle("open-file-with-app", async (_event, payload: { filePath?: string; appId?: string } | undefined) => {
-    const filePath = payload?.filePath?.trim();
-    if (!filePath) {
-      throw new Error("A file path is required.");
-    }
+  ipcMain.handle(
+    "open-file-with-app",
+    async (
+      _event,
+      payload: { filePath?: string; appId?: string } | undefined,
+    ) => {
+      const filePath = payload?.filePath?.trim();
+      if (!filePath) {
+        throw new Error("A file path is required.");
+      }
 
-    const execFileAsync = promisify(execFile);
+      const execFileAsync = promisify(execFile);
 
-    if (process.platform !== "darwin") {
-      await shell.openPath(filePath);
-      return;
-    }
-
-    // On macOS, use the open command with the specific app
-    if (payload?.appId) {
-      const editorApps = await getInstalledEditorApps();
-      const editorApp = editorApps.find((app) => app.id === payload.appId);
-      if (editorApp) {
-        await execFileAsync("open", ["-a", editorApp.appPath, filePath]);
+      if (process.platform !== "darwin") {
+        await shell.openPath(filePath);
         return;
       }
-    }
 
-    // No specific app, open with default
-    await shell.openPath(filePath);
-  });
+      // On macOS, use the open command with the specific app
+      if (payload?.appId) {
+        const editorApps = await getInstalledEditorApps();
+        const editorApp = editorApps.find((app) => app.id === payload.appId);
+        if (editorApp) {
+          await execFileAsync("open", ["-a", editorApp.appPath, filePath]);
+          return;
+        }
+      }
+
+      // No specific app, open with default
+      await shell.openPath(filePath);
+    },
+  );
 
   ipcMain.handle("open-external", (_event, url: string) => {
     shell.openExternal(url);
@@ -509,7 +523,10 @@ app.whenReady().then(async () => {
     try {
       await autoUpdater.checkForUpdates();
     } catch (err) {
-      setUpdateStatus({ phase: "error", message: err instanceof Error ? err.message : String(err) });
+      setUpdateStatus({
+        phase: "error",
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
     return updateStatus;
   });

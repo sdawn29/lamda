@@ -18,7 +18,10 @@ import {
 import { createPlanModeTools, isMode, type Mode } from "@lamda/pi-sdk";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
-import { collectCustomTools, createSessionForThread } from "../services/session-service.js";
+import {
+  collectCustomTools,
+  createSessionForThread,
+} from "../services/session-service.js";
 
 const threads = new Hono();
 
@@ -32,10 +35,15 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
 
   const threadId = insertThread(workspaceId);
-  const sessionId = await createSessionForThread(threadId, ws.path, workspaceId, {
-    provider: body.provider,
-    model: body.model,
-  });
+  const sessionId = await createSessionForThread(
+    threadId,
+    ws.path,
+    workspaceId,
+    {
+      provider: body.provider,
+      model: body.model,
+    },
+  );
 
   return c.json(
     {
@@ -150,20 +158,20 @@ threads.patch("/thread/:id/unarchive", (c) => {
 });
 
 threads.patch("/thread/:id/pin", (c) => {
-  const threadId = c.req.param("id")
-  const thread = getThread(threadId)
-  if (!thread) return c.json({ error: "Thread not found" }, 404)
-  pinThread(threadId)
-  return c.json({ ok: true })
-})
+  const threadId = c.req.param("id");
+  const thread = getThread(threadId);
+  if (!thread) return c.json({ error: "Thread not found" }, 404);
+  pinThread(threadId);
+  return c.json({ ok: true });
+});
 
 threads.patch("/thread/:id/unpin", (c) => {
-  const threadId = c.req.param("id")
-  const thread = getThread(threadId)
-  if (!thread) return c.json({ error: "Thread not found" }, 404)
-  unpinThread(threadId)
-  return c.json({ ok: true })
-})
+  const threadId = c.req.param("id");
+  const thread = getThread(threadId);
+  if (!thread) return c.json({ error: "Thread not found" }, 404);
+  unpinThread(threadId);
+  return c.json({ ok: true });
+});
 
 threads.get("/threads/archived", (c) => {
   const archived = listArchivedThreadsWithWorkspace();

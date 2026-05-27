@@ -195,8 +195,9 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         const capturedWsId = workspaceId
         const capturedThreadId = thread.id
         generateTitle(text)
-          .then(({ title }) => {
-            void updateThreadTitle(capturedThreadId, title)
+          .then(async ({ title }) => {
+            await updateThreadTitle(capturedThreadId, title)
+            await queryClient.cancelQueries({ queryKey: workspacesQueryKey })
             queryClient.setQueryData<WorkspaceDto[]>(
               workspacesQueryKey,
               (prev) =>
