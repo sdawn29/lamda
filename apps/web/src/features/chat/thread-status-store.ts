@@ -109,40 +109,97 @@ export function useSetActiveThreadId() {
 
 // ── WebSocket bootstrap ───────────────────────────────────────────────────────
 
-/**
- * Called once from main.tsx at app startup. Sets up the global WebSocket that
- * receives real-time thread status updates from the server.
- */
-export function initThreadStatusWebSocket(): void {
+let globalSocket: WebSocket | null = null
+let globalReconnectTimer: ReturnType<typeof setTimeout> | null = null
+let globalReconnectDelay = 1000
+const GLOBAL_MAX_RECONNECT_DELAY = 30_000
+
+function handleGlobalMessage(e: MessageEvent): void {
+  try {
+    const data = JSON.parse(e.data as string) as {
+      type: string
+      threadId?: string
+      status?: "streaming" | "idle"
+    }
+    if (data.type === "thread_status" && data.threadId && data.status) {
+      const { setStatus } = useThreadStatusStore.getState()
+      if (data.status === "idle") {
+        const streamed = getStreamedThreads()
+        setStatus(data.threadId, streamed.has(data.threadId) ? "completed" : "idle")
+      } else {
+        setStatus(data.threadId, data.status)
+      }
+    }
+  } catch (error) {
+    console.error("[thread-status]", error)
+  }
+}
+
+function scheduleGlobalReconnect(): void {
+  if (globalReconnectTimer !== null) return
+  globalReconnectTimer = setTimeout(() => {
+    globalReconnectTimer = null
+    connectGlobalSocket()
+  }, globalReconnectDelay)
+  globalReconnectDelay = Math.min(globalReconnectDelay * 2, GLOBAL_MAX_RECONNECT_DELAY)
+}
+
+function connectGlobalSocket(): void {
+  if (
+    globalSocket?.readyState === WebSocket.CONNECTING ||
+    globalSocket?.readyState === WebSocket.OPEN
+  ) {
+    return
+  }
+
   openGlobalWebSocket()
     .then((socket) => {
-      if (!socket) return
-
-      socket.addEventListener("message", (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data as string) as {
-            type: string
-            threadId?: string
-            status?: "streaming" | "idle"
-          }
-
-          if (data.type === "thread_status" && data.threadId && data.status) {
-            const { setStatus } = useThreadStatusStore.getState()
-            if (data.status === "idle") {
-              const streamed = getStreamedThreads()
-              setStatus(data.threadId, streamed.has(data.threadId) ? "completed" : "idle")
-            } else {
-              setStatus(data.threadId, data.status)
-            }
-          }
-        } catch (error) {
-          console.error("[thread-status]", error)
-        }
+      if (!socket) {
+        scheduleGlobalReconnect()
+        return
+      }
+      globalSocket = socket
+      globalReconnectDelay = 1000
+      socket.addEventListener("message", handleGlobalMessage)
+      socket.addEventListener("close", () => {
+        globalSocket = null
+        scheduleGlobalReconnect()
       })
-
       socket.addEventListener("error", () => {})
     })
-    .catch((error) => {
-      console.debug("[thread-status] WebSocket unavailable:", error)
+    .catch(() => {
+      scheduleGlobalReconnect()
     })
+}
+
+function reconnectGlobalSocketNow(): void {
+  if (globalReconnectTimer !== null) {
+    clearTimeout(globalReconnectTimer)
+    globalReconnectTimer = null
+  }
+  globalReconnectDelay = 1000
+  connectGlobalSocket()
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return
+  if (
+    !globalSocket ||
+    globalSocket.readyState === WebSocket.CLOSED ||
+    globalSocket.readyState === WebSocket.CLOSING
+  ) {
+    reconnectGlobalSocketNow()
+  }
+})
+
+/**
+ * Called once from main.tsx at app startup. Sets up the global WebSocket that
+ * receives real-time thread status updates from the server, and keeps it alive
+ * across laptop sleep/wake cycles.
+ */
+export function initThreadStatusWebSocket(): void {
+  connectGlobalSocket()
+  window.electronAPI?.onSystemResume?.(() => {
+    reconnectGlobalSocketNow()
+  })
 }

@@ -43,6 +43,7 @@ interface ElectronAPI {
   downloadUpdate: () => Promise<void>
   installUpdate: () => Promise<void>
   onUpdateStatusChange: (callback: (status: UpdateStatus) => void) => () => void
+  onSystemResume?: (callback: () => void) => () => void
 }
 
 declare interface Window {

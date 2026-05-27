@@ -69,4 +69,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("update-status-changed", handler);
     return () => ipcRenderer.removeListener("update-status-changed", handler);
   },
+  onSystemResume: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("system-resume", handler);
+    return () => ipcRenderer.removeListener("system-resume", handler);
+  },
 });

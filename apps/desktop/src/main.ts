@@ -5,6 +5,7 @@ import {
   globalShortcut,
   ipcMain,
   nativeImage,
+  powerMonitor,
   shell,
 } from "electron";
 import { fileURLToPath } from "node:url";
@@ -524,6 +525,14 @@ app.whenReady().then(async () => {
 
   await createWindow(splash);
   setupAutoUpdater();
+
+  powerMonitor.on("resume", () => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send("system-resume");
+      }
+    }
+  });
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {

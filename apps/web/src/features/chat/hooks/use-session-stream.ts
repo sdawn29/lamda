@@ -563,22 +563,23 @@ export function useSessionStream({
     doneFlag.current = false
     let ws: WebSocket | null = null
     let unsubscribe: (() => void) | undefined
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
-    openSessionWebSocket(sessionId)
-      .then((socket) => {
-        if (doneFlag.current) {
-          socket?.close()
-          return
-        }
-        if (!socket) {
-          doneFlag.current = true
-          callbacksRef.current.onIsLoadingChange?.(false)
-          return
-        }
+    async function connect() {
+      const socket = await openSessionWebSocket(sessionId)
+      if (doneFlag.current) {
+        socket?.close()
+        return
+      }
+      if (!socket) {
+        doneFlag.current = true
+        callbacksRef.current.onIsLoadingChange?.(false)
+        return
+      }
 
-        ws = socket
+      ws = socket
 
-        unsubscribe = subscribeToSessionEvents(ws, {
+      unsubscribe = subscribeToSessionEvents(ws, {
 
           onAgentStart: () => {
             if (doneFlag.current) return
@@ -752,10 +753,19 @@ export function useSessionStream({
 
           onTransportError: () => {
             if (doneFlag.current) return
-            // Suppress false positives: if the WebSocket closes while no agent
-            // turn is in progress (idle close after agent_end), do nothing.
-            // A real mid-turn disconnect will have agentRunningRef=true.
-            if (!agentRunningRef.current) return
+            if (!agentRunningRef.current) {
+              // Connection dropped while idle (e.g. laptop sleep/wake).
+              // Silently reconnect without surfacing an error to the user.
+              ws?.close()
+              ws = null
+              unsubscribe?.()
+              unsubscribe = undefined
+              reconnectTimer = setTimeout(() => {
+                reconnectTimer = null
+                if (!doneFlag.current) connect().catch(console.debug)
+              }, 2000)
+              return
+            }
             agentRunningRef.current = false
             doneFlag.current = true
             enqueueNow({
@@ -764,13 +774,25 @@ export function useSessionStream({
             })
           },
         })
-      })
-      .catch((err) => {
-        if (doneFlag.current) return
-        doneFlag.current = true
-        callbacksRef.current.onIsLoadingChange?.(false)
-        console.debug("[session-stream] WebSocket unavailable:", err)
-      })
+    }
+
+    connect().catch((err) => {
+      if (doneFlag.current) return
+      doneFlag.current = true
+      callbacksRef.current.onIsLoadingChange?.(false)
+      console.debug("[session-stream] WebSocket unavailable:", err)
+    })
+
+    const handleVisibilityChange = () => {
+      if (document.hidden || doneFlag.current) return
+      if (!ws || (ws.readyState !== WebSocket.CONNECTING && ws.readyState !== WebSocket.OPEN)) {
+        ws = null
+        unsubscribe?.()
+        unsubscribe = undefined
+        if (reconnectTimer === null) connect().catch(console.debug)
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
 
     const pendingToolStart = pendingToolStartRef.current
     return () => {
@@ -778,6 +800,8 @@ export function useSessionStream({
       agentRunningRef.current = false
       sessionDoneFlags.delete(sessionId)
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      if (reconnectTimer !== null) clearTimeout(reconnectTimer)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
       eventQueueRef.current = []
       pendingToolStart.clear()
       unsubscribe?.()
