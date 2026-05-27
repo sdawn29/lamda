@@ -60,7 +60,7 @@ import {
 import { ContextChart } from "./context-chart"
 import { compactSession, type SessionStats } from "../api"
 import { useCommandPalette } from "@/features/command-palette"
-import { useSettingsModal } from "@/features/settings"
+import { DEFAULT_SETTINGS_SECTION } from "@/features/settings"
 import { useTheme } from "@/shared/components/theme-provider"
 
 const THINKING_LEVEL_STORAGE_KEY = "chat:thinking_level"
@@ -165,7 +165,12 @@ export const ChatTextbox = memo(
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const openPalette = useCommandPalette((s) => s.openPalette)
-    const openSettings = useSettingsModal((s) => s.openSettings)
+    const openSettings = React.useCallback(() => {
+      navigate({
+        to: "/settings/$section",
+        params: { section: DEFAULT_SETTINGS_SECTION },
+      })
+    }, [navigate])
     const { resolvedTheme, setTheme } = useTheme()
     const selectedModelId = isControlled ? controlledModelId : internalModelId
     const selectedThinkingLevel = isThinkingControlled

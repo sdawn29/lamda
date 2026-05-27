@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react"
+import { useCallback, useState, useMemo, useRef, useEffect } from "react"
 import {
   GitCommit,
   Loader2,
@@ -7,7 +7,7 @@ import {
   Settings2,
   ChevronDown,
 } from "lucide-react"
-import { useSettingsModal } from "@/features/settings"
+import { useNavigate } from "@tanstack/react-router"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Button } from "@/shared/ui/button"
 import {
@@ -192,7 +192,10 @@ function WorkflowButton({
 
 export function CommitInputSection({ sessionId }: { sessionId: string }) {
   const [message, setMessage] = useState("")
-  const { openSettings } = useSettingsModal()
+  const navigate = useNavigate()
+  const openSettings = useCallback(() => {
+    navigate({ to: "/settings/$section", params: { section: "git" } })
+  }, [navigate])
   const { data: settings } = useAppSettings()
 
   const { data: statusData, isLoading: loading } = useGitStatus(sessionId)

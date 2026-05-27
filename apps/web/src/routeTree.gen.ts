@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as WorkspaceThreadIdRouteImport } from './routes/workspace.$threadId'
+import { Route as SettingsSectionRouteImport } from './routes/settings.$section'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -29,43 +31,71 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const WorkspaceThreadIdRoute = WorkspaceThreadIdRouteImport.update({
   id: '/workspace/$threadId',
   path: '/workspace/$threadId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsSectionRoute = SettingsSectionRouteImport.update({
+  id: '/$section',
+  path: '/$section',
+  getParentRoute: () => SettingsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
+  '/settings/$section': typeof SettingsSectionRoute
   '/workspace/$threadId': typeof WorkspaceThreadIdRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
-  '/settings': typeof SettingsRoute
+  '/settings/$section': typeof SettingsSectionRoute
   '/workspace/$threadId': typeof WorkspaceThreadIdRoute
+  '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/new': typeof NewRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
+  '/settings/$section': typeof SettingsSectionRoute
   '/workspace/$threadId': typeof WorkspaceThreadIdRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/new' | '/settings' | '/workspace/$threadId'
+  fullPaths:
+    | '/'
+    | '/new'
+    | '/settings'
+    | '/settings/$section'
+    | '/workspace/$threadId'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/new' | '/settings' | '/workspace/$threadId'
-  id: '__root__' | '/' | '/new' | '/settings' | '/workspace/$threadId'
+  to: '/' | '/new' | '/settings/$section' | '/workspace/$threadId' | '/settings'
+  id:
+    | '__root__'
+    | '/'
+    | '/new'
+    | '/settings'
+    | '/settings/$section'
+    | '/workspace/$threadId'
+    | '/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NewRoute: typeof NewRoute
-  SettingsRoute: typeof SettingsRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
   WorkspaceThreadIdRoute: typeof WorkspaceThreadIdRoute
 }
 
@@ -92,6 +122,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/workspace/$threadId': {
       id: '/workspace/$threadId'
       path: '/workspace/$threadId'
@@ -99,13 +136,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkspaceThreadIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/$section': {
+      id: '/settings/$section'
+      path: '/$section'
+      fullPath: '/settings/$section'
+      preLoaderRoute: typeof SettingsSectionRouteImport
+      parentRoute: typeof SettingsRoute
+    }
   }
 }
+
+interface SettingsRouteChildren {
+  SettingsSectionRoute: typeof SettingsSectionRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsSectionRoute: SettingsSectionRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NewRoute: NewRoute,
-  SettingsRoute: SettingsRoute,
+  SettingsRoute: SettingsRouteWithChildren,
   WorkspaceThreadIdRoute: WorkspaceThreadIdRoute,
 }
 export const routeTree = rootRouteImport

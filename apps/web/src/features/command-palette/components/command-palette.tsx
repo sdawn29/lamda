@@ -38,7 +38,7 @@ import { useTerminalForWorkspace } from "@/features/terminal"
 import { useMainTabs } from "@/features/main-tabs"
 import { useRightSidebar } from "@/features/layout"
 import { useSidebar } from "@/shared/ui/sidebar"
-import { useSettingsModal } from "@/features/settings"
+import { DEFAULT_SETTINGS_SECTION } from "@/features/settings"
 import { useTheme } from "@/shared/components/theme-provider"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
@@ -61,7 +61,12 @@ export function CommandPalette() {
   const { isOpen: rightSidebarOpen, isFileTreeOpen, togglePanel } = useRightSidebar()
   const { addFileTab } = useMainTabs()
   const { toggleSidebar } = useSidebar()
-  const { openSettings } = useSettingsModal()
+  const openSettings = useCallback(() => {
+    navigate({
+      to: "/settings/$section",
+      params: { section: DEFAULT_SETTINGS_SECTION },
+    })
+  }, [navigate])
   const { theme, setTheme } = useTheme()
 
   const activeWorkspace =

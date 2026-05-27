@@ -3,7 +3,6 @@ import {
   ServerUnavailable,
   useElectronServerStatus,
 } from "@/features/electron"
-import { SettingsModal, ConfigureProviderModal } from "@/features/settings"
 import { WorkspaceProvider } from "@/features/workspace"
 import { WorkspaceLayout } from "@/features/layout"
 import { ErrorBoundary } from "@/shared/components/error-boundary"
@@ -25,8 +24,6 @@ function RootLayoutGate() {
   return (
     <WorkspaceProvider>
       <RootLayoutInner />
-      <SettingsModal />
-      <ConfigureProviderModal />
     </WorkspaceProvider>
   )
 }

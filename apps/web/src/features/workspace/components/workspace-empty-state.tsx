@@ -1,8 +1,8 @@
 import { useState } from "react"
 import { Bot, CheckCircle2, GitBranch, SquareTerminal } from "lucide-react"
+import { useNavigate } from "@tanstack/react-router"
 
 import { Button } from "@/shared/ui/button"
-import { useConfigureProvider } from "@/features/settings"
 import { useProviders, useOAuthProviders } from "@/features/settings/queries"
 import { CreateWorkspaceDialog } from "./create-workspace-dialog"
 import { useCreateWorkspaceAction } from "../context"
@@ -95,7 +95,7 @@ function StepRow({
 export function WorkspaceEmptyState() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const { handleCreateLocal, handleCreateRemote } = useCreateWorkspaceAction()
-  const { openConfigure } = useConfigureProvider()
+  const navigate = useNavigate()
   const hasProvider = useHasProvider()
 
   return (
@@ -129,7 +129,12 @@ export function WorkspaceEmptyState() {
               title="Connect an AI provider"
               description="Add an API key or sign in with OAuth to power the coding agent."
               done={hasProvider}
-              action={() => openConfigure("api-keys")}
+              action={() =>
+                navigate({
+                  to: "/settings/$section",
+                  params: { section: "api-keys" },
+                })
+              }
               actionLabel="Set up provider"
             />
             <StepRow

@@ -51,7 +51,7 @@ import { Button } from "@/shared/ui/button"
 import { useWorkspace, useCreateWorkspaceAction } from "../context"
 import { useThreadStatus } from "@/features/chat"
 import type { Thread } from "../context"
-import { useSettingsModal } from "@/features/settings"
+import { DEFAULT_SETTINGS_SECTION } from "@/features/settings"
 import { useMainTabs } from "@/features/main-tabs"
 import { useCommandPalette } from "@/features/command-palette"
 import { ArchivedThreadsDialog } from "./archived-threads-dialog"
@@ -224,7 +224,12 @@ export function AppSidebar() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const navigate = useNavigate()
-  const { openSettings } = useSettingsModal()
+  const openSettings = useCallback(() => {
+    navigate({
+      to: "/settings/$section",
+      params: { section: DEFAULT_SETTINGS_SECTION },
+    })
+  }, [navigate])
   const openPalette = useCommandPalette((state) => state.openPalette)
   const { pendingThreadIds } = useMainTabs()
 

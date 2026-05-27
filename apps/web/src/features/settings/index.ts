@@ -1,6 +1,9 @@
-export { SettingsPage } from "./components/settings-page"
-export { SettingsModal } from "./components/settings-modal"
-export { useSettingsModal } from "./store"
-export { useConfigureProvider } from "./configure-provider-store"
-export { ConfigureProviderModal } from "./components/configure-provider-modal"
-export type { ConfigureProviderTab } from "./configure-provider-store"
+export { SettingsLayout, SettingsContent } from "./components/settings-layout"
+export {
+  DEFAULT_SETTINGS_SECTION,
+  findSettingsSection,
+  matchesSearch,
+  SETTINGS_GROUPS,
+  SETTINGS_SECTIONS,
+} from "./sections"
+export type { SettingsSectionMeta, SettingsGroupId } from "./sections"

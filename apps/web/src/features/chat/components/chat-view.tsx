@@ -52,7 +52,6 @@ import {
   useRevertToMessage,
 } from "../mutations"
 import { useModels } from "../queries"
-import { useConfigureProvider } from "@/features/settings"
 import { ThinkingIndicator } from "./thinking-indicator"
 import { CompactingIndicator } from "./compacting-indicator"
 import { ChatErrorAlert } from "./chat-error-alert"
@@ -337,7 +336,6 @@ export function ChatView({
   const rootPath = activeWorkspace?.path
   const openWithAppId = activeWorkspace?.openWithAppId
   const { data: models, isLoading: modelsLoading } = useModels()
-  const { openConfigure } = useConfigureProvider()
   const noProvider = !modelsLoading && !models?.models?.length
   const pendingPreferences = getPendingThreadPreferences(threadId)
   const initialSelectedModelId = pendingPreferences?.modelId ?? initialModelId
@@ -1106,7 +1104,12 @@ export function ChatView({
               size="sm"
               variant="outline"
               className="h-7 shrink-0 border-amber-500/30 text-xs hover:bg-amber-500/10"
-              onClick={() => openConfigure("subscriptions")}
+              onClick={() =>
+                navigate({
+                  to: "/settings/$section",
+                  params: { section: "subscriptions" },
+                })
+              }
             >
               Configure provider
             </Button>

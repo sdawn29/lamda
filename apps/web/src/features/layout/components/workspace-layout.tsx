@@ -7,7 +7,13 @@ import React, {
   useState,
   useSyncExternalStore,
 } from "react"
-import { Outlet, useParams, useRouter, useSearch } from "@tanstack/react-router"
+import {
+  Outlet,
+  useLocation,
+  useParams,
+  useRouter,
+  useSearch,
+} from "@tanstack/react-router"
 import { ChevronLeft, ChevronRight, PanelRight } from "lucide-react"
 
 import { AppSidebar, useWorkspace } from "@/features/workspace"
@@ -220,6 +226,8 @@ export function MainContentArea() {
 }
 
 export function WorkspaceLayout() {
+  const { pathname } = useLocation()
+  const isSettingsRoute = pathname.startsWith("/settings")
   const { isLoading, workspaces } = useWorkspace()
   const { threadId: activeThreadId } = useParams({ strict: false }) as {
     threadId?: string
@@ -306,8 +314,6 @@ export function WorkspaceLayout() {
     [terminalHeight]
   )
 
-  const isEmptyState = !activeThreadId
-
   usePrefetchThreadsMessages()
 
   const { ws: newThreadWsId } = useSearch({ strict: false }) as { ws?: string }
@@ -375,6 +381,14 @@ export function WorkspaceLayout() {
     SHORTCUT_ACTIONS.TOGGLE_FILE_TREE,
     rsWorkspacePath ? toggleFileTree : null
   )
+
+  if (isSettingsRoute) {
+    return (
+      <TooltipProvider>
+        <Outlet />
+      </TooltipProvider>
+    )
+  }
 
   if (isLoading) {
     return <SplashScreen />
