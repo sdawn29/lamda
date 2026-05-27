@@ -290,7 +290,10 @@ export function TitleBar() {
               <Button
                 variant="ghost"
                 onClick={() => setMcpDialogOpen(true)}
-                className="h-7 gap-1.5 px-2"
+                className={cn(
+                  "h-7 text-muted-foreground",
+                  mcpConnectedCount > 0 ? "gap-1.5 px-2" : "w-7"
+                )}
               >
                 <Server className="size-4 shrink-0" />
                 {mcpConnectedCount > 0 && (

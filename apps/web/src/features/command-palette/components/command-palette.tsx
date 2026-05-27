@@ -10,6 +10,7 @@ import {
   SunIcon,
   MoonIcon,
   MessageSquareIcon,
+  RefreshCwIcon,
   Loader2,
 } from "lucide-react"
 import {
@@ -277,6 +278,13 @@ export function CommandPalette() {
             >
               {theme === "dark" ? <SunIcon /> : <MoonIcon />}
               {theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            </CommandItem>
+            <CommandItem
+              value="reload window refresh"
+              onSelect={() => run(() => window.location.reload())}
+            >
+              <RefreshCwIcon />
+              Reload Window
             </CommandItem>
           </CommandGroup>
         </CommandList>
