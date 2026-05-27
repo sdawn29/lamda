@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { openGlobalWebSocket } from "./api"
+import { queryClient } from "@/shared/lib/query-client"
 
 export type ThreadStatus = "streaming" | "completed" | "idle" | "error"
 
@@ -107,6 +108,16 @@ export function useSetActiveThreadId() {
   return useThreadStatusStore.getState().setActiveThreadId
 }
 
+// ── Workspace file update pub/sub ─────────────────────────────────────────────
+
+type WorkspaceFileUpdateListener = (workspaceId: string) => void
+const workspaceFileUpdateListeners = new Set<WorkspaceFileUpdateListener>()
+
+export function subscribeToWorkspaceFileUpdates(fn: WorkspaceFileUpdateListener): () => void {
+  workspaceFileUpdateListeners.add(fn)
+  return () => workspaceFileUpdateListeners.delete(fn)
+}
+
 // ── WebSocket bootstrap ───────────────────────────────────────────────────────
 
 let globalSocket: WebSocket | null = null
@@ -120,6 +131,7 @@ function handleGlobalMessage(e: MessageEvent): void {
       type: string
       threadId?: string
       status?: "streaming" | "idle"
+      workspaceId?: string
     }
     if (data.type === "thread_status" && data.threadId && data.status) {
       const { setStatus } = useThreadStatusStore.getState()
@@ -129,6 +141,10 @@ function handleGlobalMessage(e: MessageEvent): void {
       } else {
         setStatus(data.threadId, data.status)
       }
+    }
+    if (data.type === "workspace_files_updated" && data.workspaceId) {
+      queryClient.invalidateQueries({ queryKey: ["workspace-files", data.workspaceId] })
+      for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
     }
   } catch (error) {
     console.error("[thread-status]", error)

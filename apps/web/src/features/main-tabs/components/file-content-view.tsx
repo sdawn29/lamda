@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, memo } from "react"
+import { useEffect, useMemo, useState, useCallback, memo } from "react"
 import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { FileHeader } from "@/features/git/components/file-header"
@@ -17,6 +17,7 @@ import {
   useDocumentSymbols,
 } from "@/features/lsp"
 import { useChatActions } from "@/features/chat/contexts/chat-actions-context"
+import { subscribeToWorkspaceFileUpdates } from "@/features/chat/thread-status-store"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -55,6 +56,15 @@ export const FileContentView = memo(function FileContentView({
 
   const workspaceId = useResolveWorkspaceId(workspacePath)
   const lsp = useLspConnection(workspaceId)
+
+  const [fileRefreshKey, setFileRefreshKey] = useState(0)
+  const incrementRefreshKey = useCallback(() => setFileRefreshKey(k => k + 1), [])
+  useEffect(() => {
+    if (!workspaceId) return
+    return subscribeToWorkspaceFileUpdates((id) => {
+      if (id === workspaceId) incrementRefreshKey()
+    })
+  }, [workspaceId, incrementRefreshKey])
 
   const { data: platform } = useElectronPlatform()
   const isMac = platform === "darwin"
@@ -183,7 +193,7 @@ export const FileContentView = memo(function FileContentView({
     return () => {
       cancelled = true
     }
-  }, [filePath, isImage])
+  }, [filePath, isImage, fileRefreshKey])
 
   if (loading) {
     return (
