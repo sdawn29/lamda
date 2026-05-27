@@ -3,7 +3,9 @@ import {
   AlertCircleIcon,
   CheckIcon,
   ChevronRightIcon,
+  CircleDotIcon,
   CopyIcon,
+  ListTodoIcon,
 } from "lucide-react"
 import { FileIcon } from "@/shared/ui/file-icon"
 import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
@@ -218,6 +220,49 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
     }
   }, [])
+
+  // Todo tool: render as a tiny inline pill — the full state lives in TodoPanel
+  // above the input, so we don't duplicate the card here.
+  if (normalizedToolName === "todo") {
+    const todoOp = (typeof msg.args === "object" && msg.args !== null)
+      ? (msg.args as Record<string, unknown>).operation as string | undefined
+      : undefined
+    return (
+      <div
+        className={cn("flex items-center gap-1.5 text-xs", isNew && "animate-chat-message-in")}
+        style={isNew && entryDelayMs > 0 ? { animationDelay: `${entryDelayMs}ms` } : undefined}
+      >
+        {msg.status === "running" ? (
+          <CircleDotIcon className="h-3 w-3 shrink-0 animate-pulse text-blue-500/60" />
+        ) : msg.status === "error" ? (
+          <AlertCircleIcon className="h-3 w-3 shrink-0 text-destructive/60" />
+        ) : (
+          <ListTodoIcon className="h-3 w-3 shrink-0 text-muted-foreground/30" />
+        )}
+        <span
+          className={cn(
+            msg.status === "running"
+              ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground/70 to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
+              : msg.status === "error"
+                ? "text-destructive/60"
+                : "text-muted-foreground/35",
+          )}
+        >
+          {msg.status === "running"
+            ? todoOp === "create" ? "Creating tasks…"
+            : todoOp === "update" ? "Updating task…"
+            : todoOp === "delete" ? "Removing task…"
+            : "Loading tasks…"
+          : msg.status === "error"
+            ? "todo failed"
+            : todoOp === "create" ? "Tasks created"
+            : todoOp === "update" ? "Task updated"
+            : todoOp === "delete" ? "Task removed"
+            : "Tasks"}
+        </span>
+      </div>
+    )
+  }
 
   // Plan-mode writes get a custom card with Review + Implement CTAs.
   // Must come after the hooks above to keep call order stable.

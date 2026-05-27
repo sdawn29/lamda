@@ -15,7 +15,7 @@ import {
   updateThreadStopped,
   updateThreadLastAccessed,
 } from "@lamda/db";
-import { createPlanModeTools, isMode, type Mode } from "@lamda/pi-sdk";
+import { createPlanModeTools, createTodoTool, isMode, type Mode } from "@lamda/pi-sdk";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import {
@@ -113,10 +113,12 @@ threads.patch("/thread/:id/mode", async (c) => {
     const entry = store.get(session.sessionId);
     if (entry) {
       const customTools = entry.workspaceId
-        ? await collectCustomTools(entry.workspaceId, entry.cwd, mode)
+        ? await collectCustomTools(entry.workspaceId, entry.cwd, mode, threadId)
         : mode === "plan"
           ? createPlanModeTools(entry.cwd)
-          : [];
+          : mode === "ask"
+            ? []
+            : [createTodoTool(threadId)];
       session.handle.setCustomTools(customTools);
     }
     session.handle.setMode(mode);

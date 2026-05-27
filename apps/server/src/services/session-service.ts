@@ -2,6 +2,7 @@ import {
   createManagedSession,
   openManagedSession,
   createPlanModeTools,
+  createTodoTool,
   PLAN_DIR,
   type SdkConfig,
 } from "@lamda/pi-sdk";
@@ -19,10 +20,12 @@ async function buildSessionCustomTools(
   const thread = getThread(threadId);
   const mode = thread?.mode as SdkConfig["mode"] | undefined;
   const customTools = workspaceId
-    ? await collectCustomTools(workspaceId, cwd, mode)
+    ? await collectCustomTools(workspaceId, cwd, mode, threadId)
     : mode === "plan"
       ? createPlanModeTools(cwd)
-      : undefined;
+      : mode === "ask"
+        ? []
+        : [createTodoTool(threadId)];
 
   return { customTools, mode };
 }
@@ -123,10 +126,13 @@ export async function collectCustomTools(
   workspaceId: string,
   workspacePath: string,
   mode?: SdkConfig["mode"],
+  threadId?: string,
 ) {
   if (mode === "plan" || mode === "ask") {
     return mode === "plan" ? createPlanModeTools(workspacePath) : [];
   }
+
+  const todoTool = threadId ? createTodoTool(threadId) : null;
 
   const [mcpTools, lspTools] = await Promise.all([
     import("./mcp-service.js")
@@ -142,7 +148,7 @@ export async function collectCustomTools(
         return [];
       }),
   ]);
-  return [...mcpTools, ...lspTools];
+  return [...(todoTool ? [todoTool] : []), ...mcpTools, ...lspTools];
 }
 
 export async function refreshWorkspaceSessionTools(workspaceId: string) {
@@ -155,7 +161,7 @@ export async function refreshWorkspaceSessionTools(workspaceId: string) {
 
     const thread = getThread(threadId);
     const mode = thread?.mode as SdkConfig["mode"] | undefined;
-    const tools = await collectCustomTools(workspaceId, ws.path, mode);
+    const tools = await collectCustomTools(workspaceId, ws.path, mode, threadId);
     handle.setCustomTools(tools);
 
     if (mode) {

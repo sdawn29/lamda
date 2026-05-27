@@ -76,41 +76,41 @@
 
 /* ── Jellybeans Light ─────────────────────────────────────────────── */
 :root {
-  /* ── Base: warm parchment page background (avg L 238) ── */
-  --background: #f3efe8;
-  --foreground: #1c1916;
+  /* ── Base: clean near-white neutral page background ── */
+  --background: #f7f7f5;
+  --foreground: #1c1c1c;
 
-  /* ── Card: elevated warm surface (avg L 230, step −8) ── */
-  --card: #ede7de;
-  --card-foreground: #1c1916;
+  /* ── Card: elevated neutral surface (step −7) ── */
+  --card: #f0f0ed;
+  --card-foreground: #1c1c1c;
 
   /* ── Popover: same as card ── */
-  --popover: #ede7de;
-  --popover-foreground: #1c1916;
+  --popover: #f0f0ed;
+  --popover-foreground: #1c1c1c;
 
-  /* ── Secondary: recessed inputs / nested panels (avg L 216, step −14) ── */
-  --secondary: #e0d9cf;
-  --secondary-foreground: #1c1916;
+  /* ── Secondary: recessed inputs / nested panels (step −8) ── */
+  --secondary: #e8e8e4;
+  --secondary-foreground: #1c1c1c;
 
-  /* ── Muted: disabled / faded areas (avg L 204, step −12) ── */
-  --muted: #d4cdc4;
-  --muted-foreground: #5c5854;
+  /* ── Muted: disabled / faded areas (step −8) ── */
+  --muted: #dcdcd8;
+  --muted-foreground: #6b6b6b;
 
-  /* ── Accent: hover / selection highlight (avg L 192, step −12) ── */
-  --accent: #c8c1b7;
-  --accent-foreground: #1c1916;
+  /* ── Accent: hover / selection highlight (step −8) ── */
+  --accent: #d0d0cb;
+  --accent-foreground: #1c1c1c;
 
   /* ── Primary (jellybeans steel blue) ── */
   --primary: #1a4080;
-  --primary-foreground: #f3efe8;
+  --primary-foreground: #f7f7f5;
 
   /* ── Destructive (jellybeans error red) ── */
   --destructive: #902020;
 
   /* ── Border: subtle separator between bg and card ── */
   /* ── Input: outline for form fields (between secondary and muted) ── */
-  --border: #e7e1d8;
-  --input: #dad3ca;
+  --border: #eaeae7;
+  --input: #e2e2de;
   --ring: #1a4080;
 
   /* ── Charts (jellybeans syntax colors, darkened for light bg) ── */
@@ -123,14 +123,14 @@
   /* ── Radius ── */
   --radius: 0.5rem;
 
-  /* ── Sidebar: distinct panel, darker than content area (avg L 225) ── */
-  --sidebar: #e8e2d9;
-  --sidebar-foreground: #1c1916;
+  /* ── Sidebar: distinct panel, slightly darker than content area ── */
+  --sidebar: #ededea;
+  --sidebar-foreground: #1c1c1c;
   --sidebar-primary: #1a4080;
-  --sidebar-primary-foreground: #f3efe8;
-  --sidebar-accent: #ddd7ce;
-  --sidebar-accent-foreground: #1c1916;
-  --sidebar-border: #d4cec5;
+  --sidebar-primary-foreground: #f7f7f5;
+  --sidebar-accent: #e5e5e1;
+  --sidebar-accent-foreground: #1c1c1c;
+  --sidebar-border: #dcdcd8;
   --sidebar-ring: #1a4080;
 }
 

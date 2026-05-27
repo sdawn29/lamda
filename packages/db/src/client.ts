@@ -136,6 +136,25 @@ function createDb() {
       created_at   INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS thread_todo_goals (
+      id          TEXT PRIMARY KEY,
+      thread_id   TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      status      TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'completed')),
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_at  INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS thread_todos (
+      id         TEXT PRIMARY KEY,
+      thread_id  TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+      goal_id    TEXT,
+      content    TEXT NOT NULL,
+      status     TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'in_progress', 'completed')),
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS agent_turns (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id      TEXT NOT NULL,
@@ -163,6 +182,9 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS mcp_servers_workspace_idx ON mcp_servers(workspace_id);
     CREATE INDEX IF NOT EXISTS agent_turns_thread_idx ON agent_turns(thread_id);
     CREATE INDEX IF NOT EXISTS agent_turn_files_turn_idx ON agent_turn_files(turn_id);
+    CREATE INDEX IF NOT EXISTS thread_todo_goals_thread_idx ON thread_todo_goals(thread_id, sort_order, created_at);
+    CREATE INDEX IF NOT EXISTS thread_todos_thread_idx ON thread_todos(thread_id, sort_order, created_at);
+    CREATE INDEX IF NOT EXISTS thread_todos_goal_idx ON thread_todos(goal_id);
   `);
 
   // Migration: Add env column to workspaces table.
@@ -266,6 +288,16 @@ function createDb() {
     }
   } catch (e) {
     // Migration may fail if table already has correct schema or on first run — safe to ignore.
+  }
+
+  // Migration: Add goal_id column to thread_todos table.
+  try {
+    const todoCols = sqlite.prepare("PRAGMA table_info(thread_todos)").all() as { name: string }[];
+    if (!todoCols.some((col) => col.name === "goal_id")) {
+      sqlite.exec(`ALTER TABLE thread_todos ADD COLUMN goal_id TEXT`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist or table doesn't exist yet.
   }
 
   return db;

@@ -107,6 +107,38 @@ export const agentTurnFiles = sqliteTable("agent_turn_files", {
   wasCreatedByTurn: integer("was_created_by_turn", { mode: "boolean" }).notNull().default(false),
 })
 
+// ── Thread Todo Goals ─────────────────────────────────────────────────────────
+
+export const threadTodoGoals = sqliteTable("thread_todo_goals", {
+  id: text("id").primaryKey(),
+  threadId: text("thread_id")
+    .notNull()
+    .references(() => threads.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  status: text("status", { enum: ["active", "completed"] })
+    .notNull()
+    .default("active"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+})
+
+// ── Thread Todos ──────────────────────────────────────────────────────────────
+
+export const threadTodos = sqliteTable("thread_todos", {
+  id: text("id").primaryKey(),
+  threadId: text("thread_id")
+    .notNull()
+    .references(() => threads.id, { onDelete: "cascade" }),
+  /** Nullable for legacy rows; always set for new rows. */
+  goalId: text("goal_id"),
+  content: text("content").notNull(),
+  status: text("status", { enum: ["pending", "in_progress", "completed"] })
+    .notNull()
+    .default("pending"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+})
+
 // ── MCP Servers ───────────────────────────────────────────────────────────────
 
 export const workspaceTasks = sqliteTable("workspace_tasks", {

@@ -19,6 +19,7 @@ export const BUILTIN_TOOL_NAMES = [
   "write",
   "plan_read",
   "plan_write",
+  "todo",
   "grep",
   "find",
   "ls",
@@ -55,8 +56,14 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
   code: {
     label: "Code",
     description: "Full coding agent. Can edit, write, and run shell commands.",
-    preamble: "",
-    allowedBuiltins: ["read", "bash", "edit", "write", "grep", "find", "ls"],
+    preamble:
+      "You are a skilled software engineer. For any task that involves more than 2–3 steps, use the `todo` tool to plan and track your work before you begin:\n\n" +
+      "1. Call `todo` with operation=`create` to list every step you plan to take.\n" +
+      "2. Before starting each step, call `todo` with operation=`update` to mark it `in_progress`.\n" +
+      "3. When a step is done, mark it `completed`.\n" +
+      "4. Keep todos updated so the user always knows current progress.\n\n" +
+      "Simple, single-step tasks do not need todos. Use your judgement — when in doubt, use todos.",
+    allowedBuiltins: ["read", "bash", "edit", "write", "todo", "grep", "find", "ls"],
     allowCustomTools: true,
   },
 };

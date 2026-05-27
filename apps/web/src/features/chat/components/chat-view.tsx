@@ -88,6 +88,7 @@ import { forkSession, listMessages } from "../api"
 import { blocksToMessages, type MessageBlock } from "../types"
 import { workspaceKeys } from "@/features/workspace/queries"
 import { MESSAGES_PAGE_SIZE, type MessagesInfiniteData } from "../queries"
+import { TodoPanel } from "./todo-panel"
 
 type MessageGroup =
   | {
@@ -1246,6 +1247,10 @@ export function ChatView({
             </Button>
           </div>
         )}
+
+        <div className="mx-auto w-full max-w-3xl shrink-0 bg-background px-6 pb-2">
+          <TodoPanel messages={visibleMessages} />
+        </div>
 
         <div className="mx-auto w-full max-w-3xl shrink-0 bg-background px-6 py-2">
           <ChatTextbox
