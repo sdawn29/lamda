@@ -7,6 +7,7 @@ import {
   type WorkspaceFileEntry,
 } from "@lamda/db";
 import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
+import { gitStatusBroadcaster } from "../git-status-broadcaster.js";
 
 const EXCLUDED_DIRS = new Set([
   ".git",
@@ -18,6 +19,8 @@ interface WorkspaceState {
   path: string;
   index: Map<string, WorkspaceFileEntry>;
   watcher: FSWatcher | null;
+  gitWatcher: FSWatcher | null;
+  gitStatusTimer: ReturnType<typeof setTimeout> | null;
   pendingPaths: Set<string>;
   pendingFullScan: boolean;
   flushTimer: ReturnType<typeof setTimeout> | null;
@@ -61,6 +64,8 @@ class WorkspaceIndexer {
       path: workspacePath,
       index: new Map(),
       watcher: null,
+      gitWatcher: null,
+      gitStatusTimer: null,
       pendingPaths: new Set(),
       pendingFullScan: false,
       flushTimer: null,
@@ -75,6 +80,7 @@ class WorkspaceIndexer {
 
     this.workspaces.set(workspaceId, state);
     this.attachWatcher(workspaceId, state);
+    this.attachGitWatcher(workspaceId, state);
     this.queueFullScan(workspaceId, state);
   }
 
@@ -89,10 +95,12 @@ class WorkspaceIndexer {
     const state = this.workspaces.get(workspaceId);
     if (!state) return;
     if (state.flushTimer) clearTimeout(state.flushTimer);
+    if (state.gitStatusTimer) clearTimeout(state.gitStatusTimer);
     if (state.watcher) {
-      try {
-        state.watcher.close();
-      } catch {}
+      try { state.watcher.close(); } catch {}
+    }
+    if (state.gitWatcher) {
+      try { state.gitWatcher.close(); } catch {}
     }
     this.workspaces.delete(workspaceId);
     // Shut down any LSP servers spawned for this workspace.
@@ -142,6 +150,9 @@ class WorkspaceIndexer {
             state.pendingPaths.add(rel);
           }
           this.scheduleFlush(workspaceId, state, FLUSH_DEBOUNCE_MS);
+          // Any working-tree change may affect git status (content modifications,
+          // new untracked files, deletions) — broadcast even if file presence didn't change.
+          this.scheduleGitStatusBroadcast(workspaceId, state);
         },
       );
       watcher.on("error", (err) => {
@@ -151,6 +162,32 @@ class WorkspaceIndexer {
     } catch (err) {
       console.error(`[workspace-indexer] could not watch ${state.path}:`, err);
     }
+  }
+
+  private attachGitWatcher(workspaceId: string, state: WorkspaceState): void {
+    const gitDir = join(state.path, ".git");
+    try {
+      const watcher = watch(
+        gitDir,
+        { recursive: true, persistent: false },
+        () => {
+          // Any .git change (index, HEAD, refs) means staging/commit/branch state changed.
+          this.scheduleGitStatusBroadcast(workspaceId, state);
+        },
+      );
+      watcher.on("error", () => {});
+      state.gitWatcher = watcher;
+    } catch {
+      // Not a git repo or .git doesn't exist — silently skip.
+    }
+  }
+
+  private scheduleGitStatusBroadcast(workspaceId: string, state: WorkspaceState): void {
+    if (state.gitStatusTimer) return;
+    state.gitStatusTimer = setTimeout(() => {
+      state.gitStatusTimer = null;
+      gitStatusBroadcaster.broadcast(workspaceId);
+    }, FLUSH_DEBOUNCE_MS);
   }
 
   private scheduleFlush(

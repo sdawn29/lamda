@@ -57,7 +57,13 @@ function computeHistoricalDuration(messages: WorkingMessage[]): number {
   if (starts.length > 0 && ends.length > 0) {
     return Math.max(...ends) - Math.min(...starts)
   }
-  return tools.reduce((sum, t) => sum + (t.duration ?? 0), 0)
+  const toolDuration = tools.reduce((sum, t) => sum + (t.duration ?? 0), 0)
+  if (toolDuration > 0) return toolDuration
+
+  // Thinking-only block: use responseTime from assistant messages
+  return messages
+    .filter((m): m is AssistantMessage => m.role === "assistant")
+    .reduce((sum, a) => sum + (a.responseTime ?? 0), 0)
 }
 
 export const WorkingBlock = memo(function WorkingBlock({
@@ -167,7 +173,7 @@ export const WorkingBlock = memo(function WorkingBlock({
           ) : displayDuration > 0 ? (
             `Worked for ${formatDuration(displayDuration)}`
           ) : (
-            "Worked"
+            "Worked briefly"
           )}
         </span>
 

@@ -704,6 +704,8 @@ export function useSessionStream({
             // Skip if a fetch is already in-flight — the response will reflect the latest state.
             if (queryClient.getQueryState(gitKeys.turns(sessionId))?.fetchStatus === "fetching") return
             void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
+            void queryClient.invalidateQueries({ queryKey: gitKeys.status(sessionId) })
+            void queryClient.invalidateQueries({ queryKey: gitKeys.diffStat(sessionId) })
           },
 
           onPlanSaved: (data) => {

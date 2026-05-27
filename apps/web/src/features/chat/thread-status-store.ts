@@ -146,6 +146,12 @@ function handleGlobalMessage(e: MessageEvent): void {
       queryClient.invalidateQueries({ queryKey: ["workspace-files", data.workspaceId] })
       for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
     }
+    if (data.type === "git_status_changed") {
+      // Invalidates all mounted git queries (status, diffs, diff stats).
+      // React Query only refetches queries that are currently rendered,
+      // so this won't cause unnecessary network requests for inactive sessions.
+      void queryClient.invalidateQueries({ queryKey: ["git"] })
+    }
   } catch (error) {
     console.error("[thread-status]", error)
   }
