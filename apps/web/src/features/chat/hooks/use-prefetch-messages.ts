@@ -52,6 +52,12 @@ export function usePrefetchThreadsMessages() {
               syncEngine.saveMessages(sessionId, serverMessages)
               const currentWs = workspacesRef.current
               if (currentWs.some((w) => w.threads.some((t) => t.sessionId === sessionId))) {
+                // Guard: don't overwrite if the WS stream or a live refetch has already
+                // written more messages than what the server snapshot contains.
+                // (Same guard as the "no local data" path below.)
+                const existingCached = queryClient.getQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId))
+                const existingCount = (existingCached?.pages ?? []).flatMap((p) => p.messages).length
+                if (existingCount > serverMessages.length) return
                 queryClient.setQueryData(
                   messagesQueryKey(sessionId),
                   makeInfiniteSeed(serverMessages, hasMore, oldestBlockIndex)

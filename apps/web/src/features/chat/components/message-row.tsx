@@ -210,11 +210,12 @@ export function getMessageKey(message: Message, index: number): string {
   )
     return message.id
   if (message.role === "tool") return `tool-${message.toolCallId}`
-  // Prefer DB id when present — stable across prepends & remounts.
+  // Prefer DB id when present — stable across prepends & remounts and unique
+  // even when two messages share the same millisecond-precision createdAt.
   if (message.role === "user" && message.id) return `user-${message.id}`
+  if (message.role === "assistant" && message.id) return `assistant-${message.id}`
   // Streaming messages have no id yet — fall back to createdAt + role, then index.
-  // createdAt is sufficiently unique for messages that have it; index covers
-  // the in-flight optimistic / streaming message that has neither id nor createdAt.
+  // index covers the in-flight optimistic/streaming message that has neither.
   if (message.createdAt != null) return `${message.role}-t${message.createdAt}`
   return `${message.role}-i${index}`
 }

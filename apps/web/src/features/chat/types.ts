@@ -17,6 +17,8 @@ export interface UserMessage {
 
 export interface AssistantMessage {
   role: "assistant"
+  /** DB block id — present on persisted messages, absent on streaming */
+  id?: string
   content: string
   thinking: string
   model?: string
@@ -207,6 +209,7 @@ export function blockToMessage(block: MessageBlock): Message {
     case "assistant":
       return {
         role: "assistant",
+        id: block.id,
         content: block.content ?? "",
         thinking: block.thinking ?? "",
         model: block.model ?? undefined,

@@ -9,7 +9,7 @@ import {
   fetchSessionStats,
   fetchSessionStatus,
 } from "./api"
-import { blocksToMessages, type MessageBlock, type Message } from "./types"
+import { blocksToMessages, type MessageBlock, type Message, type ToolMessage } from "./types"
 import {
   getChatSyncEngine,
   loadThreadFromStorage,
@@ -75,10 +75,38 @@ export function updateLastPageMessages(
   }
 }
 
-/** Flatten all pages into a single chronological message list. */
+/** Flatten all pages into a single chronological message list.
+ *
+ * Tool messages are deduplicated by toolCallId, keeping the LAST occurrence.
+ * This guards against the multi-page edge case where `upsertToolMessage` (which
+ * only operates on the last page) misses a same-ID entry in an older page and
+ * inserts a second copy, causing React key collisions in WorkingBlock.
+ */
 export function getMessagesFromInfinite(data: MessagesInfiniteData | undefined): Message[] {
   if (!data) return []
-  return data.pages.flatMap((p) => p.messages)
+  const flat = data.pages.flatMap((p) => p.messages)
+
+  // Fast path: no pages or a single page (the common case during streaming).
+  if (data.pages.length <= 1) return flat
+
+  // Build a map of toolCallId → last index so we can filter out earlier dupes.
+  const toolLastIndex = new Map<string, number>()
+  for (let i = 0; i < flat.length; i++) {
+    const m = flat[i]
+    if (m.role === "tool") toolLastIndex.set((m as ToolMessage).toolCallId, i)
+  }
+
+  // If every tool call id is unique there's nothing to filter.
+  const hasDupes = flat.some(
+    (m, i) => m.role === "tool" && toolLastIndex.get((m as ToolMessage).toolCallId) !== i
+  )
+  if (!hasDupes) return flat
+
+  return flat.filter((m, i) => {
+    if (m.role !== "tool") return true
+    // Keep only the last (most up-to-date) entry for each toolCallId.
+    return toolLastIndex.get((m as ToolMessage).toolCallId) === i
+  })
 }
 
 export function useInfiniteMessages(sessionId: string) {

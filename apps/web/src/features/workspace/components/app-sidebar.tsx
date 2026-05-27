@@ -284,36 +284,198 @@ export function AppSidebar() {
       .filter((t) => t.isPinned && !pendingThreadIds.has(t.id))
       .map((t) => ({ ...t, workspaceId: ws.id, workspaceName: ws.name }))
   )
+  const pinnedWorkspaces = workspaces
+    .filter((ws) => ws.isPinned)
+    .sort((a, b) => a.createdAt - b.createdAt)
+  const unpinnedWorkspaces = workspaces
+    .filter((ws) => !ws.isPinned)
+    .sort((a, b) => a.createdAt - b.createdAt)
 
-  return (
-    <Sidebar collapsible="offcanvas">
-      <SidebarHeader className="h-11 shrink-0 p-0" />
-      <SidebarContent className="overflow-hidden">
-        {/* Pinned threads section */}
-        {pinnedThreads.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Pinned</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {pinnedThreads.map((thread) => (
+  const renderWorkspaceItem = (ws: (typeof workspaces)[0]) => (
+    <SidebarMenuItem key={ws.id} className="group/ws">
+      <SidebarMenuButton
+        onClick={() => {
+          setCollapsed((prev) => ({
+            ...prev,
+            [ws.id]: !prev[ws.id],
+          }))
+        }}
+        tooltip={ws.name}
+      >
+        <span className="text-foreground/80">{ws.name}</span>
+      </SidebarMenuButton>
+
+      {/* Workspace options */}
+      <DropdownMenu>
+        <SidebarMenuAction
+          showOnHover
+          className="right-7"
+          render={<DropdownMenuTrigger />}
+        >
+          <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground/60 transition-colors hover:text-foreground" />
+          <span className="sr-only">Workspace options</span>
+        </SidebarMenuAction>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onClick={() => openPathMutation.mutate(ws.path)}
+          >
+            <FolderOpen className="mr-2 h-4 w-4" />
+            Find in Finder
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              openWithAppMutation.mutate({
+                workspacePath: ws.path,
+              })
+            }
+          >
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Open in Editor
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setEnvWorkspace(ws)}>
+            <KeyRound className="mr-2 h-4 w-4" />
+            Environment Variables
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              if (ws.isPinned) {
+                void unpinWorkspace(ws.id)
+              } else {
+                void pinWorkspace(ws.id)
+              }
+            }}
+          >
+            <Pin className="mr-2 h-4 w-4" />
+            {ws.isPinned ? "Unpin Workspace" : "Pin Workspace"}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => {
+              setDeleteError(null)
+              setDeletingWorkspace(ws)
+            }}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete Workspace
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* New thread action */}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <SidebarMenuAction
+              showOnHover
+              onClick={() => {
+                setCollapsed((prev) => ({
+                  ...prev,
+                  [ws.id]: false,
+                }))
+                navigate({
+                  to: "/new",
+                  search: { ws: ws.id },
+                })
+              }}
+            >
+              <MessageSquarePlus className="h-3.5 w-3.5 text-muted-foreground/60 transition-colors hover:text-foreground" />
+              <span className="sr-only">New thread</span>
+            </SidebarMenuAction>
+          }
+        />
+        <TooltipContent side="right">
+          New thread{" "}
+          <ShortcutKbd
+            binding={newThreadBinding}
+            className="ml-1 opacity-55"
+          />
+        </TooltipContent>
+      </Tooltip>
+
+      {!collapsed[ws.id] && (
+        ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id)).length > 0 ? (
+          <SidebarMenuSub className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
+            {(() => {
+              const visibleThreads = ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id))
+              const visibleIds = new Set(visibleThreads.map((t) => t.id))
+              const childrenMap = new Map<string, Thread[]>()
+              const rootThreads: Thread[] = []
+              for (const t of visibleThreads) {
+                if (t.forkedFromId && visibleIds.has(t.forkedFromId)) {
+                  const siblings = childrenMap.get(t.forkedFromId) ?? []
+                  siblings.push(t)
+                  childrenMap.set(t.forkedFromId, siblings)
+                } else {
+                  rootThreads.push(t)
+                }
+              }
+              rootThreads.sort((a, b) => b.createdAt - a.createdAt)
+              const renderThread = (thread: Thread, depth: number): React.ReactNode[] => {
+                const children = (childrenMap.get(thread.id) ?? []).slice().sort((a, b) => b.createdAt - a.createdAt)
+                return [
                   <ThreadRow
                     key={thread.id}
                     thread={thread}
-                    workspaceId={thread.workspaceId}
+                    workspaceId={ws.id}
                     isActive={activeThreadId === thread.id}
+                    depth={depth}
                     onClick={() => {
                       navigate({
                         to: "/workspace/$threadId",
                         params: { threadId: thread.id },
                       })
                     }}
-                  />
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+                  />,
+                  ...children.flatMap((child) => renderThread(child, depth + 1)),
+                ]
+              }
+              const flattened = rootThreads.flatMap((thread) =>
+                renderThread(thread, 0)
+              )
+              const isExpanded = expandedThreadLists[ws.id] ?? false
+              const visibleThreadRows = isExpanded
+                ? flattened
+                : flattened.slice(0, 5)
 
+              return (
+                <>
+                  {visibleThreadRows}
+                  {flattened.length > 5 && (
+                    <SidebarMenuSubItem>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-[1.625rem] h-auto px-1 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() =>
+                          setExpandedThreadLists((prev) => ({
+                            ...prev,
+                            [ws.id]: !isExpanded,
+                          }))
+                        }
+                      >
+                        {isExpanded ? "Show less" : "Show more"}
+                      </Button>
+                    </SidebarMenuSubItem>
+                  )}
+                </>
+              )
+            })()}
+          </SidebarMenuSub>
+        ) : (
+          <div className="animate-in mx-2 my-1 rounded-md px-2 py-1.5 text-center duration-150 fade-in-0 slide-in-from-top-1">
+            <span className="text-[11px] text-muted-foreground/60">
+              No threads
+            </span>
+          </div>
+        )
+      )}
+    </SidebarMenuItem>
+  )
+
+  return (
+    <Sidebar collapsible="offcanvas">
+      <SidebarHeader className="h-11 shrink-0 p-0" />
+      <SidebarContent className="overflow-hidden">
         {workspaces.length > 0 && (
           <div className="px-2 pb-1">
             <Button
@@ -348,6 +510,32 @@ export function AppSidebar() {
               />
             </Button>
           </div>
+        )}
+
+        {/* Pinned section: pinned workspaces + pinned threads */}
+        {(pinnedWorkspaces.length > 0 || pinnedThreads.length > 0) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Pinned</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {pinnedWorkspaces.map(renderWorkspaceItem)}
+                {pinnedThreads.map((thread) => (
+                  <ThreadRow
+                    key={thread.id}
+                    thread={thread}
+                    workspaceId={thread.workspaceId}
+                    isActive={activeThreadId === thread.id}
+                    onClick={() => {
+                      navigate({
+                        to: "/workspace/$threadId",
+                        params: { threadId: thread.id },
+                      })
+                    }}
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
 
         <SidebarGroup className="group/workspaces flex min-h-0 flex-1 flex-col">
@@ -393,192 +581,7 @@ export function AppSidebar() {
                   </Button>
                 </div>
               ) : (
-                [...workspaces]
-                  .sort((a, b) => {
-                    if (a.isPinned && !b.isPinned) return -1
-                    if (!a.isPinned && b.isPinned) return 1
-                    return a.createdAt - b.createdAt
-                  })
-                  .map((ws) => (
-                  <SidebarMenuItem key={ws.id} className="group/ws">
-                    <SidebarMenuButton
-                      onClick={() => {
-                        setCollapsed((prev) => ({
-                          ...prev,
-                          [ws.id]: !prev[ws.id],
-                        }))
-                      }}
-                      tooltip={ws.name}
-                    >
-                      <span className="text-foreground/80">{ws.name}</span>
-                    </SidebarMenuButton>
-
-                    {/* New thread action */}
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <SidebarMenuAction
-                            showOnHover
-                            className="right-7"
-                            onClick={() => {
-                              setCollapsed((prev) => ({
-                                ...prev,
-                                [ws.id]: false,
-                              }))
-                              navigate({
-                                to: "/new",
-                                search: { ws: ws.id },
-                              })
-                            }}
-                          >
-                            <MessageSquarePlus className="h-3.5 w-3.5 text-muted-foreground/60 transition-colors hover:text-foreground" />
-                            <span className="sr-only">New thread</span>
-                          </SidebarMenuAction>
-                        }
-                      />
-                      <TooltipContent side="right">
-                        New thread{" "}
-                        <ShortcutKbd
-                          binding={newThreadBinding}
-                          className="ml-1 opacity-55"
-                        />
-                      </TooltipContent>
-                    </Tooltip>
-
-                    {/* Workspace options */}
-                    <DropdownMenu>
-                      <SidebarMenuAction
-                        showOnHover
-                        render={<DropdownMenuTrigger />}
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground/60 transition-colors hover:text-foreground" />
-                        <span className="sr-only">Workspace options</span>
-                      </SidebarMenuAction>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => openPathMutation.mutate(ws.path)}
-                        >
-                          <FolderOpen className="mr-2 h-4 w-4" />
-                          Find in Finder
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            openWithAppMutation.mutate({
-                              workspacePath: ws.path,
-                            })
-                          }
-                        >
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          Open in Editor
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setEnvWorkspace(ws)}>
-                          <KeyRound className="mr-2 h-4 w-4" />
-                          Environment Variables
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            if (ws.isPinned) {
-                              void unpinWorkspace(ws.id)
-                            } else {
-                              void pinWorkspace(ws.id)
-                            }
-                          }}
-                        >
-                          <Pin className="mr-2 h-4 w-4" />
-                          {ws.isPinned ? "Unpin Workspace" : "Pin Workspace"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => {
-                            setDeleteError(null)
-                            setDeletingWorkspace(ws)
-                          }}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Workspace
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    {!collapsed[ws.id] && (
-                      ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id)).length > 0 ? (
-                        <SidebarMenuSub className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
-                          {(() => {
-                            const visibleThreads = ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id))
-                            const visibleIds = new Set(visibleThreads.map((t) => t.id))
-                            const childrenMap = new Map<string, Thread[]>()
-                            const rootThreads: Thread[] = []
-                            for (const t of visibleThreads) {
-                              if (t.forkedFromId && visibleIds.has(t.forkedFromId)) {
-                                const siblings = childrenMap.get(t.forkedFromId) ?? []
-                                siblings.push(t)
-                                childrenMap.set(t.forkedFromId, siblings)
-                              } else {
-                                rootThreads.push(t)
-                              }
-                            }
-                            rootThreads.sort((a, b) => b.createdAt - a.createdAt)
-                            const renderThread = (thread: Thread, depth: number): React.ReactNode[] => {
-                              const children = (childrenMap.get(thread.id) ?? []).slice().sort((a, b) => b.createdAt - a.createdAt)
-                              return [
-                                <ThreadRow
-                                  key={thread.id}
-                                  thread={thread}
-                                  workspaceId={ws.id}
-                                  isActive={activeThreadId === thread.id}
-                                  depth={depth}
-                                  onClick={() => {
-                                    navigate({
-                                      to: "/workspace/$threadId",
-                                      params: { threadId: thread.id },
-                                    })
-                                  }}
-                                />,
-                                ...children.flatMap((child) => renderThread(child, depth + 1)),
-                              ]
-                            }
-                            const flattened = rootThreads.flatMap((thread) =>
-                              renderThread(thread, 0)
-                            )
-                            const isExpanded = expandedThreadLists[ws.id] ?? false
-                            const visibleThreadRows = isExpanded
-                              ? flattened
-                              : flattened.slice(0, 5)
-
-                            return (
-                              <>
-                                {visibleThreadRows}
-                                {flattened.length > 5 && (
-                                  <SidebarMenuSubItem>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="ml-[1.625rem] h-auto px-1 py-0.5 text-xs text-muted-foreground hover:text-foreground"
-                                      onClick={() =>
-                                        setExpandedThreadLists((prev) => ({
-                                          ...prev,
-                                          [ws.id]: !isExpanded,
-                                        }))
-                                      }
-                                    >
-                                      {isExpanded ? "Show less" : "Show more"}
-                                    </Button>
-                                  </SidebarMenuSubItem>
-                                )}
-                              </>
-                            )
-                          })()}
-                        </SidebarMenuSub>
-                      ) : (
-                        <div className="animate-in mx-2 my-1 rounded-md px-2 py-1.5 text-center duration-150 fade-in-0 slide-in-from-top-1">
-                          <span className="text-[11px] text-muted-foreground/60">
-                            No threads
-                          </span>
-                        </div>
-                      )
-                    )}
-                  </SidebarMenuItem>
-                ))
+                unpinnedWorkspaces.map(renderWorkspaceItem)
               )}
             </SidebarMenu>
           </SidebarGroupContent>

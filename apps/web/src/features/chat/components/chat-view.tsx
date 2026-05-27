@@ -659,8 +659,9 @@ export function ChatView({
           keys[i] = `working-tool-${firstMsg.toolCallId}`
         } else if (firstMsg?.role === "assistant") {
           const a = firstMsg as AssistantMessage
-          keys[i] =
-            a.createdAt != null
+          keys[i] = a.id
+            ? `working-assistant-id${a.id}`
+            : a.createdAt != null
               ? `working-assistant-t${a.createdAt}`
               : `working-assistant-i${group.startIndex}`
         } else {

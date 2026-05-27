@@ -33,9 +33,13 @@ function upsertToolMessage(
 function mergeRunningTools(messages: Message[], runningTools: Message[]): Message[] {
   if (runningTools.length === 0) return messages
 
+  // Check ALL existing tool messages regardless of status — not just running ones.
+  // The async listRunningTools fetch in onAgentStart can resolve after tool_start +
+  // tool_end have already been processed (completing the tool). Filtering only for
+  // status === "running" would miss the completed entry and insert a duplicate.
   const existingIds = new Set(
     messages
-      .filter((m): m is ToolMessage => m.role === "tool" && m.status === "running")
+      .filter((m): m is ToolMessage => m.role === "tool")
       .map((m) => m.toolCallId)
   )
 
