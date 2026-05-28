@@ -46,6 +46,10 @@ export function updateWorkspaceOpenWithApp(id: string, openWithAppId: string | n
   db.update(workspaces).set({ openWithAppId }).where(eq(workspaces.id, id)).run()
 }
 
+export function updateWorkspaceIcon(id: string, iconPath: string | null) {
+  db.update(workspaces).set({ icon: iconPath }).where(eq(workspaces.id, id)).run()
+}
+
 export function updateWorkspaceEnv(id: string, env: Record<string, string> | null) {
   db.update(workspaces).set({ env: env ? JSON.stringify(env) : null }).where(eq(workspaces.id, id)).run()
 }

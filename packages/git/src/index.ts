@@ -27,7 +27,7 @@ async function getTrackedNumstat(cwd: string): Promise<string> {
   try {
     const { stdout } = await execFileAsync(
       "git",
-      ["diff", "--numstat", "HEAD"],
+      ["--no-optional-locks", "diff", "--numstat", "HEAD"],
       { cwd, timeout: 5000 },
     );
     return stdout;
@@ -35,7 +35,7 @@ async function getTrackedNumstat(cwd: string): Promise<string> {
     try {
       const { stdout } = await execFileAsync(
         "git",
-        ["diff", "--cached", "--numstat", "--root", EMPTY_TREE_HASH],
+        ["--no-optional-locks", "diff", "--cached", "--numstat", "--root", EMPTY_TREE_HASH],
         { cwd, timeout: 5000 },
       );
       return stdout;
@@ -172,11 +172,13 @@ export async function createBranch(cwd: string, branch: string): Promise<void> {
 
 /** Returns raw `git status --short` output. Uses -uall so untracked files inside
  *  dot-folders (e.g. .claude/) are listed individually rather than as a single
- *  directory entry, which would break diffing and staging. */
+ *  directory entry, which would break diffing and staging.
+ *  --no-optional-locks prevents git from refreshing the stat cache in .git/index,
+ *  which would otherwise trigger the fs.watcher → broadcast → refetch feedback loop. */
 export async function gitStatus(cwd: string): Promise<string> {
   const { stdout } = await execFileAsync(
     "git",
-    ["status", "--short", "-uall"],
+    ["--no-optional-locks", "status", "--short", "-uall"],
     { cwd, timeout: 5000 },
   );
   return stdout;
@@ -192,9 +194,11 @@ export async function gitFileDiff(
   statusCode: string,
 ): Promise<string> {
   const isUntracked = statusCode.trim() === "??" || statusCode.trim() === "U";
+  // --no-optional-locks: prevent stat-cache writes to .git/index that would
+  // re-trigger the fs.watcher → broadcast → refetch feedback loop.
   const args = isUntracked
-    ? ["diff", "--no-index", "--", "/dev/null", filePath]
-    : ["diff", "HEAD", "--", filePath];
+    ? ["--no-optional-locks", "diff", "--no-index", "--", "/dev/null", filePath]
+    : ["--no-optional-locks", "diff", "HEAD", "--", filePath];
   try {
     const { stdout } = await execFileAsync("git", args, {
       cwd,

@@ -5,6 +5,8 @@ import {
   Pencil,
   Trash2,
   Server,
+  Download,
+  RefreshCw,
 } from "lucide-react"
 import {
   useRouter,
@@ -27,7 +29,15 @@ import {
 import { useWorkspace } from "@/features/workspace"
 import { useTerminalForWorkspace } from "@/features/terminal"
 import { useRightSidebar } from "../store/right-sidebar"
-import { useElectronFullscreen, useElectronPlatform } from "@/features/electron"
+import {
+  useElectronFullscreen,
+  useElectronPlatform,
+  useElectronUpdateStatus,
+  useDownloadUpdate,
+  useInstallUpdate,
+  useAutoUpdateCheck,
+  type ElectronUpdateStatus,
+} from "@/features/electron"
 import { OpenWithButton } from "./open-with-button"
 import {
   useShortcutHandler,
@@ -39,6 +49,102 @@ import { McpDialog, useMcpServerStatus } from "@/features/mcp"
 import { TasksDropdown } from "@/features/tasks"
 import { useMainTabs } from "@/features/main-tabs"
 import { cn } from "@/shared/lib/utils"
+
+function UpdateButton({ status }: { status: ElectronUpdateStatus }) {
+  const downloadUpdate = useDownloadUpdate()
+  const installUpdate = useInstallUpdate()
+  const navigate = useNavigate()
+
+  if (status.phase === "available") {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              onClick={() => downloadUpdate.mutate()}
+              disabled={downloadUpdate.isPending}
+            >
+              <Download className="size-3.5 shrink-0" />
+              {status.version ? `v${status.version} available` : "Update available"}
+            </Button>
+          }
+        />
+        <TooltipContent>Download and install the latest version</TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  if (status.phase === "downloading") {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              disabled
+            >
+              <Download className="size-3.5 shrink-0 animate-bounce" />
+              {status.percent != null
+                ? `Downloading… ${Math.round(status.percent)}%`
+                : "Downloading…"}
+            </Button>
+          }
+        />
+        <TooltipContent>Downloading update</TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  if (status.phase === "ready") {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              onClick={() => installUpdate.mutate()}
+            >
+              <RefreshCw className="size-3.5 shrink-0" />
+              Restart to install
+            </Button>
+          }
+        />
+        <TooltipContent>Restart the app to apply the update</TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  if (status.phase === "error") {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs text-destructive border-destructive/40 hover:bg-destructive/10"
+              onClick={() =>
+                navigate({
+                  to: "/settings/$section",
+                  params: { section: "updates" },
+                })
+              }
+            >
+              Update error
+            </Button>
+          }
+        />
+        <TooltipContent>{status.message ?? "Update failed — click for details"}</TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  return null
+}
 
 export function TitleBar() {
   const router = useRouter()
@@ -100,6 +206,10 @@ export function TitleBar() {
   const { data: platform } = useElectronPlatform()
   const { data: isFullscreen = false } = useElectronFullscreen()
   const isMac = platform === "darwin"
+
+  // Auto update check — fires once per week in Electron, no-op in browser.
+  useAutoUpdateCheck()
+  const { data: updateStatus } = useElectronUpdateStatus()
 
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState("")
@@ -279,6 +389,10 @@ export function TitleBar() {
         )}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
+        {updateStatus && updateStatus.phase !== "idle" && updateStatus.phase !== "checking" && (
+          <UpdateButton status={updateStatus} />
+        )}
+
         <TasksDropdown
           workspaceId={actionWorkspace?.id ?? ""}
           onRunTask={runTerminalCommand}

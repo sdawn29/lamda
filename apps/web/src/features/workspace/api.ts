@@ -29,6 +29,8 @@ export interface WorkspaceDto {
   openWithAppId: string | null
   isPinned?: boolean
   env: Record<string, string>
+  /** Relative path of the detected project icon (e.g. "public/favicon.ico"), or null if none found. */
+  icon: string | null
   createdAt: number
   threads: ThreadDto[]
 }

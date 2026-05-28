@@ -2,8 +2,9 @@ import React, { useState, useCallback, useEffect, useRef, memo } from "react"
 import {
   Archive,
   ExternalLink,
-  FolderPlus,
+  Folder,
   FolderOpen,
+  FolderPlus,
   KeyRound,
   Loader2,
   MessageSquarePlus,
@@ -48,6 +49,7 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { useOpenPath, useOpenWorkspaceWithApp } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
+import { apiUrl } from "@/shared/lib/client"
 import { useWorkspace, useCreateWorkspaceAction } from "../context"
 import { useThreadStatus } from "@/features/chat"
 import type { Thread } from "../context"
@@ -84,6 +86,36 @@ function useNow() {
     return () => clearInterval(id)
   }, [])
   return now
+}
+
+function WorkspaceIcon({
+  workspaceId,
+  icon,
+  isCollapsed,
+}: {
+  workspaceId: string
+  icon: string | null
+  isCollapsed: boolean
+}) {
+  const FallbackIcon = isCollapsed ? Folder : FolderOpen
+  if (!icon) return <FallbackIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
+  let src: string
+  try {
+    src = apiUrl(`/workspace/${workspaceId}/icon`)
+  } catch {
+    return <FallbackIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      className="size-3.5 shrink-0 rounded-[2px] object-contain"
+      onError={(e) => {
+        // Fallback: hide the broken image — the parent text label is still visible.
+        ;(e.currentTarget as HTMLImageElement).style.display = "none"
+      }}
+    />
+  )
 }
 
 const ThreadRow = memo(function ThreadRow({
@@ -302,6 +334,7 @@ export function AppSidebar() {
         }}
         tooltip={ws.name}
       >
+        <WorkspaceIcon workspaceId={ws.id} icon={ws.icon ?? null} isCollapsed={!!collapsed[ws.id]} />
         <span className="text-foreground/80">{ws.name}</span>
       </SidebarMenuButton>
 

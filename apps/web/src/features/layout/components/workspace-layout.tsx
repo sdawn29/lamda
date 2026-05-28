@@ -358,7 +358,7 @@ export function WorkspaceLayout() {
   const rsWorkspaceId = rsWorkspace?.id
   const rsWorkspacePath = rsWorkspace?.path
   const rsOpenWithAppId = rsWorkspace?.openWithAppId ?? null
-  const rsReady = !!rsSessionId
+  const rsReady = !!rsSessionId || !!rsWorkspace
 
   // Workspace-stable session for git queries — only changes when the workspace changes,
   // not on every thread switch. Prevents git APIs from re-running when switching between

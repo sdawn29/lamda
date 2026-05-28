@@ -1122,6 +1122,18 @@ export function ChatView({
           className="flex w-full flex-1 flex-col overflow-y-auto pt-4 pb-4 [overflow-anchor:none] [scrollbar-gutter:stable]"
         >
           <div ref={messagesContainerRef}>
+            {/* Load earlier messages button — visible when older history exists and isn't loading */}
+            {hasPreviousPage && !isFetchingPreviousPage && (
+              <div className="flex justify-center py-3">
+                <button
+                  type="button"
+                  onClick={fetchPreviousPage}
+                  className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  Load earlier messages
+                </button>
+              </div>
+            )}
             {/* Spinner while loading older history */}
             {isFetchingPreviousPage && (
               <div className="flex justify-center py-3">

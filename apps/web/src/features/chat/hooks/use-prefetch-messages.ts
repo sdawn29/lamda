@@ -49,7 +49,7 @@ export function usePrefetchThreadsMessages() {
               if (!active) return
               const serverMessages = blocksToMessages(blocks as MessageBlock[])
               const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
-              syncEngine.saveMessages(sessionId, serverMessages)
+              syncEngine.saveMessages(sessionId, serverMessages, { hasMore, oldestBlockIndex })
               const currentWs = workspacesRef.current
               if (currentWs.some((w) => w.threads.some((t) => t.sessionId === sessionId))) {
                 // Guard: don't overwrite if the WS stream or a live refetch has already
@@ -78,7 +78,7 @@ export function usePrefetchThreadsMessages() {
             if (!active) return
             const messages = blocksToMessages(blocks as MessageBlock[])
             const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
-            syncEngine.saveMessages(sessionId, messages)
+            syncEngine.saveMessages(sessionId, messages, { hasMore, oldestBlockIndex })
             const currentWs = workspacesRef.current
             if (currentWs.some((w) => w.threads.some((t) => t.sessionId === sessionId))) {
               // Guard: re-check the cache before writing. If an optimistic message was

@@ -59,6 +59,7 @@ function createDb() {
       path             TEXT NOT NULL,
       open_with_app_id TEXT,
       is_pinned        INTEGER NOT NULL DEFAULT 0,
+      icon             TEXT,
       created_at       INTEGER NOT NULL
     );
 
@@ -298,6 +299,16 @@ function createDb() {
     }
   } catch {
     // Safe to ignore — column may already exist or table doesn't exist yet.
+  }
+
+  // Migration: Add icon column to workspaces table.
+  try {
+    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+    if (!wsCols.some((col) => col.name === "icon")) {
+      sqlite.exec(`ALTER TABLE workspaces ADD COLUMN icon TEXT`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
   }
 
   return db;

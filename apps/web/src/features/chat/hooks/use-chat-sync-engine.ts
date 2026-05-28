@@ -27,6 +27,14 @@ interface StoredThreadData {
   lastSyncedAt: number
   serverVersion: number
   dirty: boolean
+  /** True when the server has more (older) blocks than what is stored here. */
+  hasMore?: boolean
+  /**
+   * blockIndex of the oldest stored block — used as the cursor for
+   * `fetchPreviousPage` after a refresh so pagination can continue.
+   * null means we don't know (old format or no blocks stored).
+   */
+  oldestBlockIndex?: number | null
 }
 
 interface SyncEngineState {
@@ -99,7 +107,8 @@ function cleanOldThreads(keepIds: Set<string>): void {
 export function saveBlocksToStorage(
   sessionId: string,
   blocks: MessageBlock[],
-  serverVersion: number = 0
+  serverVersion: number = 0,
+  pagination?: { hasMore: boolean; oldestBlockIndex: number | null }
 ): void {
   try {
     const data: StoredThreadData = {
@@ -108,6 +117,8 @@ export function saveBlocksToStorage(
       lastSyncedAt: Date.now(),
       serverVersion,
       dirty: false,
+      hasMore: pagination?.hasMore,
+      oldestBlockIndex: pagination?.oldestBlockIndex ?? null,
     }
     
     localStorage.setItem(getStorageKey(sessionId), JSON.stringify(data))
@@ -151,11 +162,12 @@ export function saveBlocksToStorage(
 export function saveMessagesToStorage(
   sessionId: string,
   messages: Message[],
-  serverVersion: number = 0
+  serverVersion: number = 0,
+  pagination?: { hasMore: boolean; oldestBlockIndex: number | null }
 ): void {
   // Convert messages back to blocks for storage
   const blocks = messagesToBlocks(messages)
-  saveBlocksToStorage(sessionId, blocks, serverVersion)
+  saveBlocksToStorage(sessionId, blocks, serverVersion, pagination)
 }
 
 /**
@@ -267,10 +279,18 @@ export function loadBlocksFromStorage(sessionId: string): StoredThreadData | nul
   }
 }
 
-export function loadThreadFromStorage(sessionId: string): { messages: Message[] } | null {
+export function loadThreadFromStorage(sessionId: string): {
+  messages: Message[]
+  hasMore: boolean
+  oldestBlockIndex: number | null
+} | null {
   const stored = loadBlocksFromStorage(sessionId)
   if (!stored) return null
-  return { messages: stored.messages }
+  return {
+    messages: stored.messages,
+    hasMore: stored.hasMore ?? false,
+    oldestBlockIndex: stored.oldestBlockIndex ?? null,
+  }
 }
 
 export function markThreadDirty(sessionId: string): void {
@@ -385,8 +405,12 @@ class ChatSyncEngine {
   /**
    * Save messages to localStorage (converts to blocks)
    */
-  saveMessages(sessionId: string, messages: Message[]): void {
-    saveMessagesToStorage(sessionId, messages)
+  saveMessages(
+    sessionId: string,
+    messages: Message[],
+    pagination?: { hasMore: boolean; oldestBlockIndex: number | null }
+  ): void {
+    saveMessagesToStorage(sessionId, messages, 0, pagination)
   }
 
   /**

@@ -29,3 +29,4 @@ export {
   useSelectFolder,
 } from "./mutations"
 export { ServerUnavailable } from "./server-unavailable"
+export { useAutoUpdateCheck } from "./use-auto-update-check"

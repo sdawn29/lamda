@@ -17,12 +17,13 @@ import {
   messagesQueryKey,
   useSessionStatus,
   updateLastPageMessages,
+  MESSAGES_PAGE_SIZE,
   type MessagesInfiniteData,
 } from "./queries"
-import { dismissSessionError } from "./api"
-import { createErrorMessage } from "./types"
-import type { ErrorMessage, Message } from "./types"
-import { useSetThreadStatus } from "./thread-status-store"
+import { dismissSessionError, listMessages } from "./api"
+import { createErrorMessage, blocksToMessages } from "./types"
+import type { ErrorMessage, Message, UserMessage, MessageBlock } from "./types"
+import { useSetThreadStatus, useThreadStatusStore } from "./thread-status-store"
 import { gitStatusKey, gitKeys } from "@/features/git/queries"
 
 const FILE_MODIFYING_TOOLS = new Set([
@@ -108,7 +109,20 @@ export function useChatStream({
       setPendingError(createErrorMessage(title, message, { retryable, retryCount, action: { type: "dismiss" } }))
       setThreadStatus(threadId, "error")
     }
-  }, [sessionStatus, setThreadStatus, threadId])
+
+    // If the agent finished while we were viewing another thread, the per-session
+    // WebSocket was closed and never delivered the agent_end event, so the messages
+    // cache may be missing the DB-persisted turn. Force a refresh whenever we mount
+    // onto a session that (a) is not running now and (b) was marked "completed" by
+    // the global WebSocket while we were away — exactly the condition where events
+    // were missed.
+    if (!sessionStatus.isRunning) {
+      const storedStatus = useThreadStatusStore.getState().statuses[threadId]
+      if (storedStatus === "completed") {
+        void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+      }
+    }
+  }, [sessionStatus, setThreadStatus, threadId, queryClient, sessionId])
 
   const {
     messages,
@@ -129,7 +143,13 @@ export function useChatStream({
   }, [setThreadStatus, threadId])
 
   const handleToolExecutionEnd = useCallback((toolName: string) => {
-    void queryClient.invalidateQueries({ queryKey: gitKeys.session(sessionId) })
+    // Skip per-file diffs (key[3] === "diff") — N active observers all refetching
+    // on every tool execution end creates a request burst. Diffs are lazily
+    // refreshed when the user expands a file or the statusCode changes.
+    void queryClient.invalidateQueries({
+      queryKey: gitKeys.session(sessionId),
+      predicate: (query) => (query.queryKey as unknown[])[3] !== "diff",
+    })
     void queryClient.invalidateQueries({ queryKey: ["file-tree"] })
     if (isFileModifyingTool(toolName)) {
       void queryClient.refetchQueries({ queryKey: gitStatusKey(sessionId) })
@@ -149,18 +169,48 @@ export function useChatStream({
     onPlanSaved,
   })
 
-  // After the agent finishes, refetch messages so optimistic user message
-  // placeholders (which have no DB id) get replaced with server-persisted
-  // versions that carry an id — required for the fork/revert buttons to appear.
+  // After the agent finishes, replace optimistic user-message placeholders (no
+  // DB id) with server-persisted versions so fork/revert blockIds appear.
   // The 750 ms delay lets the server finish its async DB write before we fetch.
-  // The effect cleanup cancels the timer if the user sends another prompt first.
+  //
+  // We use setQueryData (patching only the last page) instead of invalidateQueries
+  // (which refetches all pages) so that older pages the user has already scrolled
+  // back to load are not dropped from the cache.
   const prevIsLoadingRef = useRef(isLoading)
   useEffect(() => {
     const wasLoading = prevIsLoadingRef.current
     prevIsLoadingRef.current = isLoading
     if (!wasLoading || isLoading) return
     const timer = setTimeout(() => {
-      void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+      listMessages(sessionId, { limit: MESSAGES_PAGE_SIZE })
+        .then(({ blocks }) => {
+          const serverMessages = blocksToMessages(blocks as MessageBlock[])
+          // Build a content-keyed map of server user messages that now have DB ids.
+          const serverUserByContent = new Map<string, UserMessage>()
+          for (const m of serverMessages) {
+            if (m.role === "user" && (m as UserMessage).id) {
+              serverUserByContent.set((m as UserMessage).content, m as UserMessage)
+            }
+          }
+          if (serverUserByContent.size === 0) return
+
+          // Patch only the last (most-recent) page — older pages stay intact.
+          queryClient.setQueryData<MessagesInfiniteData>(
+            messagesQueryKey(sessionId),
+            (prev) =>
+              updateLastPageMessages(prev, (msgs) =>
+                msgs.map((msg): Message => {
+                  if (msg.role !== "user" || (msg as UserMessage).id) return msg
+                  const persisted = serverUserByContent.get((msg as UserMessage).content)
+                  return persisted ?? msg
+                })
+              )
+          )
+        })
+        .catch(() => {
+          // Fall back to a full invalidation if the fetch fails.
+          void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+        })
     }, 750)
     return () => clearTimeout(timer)
   }, [isLoading, queryClient, sessionId])

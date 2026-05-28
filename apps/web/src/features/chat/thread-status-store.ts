@@ -147,10 +147,16 @@ function handleGlobalMessage(e: MessageEvent): void {
       for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
     }
     if (data.type === "git_status_changed") {
-      // Invalidates all mounted git queries (status, diffs, diff stats).
-      // React Query only refetches queries that are currently rendered,
-      // so this won't cause unnecessary network requests for inactive sessions.
-      void queryClient.invalidateQueries({ queryKey: ["git"] })
+      // Invalidates status, diff-stat, turns, branch, ahead-behind, etc. for all
+      // mounted sessions. Skips per-file diffs (key[3] === "diff") — those are
+      // keyed by (sessionId, filePath, statusCode) and are O(N files) active
+      // observers, so broadcasting against all of them on every .git write causes
+      // a request explosion during active agent runs. File diffs become stale
+      // naturally when the status query updates (new statusCode → new query key).
+      void queryClient.invalidateQueries({
+        queryKey: ["git"],
+        predicate: (query) => (query.queryKey as unknown[])[3] !== "diff",
+      })
     }
   } catch (error) {
     console.error("[thread-status]", error)

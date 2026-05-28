@@ -418,7 +418,11 @@ export function useSessionStream({
             void queryClient.invalidateQueries({ queryKey: chatKeys.contextUsage(sessionId) })
             void queryClient.invalidateQueries({ queryKey: chatKeys.sessionStats(sessionId) })
             void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
-            void queryClient.invalidateQueries({ queryKey: gitKeys.session(sessionId) })
+            // Skip per-file diffs (key[3] === "diff") — see use-chat-stream.ts comment.
+            void queryClient.invalidateQueries({
+              queryKey: gitKeys.session(sessionId),
+              predicate: (query) => (query.queryKey as unknown[])[3] !== "diff",
+            })
             void queryClient.invalidateQueries({ queryKey: ["file-tree"] })
           })
           break

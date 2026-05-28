@@ -12,6 +12,7 @@ export const workspaces = sqliteTable("workspaces", {
   openWithAppId: text("open_with_app_id"),
   isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
   env: text("env"), // JSON object: { KEY: "value" }
+  icon: text("icon"), // relative path to detected icon file (e.g. "public/favicon.ico")
   createdAt: integer("created_at").notNull(),
 })
 

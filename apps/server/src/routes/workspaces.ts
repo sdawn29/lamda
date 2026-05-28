@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, access } from "node:fs/promises";
+import { join, extname } from "node:path";
 import {
   listWorkspacesWithThreads,
   getWorkspace,
@@ -10,6 +10,7 @@ import {
   deleteAllWorkspaces,
   updateWorkspaceOpenWithApp,
   updateWorkspaceEnv,
+  updateWorkspaceIcon,
   pinWorkspace,
   unpinWorkspace,
   createWorkspaceTask,
@@ -55,6 +56,63 @@ function parseEnv(env: string | null | undefined): Record<string, string> {
   }
 }
 
+/** Ordered list of relative paths to check for project icons, from most to least specific. */
+const ICON_CANDIDATES = [
+  // Web apps (CRA / Next.js / Vite / etc.)
+  "public/favicon.svg",
+  "public/favicon.ico",
+  "public/favicon.png",
+  "public/apple-touch-icon.png",
+  "public/logo.svg",
+  "public/logo.png",
+  // SvelteKit / static sites
+  "static/favicon.svg",
+  "static/favicon.ico",
+  "static/favicon.png",
+  "static/logo.svg",
+  "static/logo.png",
+  // Electron
+  "assets/icon.png",
+  "assets/icon.icns",
+  "build/icon.png",
+  "resources/icon.png",
+  // Root-level fallbacks
+  "favicon.svg",
+  "favicon.ico",
+  "favicon.png",
+  "logo.svg",
+  "logo.png",
+  // Source assets
+  "src/assets/logo.svg",
+  "src/assets/logo.png",
+  "src/assets/favicon.svg",
+  "src/assets/favicon.ico",
+  "src/assets/favicon.png",
+];
+
+async function detectWorkspaceIcon(workspacePath: string): Promise<string | null> {
+  for (const candidate of ICON_CANDIDATES) {
+    try {
+      await access(join(workspacePath, candidate));
+      return candidate;
+    } catch {
+      // File not found — try next candidate.
+    }
+  }
+  return null;
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  ".ico": "image/x-icon",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".icns": "image/x-icns",
+};
+
 async function createTasksFromPackageScripts(
   workspaceId: string,
   workspacePath: string,
@@ -91,6 +149,7 @@ workspaces.get("/workspaces", (c) => {
     openWithAppId: ws.openWithAppId ?? null,
     isPinned: ws.isPinned ?? false,
     env: parseEnv(ws.env),
+    icon: ws.icon ?? null,
     createdAt: ws.createdAt,
     threads: ws.threads.map((t) => mapThread(t, ws.id)),
   }));
@@ -138,6 +197,10 @@ workspaces.post("/workspace", async (c) => {
 
   workspaceIndexer.startIndexing(workspaceId, body.path);
 
+  // Detect icon and persist it; best-effort — don't fail workspace creation.
+  const detectedIcon = await detectWorkspaceIcon(body.path).catch(() => null);
+  if (detectedIcon) updateWorkspaceIcon(workspaceId, detectedIcon);
+
   return c.json(
     {
       workspace: {
@@ -147,6 +210,7 @@ workspaces.post("/workspace", async (c) => {
         openWithAppId: null,
         isPinned: false,
         env: {},
+        icon: detectedIcon,
         threads: [],
       },
     },
@@ -237,6 +301,32 @@ workspaces.patch("/workspace/:id/unpin", (c) => {
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
   unpinWorkspace(workspaceId);
   return c.json({ ok: true });
+});
+
+/** Serves the detected icon file for a workspace (e.g. favicon.ico / logo.svg). */
+workspaces.get("/workspace/:id/icon", async (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  if (!ws.icon) return c.json({ error: "No icon for this workspace" }, 404);
+
+  const iconPath = join(ws.path, ws.icon);
+  let data: Buffer;
+  try {
+    data = await readFile(iconPath);
+  } catch {
+    return c.json({ error: "Icon file not found on disk" }, 404);
+  }
+
+  const ext = extname(iconPath).toLowerCase();
+  const contentType = MIME_BY_EXT[ext] ?? "application/octet-stream";
+
+  return new Response(data, {
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=3600",
+    },
+  });
 });
 
 export default workspaces;

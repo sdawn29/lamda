@@ -1,4 +1,4 @@
-import { useQuery, useInfiniteQuery } from "@tanstack/react-query"
+import { useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query"
 import type { InfiniteData } from "@tanstack/react-query"
 import {
   listMessages,
@@ -47,7 +47,7 @@ export const chatKeys = {
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 
-export const MESSAGES_PAGE_SIZE = 50
+export const MESSAGES_PAGE_SIZE = 100
 
 export const messagesQueryKey = (sessionId: string) =>
   chatKeys.messages(sessionId)
@@ -111,6 +111,7 @@ export function getMessagesFromInfinite(data: MessagesInfiniteData | undefined):
 
 export function useInfiniteMessages(sessionId: string) {
   const syncEngine = getChatSyncEngine()
+  const queryClient = useQueryClient()
 
   return useInfiniteQuery<
     MessagesPage,
@@ -127,10 +128,21 @@ export function useInfiniteMessages(sessionId: string) {
       })
       const messages = blocksToMessages(blocks as MessageBlock[])
       const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
-      // Persist the first (most-recent) page so the next thread switch is instant.
+
       if (pageParam === undefined) {
-        syncEngine.saveMessages(sessionId, messages)
+        // Initial (most-recent) page — persist it immediately.
+        syncEngine.saveMessages(sessionId, messages, { hasMore, oldestBlockIndex })
+      } else {
+        // An older page was just loaded (fetchPreviousPage). Persist the full
+        // set — this page + the already-cached newer pages — so that after a
+        // refresh the user sees all previously-loaded blocks, not just the
+        // most-recent 100.
+        const existing = queryClient.getQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId))
+        const newerMessages = existing ? existing.pages.flatMap((p) => p.messages) : []
+        const allMessages = [...messages, ...newerMessages]
+        syncEngine.saveMessages(sessionId, allMessages, { hasMore, oldestBlockIndex })
       }
+
       return { messages, hasMore, oldestBlockIndex }
     },
     initialPageParam: undefined,
@@ -140,15 +152,25 @@ export function useInfiniteMessages(sessionId: string) {
         ? firstPage.oldestBlockIndex
         : undefined,
     getNextPageParam: () => undefined, // WS stream handles new messages
-    // Always return a valid InfiniteData — never undefined.
-    // When initialData returns undefined, TQ v5 creates { pages: undefined, pageParams: undefined }
-    // which causes getNextPageParam to crash on pages.length.
+    // Seed from localStorage immediately (no network wait).
+    //
+    // We restore ALL stored messages in one page so that after a refresh
+    // the user sees their full history without having to scroll/click.
+    // The server refetch (triggered automatically because initialData is
+    // always considered stale) will replace the last page with fresh DB
+    // content; if there are blocks older than what's stored, the
+    // "Load earlier messages" button will appear then.
     initialData: (): MessagesInfiniteData => {
       const stored = loadThreadFromStorage(sessionId)
       const storedMsgs = stored?.messages ?? []
-      const msgs = storedMsgs.slice(-MESSAGES_PAGE_SIZE)
       return {
-        pages: [{ messages: msgs, hasMore: storedMsgs.length > MESSAGES_PAGE_SIZE, oldestBlockIndex: null }],
+        pages: [{
+          messages: storedMsgs,
+          // Use stored hasMore / oldestBlockIndex so that pagination can resume
+          // immediately (the button shows up before the server responds).
+          hasMore: stored?.hasMore ?? false,
+          oldestBlockIndex: stored?.oldestBlockIndex ?? null,
+        }],
         pageParams: [undefined],
       }
     },
