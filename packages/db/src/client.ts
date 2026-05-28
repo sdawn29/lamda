@@ -7,13 +7,16 @@ import * as schema from "./schema.js";
 
 const APP_DATA_DIR_NAME = ".lamda-code";
 const LEGACY_APP_DATA_DIR_NAME = ".lambda-code";
-const DB_FILENAME = "db-v2.sqlite";
+const LEGACY_DB_FILENAME = "db-v2.sqlite";
+const DB_FILENAME =
+  process.env.NODE_ENV === "development" ? "db-dev.sqlite" : "db.sqlite";
 
 function resolveDbPath(): string {
   const homeDir = homedir();
   const dir = join(homeDir, APP_DATA_DIR_NAME);
   const legacyDir = join(homeDir, LEGACY_APP_DATA_DIR_NAME);
 
+  // Migrate legacy directory name (.lambda-code → .lamda-code).
   if (!existsSync(dir) && existsSync(legacyDir)) {
     try {
       renameSync(legacyDir, dir);
@@ -23,7 +26,20 @@ function resolveDbPath(): string {
   }
 
   mkdirSync(dir, { recursive: true });
-  return join(dir, DB_FILENAME);
+
+  const dbPath = join(dir, DB_FILENAME);
+
+  // Migrate legacy db filename (db-v2.sqlite → db.sqlite / db-dev.sqlite).
+  const legacyDbPath = join(dir, LEGACY_DB_FILENAME);
+  if (!existsSync(dbPath) && existsSync(legacyDbPath)) {
+    try {
+      renameSync(legacyDbPath, dbPath);
+    } catch {
+      return legacyDbPath;
+    }
+  }
+
+  return dbPath;
 }
 
 export const dbPath = resolveDbPath();

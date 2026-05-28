@@ -1,17 +1,13 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 
 import { DEFAULT_SETTINGS_SECTION } from "@/features/settings"
 
 export const Route = createFileRoute("/settings/")({
-  component: SettingsIndex,
+  beforeLoad: () => {
+    throw redirect({
+      to: "/settings/$section",
+      params: { section: DEFAULT_SETTINGS_SECTION },
+      replace: true,
+    })
+  },
 })
-
-function SettingsIndex() {
-  return (
-    <Navigate
-      to="/settings/$section"
-      params={{ section: DEFAULT_SETTINGS_SECTION }}
-      replace
-    />
-  )
-}

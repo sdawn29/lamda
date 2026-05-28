@@ -1,4 +1,4 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 
 import {
   DEFAULT_SETTINGS_SECTION,
@@ -30,23 +30,24 @@ const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
 }
 
 export const Route = createFileRoute("/settings/$section")({
+  beforeLoad: ({ params }) => {
+    const section = findSettingsSection(params.section)
+    const Component = SECTION_COMPONENTS[params.section]
+    if (!section || !Component) {
+      throw redirect({
+        to: "/settings/$section",
+        params: { section: DEFAULT_SETTINGS_SECTION },
+        replace: true,
+      })
+    }
+  },
   component: SettingsSectionRoute,
 })
 
 function SettingsSectionRoute() {
   const { section: slug } = Route.useParams()
-  const section = findSettingsSection(slug)
-  const Component = SECTION_COMPONENTS[slug]
-
-  if (!section || !Component) {
-    return (
-      <Navigate
-        to="/settings/$section"
-        params={{ section: DEFAULT_SETTINGS_SECTION }}
-        replace
-      />
-    )
-  }
+  const section = findSettingsSection(slug)!
+  const Component = SECTION_COMPONENTS[slug]!
 
   return (
     <SettingsContent section={section}>

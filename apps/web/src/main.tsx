@@ -2,7 +2,7 @@ import { StrictMode } from "react"
 import ReactDOM from "react-dom/client"
 import {
   RouterProvider,
-  createHashHistory,
+  createMemoryHistory,
   createRouter,
 } from "@tanstack/react-router"
 import { QueryClientProvider } from "@tanstack/react-query"
@@ -20,7 +20,7 @@ import { initThreadStatusWebSocket } from "./features/chat/thread-status-store"
 
 initThreadStatusWebSocket()
 
-const router = createRouter({ routeTree, history: createHashHistory() })
+const router = createRouter({ routeTree, history: createMemoryHistory() })
 
 // Register the router instance for type safety
 declare module "@tanstack/react-router" {
