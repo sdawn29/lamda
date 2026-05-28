@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.0](../../releases/tag/v0.7.0) — 2026-05-28
+
+### Features
+
+* update routing to use memory history and enhance settings redirection logic
+* **workspaces:** add workspace icon detection and management feat(chat): implement pagination for message history loading feat(chat): enhance message storage with pagination support feat(electron): add auto-update check functionality refactor(git): optimize git command execution with no-optional-locks
+* enhance message handling and workspace management in chat components
+* **CommandPalette:** add reload window option to command palette
+* add settings sections for appearance, chat, subscriptions, api keys, git, shortcuts, lsp, retry, updates, and data management
+* **todos:** implement todo tool and integrate with thread management
+* implement git status broadcasting and update related components
+* **FileChangesCard:** filter displayed files based on git status and update file handling logic feat(FileContentView): subscribe to workspace file updates for real-time file refresh
+* implement system resume handling with WebSocket reconnection and update API
+
+### Code Refactoring
+
+* improve performance and readability in various components
+
 ## [0.6.0](../../releases/tag/v0.6.0) — 2026-05-26
 
 ### Features
