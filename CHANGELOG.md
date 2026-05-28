@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.1](../../releases/tag/v0.7.1) — 2026-05-28
+
+### Features
+
+* **assets:** update application icons for desktop
+
 ## [0.7.0](../../releases/tag/v0.7.0) — 2026-05-28
 
 ### Features
