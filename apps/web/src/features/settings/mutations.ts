@@ -7,9 +7,17 @@ import {
   startOAuthLogin,
   updateProviders,
   updateAppSetting,
+  saveLocalProvider,
+  deleteLocalProvider,
   type ProviderKeys,
+  type LocalProviderConfig,
 } from "./api"
-import { appSettingsQueryKey, oauthProvidersQueryKey, providersQueryKey } from "./queries"
+import {
+  appSettingsQueryKey,
+  oauthProvidersQueryKey,
+  providersQueryKey,
+  localProvidersQueryKey,
+} from "./queries"
 import { modelsQueryKey } from "@/features/chat/queries"
 
 export function useUpdateAppSetting() {
@@ -42,6 +50,29 @@ export function useUpdateProviders() {
     mutationFn: (providers: ProviderKeys) => updateProviders(providers),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: providersQueryKey })
+      queryClient.invalidateQueries({ queryKey: modelsQueryKey })
+    },
+  })
+}
+
+export function useSaveLocalProvider() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, config }: { id: string; config: LocalProviderConfig }) =>
+      saveLocalProvider(id, config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: localProvidersQueryKey })
+      queryClient.invalidateQueries({ queryKey: modelsQueryKey })
+    },
+  })
+}
+
+export function useDeleteLocalProvider() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteLocalProvider(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: localProvidersQueryKey })
       queryClient.invalidateQueries({ queryKey: modelsQueryKey })
     },
   })

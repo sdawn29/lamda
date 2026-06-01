@@ -9,6 +9,7 @@ import { AppearanceSection } from "@/features/settings/sections/appearance"
 import { ChatSection } from "@/features/settings/sections/chat"
 import { SubscriptionsSection } from "@/features/settings/sections/subscriptions"
 import { ApiKeysSection } from "@/features/settings/sections/api-keys"
+import { LocalModelsSection } from "@/features/settings/sections/local-models"
 import { GitSection } from "@/features/settings/sections/git"
 import { ShortcutsSection } from "@/features/settings/sections/shortcuts"
 import { LspSection } from "@/features/settings/sections/lsp"
@@ -21,6 +22,7 @@ const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
   chat: ChatSection,
   subscriptions: SubscriptionsSection,
   "api-keys": ApiKeysSection,
+  "local-models": LocalModelsSection,
   git: GitSection,
   shortcuts: ShortcutsSection,
   lsp: LspSection,

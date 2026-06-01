@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Palette,
   RefreshCw,
+  Server,
 } from "lucide-react"
 
 export interface SettingsSectionMeta {
@@ -105,6 +106,27 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
       "provider",
       "secret",
       "token",
+    ],
+  },
+  {
+    slug: "local-models",
+    label: "Local Models",
+    title: "Local Models",
+    description:
+      "Connect local model servers like Ollama, LM Studio, or vLLM.",
+    icon: Server,
+    group: "providers",
+    keywords: [
+      "local",
+      "ollama",
+      "lm studio",
+      "lmstudio",
+      "vllm",
+      "offline",
+      "models.json",
+      "custom provider",
+      "base url",
+      "self-hosted",
     ],
   },
   {

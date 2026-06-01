@@ -1047,7 +1047,7 @@ export const ReviewPanel = memo(function ReviewPanel({
       <div className="flex h-full w-full flex-col bg-transparent">
         {/* Tab bar — only shown when viewing source control */}
         {!activeFileTab && (
-          <div className="flex h-9 shrink-0 items-center gap-0.5 bg-transparent px-1">
+          <div className="flex h-11 shrink-0 items-center gap-0.5 bg-transparent px-1">
             {/* View selector for source-control content */}
             <DropdownMenu>
               <DropdownMenuTrigger

@@ -32,6 +32,65 @@ export async function updateProviders(providers: ProviderKeys): Promise<void> {
   })
 }
 
+// ── Local model providers (models.json) ────────────────────────────────────────
+
+export type LocalProviderApi =
+  | "openai-completions"
+  | "openai-responses"
+  | "anthropic-messages"
+  | "google-generative-ai"
+
+export interface LocalModelConfig {
+  id: string
+  name?: string
+  reasoning?: boolean
+  input?: ("text" | "image")[]
+  contextWindow?: number
+  maxTokens?: number
+  compat?: Record<string, unknown>
+}
+
+export interface LocalProviderConfig {
+  baseUrl: string
+  api: LocalProviderApi
+  apiKey?: string
+  headers?: Record<string, string>
+  authHeader?: boolean
+  compat?: Record<string, unknown>
+  models: LocalModelConfig[]
+}
+
+export type LocalProviders = Record<string, LocalProviderConfig>
+
+export async function fetchLocalProviders(
+  signal?: AbortSignal,
+): Promise<{ providers: LocalProviders; error?: string }> {
+  return apiFetch<{ providers: LocalProviders; error?: string }>(
+    "/local-providers",
+    { signal },
+  )
+}
+
+export async function saveLocalProvider(
+  id: string,
+  config: LocalProviderConfig,
+): Promise<{ error?: string }> {
+  return apiFetch<{ ok: boolean; error?: string }>(
+    `/local-providers/${encodeURIComponent(id)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config),
+    },
+  )
+}
+
+export async function deleteLocalProvider(id: string): Promise<void> {
+  await apiFetch(`/local-providers/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  })
+}
+
 // ── OAuth ─────────────────────────────────────────────────────────────────────
 
 export interface OAuthProvider {

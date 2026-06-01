@@ -41,3 +41,18 @@ export function getAvailableModels(): ModelInfo[] {
     };
   });
 }
+
+/**
+ * Returns the error (if any) from loading the user's `~/.pi/agent/models.json`.
+ * Useful for surfacing custom-provider schema/parse errors to the UI.
+ * Returns undefined when the file is absent or valid.
+ */
+export function getModelsConfigError(): string | undefined {
+  if (!cachedAuthStorage) {
+    cachedAuthStorage = AuthStorage.create();
+  }
+  if (!cachedModelRegistry) {
+    cachedModelRegistry = ModelRegistry.create(cachedAuthStorage);
+  }
+  return cachedModelRegistry.getError();
+}

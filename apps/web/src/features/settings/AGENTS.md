@@ -120,6 +120,18 @@ export type { ConfigureProviderTab } from "./configure-provider-context"
 | Mistral | `MISTRAL_API_KEY` | `https://api.mistral.ai` |
 | Perplexity | `PERPLEXITY_API_KEY` | `https://api.perplexity.ai` |
 
+### Local Models (custom providers)
+
+The **Local Models** section (`sections/local-models.tsx`, slug `local-models`)
+configures local/self-hosted model servers (Ollama, LM Studio, vLLM, or any
+OpenAI/Anthropic/Google-compatible endpoint). Unlike API-key providers, these
+are persisted to `~/.pi/agent/models.json` (not `auth.json`) as entries under
+`providers` with `baseUrl`, `api`, `apiKey`, and a `models` list — the schema
+documented in the pi-coding-agent SDK's `docs/models.md`. The SDK's
+`ModelRegistry` auto-loads this file, so saving + invalidating the model cache
+surfaces the models in the picker. Managed via `/local-providers` server
+endpoints (`GET` / `PUT :id` / `DELETE :id`).
+
 ### Provider Card States
 
 - **Unconfigured:** No API key, shows "Configure" button
