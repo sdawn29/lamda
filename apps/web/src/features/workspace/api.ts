@@ -203,6 +203,17 @@ export function listWorkspaceIndexFiles(
   return apiFetch<{ files: WorkspaceFileEntry[] }>(`/workspace/${workspaceId}/files`)
 }
 
+/** Lists the immediate children of one directory (lazy file tree). `relPath` "" = root. */
+export function listWorkspaceDir(
+  workspaceId: string,
+  relPath: string
+): Promise<{ entries: WorkspaceFileEntry[] }> {
+  const query = relPath ? `?path=${encodeURIComponent(relPath)}` : ""
+  return apiFetch<{ entries: WorkspaceFileEntry[] }>(
+    `/workspace/${workspaceId}/dir${query}`
+  )
+}
+
 export function triggerWorkspaceReindex(workspaceId: string): Promise<void> {
   return apiFetch<void>(`/workspace/${workspaceId}/reindex`, { method: "POST" })
 }

@@ -18,6 +18,7 @@ import {
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { workspaceIndexer } from "../services/workspace-indexer.js";
+import { fileTreeService } from "../services/file-tree-service.js";
 
 const workspaces = new Hono();
 
@@ -239,6 +240,31 @@ workspaces.get("/workspace/:id/files", (c) => {
   return c.json({ files: workspaceIndexer.listFiles(workspaceId) });
 });
 
+// Lazy, on-demand directory listing for the file tree. Returns only the
+// immediate children of `path` (workspace-relative, "" = root) and ensures a
+// scoped watcher so changes broadcast a `workspace_dir_changed` event.
+workspaces.get("/workspace/:id/dir", async (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+
+  const relPath = c.req.query("path") ?? "";
+  if (relPath.split("/").some((seg) => seg === "..")) {
+    return c.json({ error: "Invalid path" }, 400);
+  }
+
+  try {
+    const entries = await fileTreeService.readDir(ws.path, relPath);
+    fileTreeService.watchDir(workspaceId, ws.path, relPath);
+    return c.json({ entries });
+  } catch (err) {
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
+  }
+});
+
 workspaces.post("/workspace/:id/reindex", async (c) => {
   const workspaceId = c.req.param("id");
   const ws = getWorkspace(workspaceId);
@@ -252,6 +278,7 @@ workspaces.post("/workspace/:id/reindex", async (c) => {
 workspaces.delete("/workspace/:id", async (c) => {
   const workspaceId = c.req.param("id");
   workspaceIndexer.stopIndexing(workspaceId);
+  fileTreeService.stopWorkspace(workspaceId);
   const ws = listWorkspacesWithThreads().find((w) => w.id === workspaceId);
   if (ws) {
     for (const thread of ws.threads) {

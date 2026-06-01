@@ -122,6 +122,25 @@ export async function isGitRepo(cwd: string): Promise<boolean> {
   return root !== null;
 }
 
+/**
+ * Lists every file git considers part of the working tree: tracked files plus
+ * untracked-but-not-ignored files (`-c -o --exclude-standard`). `.gitignore` is
+ * respected natively, so `node_modules` and other ignored paths are excluded for
+ * free. Paths are workspace-relative, "/"-separated. Returns [] if not a repo.
+ */
+export async function listWorkspaceFiles(cwd: string): Promise<string[]> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["ls-files", "-c", "-o", "--exclude-standard", "-z"],
+      { cwd, timeout: 15000, maxBuffer: 64 * 1024 * 1024 },
+    );
+    return stdout.split("\0").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 /** Clones a repository to the specified directory. Returns the clone output. */
 export async function gitClone(url: string, cwd: string): Promise<string> {
   const { stdout } = await execFileAsync(

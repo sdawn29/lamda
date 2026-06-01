@@ -1,34 +1,57 @@
 import { watch, type FSWatcher } from "node:fs";
-import { readdir, stat } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { readdir } from "node:fs/promises";
+import { join, sep } from "node:path";
 import {
   listWorkspaceFileEntries,
   replaceWorkspaceFiles,
   type WorkspaceFileEntry,
 } from "@lamda/db";
+import { isGitRepo, listWorkspaceFiles } from "@lamda/git";
 import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
 import { gitStatusBroadcaster } from "../git-status-broadcaster.js";
 
-const EXCLUDED_DIRS = new Set([".git"]);
+// Directories never worth indexing for fuzzy search. `git ls-files` already
+// honors .gitignore, so these only matter for the non-git fallback scan and for
+// cheaply discarding watcher events.
+const IGNORED_DIRS = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "build",
+  ".turbo",
+  ".next",
+  "out",
+  ".cache",
+]);
 
-const FLUSH_DEBOUNCE_MS = 150;
+const REFRESH_DEBOUNCE_MS = 300;
+const GIT_STATUS_DEBOUNCE_MS = 150;
+const IDLE_WORKSPACE_TTL_MS = 30 * 60 * 1000;
+const MAX_FALLBACK_ENTRIES = 50_000;
 
 interface WorkspaceState {
   path: string;
-  index: Map<string, WorkspaceFileEntry>;
+  entries: WorkspaceFileEntry[];
+  // Recursive root watcher used ONLY to refresh the flat search index and to
+  // trigger git-status broadcasts. The tree itself is watched per-directory by
+  // file-tree-service. Events for ignored paths are discarded with a string
+  // check before any work happens.
   watcher: FSWatcher | null;
   gitWatcher: FSWatcher | null;
+  refreshTimer: ReturnType<typeof setTimeout> | null;
   gitStatusTimer: ReturnType<typeof setTimeout> | null;
-  pendingPaths: Set<string>;
-  pendingFullScan: boolean;
-  flushTimer: ReturnType<typeof setTimeout> | null;
-  scanInProgress: boolean;
-  flushInProgress: boolean;
+  refreshInProgress: boolean;
+  refreshQueued: boolean;
   lastAccessedAt: number;
 }
 
-const IDLE_WORKSPACE_TTL_MS = 30 * 60 * 1000;
-
+/**
+ * Maintains a flat, fuzzy-searchable file index per workspace, used by Cmd+P and
+ * @-mentions (NOT by the file tree, which is lazy). The list is sourced from
+ * `git ls-files` so .gitignore is respected for free; non-git workspaces fall
+ * back to a filtered recursive scan. Directory entries are synthesized from file
+ * paths so directory mentions still work.
+ */
 class WorkspaceIndexer {
   private workspaces = new Map<string, WorkspaceState>();
 
@@ -47,15 +70,15 @@ class WorkspaceIndexer {
   }
 
   /**
-   * Begin tracking a workspace. Returns immediately after hydrating the in-memory
-   * cache from the DB snapshot; a fresh full scan runs in the background and
-   * broadcasts when it completes. Safe to call repeatedly.
+   * Begin tracking a workspace. Hydrates the in-memory list from the DB snapshot
+   * immediately, then refreshes from git in the background. Safe to call repeatedly.
    */
   startIndexing(workspaceId: string, workspacePath: string): void {
     const existing = this.workspaces.get(workspaceId);
     if (existing) {
+      existing.lastAccessedAt = Date.now();
       if (existing.path === workspacePath) {
-        this.queueFullScan(workspaceId, existing);
+        this.scheduleRefresh(workspaceId, existing, 0);
         return;
       }
       this.stopIndexing(workspaceId);
@@ -63,31 +86,23 @@ class WorkspaceIndexer {
 
     const state: WorkspaceState = {
       path: workspacePath,
-      index: new Map(),
+      entries: listWorkspaceFileEntries(workspaceId),
       watcher: null,
       gitWatcher: null,
+      refreshTimer: null,
       gitStatusTimer: null,
-      pendingPaths: new Set(),
-      pendingFullScan: false,
-      flushTimer: null,
-      scanInProgress: false,
-      flushInProgress: false,
+      refreshInProgress: false,
+      refreshQueued: false,
       lastAccessedAt: Date.now(),
     };
-
-    for (const entry of listWorkspaceFileEntries(workspaceId)) {
-      state.index.set(entry.relativePath, entry);
-    }
 
     this.workspaces.set(workspaceId, state);
     this.attachWatcher(workspaceId, state);
     this.attachGitWatcher(workspaceId, state);
-    this.queueFullScan(workspaceId, state);
+    this.scheduleRefresh(workspaceId, state, 0);
   }
 
-  /**
-   * Convenience: start if not running, or trigger a refresh if already running.
-   */
+  /** Convenience: start if not running, or trigger a refresh if already running. */
   ensureIndexing(workspaceId: string, workspacePath: string): void {
     this.startIndexing(workspaceId, workspacePath);
   }
@@ -95,7 +110,7 @@ class WorkspaceIndexer {
   stopIndexing(workspaceId: string): void {
     const state = this.workspaces.get(workspaceId);
     if (!state) return;
-    if (state.flushTimer) clearTimeout(state.flushTimer);
+    if (state.refreshTimer) clearTimeout(state.refreshTimer);
     if (state.gitStatusTimer) clearTimeout(state.gitStatusTimer);
     if (state.watcher) {
       try {
@@ -119,28 +134,20 @@ class WorkspaceIndexer {
   async reindex(workspaceId: string): Promise<void> {
     const state = this.workspaces.get(workspaceId);
     if (!state) return;
-    await this.fullScan(workspaceId, state);
-    workspaceIndexBroadcaster.broadcast(workspaceId);
+    await this.refresh(workspaceId, state);
   }
 
   listFiles(workspaceId: string): WorkspaceFileEntry[] {
     const state = this.workspaces.get(workspaceId);
     if (!state) return listWorkspaceFileEntries(workspaceId);
     state.lastAccessedAt = Date.now();
-    return Array.from(state.index.values());
+    return state.entries;
   }
 
   // ─── Internal ──────────────────────────────────────────────────────────────
 
-  private isExcluded(rel: string): boolean {
-    if (!rel) return true;
-    return rel.split("/").some((p) => EXCLUDED_DIRS.has(p));
-  }
-
-  private queueFullScan(workspaceId: string, state: WorkspaceState): void {
-    state.pendingFullScan = true;
-    if (state.flushTimer) return;
-    this.scheduleFlush(workspaceId, state, 0);
+  private isIgnored(rel: string): boolean {
+    return rel.split("/").some((p) => IGNORED_DIRS.has(p));
   }
 
   private attachWatcher(workspaceId: string, state: WorkspaceState): void {
@@ -149,16 +156,13 @@ class WorkspaceIndexer {
         state.path,
         { recursive: true, persistent: false },
         (_eventType, filename) => {
-          if (!filename) {
-            state.pendingFullScan = true;
-          } else {
+          if (filename) {
             const rel = filename.split(sep).join("/");
-            if (this.isExcluded(rel)) return;
-            state.pendingPaths.add(rel);
+            // Cheap discard: ignored paths (node_modules churn, etc.) never
+            // trigger a refresh or a git-status broadcast.
+            if (this.isIgnored(rel)) return;
           }
-          this.scheduleFlush(workspaceId, state, FLUSH_DEBOUNCE_MS);
-          // Any working-tree change may affect git status (content modifications,
-          // new untracked files, deletions) — broadcast even if file presence didn't change.
+          this.scheduleRefresh(workspaceId, state, REFRESH_DEBOUNCE_MS);
           this.scheduleGitStatusBroadcast(workspaceId, state);
         },
       );
@@ -181,7 +185,8 @@ class WorkspaceIndexer {
         gitDir,
         { recursive: true, persistent: false },
         () => {
-          // Any .git change (index, HEAD, refs) means staging/commit/branch state changed.
+          // Any .git change (index, HEAD, refs) means staging/commit/branch
+          // state changed.
           this.scheduleGitStatusBroadcast(workspaceId, state);
         },
       );
@@ -200,224 +205,118 @@ class WorkspaceIndexer {
     state.gitStatusTimer = setTimeout(() => {
       state.gitStatusTimer = null;
       gitStatusBroadcaster.broadcast(workspaceId);
-    }, FLUSH_DEBOUNCE_MS);
+    }, GIT_STATUS_DEBOUNCE_MS);
   }
 
-  private scheduleFlush(
+  private scheduleRefresh(
     workspaceId: string,
     state: WorkspaceState,
     delay: number,
   ): void {
-    if (state.flushTimer) return;
-    state.flushTimer = setTimeout(() => {
-      state.flushTimer = null;
-      this.flush(workspaceId, state).catch((err) =>
+    if (state.refreshTimer) return;
+    state.refreshTimer = setTimeout(() => {
+      state.refreshTimer = null;
+      this.refresh(workspaceId, state).catch((err) =>
         console.error(
-          `[workspace-indexer] flush failed for ${workspaceId}:`,
+          `[workspace-indexer] refresh failed for ${workspaceId}:`,
           err,
         ),
       );
     }, delay);
   }
 
-  private async flush(
+  private async refresh(
     workspaceId: string,
     state: WorkspaceState,
   ): Promise<void> {
-    if (state.flushInProgress) {
-      this.scheduleFlush(workspaceId, state, FLUSH_DEBOUNCE_MS);
+    if (state.refreshInProgress) {
+      state.refreshQueued = true;
       return;
     }
-    state.flushInProgress = true;
+    state.refreshInProgress = true;
     try {
-      const wantsFullScan = state.pendingFullScan;
-      const pending = Array.from(state.pendingPaths);
-      state.pendingFullScan = false;
-      state.pendingPaths.clear();
+      const filePaths = (await isGitRepo(state.path))
+        ? await listWorkspaceFiles(state.path)
+        : await this.fallbackScan(state.path);
 
-      if (wantsFullScan) {
-        const changed = await this.fullScan(workspaceId, state);
-        if (changed) workspaceIndexBroadcaster.broadcast(workspaceId);
-      } else if (pending.length > 0) {
-        const changed = await this.applyDelta(workspaceId, state, pending);
-        if (changed) workspaceIndexBroadcaster.broadcast(workspaceId);
+      const next = buildEntries(filePaths);
+      if (!entriesEqual(state.entries, next)) {
+        state.entries = next;
+        replaceWorkspaceFiles(workspaceId, next);
+        workspaceIndexBroadcaster.broadcast(workspaceId);
       }
     } finally {
-      state.flushInProgress = false;
-      if (state.pendingFullScan || state.pendingPaths.size > 0) {
-        this.scheduleFlush(workspaceId, state, FLUSH_DEBOUNCE_MS);
+      state.refreshInProgress = false;
+      if (state.refreshQueued) {
+        state.refreshQueued = false;
+        this.scheduleRefresh(workspaceId, state, REFRESH_DEBOUNCE_MS);
       }
     }
   }
 
-  private async fullScan(
-    workspaceId: string,
-    state: WorkspaceState,
-  ): Promise<boolean> {
-    if (state.scanInProgress) return false;
-    state.scanInProgress = true;
-    try {
-      const newIndex = new Map<string, WorkspaceFileEntry>();
-      let raw: import("node:fs").Dirent[];
+  /** Recursive scan honoring IGNORED_DIRS, for workspaces that aren't git repos. */
+  private async fallbackScan(rootPath: string): Promise<string[]> {
+    const out: string[] = [];
+    const stack: string[] = [""];
+    while (stack.length > 0) {
+      const relDir = stack.pop()!;
+      let dirents: import("node:fs").Dirent[];
       try {
-        raw = await readdir(state.path, {
+        dirents = await readdir(relDir ? join(rootPath, relDir) : rootPath, {
           withFileTypes: true,
-          recursive: true,
         });
-      } catch (err) {
-        console.error(
-          `[workspace-indexer] readdir failed for ${state.path}:`,
-          err,
-        );
-        return false;
-      }
-
-      for (const entry of raw) {
-        const fullPath = join(entry.parentPath, entry.name);
-        const rel = relative(state.path, fullPath).split(sep).join("/");
-        if (!rel || this.isExcluded(rel)) continue;
-        if (entry.isDirectory()) {
-          newIndex.set(rel, {
-            relativePath: rel,
-            name: entry.name,
-            isDirectory: true,
-          });
-        } else if (entry.isFile()) {
-          newIndex.set(rel, {
-            relativePath: rel,
-            name: entry.name,
-            isDirectory: false,
-          });
-        }
-      }
-
-      const changed = !indexesEqual(state.index, newIndex);
-      state.index = newIndex;
-      if (changed) {
-        replaceWorkspaceFiles(workspaceId, Array.from(newIndex.values()));
-      }
-      return changed;
-    } catch (err) {
-      console.error(
-        `[workspace-indexer] full scan failed for ${workspaceId}:`,
-        err,
-      );
-      return false;
-    } finally {
-      state.scanInProgress = false;
-    }
-  }
-
-  private async applyDelta(
-    workspaceId: string,
-    state: WorkspaceState,
-    paths: string[],
-  ): Promise<boolean> {
-    let changed = false;
-
-    for (const rel of paths) {
-      if (this.isExcluded(rel)) continue;
-      const fullPath = join(state.path, rel);
-      let s;
-      try {
-        s = await stat(fullPath);
       } catch {
-        if (this.removeSubtree(state, rel)) changed = true;
         continue;
       }
-
-      const name = rel.split("/").pop() ?? rel;
-
-      if (s.isDirectory()) {
-        const existing = state.index.get(rel);
-        if (!existing || !existing.isDirectory) {
-          state.index.set(rel, { relativePath: rel, name, isDirectory: true });
-          changed = true;
-        }
-        // Walk newly-added directories to capture descendants the watcher
-        // may not surface as individual events.
-        if (await this.scanDirectory(state, fullPath, rel)) {
-          changed = true;
-        }
-      } else if (s.isFile()) {
-        const existing = state.index.get(rel);
-        if (!existing || existing.isDirectory) {
-          state.index.set(rel, { relativePath: rel, name, isDirectory: false });
-          changed = true;
+      for (const d of dirents) {
+        if (IGNORED_DIRS.has(d.name)) continue;
+        const childRel = relDir ? `${relDir}/${d.name}` : d.name;
+        if (d.isDirectory()) {
+          stack.push(childRel);
+        } else if (d.isFile()) {
+          out.push(childRel);
+          if (out.length >= MAX_FALLBACK_ENTRIES) return out;
         }
       }
     }
-
-    if (changed) {
-      replaceWorkspaceFiles(workspaceId, Array.from(state.index.values()));
-    }
-    return changed;
-  }
-
-  private async scanDirectory(
-    state: WorkspaceState,
-    fullDirPath: string,
-    relDirPath: string,
-  ): Promise<boolean> {
-    let entries: import("node:fs").Dirent[];
-    try {
-      entries = await readdir(fullDirPath, {
-        withFileTypes: true,
-        recursive: true,
-      });
-    } catch {
-      return false;
-    }
-    let changed = false;
-    for (const entry of entries) {
-      const childFullPath = join(entry.parentPath, entry.name);
-      const childRelInDir = relative(fullDirPath, childFullPath)
-        .split(sep)
-        .join("/");
-      const childRel = childRelInDir
-        ? `${relDirPath}/${childRelInDir}`
-        : relDirPath;
-      if (this.isExcluded(childRel)) continue;
-      const isDir = entry.isDirectory();
-      const isFile = entry.isFile();
-      if (!isDir && !isFile) continue;
-      const existing = state.index.get(childRel);
-      if (!existing || existing.isDirectory !== isDir) {
-        state.index.set(childRel, {
-          relativePath: childRel,
-          name: entry.name,
-          isDirectory: isDir,
-        });
-        changed = true;
-      }
-    }
-    return changed;
-  }
-
-  private removeSubtree(state: WorkspaceState, rel: string): boolean {
-    let removed = state.index.delete(rel);
-    const prefix = `${rel}/`;
-    for (const key of state.index.keys()) {
-      if (key.startsWith(prefix)) {
-        state.index.delete(key);
-        removed = true;
-      }
-    }
-    return removed;
+    return out;
   }
 }
 
-function indexesEqual(
-  a: Map<string, WorkspaceFileEntry>,
-  b: Map<string, WorkspaceFileEntry>,
+/** Expands a list of file paths into file entries plus synthesized ancestor dirs. */
+function buildEntries(filePaths: string[]): WorkspaceFileEntry[] {
+  const map = new Map<string, WorkspaceFileEntry>();
+  for (const raw of filePaths) {
+    const rel = raw.split(sep).join("/");
+    if (!rel) continue;
+    const segments = rel.split("/");
+    const name = segments[segments.length - 1] ?? rel;
+    map.set(rel, { relativePath: rel, name, isDirectory: false });
+    for (let i = 1; i < segments.length; i++) {
+      const dirRel = segments.slice(0, i).join("/");
+      if (!map.has(dirRel)) {
+        map.set(dirRel, {
+          relativePath: dirRel,
+          name: segments[i - 1]!,
+          isDirectory: true,
+        });
+      }
+    }
+  }
+  return Array.from(map.values()).sort((a, b) =>
+    a.relativePath.localeCompare(b.relativePath),
+  );
+}
+
+function entriesEqual(
+  a: WorkspaceFileEntry[],
+  b: WorkspaceFileEntry[],
 ): boolean {
-  if (a.size !== b.size) return false;
-  for (const [key, value] of a) {
-    const other = b.get(key);
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
     if (
-      !other ||
-      other.isDirectory !== value.isDirectory ||
-      other.name !== value.name
+      a[i]!.relativePath !== b[i]!.relativePath ||
+      a[i]!.isDirectory !== b[i]!.isDirectory
     ) {
       return false;
     }

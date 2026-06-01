@@ -3,6 +3,7 @@ import type { WebSocket } from "ws";
 import { getAvailableModels } from "@lamda/pi-sdk";
 import { threadStatusBroadcaster } from "../thread-status-broadcaster.js";
 import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
+import { workspaceDirBroadcaster } from "../workspace-dir-broadcaster.js";
 import { gitStatusBroadcaster } from "../git-status-broadcaster.js";
 
 const health = new Hono();
@@ -24,6 +25,15 @@ export function handleGlobalEventsWs(ws: WebSocket) {
     },
   );
 
+  const unsubscribeDir = workspaceDirBroadcaster.subscribe(
+    ({ workspaceId, dir }) => {
+      if (ws.readyState !== 1 /* OPEN */) return;
+      ws.send(
+        JSON.stringify({ type: "workspace_dir_changed", workspaceId, dir }),
+      );
+    },
+  );
+
   const unsubscribeGit = gitStatusBroadcaster.subscribe((workspaceId) => {
     if (ws.readyState !== 1 /* OPEN */) return;
     ws.send(JSON.stringify({ type: "git_status_changed", workspaceId }));
@@ -32,6 +42,7 @@ export function handleGlobalEventsWs(ws: WebSocket) {
   const cleanup = () => {
     unsubscribeThread();
     unsubscribeIndex();
+    unsubscribeDir();
     unsubscribeGit();
   };
 

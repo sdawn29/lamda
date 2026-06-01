@@ -132,6 +132,7 @@ function handleGlobalMessage(e: MessageEvent): void {
       threadId?: string
       status?: "streaming" | "idle"
       workspaceId?: string
+      dir?: string
     }
     if (data.type === "thread_status" && data.threadId && data.status) {
       const { setStatus } = useThreadStatusStore.getState()
@@ -141,6 +142,16 @@ function handleGlobalMessage(e: MessageEvent): void {
       } else {
         setStatus(data.threadId, data.status)
       }
+    }
+    if (
+      data.type === "workspace_dir_changed" &&
+      data.workspaceId &&
+      data.dir !== undefined
+    ) {
+      // Scoped delta: re-read just the one directory whose children changed.
+      queryClient.invalidateQueries({
+        queryKey: ["workspace-dir", data.workspaceId, data.dir],
+      })
     }
     if (data.type === "workspace_files_updated" && data.workspaceId) {
       queryClient.invalidateQueries({ queryKey: ["workspace-files", data.workspaceId] })
