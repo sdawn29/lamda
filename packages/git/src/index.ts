@@ -544,12 +544,12 @@ export async function gitStashStore(cwd: string, sha: string, message: string): 
 }
 
 /**
- * Restores a specific file from the working-tree part of a stash object
- * (stash^2 = the working tree snapshot). Used to revert individual files
- * back to their pre-turn state without affecting other files.
+ * Restores a specific file from a stash object back to the pre-stash working
+ * tree state. The stash commit's own tree holds the working-tree snapshot;
+ * stash^2 is the index snapshot and would miss unstaged changes for " M" files.
  */
 export async function gitRestoreFileFromRef(cwd: string, ref: string, filePath: string): Promise<void> {
-  await execFileAsync("git", ["checkout", `${ref}^2`, "--", filePath], {
+  await execFileAsync("git", ["checkout", ref, "--", filePath], {
     cwd,
     timeout: 10000,
   });

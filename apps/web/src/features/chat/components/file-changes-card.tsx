@@ -3,7 +3,7 @@ import { GitCompare, ChevronRight, Undo2, Loader2, Eye, ExternalLink, Files } fr
 import { openFileWithApp } from "@/features/electron/api"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
-import { useRevertToTurn, useGitFileDiff, useGitStatus, DiffView, DiffStat, parseDiffCounts } from "@/features/git"
+import { useRevertToTurn, useGitFileDiff, DiffView, DiffStat, parseDiffCounts } from "@/features/git"
 import { useRightSidebar } from "@/features/layout"
 import { useMainTabs } from "@/features/main-tabs"
 import { useGitRevertFile } from "@/features/git/mutations"
@@ -209,23 +209,11 @@ export const FileChangesCard = memo(function FileChangesCard({
   const [expanded, setExpanded] = useState(true)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
-  const { data: gitStatusData } = useGitStatus(sessionId)
-
-  const dirtyPaths = useMemo(() => {
-    const raw = gitStatusData?.raw ?? ""
-    const set = new Set<string>()
-    for (const line of raw.split("\n")) {
-      if (line.length >= 4) set.add(line.slice(3))
-    }
-    return set
-  }, [gitStatusData?.raw])
-
   const files: ChangedFile[] = useMemo(() => {
     return turn.files
-      .filter((f) => dirtyPaths.has(f.filePath))
       .map((f) => parseStatusLine(`${f.postStatusCode} ${f.filePath}`))
       .filter(Boolean)
-  }, [turn, dirtyPaths])
+  }, [turn])
 
   const hasChanges = files.length > 0
   const fileSummary = useMemo(() => {

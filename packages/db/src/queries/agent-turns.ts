@@ -34,32 +34,34 @@ export function insertAgentTurn(data: {
   checkpointSha: string;
   files: AgentTurnFileDetail[];
 }): void {
-  const [turn] = db
-    .insert(agentTurns)
-    .values({
-      sessionId: data.sessionId,
-      threadId: data.threadId,
-      startedAt: data.startedAt,
-      endedAt: data.endedAt,
-      checkpointSha: data.checkpointSha,
-    })
-    .returning()
-    .all();
+  db.transaction(() => {
+    const [turn] = db
+      .insert(agentTurns)
+      .values({
+        sessionId: data.sessionId,
+        threadId: data.threadId,
+        startedAt: data.startedAt,
+        endedAt: data.endedAt,
+        checkpointSha: data.checkpointSha,
+      })
+      .returning()
+      .all();
 
-  if (!turn || data.files.length === 0) return;
+    if (!turn || data.files.length === 0) return;
 
-  db.insert(agentTurnFiles)
-    .values(
-      data.files.map((f) => ({
-        turnId: turn.id,
-        filePath: f.filePath,
-        postStatusCode: f.postStatusCode,
-        preStatusCode: f.preStatusCode,
-        preContent: f.preContent,
-        wasCreatedByTurn: f.wasCreatedByTurn,
-      }))
-    )
-    .run();
+    db.insert(agentTurnFiles)
+      .values(
+        data.files.map((f) => ({
+          turnId: turn.id,
+          filePath: f.filePath,
+          postStatusCode: f.postStatusCode,
+          preStatusCode: f.preStatusCode,
+          preContent: f.preContent,
+          wasCreatedByTurn: f.wasCreatedByTurn,
+        }))
+      )
+      .run();
+  });
 }
 
 function buildTurnSummaries(
@@ -168,6 +170,8 @@ export function deleteAgentTurnsFrom(sessionId: string, fromTurnId: number): voi
 
   if (turnIds.length === 0) return;
 
-  db.delete(agentTurnFiles).where(inArray(agentTurnFiles.turnId, turnIds)).run();
-  db.delete(agentTurns).where(inArray(agentTurns.id, turnIds)).run();
+  db.transaction(() => {
+    db.delete(agentTurnFiles).where(inArray(agentTurnFiles.turnId, turnIds)).run();
+    db.delete(agentTurns).where(inArray(agentTurns.id, turnIds)).run();
+  });
 }

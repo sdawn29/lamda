@@ -96,6 +96,11 @@ export function LspCodeViewer({
   const [commentText, setCommentText] = useState("")
   const hoverTimer = useRef<number | null>(null)
   const lastHoverPos = useRef<{ line: number; character: number } | null>(null)
+  // Coalesce pointer-move work to one run per animation frame. Resolving a
+  // screen point back to (line, character) walks the DOM and measures ranges,
+  // which is too expensive to do on every raw pointermove event.
+  const moveRaf = useRef<number | null>(null)
+  const pendingMove = useRef<{ x: number; y: number } | null>(null)
 
   const lineDecorations = useMemo(() => {
     const map = new Map<number, LineDecoration[]>()
@@ -220,10 +225,10 @@ export function LspCodeViewer({
     []
   )
 
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
+  const processMove = useCallback(
+    (x: number, y: number) => {
       if (!connection || !filePath) return
-      const pos = resolvePosition(e.clientX, e.clientY)
+      const pos = resolvePosition(x, y)
       if (!pos) {
         if (hoverTimer.current) clearTimeout(hoverTimer.current)
         hoverTimer.current = window.setTimeout(() => setHover(null), 100)
@@ -234,8 +239,6 @@ export function LspCodeViewer({
         return
       lastHoverPos.current = pos
       if (hoverTimer.current) clearTimeout(hoverTimer.current)
-      const x = e.clientX
-      const y = e.clientY
 
       // Diagnostics overlapping this position — show them right away.
       const matchingDiags = diagnostics.filter((d) =>
@@ -264,7 +267,26 @@ export function LspCodeViewer({
     [connection, filePath, resolvePosition, diagnostics]
   )
 
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!connection || !filePath) return
+      pendingMove.current = { x: e.clientX, y: e.clientY }
+      if (moveRaf.current != null) return
+      moveRaf.current = requestAnimationFrame(() => {
+        moveRaf.current = null
+        const p = pendingMove.current
+        if (p) processMove(p.x, p.y)
+      })
+    },
+    [connection, filePath, processMove]
+  )
+
   const handlePointerLeave = useCallback(() => {
+    if (moveRaf.current != null) {
+      cancelAnimationFrame(moveRaf.current)
+      moveRaf.current = null
+    }
+    pendingMove.current = null
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
     setHover(null)
     lastHoverPos.current = null
@@ -348,6 +370,7 @@ export function LspCodeViewer({
   useEffect(() => {
     return () => {
       if (hoverTimer.current) clearTimeout(hoverTimer.current)
+      if (moveRaf.current != null) cancelAnimationFrame(moveRaf.current)
     }
   }, [])
 

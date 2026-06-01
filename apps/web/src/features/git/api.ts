@@ -252,4 +252,16 @@ export function revertToTurn(sessionId: string, turnId: number): Promise<void> {
   return apiFetch<void>(`${base(sessionId)}/turns/${turnId}/revert`, { method: "POST" })
 }
 
+export function getWorkspaceBranch(
+  workspaceId: string
+): Promise<{ branch: string | null }> {
+  return apiFetch<{ branch: string | null }>(`/workspace/${workspaceId}/branch`)
+}
+
+export function listWorkspaceBranches(
+  workspaceId: string
+): Promise<{ branches: string[] }> {
+  return apiFetch<{ branches: string[] }>(`/workspace/${workspaceId}/branches`)
+}
+
 

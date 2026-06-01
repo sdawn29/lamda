@@ -225,14 +225,20 @@ const TurnItem = memo(function TurnItem({
 const TurnHistoryView = memo(function TurnHistoryView({
   sessionId,
   mode,
-  turns,
+  turns: allTurns,
   isLoading,
+  clearedAt,
 }: {
   sessionId: string
   mode: DiffMode
   turns: TurnSummary[]
   isLoading: boolean
+  clearedAt?: number
 }) {
+  const turns = clearedAt
+    ? allTurns.filter((t) => t.inProgress || t.startedAt > clearedAt)
+    : allTurns
+
   const [expandedIds, setExpandedIds] = useState<Set<number>>(
     () => new Set(turns[0] ? [turns[0].id] : [])
   )
@@ -484,12 +490,16 @@ const SourceControlContent = memo(function SourceControlContent({
   view,
   mode,
   sortMode,
+  onCommitSuccess,
+  turnsClearedAt,
 }: {
   sessionId: string
   workspaceSessionId: string
   view: ContentView
   mode: DiffMode
   sortMode: SortMode
+  onCommitSuccess?: () => void
+  turnsClearedAt?: number
 }) {
   const { data: turnsData = [], isLoading: turnsLoading } = useTurns(sessionId)
 
@@ -554,12 +564,13 @@ const SourceControlContent = memo(function SourceControlContent({
             mode={mode}
             turns={turnsData}
             isLoading={turnsLoading}
+            clearedAt={turnsClearedAt}
           />
         ) : view === "history" ? (
           <HistoryView sessionId={workspaceSessionId} />
         ) : (
           <>
-            <CommitInputSection sessionId={workspaceSessionId} />
+            <CommitInputSection sessionId={workspaceSessionId} onCommitSuccess={onCommitSuccess} />
             <div className="min-h-0 flex-1 overflow-y-auto">
               {!loading && !isGitRepo && (
                 <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
@@ -1011,6 +1022,7 @@ export const ReviewPanel = memo(function ReviewPanel({
   const [scView, setScView] = useState<ContentView>("turn")
   const [scMode, setScMode] = useState<DiffMode>("inline")
   const [scSortMode, setScSortMode] = useState<SortMode>("name")
+  const [turnsClearedAt, setTurnsClearedAt] = useState(0)
   const activeTurnId = turnsData[0]?.id
   const { data: turnDiffStat } = useTurnDiffStat(
     sessionId,
@@ -1186,6 +1198,8 @@ export const ReviewPanel = memo(function ReviewPanel({
               view={scView}
               mode={scMode}
               sortMode={scSortMode}
+              onCommitSuccess={() => setTurnsClearedAt(Date.now())}
+              turnsClearedAt={turnsClearedAt}
             />
           )}
         </div>

@@ -1,6 +1,5 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router"
 
-import { WorkspaceEmptyState } from "@/features/workspace"
 import { useWorkspace } from "@/features/workspace"
 import { useAppSettings } from "@/features/settings/queries"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
@@ -15,7 +14,7 @@ function Index() {
 
   if (workspacesLoading || settingsLoading) return null
 
-  if (workspaces.length === 0) return <WorkspaceEmptyState />
+  if (workspaces.length === 0) return <Navigate to="/onboard" />
 
   const allThreads = workspaces.flatMap((w) => w.threads)
   const savedThreadId = settings?.[APP_SETTINGS_KEYS.ACTIVE_THREAD_ID]

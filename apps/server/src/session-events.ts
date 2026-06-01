@@ -310,19 +310,24 @@ class SessionEventHub {
       setTimeout(() => reject(new Error("git-status timeout")), timeoutMs),
     );
     try {
+      // Stash resolves to "" on timeout so it never blocks the turn capture.
+      const stashDeadline = new Promise<string>((resolve) =>
+        setTimeout(() => resolve(""), timeoutMs),
+      );
+      const stashPromise = gitStashCreate(this.cwd)
+        .then(async (sha) => {
+          if (sha) {
+            const label = `lamda-checkpoint:${randomUUID()}`;
+            await gitStashStore(this.cwd!, sha, label).catch(() => {});
+          }
+          return sha;
+        })
+        .catch(() => "");
+
       const [raw, checkpointSha] = await Promise.all([
         Promise.race([gitStatus(this.cwd), deadline]),
-        // Create a non-destructive git stash checkpoint of current state.
-        // gitStashCreate returns empty string if working tree is clean — that's fine.
-        gitStashCreate(this.cwd)
-          .then(async (sha) => {
-            if (sha) {
-              const label = `asphalt-checkpoint:${this.sessionId}:${Date.now()}`;
-              await gitStashStore(this.cwd!, sha, label).catch(() => {});
-            }
-            return sha;
-          })
-          .catch(() => ""),
+        // Non-destructive stash checkpoint — returns "" if tree is clean or on timeout.
+        Promise.race([stashPromise, stashDeadline]),
       ]);
 
       this.preTurnStatusMap = this.parseStatusToMap(raw);

@@ -487,7 +487,7 @@ async function handleGitCommand(
       }
       case "git:revert-file": {
         const m = msg as GitRevertFileMessage;
-        await gitRevertFile(cwd, m.filePath, "");
+        await gitRevertFile(cwd, m.filePath, m.raw);
         send(ws, {
           type: "git:result",
           sessionId,

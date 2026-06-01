@@ -47,9 +47,10 @@ export function RightSidebarContent({
   const isMobile = useIsMobile(900)
   const fullscreenBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF)
   const fileTreeBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE)
-  const { tabs, activeTabId, setActiveTab, closeTab, clearActiveTab } = useMainTabs()
+  const { tabs, activeTabId, activeTab, setActiveTab, closeTab, clearActiveTab } = useMainTabs()
   const fileTabs = tabs.filter((t) => t.type === "file")
   const isChangesActive = !fileTabs.some((t) => t.id === activeTabId)
+  const hasActiveFileTab = activeTab?.type === "file"
 
   const sidebarEl = (
     <Sidebar side="right" collapsible="none" className="h-full w-full">
@@ -172,11 +173,11 @@ export function RightSidebarContent({
       <SidebarContent className="overflow-hidden p-0">
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="min-w-0 flex-1 overflow-hidden">
-            {sessionId ? (
+            {(sessionId || hasActiveFileTab) ? (
               <Suspense fallback={<div className="h-full bg-sidebar" />}>
                 <ReviewPanel
-                  sessionId={sessionId}
-                  workspaceSessionId={workspaceSessionId ?? sessionId}
+                  sessionId={sessionId ?? ""}
+                  workspaceSessionId={workspaceSessionId ?? sessionId ?? ""}
                   openWithAppId={openWithAppId}
                   isEmbedded
                 />

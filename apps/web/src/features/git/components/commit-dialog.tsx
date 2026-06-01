@@ -190,7 +190,13 @@ function WorkflowButton({
 
 // ─── CommitInputSection ───────────────────────────────────────────────────────
 
-export function CommitInputSection({ sessionId }: { sessionId: string }) {
+export function CommitInputSection({
+  sessionId,
+  onCommitSuccess,
+}: {
+  sessionId: string
+  onCommitSuccess?: () => void
+}) {
   const [message, setMessage] = useState("")
   const navigate = useNavigate()
   const openSettings = useCallback(() => {
@@ -228,6 +234,7 @@ export function CommitInputSection({ sessionId }: { sessionId: string }) {
     commitMutation.reset()
     try {
       await commitMutation.mutateAsync(msg)
+      onCommitSuccess?.()
     } catch {}
   }
 
@@ -239,6 +246,7 @@ export function CommitInputSection({ sessionId }: { sessionId: string }) {
     pushMutation.reset()
     try {
       await commitMutation.mutateAsync(msg)
+      onCommitSuccess?.()
     } catch {
       return
     }

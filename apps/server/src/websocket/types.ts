@@ -129,6 +129,7 @@ export interface GitStashDropMessage {
 export interface GitRevertFileMessage {
   type: "git:revert-file";
   filePath: string;
+  raw: string;
 }
 
 export interface GitInitMessage {

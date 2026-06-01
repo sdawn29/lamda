@@ -128,6 +128,7 @@ export interface GitStashDropMessage {
 export interface GitRevertFileMessage {
   type: "git:revert-file"
   filePath: string
+  raw: string
 }
 
 export interface GitInitMessage {
@@ -393,8 +394,8 @@ export class SessionCommandsClient {
     await this.send({ type: "git:stash-drop", ref } satisfies GitStashDropMessage)
   }
 
-  async gitRevertFile(filePath: string): Promise<void> {
-    await this.send({ type: "git:revert-file", filePath } satisfies GitRevertFileMessage)
+  async gitRevertFile(filePath: string, raw: string): Promise<void> {
+    await this.send({ type: "git:revert-file", filePath, raw } satisfies GitRevertFileMessage)
   }
 
   async gitInit(): Promise<void> {

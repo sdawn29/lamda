@@ -245,6 +245,7 @@ export function WorkspaceLayout() {
   const isDragging = useRef(false)
   const dragStartX = useRef(0)
   const dragStartWidth = useRef(0)
+  const sidebarRef = useRef<HTMLDivElement>(null)
 
   const [terminalHeight, setTerminalHeight] = useState(256)
   const isTerminalDragging = useRef(false)
@@ -265,15 +266,25 @@ export function WorkspaceLayout() {
           240,
           Math.min(800, dragStartWidth.current + delta)
         )
-        setRightSidebarWidth(next)
+        // Bypass React re-renders during drag — update the CSS variable directly
+        if (sidebarRef.current) {
+          sidebarRef.current.style.setProperty("--sidebar-width", `${next}px`)
+        }
       }
 
-      const onUp = () => {
+      const onUp = (ev: MouseEvent) => {
         isDragging.current = false
         document.removeEventListener("mousemove", onMove)
         document.removeEventListener("mouseup", onUp)
         document.body.style.cursor = ""
         document.body.style.userSelect = ""
+        // Commit final width to React state exactly once
+        const delta = dragStartX.current - ev.clientX
+        const finalWidth = Math.max(
+          240,
+          Math.min(800, dragStartWidth.current + delta)
+        )
+        setRightSidebarWidth(finalWidth)
       }
 
       document.body.style.cursor = "col-resize"
@@ -390,6 +401,14 @@ export function WorkspaceLayout() {
     )
   }
 
+  if (pathname === "/onboard") {
+    return (
+      <div className="h-svh">
+        <Outlet />
+      </div>
+    )
+  }
+
   if (isLoading) {
     return <SplashScreen />
   }
@@ -449,6 +468,7 @@ export function WorkspaceLayout() {
                 </div>
               )}
               <SidebarProvider
+                ref={sidebarRef}
                 style={
                   {
                     "--sidebar-width": `${rightSidebarWidth}px`,

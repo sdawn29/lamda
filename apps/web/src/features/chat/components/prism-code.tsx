@@ -25,7 +25,13 @@ import tsx from "react-syntax-highlighter/dist/esm/languages/prism/tsx"
 import typescript from "react-syntax-highlighter/dist/esm/languages/prism/typescript"
 import yaml from "react-syntax-highlighter/dist/esm/languages/prism/yaml"
 import { refractor } from "refractor/core"
-import { Fragment, type CSSProperties, type ReactNode } from "react"
+import {
+  Fragment,
+  memo,
+  useMemo,
+  type CSSProperties,
+  type ReactNode,
+} from "react"
 
 let languagesRegistered = false
 
@@ -135,7 +141,7 @@ type SyntaxRendererProps = Parameters<
   NonNullable<SyntaxHighlighterProps["renderer"]>
 >[0]
 
-export default function PrismCode({
+function PrismCode({
   code,
   language,
   style,
@@ -157,54 +163,119 @@ export default function PrismCode({
     !!renderLineAction ||
     (lineDecorations && lineDecorations.size > 0)
 
-  const lineProps = wrapLines
-    ? (lineNumber: number) => {
-        const decorations = lineDecorations?.get(lineNumber)
-        const props: { [key: string]: unknown; style?: CSSProperties } = {
-          "data-line": lineNumber,
-        }
-        if (activeLine === lineNumber) {
-          props.className =
-            "block bg-primary/10 ring-1 ring-inset ring-primary/20"
-        }
-        const style = decorationStyle(decorations)
-        if (style) props.style = style
-        if (decorations && decorations.length > 0) {
-          props["data-severity"] = decorations.reduce(
-            (s, d) => Math.min(s, d.severity),
-            4
-          )
-          props["title"] = decorations.map((d) => d.message).join("\n")
-        }
-        return props
-      }
-    : undefined
+  const lineProps = useMemo(
+    () =>
+      wrapLines
+        ? (lineNumber: number) => {
+            const decorations = lineDecorations?.get(lineNumber)
+            const props: { [key: string]: unknown; style?: CSSProperties } = {
+              "data-line": lineNumber,
+            }
+            if (activeLine === lineNumber) {
+              props.className =
+                "block bg-primary/10 ring-1 ring-inset ring-primary/20"
+            }
+            const style = decorationStyle(decorations)
+            if (style) props.style = style
+            if (decorations && decorations.length > 0) {
+              props["data-severity"] = decorations.reduce(
+                (s, d) => Math.min(s, d.severity),
+                4
+              )
+              props["title"] = decorations.map((d) => d.message).join("\n")
+            }
+            return props
+          }
+        : undefined,
+    [wrapLines, lineDecorations, activeLine]
+  )
 
-  const renderer =
-    renderAfterLine || renderLineAction
-      ? ({ rows, stylesheet, useInlineStyles }: SyntaxRendererProps) =>
-          rows.map((node, index) => {
-            const lineNumber = Number(
-              node.properties?.["data-line"] ?? index + 1
-            )
-            const afterLine = renderAfterLine?.(lineNumber)
-            const lineAction = renderLineAction?.(lineNumber)
-            return (
-              <Fragment key={`code-line-${lineNumber}-${index}`}>
-                <span className="group/code-line relative block">
-                  {createSyntaxElement({
-                    node,
-                    stylesheet,
-                    useInlineStyles,
-                    key: `code-segment-${index}`,
-                  })}
-                  {lineAction}
-                </span>
-                {afterLine}
-              </Fragment>
-            )
-          })
-      : undefined
+  const renderer = useMemo(
+    () =>
+      renderAfterLine || renderLineAction
+        ? ({ rows, stylesheet, useInlineStyles }: SyntaxRendererProps) =>
+            rows.map((node, index) => {
+              const lineNumber = Number(
+                node.properties?.["data-line"] ?? index + 1
+              )
+              const afterLine = renderAfterLine?.(lineNumber)
+              const lineAction = renderLineAction?.(lineNumber)
+              return (
+                <Fragment key={`code-line-${lineNumber}-${index}`}>
+                  <span className="code-line group/code-line relative block">
+                    {lineAction != null && (
+                      <span
+                        style={{
+                          position: "sticky",
+                          left: 0,
+                          display: "inline-block",
+                          width: 0,
+                          overflow: "visible",
+                          verticalAlign: "middle",
+                          zIndex: 10,
+                        }}
+                      >
+                        {lineAction}
+                      </span>
+                    )}
+                    <span className="inline-block w-full">
+                      {createSyntaxElement({
+                        node,
+                        stylesheet,
+                        useInlineStyles,
+                        key: `code-segment-${index}`,
+                      })}
+                    </span>
+                  </span>
+                  {afterLine}
+                </Fragment>
+              )
+            })
+        : undefined,
+    [renderAfterLine, renderLineAction]
+  )
+
+  const lineNumberStyle = useMemo<CSSProperties>(
+    () => ({
+      minWidth: "2.5em",
+      paddingRight: "1em",
+      position: "sticky",
+      left: 0,
+      zIndex: 1,
+      backgroundColor: "var(--code-gutter-bg, var(--background))",
+      color: "var(--muted-foreground)",
+      userSelect: "none",
+      fontStyle: "normal",
+      fontWeight: "normal",
+      fontSize,
+    }),
+    [fontSize]
+  )
+
+  const customStyle = useMemo<CSSProperties>(
+    () => ({
+      margin: 0,
+      padding: "0.75rem 1rem 0.75rem 0",
+      borderRadius: 0,
+      fontSize,
+      lineHeight: "1.6",
+      background: "transparent",
+      opacity,
+      userSelect: "text",
+    }),
+    [fontSize, opacity]
+  )
+
+  const codeTagProps = useMemo(
+    () => ({
+      style: {
+        fontFamily: "var(--font-mono, ui-monospace, monospace)",
+        fontWeight: "normal",
+        fontSize,
+      },
+    }),
+    [fontSize]
+  )
 
   return (
     <SyntaxHighlighter
@@ -216,39 +287,18 @@ export default function PrismCode({
       wrapLines={wrapLines}
       lineProps={lineProps}
       renderer={renderer}
-      lineNumberStyle={{
-        minWidth: "2.5em",
-        paddingRight: "1em",
-        position: "sticky",
-        left: 0,
-        zIndex: 1,
-        backgroundColor: "var(--code-gutter-bg, var(--background))",
-        color: "var(--muted-foreground)",
-        userSelect: "none",
-        fontStyle: "normal",
-        fontWeight: "normal",
-        fontSize,
-      }}
-      customStyle={{
-        margin: 0,
-        padding: "0.75rem 1rem 0.75rem 0",
-        borderRadius: 0,
-        fontSize,
-        lineHeight: "1.6",
-        background: "transparent",
-        opacity,
-        userSelect: "text",
-      }}
-      codeTagProps={{
-        style: {
-          fontFamily: "var(--font-mono, ui-monospace, monospace)",
-          fontWeight: "normal",
-          fontSize,
-        },
-      }}
+      lineNumberStyle={lineNumberStyle}
+      customStyle={customStyle}
+      codeTagProps={codeTagProps}
       wrapLongLines={false}
     >
       {code}
     </SyntaxHighlighter>
   )
 }
+
+// Tokenizing + building the syntax tree for a whole file is expensive, so we
+// skip it whenever the inputs are referentially unchanged. Callers must pass
+// stable props (memoized decorations / callbacks) for this to be effective —
+// see LspCodeViewer.
+export default memo(PrismCode)

@@ -329,6 +329,45 @@
     font-weight: normal !important;
   }
 
+  /* Browser-native windowing for the file viewer: each code line skips layout
+     and paint while off-screen, so opening large files and (especially)
+     resizing the window no longer reflows/repaints the entire file at once.
+     The intrinsic-size estimate keeps the scrollbar stable for unrendered
+     lines; `auto` lets the browser remember the real height once measured.
+
+     `content-visibility: auto` also implies `contain: paint`, which would clip
+     each line to the container width. Sizing the line box to `max-content`
+     makes the clip box equal the line's own content, so long lines extend the
+     horizontal scroll area instead of being clipped; `min-width: 100%` keeps
+     short lines (and the active-line highlight) spanning the full width. Only
+     the line wrappers are widened — the code element (and the inline comment
+     composer that lives alongside the lines) stay at the container width. */
+  .syntax-highlighter .code-line {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1.25rem;
+    display: block;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  /* Keep the code element block-level (but at container width, not max-content)
+     so the line wrappers' `min-width: 100%` resolves to the viewport width and
+     the comment composer that sits alongside the lines isn't stretched to the
+     widest line. */
+  .file-viewer-code .syntax-highlighter code[class*="language-"] {
+    display: block;
+  }
+
+  /* The Prism theme sets `overflow: auto` inline on the code block, so its
+     horizontal scrollbar ends up at the very bottom of the whole file instead
+     of pinned to the viewport. Let the outer `.file-viewer-code` container
+     (already an overflow-auto box) own both scroll axes, so vertical and
+     horizontal scrollbars sit at the viewport edges and share one scrollport
+     for the content-visibility windowing. */
+  .file-viewer-code .syntax-highlighter {
+    overflow: visible !important;
+  }
+
   /* ── Sonner toast theming ─────────────────────────────────────────────── */
   .sonner-toast {
     background: var(--popover) !important;
@@ -451,6 +490,20 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     font-feature-settings: "ss01", "ss02", "cv11";
+  }
+
+  /* The ambient gradient wash lives on its own fixed, GPU-composited layer
+     instead of `background-attachment: fixed` on <body>. A fixed background
+     attachment forces a full-viewport repaint on every window-resize frame
+     (very noticeable with a large file open); isolating it into a promoted
+     compositor layer lets the browser just re-composite it instead. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    will-change: transform;
     background-image:
       radial-gradient(
         1100px 520px at 88% -10%,
@@ -462,7 +515,6 @@
         color-mix(in srgb, var(--primary) 4%, transparent),
         transparent 65%
       );
-    background-attachment: fixed;
   }
 
   html {

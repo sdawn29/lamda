@@ -26,7 +26,7 @@ import { workspacesQueryKey } from "@/features/workspace/queries"
 import type { Mode, WorkspaceDto } from "@/features/workspace/api"
 import { BranchSelector } from "@/features/git"
 
-import { useBranch, useBranches } from "@/features/git"
+import { useBranch, useBranches, useWorkspaceBranch, useWorkspaceBranches } from "@/features/git"
 import { checkoutBranch } from "../api"
 import {
   ChatTextbox,
@@ -69,15 +69,20 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
 
   // Use the first available session from the selected workspace to query branch
   // data — git state is workspace-level, so any session is a valid proxy.
+  // Fall back to workspace-level endpoints when no session exists yet.
   const selectedWorkspace = workspaces.find((w) => w.id === workspaceId)
   const refSessionId =
     selectedWorkspace?.threads.find((t) => t.sessionId)?.sessionId ?? ""
+  const hasSession = !!refSessionId
 
-  const { data: branchData } = useBranch(refSessionId)
-  const { data: branchesData } = useBranches(refSessionId)
-  const currentBranch = branchData?.branch ?? null
-  const branches = branchesData?.branches ?? []
-  const hasBranchInfo = !!refSessionId && currentBranch !== null
+  const { data: sessionBranchData } = useBranch(refSessionId)
+  const { data: sessionBranchesData } = useBranches(refSessionId)
+  const { data: wsBranchData } = useWorkspaceBranch(hasSession ? null : workspaceId)
+  const { data: wsBranchesData } = useWorkspaceBranches(hasSession ? null : workspaceId)
+
+  const currentBranch = (hasSession ? sessionBranchData?.branch : wsBranchData?.branch) ?? null
+  const branches = (hasSession ? sessionBranchesData?.branches : wsBranchesData?.branches) ?? []
+  const hasBranchInfo = currentBranch !== null
 
   // Reset branch selection when the workspace changes.
   const prevWorkspaceIdRef = useRef(workspaceId)

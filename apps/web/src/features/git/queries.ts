@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFiles } from "./api"
+import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFiles, getWorkspaceBranch, listWorkspaceBranches } from "./api"
 import { getBranch, listBranches } from "@/features/chat/api"
 
 const gitRootKey = ["git"] as const
@@ -176,6 +176,24 @@ export function useBranches(sessionId: string) {
     queryKey: branchesKey(sessionId),
     queryFn: () => listBranches(sessionId),
     enabled: !!sessionId,
+    staleTime: 30_000,
+  })
+}
+
+export function useWorkspaceBranch(workspaceId: string | null) {
+  return useQuery({
+    queryKey: [...gitRootKey, "workspace", workspaceId, "branch"] as const,
+    queryFn: () => getWorkspaceBranch(workspaceId!),
+    enabled: !!workspaceId,
+    staleTime: 30_000,
+  })
+}
+
+export function useWorkspaceBranches(workspaceId: string | null) {
+  return useQuery({
+    queryKey: [...gitRootKey, "workspace", workspaceId, "branches"] as const,
+    queryFn: () => listWorkspaceBranches(workspaceId!),
+    enabled: !!workspaceId,
     staleTime: 30_000,
   })
 }

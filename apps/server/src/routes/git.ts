@@ -39,6 +39,7 @@ import {
   getAgentTurnFiles,
   getAgentTurnsFromId,
   deleteAgentTurnsFrom,
+  getWorkspace,
 } from "@lamda/db";
 import { store } from "../store.js";
 import { gitCwd } from "../services/session-service.js";
@@ -82,6 +83,18 @@ git.get("/session/:id/branches", async (c) => {
   const cwd = store.getCwd(c.req.param("id"));
   if (!cwd) return c.json({ branches: [] });
   return c.json({ branches: await listBranches(cwd) });
+});
+
+git.get("/workspace/:id/branch", async (c) => {
+  const ws = getWorkspace(c.req.param("id"));
+  if (!ws) return c.json({ branch: null });
+  return c.json({ branch: await getCurrentBranch(ws.path) });
+});
+
+git.get("/workspace/:id/branches", async (c) => {
+  const ws = getWorkspace(c.req.param("id"));
+  if (!ws) return c.json({ branches: [] });
+  return c.json({ branches: await listBranches(ws.path) });
 });
 
 git.post("/session/:id/checkout", async (c) => {
