@@ -27,9 +27,9 @@ export const FilesSection = memo(function FilesSection({
         <p className="px-3 py-2 text-[11px] text-muted-foreground/50">{emptyText}</p>
       )}
       <div className="divide-y divide-border/25">
-        {files.map((file, i) => (
+        {files.map((file) => (
           <FileAccordionItem
-            key={i}
+            key={file.filePath}
             file={file}
             sessionId={sessionId}
             mode={mode}

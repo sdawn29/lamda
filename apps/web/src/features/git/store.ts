@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { useShallow } from "zustand/react/shallow"
 
 export interface ReviewPanelTab {
   id: string
@@ -144,6 +145,19 @@ export const useReviewPanelStore = create<ReviewPanelStore>()((set) => ({
     }),
 }))
 
+// Project only the fields consumers actually read. Subscribing to the whole
+// store would re-render every consumer on any tab open/close/activate change.
 export function useReviewPanel() {
-  return useReviewPanelStore()
+  return useReviewPanelStore(
+    useShallow((s) => ({
+      isOpen: s.isOpen,
+      isFullscreen: s.isFullscreen,
+      currentWorkspacePath: s.currentWorkspacePath,
+      toggle: s.toggle,
+      open: s.open,
+      close: s.close,
+      toggleFullscreen: s.toggleFullscreen,
+      setCurrentWorkspace: s.setCurrentWorkspace,
+    }))
+  )
 }

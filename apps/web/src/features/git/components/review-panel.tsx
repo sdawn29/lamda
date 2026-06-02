@@ -111,15 +111,17 @@ const TurnItem = memo(function TurnItem({
   mode,
   isExpanded,
   onToggle,
-  revertMutation,
+  onRevert,
+  isReverting,
 }: {
   turn: TurnSummary
   turnNumber: number
   sessionId: string
   mode: DiffMode
   isExpanded: boolean
-  onToggle: () => void
-  revertMutation: ReturnType<typeof useRevertToTurn>
+  onToggle: (id: number) => void
+  onRevert: (id: number) => void
+  isReverting: boolean
 }) {
   const files: ChangedFile[] = useMemo(
     () =>
@@ -129,13 +131,11 @@ const TurnItem = memo(function TurnItem({
     [turn.files]
   )
 
-  const isReverting = revertMutation.isPending
-
   return (
     <div className="mx-2 mt-1.5 overflow-hidden rounded-lg border border-border/50">
       <button
         type="button"
-        onClick={onToggle}
+        onClick={() => onToggle(turn.id)}
         className="flex h-7 w-full items-center gap-1.5 bg-muted/30 px-2.5 transition-colors hover:bg-muted/50"
       >
         <ChevronRight
@@ -176,7 +176,7 @@ const TurnItem = memo(function TurnItem({
                   disabled={isReverting}
                   onClick={(e) => {
                     e.stopPropagation()
-                    revertMutation.mutate(turn.id)
+                    onRevert(turn.id)
                   }}
                   className="shrink-0 text-muted-foreground/50 hover:text-destructive"
                 >
@@ -252,6 +252,10 @@ const TurnHistoryView = memo(function TurnHistoryView({
   }
 
   const revertMutation = useRevertToTurn(sessionId)
+  const revertingId = revertMutation.isPending
+    ? revertMutation.variables
+    : undefined
+  const revertTurn = revertMutation.mutate
 
   const toggleTurn = useCallback((id: number) => {
     setExpandedIds((prev) => {
@@ -308,8 +312,9 @@ const TurnHistoryView = memo(function TurnHistoryView({
             sessionId={sessionId}
             mode={mode}
             isExpanded={expandedIds.has(turn.id)}
-            onToggle={() => toggleTurn(turn.id)}
-            revertMutation={revertMutation}
+            onToggle={toggleTurn}
+            onRevert={revertTurn}
+            isReverting={revertingId === turn.id}
           />
         )
       })}
@@ -1037,10 +1042,15 @@ export const ReviewPanel = memo(function ReviewPanel({
     SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF
   )
 
-  const selectScView = (view: ContentView) => {
-    clearActiveTab()
-    setScView(view)
-  }
+  const selectScView = useCallback(
+    (view: ContentView) => {
+      clearActiveTab()
+      setScView(view)
+    },
+    [clearActiveTab]
+  )
+
+  const handleCommitSuccess = useCallback(() => setTurnsClearedAt(Date.now()), [])
 
   return (
     <>
@@ -1198,7 +1208,7 @@ export const ReviewPanel = memo(function ReviewPanel({
               view={scView}
               mode={scMode}
               sortMode={scSortMode}
-              onCommitSuccess={() => setTurnsClearedAt(Date.now())}
+              onCommitSuccess={handleCommitSuccess}
               turnsClearedAt={turnsClearedAt}
             />
           )}
