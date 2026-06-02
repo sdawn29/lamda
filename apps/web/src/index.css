@@ -368,6 +368,325 @@
     overflow: visible !important;
   }
 
+  /* ── Monaco code viewer ───────────────────────────────────────────────── */
+  /* "+" affordance that overlays the line number of the hovered line; clicking
+     the line number opens the add-comment-to-chat composer. */
+  .lamda-add-comment-line {
+    cursor: pointer;
+    position: relative;
+    color: transparent !important;
+  }
+  .lamda-add-comment-line::after {
+    content: "+";
+    position: absolute;
+    inset: 1px 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background: var(--secondary);
+    color: var(--secondary-foreground);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+    font-weight: 600;
+    line-height: 1;
+  }
+  .lamda-add-comment-line:hover::after {
+    background: color-mix(in srgb, var(--secondary) 80%, transparent);
+  }
+  /* Brief flash when scroll-to-line jumps to a target line. */
+  .lamda-scroll-flash {
+    background: rgba(250, 204, 21, 0.2);
+    transition: background 0.7s ease-out;
+  }
+
+  /* ── Monaco native widgets ─────────────────────────────────────────────
+     Make Monaco's floating chrome match the app design system. Colors come
+     from the editor theme (see lsp-integration.ts `editorColors`); what the
+     theme API can't express — rounded corners, themed shadow, the sans UI
+     font — is set here against the same CSS tokens the rest of the app uses.
+     The context menu is portaled outside .monaco-editor (into .context-view),
+     so it is targeted separately. */
+  .monaco-editor .suggest-widget,
+  .monaco-editor .suggest-details,
+  .monaco-editor .monaco-hover,
+  .monaco-editor .parameter-hints-widget,
+  .monaco-editor .rename-box,
+  .monaco-editor .find-widget,
+  .monaco-editor .peekview-widget,
+  .monaco-editor .quick-input-widget,
+  .context-view .monaco-menu .monaco-action-bar.vertical,
+  .monaco-menu-container {
+    border-radius: var(--radius) !important;
+    box-shadow: 0 4px 16px -2px rgb(0 0 0 / 0.18) !important;
+  }
+
+  /* Clip inner rows/scrollbars to the rounded outer edge. */
+  .monaco-editor .suggest-widget,
+  .monaco-editor .monaco-hover,
+  .monaco-editor .parameter-hints-widget,
+  .monaco-editor .quick-input-widget,
+  .monaco-menu-container {
+    overflow: hidden !important;
+  }
+
+  /* Monaco's overlay-widgets container is sized to the editor width but has no
+     height — it's a zero-height box pinned to the top, so a child anchored with
+     `bottom` would measure against that collapsed box and land above the
+     editor. Stretch it to full height so `bottom: 0` resolves to the editor's
+     bottom edge, but keep it click-through (the now full-size box must not
+     intercept text selection); real widgets re-enable pointer events. */
+  .monaco-editor .overlayWidgets {
+    height: 100% !important;
+    pointer-events: none !important;
+  }
+  .monaco-editor .overlayWidgets > * {
+    pointer-events: auto !important;
+  }
+
+  /* Pin the find/search widget to the BOTTOM edge of the editor instead of
+     Monaco's default top-right. Monaco positions it via an inline `top` and
+     hides it by sliding up out of view; override `top` with `bottom: 0`, flip
+     the hidden-state transform so it slides in from below, round the now-
+     visible top corners, and move the divider border to the top. Anchoring at
+     the bottom also lets the replace row grow the widget upward naturally. */
+  .monaco-editor .find-widget {
+    top: auto !important;
+    bottom: 16px !important;
+    height: auto !important;
+    min-height: 36px !important;
+    overflow: visible !important;
+    border-radius: var(--radius) !important;
+    border: 1px solid color-mix(in srgb, var(--border) 85%, transparent) !important;
+    background: color-mix(in srgb, var(--popover) 96%, transparent) !important;
+    color: var(--popover-foreground) !important;
+    backdrop-filter: blur(10px);
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    box-shadow:
+      0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent),
+      0 10px 28px -18px rgb(0 0 0 / 0.45) !important;
+    transform: translateY(calc(100% + 16px)) !important;
+  }
+  .monaco-editor .find-widget.visible {
+    transform: translateY(0) !important;
+  }
+
+  /* ── Find widget internals: align every control to one centered row and
+     size them on a single scale so the input, toggles, match count and action
+     buttons all share a baseline. Colors come from the editor theme; this is
+     layout + radius to match the app design system. ── */
+  .monaco-editor .find-widget {
+    padding: 0 4px !important;
+  }
+  .monaco-editor .find-widget > .find-part,
+  .monaco-editor .find-widget > .replace-part {
+    /* Right margin reserves space for the absolutely-positioned close button
+       (a direct child of the widget, not part of this flex row) so the action
+       buttons don't run underneath it. Must clear the close button's footprint:
+       its 20px box sits at right:4px, so reserve 20 + 4 + a 6px gap. */
+    margin: 4px 30px 4px 4px !important;
+    align-items: center !important;
+    gap: 3px !important;
+  }
+
+  /* Close button (✕) is absolute, outside .find-part — pin it to the row's
+     right edge and fully define its box (size, radius, hover) here rather than
+     leaning on Monaco's defaults, so it never lands on the find-in-selection
+     toggle that ends the .find-part row. */
+  .monaco-editor .find-widget > .button.codicon-widget-close {
+    position: absolute !important;
+    top: 8px !important;
+    right: 4px !important;
+    transform: none !important;
+    width: 20px !important;
+    height: 20px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    border-radius: calc(var(--radius) * 0.5) !important;
+    background: transparent !important;
+    background-position: center !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Search field → app input surface, rounded, comfortable height. Reserve
+     space on the right so the overlaid toggles never sit on top of the text. */
+  .monaco-editor .find-widget .monaco-inputbox {
+    min-height: 28px !important;
+    border-radius: calc(var(--radius) * 0.7) !important;
+    border: 1px solid var(--input) !important;
+    background: color-mix(in srgb, var(--input) 24%, transparent) !important;
+    color: var(--foreground) !important;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      background-color 150ms ease !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  .monaco-editor .find-widget .monaco-inputbox.synthetic-focus {
+    border-color: var(--ring) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 30%, transparent) !important;
+  }
+  .monaco-editor .find-widget .monaco-inputbox .input {
+    color: var(--foreground) !important;
+    font-family: var(--font-sans) !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+  .monaco-editor .find-widget .monaco-inputbox .input::placeholder {
+    color: var(--muted-foreground) !important;
+  }
+  .monaco-editor .find-widget .monaco-findInput .input {
+    padding-right: 76px !important;
+  }
+
+  /* Case / word / regex toggles (Aa · ab · .*) — equal squares, vertically
+     centered inside the field, evenly spaced. */
+  .monaco-editor .find-widget .monaco-findInput > .controls {
+    top: 0 !important;
+    right: 4px !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+  }
+  .monaco-editor .find-widget .monaco-custom-toggle {
+    width: 18px !important;
+    height: 18px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    float: none !important;
+    color: var(--muted-foreground) !important;
+    border: 1px solid transparent !important;
+    border-radius: calc(var(--radius) * 0.5) !important;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  .monaco-editor .find-widget .monaco-custom-toggle:hover {
+    background-color: color-mix(in srgb, var(--muted) 70%, transparent) !important;
+    color: var(--foreground) !important;
+  }
+  .monaco-editor .find-widget .monaco-custom-toggle.checked {
+    border-color: color-mix(in srgb, var(--primary) 38%, transparent) !important;
+    background-color: color-mix(in srgb, var(--primary) 14%, transparent) !important;
+    color: var(--primary) !important;
+  }
+
+  /* Match count ("1 of 1") — muted, centered, no ad-hoc line-height offset. */
+  .monaco-editor .find-widget .matchesCount {
+    height: auto !important;
+    margin: 0 2px !important;
+    padding: 0 !important;
+    line-height: normal !important;
+    color: var(--muted-foreground) !important;
+    font-size: 11px !important;
+    font-variant-numeric: tabular-nums;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  /* Action buttons (prev ↑ · next ↓ · find-in-selection · close ✕) — one
+     uniform square size with centered icons, replacing Monaco's mix of
+     16px and 22px boxes so the whole row lines up. */
+  .monaco-editor .find-widget .find-actions,
+  .monaco-editor .find-widget .replace-actions {
+    height: auto !important;
+    gap: 3px !important;
+    align-items: center !important;
+  }
+  .monaco-editor .find-widget .button:not(.toggle) {
+    width: 20px !important;
+    height: 20px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: var(--muted-foreground) !important;
+    border: 1px solid transparent !important;
+    border-radius: calc(var(--radius) * 0.5) !important;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  /* Find-in-selection (≡) is a Toggle, not a .button, so the generic action
+     rule above misses it. Size it to match the prev/next buttons so the action
+     row reads as one uniform set of squares. (The Aa/ab/.* toggles live in the
+     input's .controls, not .find-actions, so they keep their 22px size.) */
+  .monaco-editor .find-widget .find-actions .monaco-custom-toggle {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .monaco-editor .find-widget .button:not(.toggle):not(.disabled):hover {
+    background-color: color-mix(in srgb, var(--muted) 70%, transparent) !important;
+    color: var(--foreground) !important;
+  }
+  .monaco-editor
+    .find-widget
+    > .button.codicon-widget-close:not(.disabled):hover {
+    background: transparent !important;
+  }
+
+  /* UI chrome (menus, find/rename inputs, suggest labels) reads as app UI, so
+     use the sans font; hover and suggest documentation keep the editor's mono
+     font since they render code/signatures. */
+  .context-view .monaco-menu,
+  .monaco-editor .find-widget,
+  .monaco-editor .rename-box,
+  .monaco-editor .parameter-hints-widget {
+    font-family: var(--font-sans) !important;
+  }
+
+  /* Rounded selection rows inside menus and the suggest list. */
+  .context-view .monaco-menu .monaco-action-bar .action-item .action-label {
+    border-radius: calc(var(--radius) * 0.6) !important;
+  }
+  .monaco-editor .suggest-widget .monaco-list .monaco-list-row {
+    border-radius: calc(var(--radius) * 0.5) !important;
+  }
+
+  /* Find-widget button tooltips use Monaco's compact workbench hover. Keep
+     those short UI labels on one line; code/documentation hovers still wrap. */
+  .monaco-hover.workbench-hover.compact
+    .markdown-hover
+    > .hover-contents:not(.code-hover-contents),
+  .monaco-hover.workbench-hover.compact
+    .hover-contents:not(.code-hover-contents):not(.html-hover-contents) {
+    max-width: none !important;
+    overflow-wrap: normal !important;
+    white-space: nowrap !important;
+    word-break: normal !important;
+    word-wrap: normal !important;
+  }
+  .monaco-hover.workbench-hover.compact
+    .hover-contents:not(.code-hover-contents):not(.html-hover-contents)
+    p {
+    white-space: nowrap !important;
+  }
+
+  /* Themed inputs inside the find/rename widgets. */
+  .monaco-editor .find-widget .monaco-inputbox,
+  .monaco-editor .rename-box .rename-input {
+    border-radius: calc(var(--radius) * 0.6) !important;
+  }
+
+  /* Round Monaco's own (non-native) scrollbar slider like the app scrollbars. */
+  .monaco-editor .scrollbar > .slider {
+    border-radius: 99px !important;
+  }
+
   /* ── Sonner toast theming ─────────────────────────────────────────────── */
   .sonner-toast {
     background: var(--popover) !important;

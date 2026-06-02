@@ -29,6 +29,13 @@ export default defineConfig({
             return "xterm"
           }
 
+          if (
+            id.includes("monaco-editor") ||
+            id.includes("@monaco-editor/")
+          ) {
+            return "monaco"
+          }
+
           if (id.includes("react-markdown") || id.includes("remark-gfm")) {
             return "markdown"
           }

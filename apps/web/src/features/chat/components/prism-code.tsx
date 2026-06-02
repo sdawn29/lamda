@@ -299,6 +299,5 @@ function PrismCode({
 
 // Tokenizing + building the syntax tree for a whole file is expensive, so we
 // skip it whenever the inputs are referentially unchanged. Callers must pass
-// stable props (memoized decorations / callbacks) for this to be effective —
-// see LspCodeViewer.
+// stable props (memoized decorations / callbacks) for this to be effective.
 export default memo(PrismCode)

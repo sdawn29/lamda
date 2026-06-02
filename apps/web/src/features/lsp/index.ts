@@ -1,5 +1,5 @@
 export { getLspConnection, disposeLspConnection, LspConnection } from "./client"
-export { LspCodeViewer } from "./components/lsp-code-viewer"
+export { MonacoCodeViewer } from "./components/monaco-code-viewer-lazy"
 export { ProblemsStrip } from "./components/problems-strip"
 export { OutlinePanel } from "./components/outline-panel"
 export { LspSettingsCard } from "./components/lsp-settings-card"

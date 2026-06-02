@@ -7,7 +7,7 @@ import { getServerUrl } from "@/shared/lib/client"
 import { cn } from "@/shared/lib/utils"
 import { LANGUAGE_MAP } from "@/shared/lib/language-map"
 import {
-  LspCodeViewer,
+  MonacoCodeViewer,
   ProblemsStrip,
   OutlinePanel,
   useFileDiagnostics,
@@ -255,16 +255,10 @@ export const FileContentView = memo(function FileContentView({
         />
       </div>
       {isCodeView && (
-        <>
-          <ProblemsStrip
-            diagnostics={diagnostics}
-            onJumpToLine={(line) => setScrollToLine(line)}
-          />
-          <OutlinePanel
-            symbols={symbols}
-            onJumpToLine={(line) => setScrollToLine(line)}
-          />
-        </>
+        <OutlinePanel
+          symbols={symbols}
+          onJumpToLine={(line) => setScrollToLine(line)}
+        />
       )}
       <div className="flex min-h-0 flex-1 flex-col p-2">
         <div
@@ -307,7 +301,7 @@ export const FileContentView = memo(function FileContentView({
               {content ?? ""}
             </ReactMarkdown>
           ) : (
-            <LspCodeViewer
+            <MonacoCodeViewer
               code={content ?? ""}
               language={language}
               fontSize="0.75rem"
@@ -334,6 +328,13 @@ export const FileContentView = memo(function FileContentView({
           )}
         </div>
       </div>
+      {isCodeView && (
+        <ProblemsStrip
+          diagnostics={diagnostics}
+          onJumpToLine={(line) => setScrollToLine(line)}
+          position="bottom"
+        />
+      )}
     </div>
   )
 })

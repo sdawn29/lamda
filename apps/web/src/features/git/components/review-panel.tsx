@@ -71,7 +71,7 @@ import { LANGUAGE_MAP } from "@/shared/lib/language-map"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
 import { useChatActions } from "@/features/chat/contexts/chat-actions-context"
 import {
-  LspCodeViewer,
+  MonacoCodeViewer,
   ProblemsStrip,
   OutlinePanel,
   useFileDiagnostics,
@@ -908,16 +908,10 @@ const FileContent = memo(function FileContent({
         />
       </div>
       {isCodeView && (
-        <>
-          <ProblemsStrip
-            diagnostics={diagnostics}
-            onJumpToLine={(line) => setScrollToLine(line)}
-          />
-          <OutlinePanel
-            symbols={symbols}
-            onJumpToLine={(line) => setScrollToLine(line)}
-          />
-        </>
+        <OutlinePanel
+          symbols={symbols}
+          onJumpToLine={(line) => setScrollToLine(line)}
+        />
       )}
       <div className="flex min-h-0 flex-1 flex-col p-2">
         <div
@@ -960,7 +954,7 @@ const FileContent = memo(function FileContent({
               {content ?? ""}
             </ReactMarkdown>
           ) : (
-            <LspCodeViewer
+            <MonacoCodeViewer
               code={content ?? ""}
               language={language}
               fontSize="0.75rem"
@@ -989,6 +983,13 @@ const FileContent = memo(function FileContent({
           )}
         </div>
       </div>
+      {isCodeView && (
+        <ProblemsStrip
+          diagnostics={diagnostics}
+          onJumpToLine={(line) => setScrollToLine(line)}
+          position="bottom"
+        />
+      )}
     </div>
   )
 })
