@@ -1,3 +1,5 @@
+import { useState } from "react"
+import { useNavigate } from "@tanstack/react-router"
 import { Server, Plus, Info } from "lucide-react"
 import { Card, CardContent } from "@/shared/ui/card"
 import { Button } from "@/shared/ui/button"
@@ -5,23 +7,35 @@ import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Separator } from "@/shared/ui/separator"
 import { useMcpSettings, useMcpServerStatus, useMcpTools } from "../queries"
 import { useSaveMcpSettings } from "../mutations"
-import { ServerListItem, useServerManagement } from "./server-form"
-import { FormDialog, DeleteConfirmDialog } from "./server-form"
+import type { McpServerConfig } from "../types"
+import { ServerListItem, DeleteConfirmDialog } from "./server-form"
 
-interface McpSettingsCardProps {
-  workspaceId?: string
-}
-
-export function McpSettingsCard({ workspaceId = "default" }: McpSettingsCardProps) {
-  const { data: settings, isLoading } = useMcpSettings(workspaceId)
-  const { data: serverStatus } = useMcpServerStatus(workspaceId)
-  const { data: allTools } = useMcpTools(workspaceId)
+export function McpSettingsCard() {
+  const navigate = useNavigate()
+  const { data: settings, isLoading } = useMcpSettings()
+  const { data: serverStatus } = useMcpServerStatus()
+  const { data: allTools } = useMcpTools()
   const saveSettings = useSaveMcpSettings()
   const servers = settings?.servers ?? []
 
-  const { showDialog, editingServer, formState, formErrors, serverToDelete, openAddDialog,
-    openEditDialog, handleSave, handleDelete, confirmDelete, setFormState, setFormErrors } =
-    useServerManagement({ workspaceId, servers, saveSettings })
+  const [serverToDelete, setServerToDelete] = useState<string | null>(null)
+
+  function openForm(serverName: string) {
+    navigate({
+      to: "/settings/$section",
+      params: { section: "mcp" },
+      search: { server: serverName },
+    })
+  }
+
+  function confirmDelete() {
+    if (serverToDelete) {
+      saveSettings.mutate({
+        settings: { servers: servers.filter((s) => s.name !== serverToDelete) },
+      })
+    }
+    setServerToDelete(null)
+  }
 
   function getStatus(name: string) {
     return serverStatus?.find((s) => s.name === name)
@@ -54,7 +68,7 @@ export function McpSettingsCard({ workspaceId = "default" }: McpSettingsCardProp
                 <p className="text-xs text-muted-foreground">Connect to Model Context Protocol servers</p>
               </div>
             </div>
-            <Button size="sm" onClick={openAddDialog}>
+            <Button size="sm" onClick={() => openForm("new")}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Add Server
             </Button>
@@ -73,15 +87,14 @@ export function McpSettingsCard({ workspaceId = "default" }: McpSettingsCardProp
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {servers.map((server) => (
+              {servers.map((server: McpServerConfig) => (
                 <ServerListItem
                   key={server.name}
                   server={server}
-                  workspaceId={workspaceId}
                   status={getStatus(server.name)}
                   tools={getServerTools(server.name)}
-                  onEdit={() => openEditDialog(server)}
-                  onDelete={() => handleDelete(server.name)}
+                  onEdit={() => openForm(server.name)}
+                  onDelete={() => setServerToDelete(server.name)}
                 />
               ))}
             </div>
@@ -90,29 +103,17 @@ export function McpSettingsCard({ workspaceId = "default" }: McpSettingsCardProp
           <Alert>
             <Info />
             <AlertDescription>
-              MCP servers are configured per-workspace. Click the play/stop button to start or stop servers. Tools from connected servers are automatically available to the agent.
+              MCP servers are configured once and shared across all workspaces. Click the play/stop button to start or stop servers. Tools from connected servers are automatically available to the agent.
             </AlertDescription>
           </Alert>
         </CardContent>
       </Card>
 
-      <FormDialog
-        open={showDialog}
-        onOpenChange={() => {}}
-        server={editingServer}
-        formState={formState}
-        setFormState={setFormState}
-        formErrors={formErrors}
-        setFormErrors={setFormErrors}
-        onSave={handleSave}
-        isSaving={saveSettings.isPending}
-      />
-
       <DeleteConfirmDialog
         open={!!serverToDelete}
         serverName={serverToDelete}
         onConfirm={confirmDelete}
-        onCancel={() => handleDelete("")}
+        onCancel={() => setServerToDelete(null)}
       />
     </>
   )

@@ -70,6 +70,26 @@ class SessionStore {
     return result;
   }
 
+  getAll(): Array<{
+    sessionId: string;
+    handle: ManagedSessionHandle;
+    workspaceId?: string;
+  }> {
+    const result: Array<{
+      sessionId: string;
+      handle: ManagedSessionHandle;
+      workspaceId?: string;
+    }> = [];
+    for (const [sessionId, entry] of this.sessions) {
+      result.push({
+        sessionId,
+        handle: entry.handle,
+        workspaceId: entry.workspaceId,
+      });
+    }
+    return result;
+  }
+
   replaceHandle(id: string, newHandle: ManagedSessionHandle): boolean {
     const entry = this.sessions.get(id);
     if (!entry) return false;

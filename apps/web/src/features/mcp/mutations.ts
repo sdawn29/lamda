@@ -7,29 +7,27 @@ export function useSaveMcpSettings() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      workspaceId,
       settings,
     }: {
-      workspaceId: string
       settings: { servers: McpServerConfig[] }
-    }) => saveMcpSettings(workspaceId, settings),
-    onMutate: async ({ workspaceId, settings }) => {
+    }) => saveMcpSettings(settings),
+    onMutate: async ({ settings }) => {
       // Optimistically update the cache
-      const prev = queryClient.getQueryData(mcpKeys.settings(workspaceId))
-      queryClient.setQueryData(mcpKeys.settings(workspaceId), settings)
+      const prev = queryClient.getQueryData(mcpKeys.settings())
+      queryClient.setQueryData(mcpKeys.settings(), settings)
       return { prev }
     },
-    onError: (_err, { workspaceId }, context) => {
+    onError: (_err, _vars, context) => {
       // Rollback on error
       if (context?.prev) {
-        queryClient.setQueryData(mcpKeys.settings(workspaceId), context.prev)
+        queryClient.setQueryData(mcpKeys.settings(), context.prev)
       }
     },
-    onSettled: (_data, _err, { workspaceId }) => {
+    onSettled: () => {
       // Always refetch after mutation
-      queryClient.invalidateQueries({ queryKey: mcpKeys.settings(workspaceId) })
-      queryClient.invalidateQueries({ queryKey: mcpKeys.status(workspaceId) })
-      queryClient.invalidateQueries({ queryKey: mcpKeys.tools(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: mcpKeys.settings() })
+      queryClient.invalidateQueries({ queryKey: mcpKeys.status() })
+      queryClient.invalidateQueries({ queryKey: mcpKeys.tools() })
     },
   })
 }
@@ -43,12 +41,12 @@ export function useTestMcpConnection() {
 export function useStartMcpServer() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ workspaceId, serverName }: { workspaceId: string; serverName: string }) =>
-      startMcpServer(workspaceId, serverName),
-    onSettled: (_data, _err, { workspaceId }) => {
+    mutationFn: ({ serverName }: { serverName: string }) =>
+      startMcpServer(serverName),
+    onSettled: () => {
       // Refresh status and tools after starting
-      queryClient.invalidateQueries({ queryKey: mcpKeys.status(workspaceId) })
-      queryClient.invalidateQueries({ queryKey: mcpKeys.tools(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: mcpKeys.status() })
+      queryClient.invalidateQueries({ queryKey: mcpKeys.tools() })
     },
   })
 }
@@ -56,12 +54,12 @@ export function useStartMcpServer() {
 export function useStopMcpServer() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ workspaceId, serverName }: { workspaceId: string; serverName: string }) =>
-      stopMcpServer(workspaceId, serverName),
-    onSettled: (_data, _err, { workspaceId }) => {
+    mutationFn: ({ serverName }: { serverName: string }) =>
+      stopMcpServer(serverName),
+    onSettled: () => {
       // Refresh status and tools after stopping
-      queryClient.invalidateQueries({ queryKey: mcpKeys.status(workspaceId) })
-      queryClient.invalidateQueries({ queryKey: mcpKeys.tools(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: mcpKeys.status() })
+      queryClient.invalidateQueries({ queryKey: mcpKeys.tools() })
     },
   })
 }
@@ -69,13 +67,13 @@ export function useStopMcpServer() {
 export function useSetMcpServerEnabled() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ workspaceId, serverName, enabled }: { workspaceId: string; serverName: string; enabled: boolean }) =>
-      setMcpServerEnabled(workspaceId, serverName, enabled),
-    onSettled: (_data, _err, { workspaceId }) => {
+    mutationFn: ({ serverName, enabled }: { serverName: string; enabled: boolean }) =>
+      setMcpServerEnabled(serverName, enabled),
+    onSettled: () => {
       // Refresh settings and status after toggling enabled
-      queryClient.invalidateQueries({ queryKey: mcpKeys.settings(workspaceId) })
-      queryClient.invalidateQueries({ queryKey: mcpKeys.status(workspaceId) })
-      queryClient.invalidateQueries({ queryKey: mcpKeys.tools(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: mcpKeys.settings() })
+      queryClient.invalidateQueries({ queryKey: mcpKeys.status() })
+      queryClient.invalidateQueries({ queryKey: mcpKeys.tools() })
     },
   })
 }

@@ -142,8 +142,7 @@ function createDb() {
 
     CREATE TABLE IF NOT EXISTS mcp_servers (
       id           TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-      name         TEXT NOT NULL,
+      name         TEXT NOT NULL UNIQUE,
       command      TEXT NOT NULL,
       args         TEXT,
       env          TEXT,
@@ -196,7 +195,6 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS message_blocks_thread_idx ON message_blocks(thread_id, block_index);
     CREATE INDEX IF NOT EXISTS workspace_files_workspace_idx ON workspace_files(workspace_id);
     CREATE INDEX IF NOT EXISTS workspace_tasks_workspace_idx ON workspace_tasks(workspace_id);
-    CREATE INDEX IF NOT EXISTS mcp_servers_workspace_idx ON mcp_servers(workspace_id);
     CREATE INDEX IF NOT EXISTS agent_turns_thread_idx ON agent_turns(thread_id);
     CREATE INDEX IF NOT EXISTS agent_turn_files_turn_idx ON agent_turn_files(turn_id);
     CREATE INDEX IF NOT EXISTS thread_todo_goals_thread_idx ON thread_todo_goals(thread_id, sort_order, created_at);
@@ -325,6 +323,44 @@ function createDb() {
     }
   } catch {
     // Safe to ignore — column may already exist.
+  }
+
+  // Migration: MCP servers are now scoped application-wide instead of
+  // per-workspace. Drop the workspace_id column and deduplicate by name,
+  // keeping the most recently created server for any duplicated name.
+  try {
+    const mcpCols = sqlite.prepare("PRAGMA table_info(mcp_servers)").all() as { name: string }[];
+    if (mcpCols.some((col) => col.name === "workspace_id")) {
+      sqlite.exec(`
+        DROP INDEX IF EXISTS mcp_servers_workspace_idx;
+
+        CREATE TABLE mcp_servers_new (
+          id           TEXT PRIMARY KEY,
+          name         TEXT NOT NULL UNIQUE,
+          command      TEXT NOT NULL,
+          args         TEXT,
+          env          TEXT,
+          cwd          TEXT,
+          description  TEXT,
+          enabled      INTEGER NOT NULL DEFAULT 1,
+          created_at   INTEGER NOT NULL
+        );
+
+        INSERT INTO mcp_servers_new (id, name, command, args, env, cwd, description, enabled, created_at)
+        SELECT id, name, command, args, env, cwd, description, enabled, created_at
+        FROM mcp_servers
+        WHERE id IN (
+          SELECT id FROM mcp_servers AS m
+          WHERE created_at = (SELECT MAX(created_at) FROM mcp_servers WHERE name = m.name)
+          GROUP BY name
+        );
+
+        DROP TABLE mcp_servers;
+        ALTER TABLE mcp_servers_new RENAME TO mcp_servers;
+      `);
+    }
+  } catch (e) {
+    // Migration may fail on first run or if already migrated — safe to ignore.
   }
 
   return db;

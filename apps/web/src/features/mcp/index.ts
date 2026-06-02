@@ -1,9 +1,8 @@
 // Components
-export { McpDialog } from "./components/mcp-dialog"
 export { McpSettingsCard } from "./components/mcp-settings-card"
 
-// Shared UI components (shared between McpDialog and McpSettingsCard)
-export { ServerListItem, FormDialog, DeleteConfirmDialog, useServerManagement, validateForm } from "./components/server-form"
+// Shared UI components
+export { ServerListItem, ServerFormPage, DeleteConfirmDialog, validateForm } from "./components/server-form"
 
 // Types
 export type {
@@ -29,9 +28,6 @@ export {
   useStopMcpServer,
   useSetMcpServerEnabled,
 } from "./mutations"
-
-// Context
-export { McpProvider, useMcpContext } from "./context"
 
 // API
 export * from "./api"

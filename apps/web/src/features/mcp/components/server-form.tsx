@@ -1,4 +1,5 @@
-import React, { useState } from "react"
+import { useState } from "react"
+import { useNavigate } from "@tanstack/react-router"
 import {
   Plus,
   Trash2,
@@ -14,6 +15,7 @@ import {
   Play,
   Square,
   AlertTriangle,
+  ArrowLeft,
 } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/shared/ui/alert"
@@ -28,7 +30,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from "@/shared/ui/dialog"
 import {
   Field,
@@ -40,6 +41,7 @@ import {
 import { cn } from "@/shared/lib/utils"
 import type { McpServerConfig, ServerFormState } from "../types"
 import { createEmptyServerForm, formStateToConfig, configToFormState } from "../types"
+import { useMcpSettings } from "../queries"
 import { useSaveMcpSettings, useTestMcpConnection, useStartMcpServer, useStopMcpServer } from "../mutations"
 
 // ── Environment Variable Row ──────────────────────────────────────────────────
@@ -174,31 +176,24 @@ function JsonImport({ onImport }: JsonImportProps) {
   )
 }
 
-// ── Main Form Dialog ──────────────────────────────────────────────────────────
+// ── Server Form Fields (shared body) ──────────────────────────────────────────
 
-interface ServerFormDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+interface ServerFormFieldsProps {
+  /** The existing server when editing; null when adding a new one */
   server: McpServerConfig | null
   formState: ServerFormState
   setFormState: (state: ServerFormState) => void
   formErrors: Record<string, string>
   setFormErrors: (errors: Record<string, string>) => void
-  onSave: () => void
-  isSaving: boolean
 }
 
-export function FormDialog({
-  open,
-  onOpenChange,
+function ServerFormFields({
   server,
   formState,
   setFormState,
   formErrors,
   setFormErrors,
-  onSave,
-  isSaving,
-}: ServerFormDialogProps) {
+}: ServerFormFieldsProps) {
   const testConnection = useTestMcpConnection()
   const [showAdvanced, setShowAdvanced] = useState(() => formState.envVars.length > 0)
 
@@ -232,296 +227,364 @@ export function FormDialog({
   }
 
   const canTest = formState.name.trim() && formState.command.trim()
-  const canSave = canTest && Object.keys(formErrors).length === 0
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton
-        className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
-      >
-        {/* Header */}
-        <DialogHeader className="shrink-0 border-b bg-muted/20 px-5 pt-5 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-primary/5">
-              <Terminal className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <DialogTitle>{server ? "Edit MCP Server" : "Add MCP Server"}</DialogTitle>
-              <DialogDescription>
-                {server
-                  ? `Update the configuration for ${server.name}.`
-                  : "Connect an MCP server to extend the agent with additional tools."}
-              </DialogDescription>
-            </div>
+    <div className="space-y-5">
+      {/* JSON Quick Import */}
+      <JsonImport onImport={(config) => setFormState(configToFormState(config))} />
+
+      {/* Core configuration */}
+      <FieldGroup>
+        {/* Name + Command in a 2-col grid */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field data-invalid={formErrors.name ? true : undefined}>
+            <FieldLabel htmlFor="server-name">
+              Name <span className="text-destructive">*</span>
+            </FieldLabel>
+            <FieldDescription>Unique identifier for this server.</FieldDescription>
+            <Input
+              id="server-name"
+              value={formState.name}
+              onChange={(e) => updateField("name", e.target.value)}
+              placeholder="my-mcp-server"
+              disabled={!!server}
+              autoFocus
+              className="mt-1.5"
+            />
+            {formErrors.name && <FieldError>{formErrors.name}</FieldError>}
+          </Field>
+
+          <Field data-invalid={formErrors.command ? true : undefined}>
+            <FieldLabel htmlFor="server-command">
+              Command <span className="text-destructive">*</span>
+            </FieldLabel>
+            <FieldDescription>Executable to run — e.g. npx, uvx.</FieldDescription>
+            <Input
+              id="server-command"
+              value={formState.command}
+              onChange={(e) => updateField("command", e.target.value)}
+              placeholder="npx"
+              className="mt-1.5 font-mono"
+            />
+            {formErrors.command && <FieldError>{formErrors.command}</FieldError>}
+          </Field>
+        </div>
+
+        <Field>
+          <FieldLabel htmlFor="server-args">Arguments</FieldLabel>
+          <FieldDescription>
+            Space-separated arguments passed to the command.
+          </FieldDescription>
+          <Input
+            id="server-args"
+            value={formState.args}
+            onChange={(e) => updateField("args", e.target.value)}
+            placeholder="-y @modelcontextprotocol/server-filesystem ./path"
+            className="mt-1.5 font-mono text-xs"
+          />
+        </Field>
+
+        {/* Command preview — shown when command is filled */}
+        {formState.command && (
+          <div className="rounded-md bg-muted/50 px-3 py-2.5">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Preview
+            </p>
+            <code className="break-all font-mono text-xs">
+              {formState.command}
+              {formState.args && ` ${formState.args}`}
+            </code>
           </div>
-        </DialogHeader>
+        )}
 
-        {/* Scrollable body */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="space-y-5 p-5">
-            {/* JSON Quick Import */}
-            <JsonImport onImport={(config) => setFormState(configToFormState(config))} />
+        <Field>
+          <FieldLabel htmlFor="server-description">Description</FieldLabel>
+          <FieldDescription>Short summary of what this server provides.</FieldDescription>
+          <Input
+            id="server-description"
+            value={formState.description}
+            onChange={(e) => updateField("description", e.target.value)}
+            placeholder="File system access with read/write capabilities"
+            className="mt-1.5"
+          />
+        </Field>
+      </FieldGroup>
 
-            {/* Core configuration */}
-            <FieldGroup>
-              {/* Name + Command in a 2-col grid */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field data-invalid={formErrors.name ? true : undefined}>
-                  <FieldLabel htmlFor="server-name">
-                    Name <span className="text-destructive">*</span>
-                  </FieldLabel>
-                  <FieldDescription>Unique identifier for this server.</FieldDescription>
-                  <Input
-                    id="server-name"
-                    value={formState.name}
-                    onChange={(e) => updateField("name", e.target.value)}
-                    placeholder="my-mcp-server"
-                    disabled={!!server}
-                    autoFocus
-                    className="mt-1.5"
-                  />
-                  {formErrors.name && <FieldError>{formErrors.name}</FieldError>}
-                </Field>
+      {/* Advanced Options */}
+      <div className="overflow-hidden rounded-lg border">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className={cn(
+            "flex w-full items-center justify-between px-4 py-3 text-xs font-medium transition-colors hover:bg-muted/50",
+            showAdvanced
+              ? "bg-muted/50 text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <Settings2 className="h-3.5 w-3.5" />
+            Advanced Options
+            {formState.envVars.length > 0 && (
+              <span className="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary">
+                {formState.envVars.length}
+              </span>
+            )}
+          </div>
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 transition-transform duration-200",
+              showAdvanced && "rotate-180"
+            )}
+          />
+        </button>
 
-                <Field data-invalid={formErrors.command ? true : undefined}>
-                  <FieldLabel htmlFor="server-command">
-                    Command <span className="text-destructive">*</span>
-                  </FieldLabel>
-                  <FieldDescription>Executable to run — e.g. npx, uvx.</FieldDescription>
-                  <Input
-                    id="server-command"
-                    value={formState.command}
-                    onChange={(e) => updateField("command", e.target.value)}
-                    placeholder="npx"
-                    className="mt-1.5 font-mono"
-                  />
-                  {formErrors.command && <FieldError>{formErrors.command}</FieldError>}
-                </Field>
-              </div>
+        {showAdvanced && (
+          <div className="space-y-5 border-t p-4">
+            <Field>
+              <FieldLabel htmlFor="server-cwd">Working Directory</FieldLabel>
+              <FieldDescription>
+                Directory where the server process is launched.
+              </FieldDescription>
+              <Input
+                id="server-cwd"
+                value={formState.cwd}
+                onChange={(e) => updateField("cwd", e.target.value)}
+                placeholder="/path/to/directory"
+                className="mt-1.5 font-mono text-xs"
+              />
+            </Field>
 
-              <Field>
-                <FieldLabel htmlFor="server-args">Arguments</FieldLabel>
-                <FieldDescription>
-                  Space-separated arguments passed to the command.
-                </FieldDescription>
-                <Input
-                  id="server-args"
-                  value={formState.args}
-                  onChange={(e) => updateField("args", e.target.value)}
-                  placeholder="-y @modelcontextprotocol/server-filesystem ./path"
-                  className="mt-1.5 font-mono text-xs"
-                />
-              </Field>
+            <Separator />
 
-              {/* Command preview — shown when command is filled */}
-              {formState.command && (
-                <div className="rounded-md bg-muted/50 px-3 py-2.5">
-                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Preview
-                  </p>
-                  <code className="break-all font-mono text-xs">
-                    {formState.command}
-                    {formState.args && ` ${formState.args}`}
-                  </code>
-                </div>
-              )}
-
-              <Field>
-                <FieldLabel htmlFor="server-description">Description</FieldLabel>
-                <FieldDescription>Short summary of what this server provides.</FieldDescription>
-                <Input
-                  id="server-description"
-                  value={formState.description}
-                  onChange={(e) => updateField("description", e.target.value)}
-                  placeholder="File system access with read/write capabilities"
-                  className="mt-1.5"
-                />
-              </Field>
-            </FieldGroup>
-
-            {/* Advanced Options */}
-            <div className="overflow-hidden rounded-lg border">
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className={cn(
-                  "flex w-full items-center justify-between px-4 py-3 text-xs font-medium transition-colors hover:bg-muted/50",
-                  showAdvanced
-                    ? "bg-muted/50 text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <Settings2 className="h-3.5 w-3.5" />
-                  Advanced Options
-                  {formState.envVars.length > 0 && (
-                    <span className="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary">
-                      {formState.envVars.length}
-                    </span>
-                  )}
-                </div>
-                <ChevronDown
-                  className={cn(
-                    "h-3.5 w-3.5 transition-transform duration-200",
-                    showAdvanced && "rotate-180"
-                  )}
-                />
-              </button>
-
-              {showAdvanced && (
-                <div className="space-y-5 border-t p-4">
-                  <Field>
-                    <FieldLabel htmlFor="server-cwd">Working Directory</FieldLabel>
-                    <FieldDescription>
-                      Directory where the server process is launched.
-                    </FieldDescription>
-                    <Input
-                      id="server-cwd"
-                      value={formState.cwd}
-                      onChange={(e) => updateField("cwd", e.target.value)}
-                      placeholder="/path/to/directory"
-                      className="mt-1.5 font-mono text-xs"
-                    />
-                  </Field>
-
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-medium">Environment Variables</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          API keys, tokens, and secrets passed to the server process.
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={addEnvVar}
-                        className="shrink-0"
-                      >
-                        <Plus />
-                        Add Variable
-                      </Button>
-                    </div>
-
-                    {formState.envVars.length > 0 ? (
-                      <div className="space-y-1.5">
-                        {formState.envVars.map((envVar, index) => (
-                          <EnvVarRow
-                            key={index}
-                            envVar={envVar}
-                            index={index}
-                            onChange={(field, value) => updateEnvVar(index, field, value)}
-                            onRemove={() => removeEnvVar(index)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-md border border-dashed px-4 py-4 text-center">
-                        <p className="text-xs text-muted-foreground">
-                          No environment variables configured
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Test Connection */}
-            <div className="rounded-lg border">
-              <div className="flex items-center justify-between gap-4 bg-muted/20 px-4 py-3">
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-medium">Test Connection</p>
+                  <p className="text-xs font-medium">Environment Variables</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Verify the server starts and lists its tools.
+                    API keys, tokens, and secrets passed to the server process.
                   </p>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => testConnection.mutate(formStateToConfig(formState))}
-                  disabled={testConnection.isPending || !canTest}
+                  onClick={addEnvVar}
                   className="shrink-0"
                 >
-                  {testConnection.isPending ? (
-                    <>
-                      <Loader2 className="animate-spin" />
-                      Testing…
-                    </>
-                  ) : (
-                    <>
-                      <Terminal />
-                      Run Test
-                    </>
-                  )}
+                  <Plus />
+                  Add Variable
                 </Button>
               </div>
 
-              {testConnection.data && (
-                <div className="border-t">
-                  <Alert
-                    variant={testConnection.data.success ? "default" : "destructive"}
-                    className="animate-in fade-in-50 rounded-none rounded-b-lg border-0"
-                  >
-                    {testConnection.data.success ? (
-                      <CheckCircle className="text-green-500" />
-                    ) : (
-                      <XCircle />
-                    )}
-                    <AlertDescription>
-                      {testConnection.data.success ? (
-                        <div>
-                          <p className="font-medium text-foreground">Connection successful</p>
-                          {testConnection.data.toolCount > 0 ? (
-                            <p className="mt-0.5">
-                              {testConnection.data.toolCount} tool
-                              {testConnection.data.toolCount !== 1 ? "s" : ""} available
-                              {testConnection.data.tools && testConnection.data.tools.length > 0 && (
-                                <span className="text-muted-foreground">
-                                  {" — "}
-                                  {testConnection.data.tools.map((t) => t.name).join(", ")}
-                                </span>
-                              )}
-                            </p>
-                          ) : (
-                            <p className="mt-0.5">No tools exposed by this server.</p>
-                          )}
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="font-medium">Connection failed</p>
-                          <p className="mt-0.5 break-all">{testConnection.data.error}</p>
-                        </div>
-                      )}
-                    </AlertDescription>
-                  </Alert>
+              {formState.envVars.length > 0 ? (
+                <div className="space-y-1.5">
+                  {formState.envVars.map((envVar, index) => (
+                    <EnvVarRow
+                      key={index}
+                      envVar={envVar}
+                      index={index}
+                      onChange={(field, value) => updateEnvVar(index, field, value)}
+                      onRemove={() => removeEnvVar(index)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed px-4 py-4 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    No environment variables configured
+                  </p>
                 </div>
               )}
             </div>
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* Footer */}
-        <DialogFooter className="shrink-0 border-t bg-muted/20 px-5 py-4">
-          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-          <Button onClick={onSave} disabled={!canSave || isSaving}>
-            {isSaving ? (
+      {/* Test Connection */}
+      <div className="rounded-lg border">
+        <div className="flex items-center justify-between gap-4 bg-muted/20 px-4 py-3">
+          <div>
+            <p className="text-xs font-medium">Test Connection</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Verify the server starts and lists its tools.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => testConnection.mutate(formStateToConfig(formState))}
+            disabled={testConnection.isPending || !canTest}
+            className="shrink-0"
+          >
+            {testConnection.isPending ? (
               <>
                 <Loader2 className="animate-spin" />
-                Saving…
+                Testing…
               </>
-            ) : server ? (
-              "Update Server"
             ) : (
-              "Add Server"
+              <>
+                <Terminal />
+                Run Test
+              </>
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+
+        {testConnection.data && (
+          <div className="border-t">
+            <Alert
+              variant={testConnection.data.success ? "default" : "destructive"}
+              className="animate-in fade-in-50 rounded-none rounded-b-lg border-0"
+            >
+              {testConnection.data.success ? (
+                <CheckCircle className="text-green-500" />
+              ) : (
+                <XCircle />
+              )}
+              <AlertDescription>
+                {testConnection.data.success ? (
+                  <div>
+                    <p className="font-medium text-foreground">Connection successful</p>
+                    {testConnection.data.toolCount > 0 ? (
+                      <p className="mt-0.5">
+                        {testConnection.data.toolCount} tool
+                        {testConnection.data.toolCount !== 1 ? "s" : ""} available
+                        {testConnection.data.tools && testConnection.data.tools.length > 0 && (
+                          <span className="text-muted-foreground">
+                            {" — "}
+                            {testConnection.data.tools.map((t) => t.name).join(", ")}
+                          </span>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="mt-0.5">No tools exposed by this server.</p>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-medium">Connection failed</p>
+                    <p className="mt-0.5 break-all">{testConnection.data.error}</p>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Server Form Page ──────────────────────────────────────────────────────────
+
+interface ServerFormPageProps {
+  /** "new" to add a server, otherwise the name of the server being edited */
+  serverName: string
+}
+
+export function ServerFormPage({ serverName }: ServerFormPageProps) {
+  const navigate = useNavigate()
+  const { data: settings } = useMcpSettings()
+  const saveSettings = useSaveMcpSettings()
+
+  const servers = settings?.servers ?? []
+  const isNew = serverName === "new"
+  const server = isNew
+    ? null
+    : (servers.find((s) => s.name === serverName) ?? null)
+
+  const [formState, setFormState] = useState<ServerFormState>(() =>
+    server ? configToFormState(server) : createEmptyServerForm()
+  )
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+
+  function goBack() {
+    navigate({
+      to: "/settings/$section",
+      params: { section: "mcp" },
+      search: {},
+    })
+  }
+
+  function handleSave() {
+    const errors = validateForm(formState)
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors)
+      return
+    }
+
+    const newConfig = formStateToConfig(formState)
+    const updatedServers = server
+      ? servers.map((s) => (s.name === server.name ? newConfig : s))
+      : [...servers.filter((s) => s.name !== newConfig.name), newConfig]
+
+    saveSettings.mutate(
+      { settings: { servers: updatedServers } },
+      { onSuccess: goBack }
+    )
+  }
+
+  const canSave =
+    formState.name.trim() &&
+    formState.command.trim() &&
+    Object.keys(formErrors).length === 0
+
+  return (
+    <div className="mx-auto w-full max-w-2xl px-8 pt-6 pb-24">
+      {/* Page header */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={goBack}
+        className="mb-4 -ml-2 h-7 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="size-3.5" />
+        <span className="text-xs font-medium">All servers</span>
+      </Button>
+
+      <header className="mb-6 flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-primary/5">
+          <Terminal className="h-4 w-4 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-base font-semibold leading-tight tracking-tight">
+            {server ? "Edit MCP Server" : "Add MCP Server"}
+          </h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {server
+              ? `Update the configuration for ${server.name}.`
+              : "Connect an MCP server to extend the agent with additional tools."}
+          </p>
+        </div>
+      </header>
+
+      <ServerFormFields
+        server={server}
+        formState={formState}
+        setFormState={setFormState}
+        formErrors={formErrors}
+        setFormErrors={setFormErrors}
+      />
+
+      {/* Actions */}
+      <div className="mt-6 flex items-center justify-end gap-2">
+        <Button variant="outline" onClick={goBack}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave} disabled={!canSave || saveSettings.isPending}>
+          {saveSettings.isPending ? (
+            <>
+              <Loader2 className="animate-spin" />
+              Saving…
+            </>
+          ) : server ? (
+            "Update Server"
+          ) : (
+            "Add Server"
+          )}
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -529,7 +592,6 @@ export function FormDialog({
 
 interface ServerListItemProps {
   server: McpServerConfig
-  workspaceId: string
   status?: { connected: boolean; toolCount: number; error?: string; enabled?: boolean }
   tools?: Array<{ name: string; description?: string }>
   onEdit: () => void
@@ -538,7 +600,6 @@ interface ServerListItemProps {
 
 export function ServerListItem({
   server,
-  workspaceId,
   status,
   tools,
   onEdit,
@@ -555,9 +616,9 @@ export function ServerListItem({
 
   function handleStartStop() {
     if (isConnected) {
-      stopServer.mutate({ workspaceId, serverName: server.name })
+      stopServer.mutate({ serverName: server.name })
     } else {
-      startServer.mutate({ workspaceId, serverName: server.name })
+      startServer.mutate({ serverName: server.name })
     }
   }
 
@@ -768,111 +829,6 @@ export function DeleteConfirmDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-// ── Shared Hook for Server Management ────────────────────────────────────────
-
-interface UseServerManagementProps {
-  workspaceId: string
-  servers: McpServerConfig[]
-  saveSettings: ReturnType<typeof useSaveMcpSettings>
-  onToggleEnabled?: (name: string, enabled: boolean) => void
-}
-
-interface UseServerManagementReturn {
-  showDialog: boolean
-  setShowDialog: (open: boolean) => void
-  editingServer: McpServerConfig | null
-  formState: ServerFormState
-  formErrors: Record<string, string>
-  serverToDelete: string | null
-  openAddDialog: () => void
-  openEditDialog: (server: McpServerConfig) => void
-  closeDialog: () => void
-  handleSave: () => void
-  handleDelete: (serverName: string) => void
-  confirmDelete: () => void
-  setFormState: React.Dispatch<React.SetStateAction<ServerFormState>>
-  setFormErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>
-}
-
-export function useServerManagement({
-  workspaceId,
-  servers,
-  saveSettings,
-}: UseServerManagementProps): UseServerManagementReturn {
-  const [showDialog, setShowDialog] = useState(false)
-  const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null)
-  const [formState, setFormState] = useState<ServerFormState>(createEmptyServerForm)
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
-  const [serverToDelete, setServerToDelete] = useState<string | null>(null)
-
-  function openAddDialog() {
-    setEditingServer(null)
-    setFormState(createEmptyServerForm())
-    setFormErrors({})
-    setShowDialog(true)
-  }
-
-  function openEditDialog(server: McpServerConfig) {
-    setEditingServer(server)
-    setFormState(configToFormState(server))
-    setFormErrors({})
-    setShowDialog(true)
-  }
-
-  function closeDialog() {
-    setShowDialog(false)
-  }
-
-  function handleSave() {
-    const errors = validateForm(formState)
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors)
-      return
-    }
-
-    const newConfig = formStateToConfig(formState)
-    const updatedServers = editingServer
-      ? servers.map((s) => (s.name === editingServer.name ? newConfig : s))
-      : [...servers.filter((s) => s.name !== newConfig.name), newConfig]
-
-    saveSettings.mutate({ workspaceId, settings: { servers: updatedServers } })
-    setShowDialog(false)
-  }
-
-  function handleDelete(serverName: string) {
-    setServerToDelete(serverName)
-  }
-
-  function confirmDelete() {
-    if (serverToDelete) {
-      saveSettings.mutate({
-        workspaceId,
-        settings: {
-          servers: servers.filter((s) => s.name !== serverToDelete),
-        },
-      })
-    }
-    setServerToDelete(null)
-  }
-
-  return {
-    showDialog,
-    editingServer,
-    formState,
-    formErrors,
-    serverToDelete,
-    openAddDialog,
-    openEditDialog,
-    closeDialog,
-    setShowDialog,
-    handleSave,
-    handleDelete,
-    confirmDelete,
-    setFormState,
-    setFormErrors,
-  }
 }
 
 // ── Form Validation ───────────────────────────────────────────────────────────

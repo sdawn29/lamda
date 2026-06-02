@@ -4,7 +4,6 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-  Server,
   Download,
   RefreshCw,
 } from "lucide-react"
@@ -45,7 +44,6 @@ import {
 } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { ShortcutKbd } from "@/shared/ui/kbd"
-import { McpDialog, useMcpServerStatus } from "@/features/mcp"
 import { TasksDropdown } from "@/features/tasks"
 import { useMainTabs } from "@/features/main-tabs"
 import { cn } from "@/shared/lib/utils"
@@ -214,12 +212,6 @@ export function TitleBar() {
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState("")
   const renameInputRef = useRef<HTMLInputElement>(null)
-  const [mcpDialogOpen, setMcpDialogOpen] = useState(false)
-  const { data: mcpServerStatus } = useMcpServerStatus(
-    actionWorkspace?.id ?? ""
-  )
-  const mcpConnectedCount =
-    mcpServerStatus?.filter((s) => s.connected).length ?? 0
 
   const startRename = () => {
     setRenameValue(urlActiveThread?.title ?? "")
@@ -398,31 +390,6 @@ export function TitleBar() {
           onRunTask={runTerminalCommand}
         />
 
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                onClick={() => setMcpDialogOpen(true)}
-                className={cn(
-                  "h-7 text-muted-foreground",
-                  mcpConnectedCount > 0 ? "gap-1.5 px-2" : "w-7"
-                )}
-              >
-                <Server className="size-4 shrink-0" />
-                {mcpConnectedCount > 0 && (
-                  <span className="flex items-center gap-1 text-[11px] font-medium tabular-nums">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
-                    {mcpConnectedCount}
-                  </span>
-                )}
-                <span className="sr-only">MCP servers</span>
-              </Button>
-            }
-          />
-          <TooltipContent>MCP servers</TooltipContent>
-        </Tooltip>
-
         <OpenWithButton
           workspaceId={actionWorkspace?.id}
           workspacePath={actionWorkspace?.path}
@@ -450,12 +417,6 @@ export function TitleBar() {
         </Tooltip>
 
       </div>
-
-      <McpDialog
-        open={mcpDialogOpen}
-        onOpenChange={setMcpDialogOpen}
-        workspaceId={actionWorkspace?.id}
-      />
 
     </div>
   )

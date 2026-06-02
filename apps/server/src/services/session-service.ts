@@ -5,6 +5,7 @@ import {
   createTodoTool,
   PLAN_DIR,
   type SdkConfig,
+  type ManagedSessionHandle,
 } from "@lamda/pi-sdk";
 import { updateThreadSessionFile, getWorkspace, getThread } from "@lamda/db";
 import { mkdir } from "node:fs/promises";
@@ -136,7 +137,7 @@ export async function collectCustomTools(
 
   const [mcpTools, lspTools] = await Promise.all([
     import("./mcp-service.js")
-      .then((m) => m.getMcpToolsForSession(workspaceId))
+      .then((m) => m.getMcpToolsForSession())
       .catch((err) => {
         console.warn("[session-service] failed to load MCP tools:", err);
         return [];
@@ -151,21 +152,43 @@ export async function collectCustomTools(
   return [...(todoTool ? [todoTool] : []), ...mcpTools, ...lspTools];
 }
 
+async function refreshSessionTools(
+  sessionId: string,
+  handle: ManagedSessionHandle,
+  workspaceId: string,
+  workspacePath: string,
+) {
+  const threadId = store.getThreadId(sessionId);
+  if (!threadId) return;
+
+  const thread = getThread(threadId);
+  const mode = thread?.mode as SdkConfig["mode"] | undefined;
+  const tools = await collectCustomTools(workspaceId, workspacePath, mode, threadId);
+  handle.setCustomTools(tools);
+
+  if (mode) {
+    handle.setMode(mode);
+  }
+}
+
 export async function refreshWorkspaceSessionTools(workspaceId: string) {
   const ws = getWorkspace(workspaceId);
   if (!ws) return;
 
   for (const { sessionId, handle } of store.getByWorkspaceId(workspaceId)) {
-    const threadId = store.getThreadId(sessionId);
-    if (!threadId) continue;
+    await refreshSessionTools(sessionId, handle, workspaceId, ws.path);
+  }
+}
 
-    const thread = getThread(threadId);
-    const mode = thread?.mode as SdkConfig["mode"] | undefined;
-    const tools = await collectCustomTools(workspaceId, ws.path, mode, threadId);
-    handle.setCustomTools(tools);
-
-    if (mode) {
-      handle.setMode(mode);
-    }
+/**
+ * Refresh custom tools for every active session across all workspaces. Used
+ * when application-wide configuration (e.g. MCP servers) changes.
+ */
+export async function refreshAllSessionTools() {
+  for (const { sessionId, handle, workspaceId } of store.getAll()) {
+    if (!workspaceId) continue;
+    const ws = getWorkspace(workspaceId);
+    if (!ws) continue;
+    await refreshSessionTools(sessionId, handle, workspaceId, ws.path);
   }
 }

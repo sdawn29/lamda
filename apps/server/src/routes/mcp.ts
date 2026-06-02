@@ -1,7 +1,8 @@
 /**
  * MCP Routes
  *
- * API endpoints for managing MCP server configurations per workspace.
+ * API endpoints for managing MCP server configurations. Servers are scoped
+ * application-wide — configured once and shared across every workspace.
  * Settings are persisted in SQLite via the db package.
  */
 
@@ -16,26 +17,24 @@ import {
   stopMcpServer,
   setServerEnabled,
 } from "../services/mcp-service.js";
-import { refreshWorkspaceSessionTools } from "../services/session-service.js";
+import { refreshAllSessionTools } from "../services/session-service.js";
 
 const mcpRouter = new Hono();
 
 /**
- * GET /mcp/settings/:workspaceId
- * Fetch MCP settings for a workspace
+ * GET /mcp/settings
+ * Fetch MCP settings
  */
-mcpRouter.get("/settings/:workspaceId", async (c) => {
-  const workspaceId = c.req.param("workspaceId");
-  const settings = getMcpSettings(workspaceId);
+mcpRouter.get("/settings", async (c) => {
+  const settings = getMcpSettings();
   return c.json({ settings });
 });
 
 /**
- * PUT /mcp/settings/:workspaceId
- * Save MCP settings for a workspace
+ * PUT /mcp/settings
+ * Save MCP settings
  */
-mcpRouter.put("/settings/:workspaceId", async (c) => {
-  const workspaceId = c.req.param("workspaceId");
+mcpRouter.put("/settings", async (c) => {
   const { settings } = await c.req.json<{
     settings: {
       servers: Array<{
@@ -49,32 +48,26 @@ mcpRouter.put("/settings/:workspaceId", async (c) => {
     };
   }>();
 
-  saveMcpSettings(workspaceId, settings);
-  await refreshWorkspaceSessionTools(workspaceId);
+  saveMcpSettings(settings);
+  await refreshAllSessionTools();
   return c.json({ success: true });
 });
 
 /**
- * GET /mcp/status/:workspaceId
+ * GET /mcp/status
  * Get MCP server connection status
  */
-mcpRouter.get("/status/:workspaceId", async (c) => {
-  const workspaceId = c.req.param("workspaceId");
-
-  const status = await getMcpServerStatus(workspaceId);
-
+mcpRouter.get("/status", async (c) => {
+  const status = await getMcpServerStatus();
   return c.json({ servers: status });
 });
 
 /**
- * GET /mcp/tools/:workspaceId
+ * GET /mcp/tools
  * List available MCP tools
  */
-mcpRouter.get("/tools/:workspaceId", async (c) => {
-  const workspaceId = c.req.param("workspaceId");
-
-  const tools = await getMcpTools(workspaceId);
-
+mcpRouter.get("/tools", async (c) => {
+  const tools = await getMcpTools();
   return c.json({ tools });
 });
 
@@ -98,42 +91,39 @@ mcpRouter.post("/test-connection", async (c) => {
 });
 
 /**
- * POST /mcp/start/:workspaceId/:serverName
+ * POST /mcp/start/:serverName
  * Start an MCP server
  */
-mcpRouter.post("/start/:workspaceId/:serverName", async (c) => {
-  const workspaceId = c.req.param("workspaceId");
+mcpRouter.post("/start/:serverName", async (c) => {
   const serverName = c.req.param("serverName");
 
-  const result = await startMcpServer(workspaceId, serverName);
-  if (result.success) await refreshWorkspaceSessionTools(workspaceId);
+  const result = await startMcpServer(serverName);
+  if (result.success) await refreshAllSessionTools();
   return c.json(result);
 });
 
 /**
- * POST /mcp/stop/:workspaceId/:serverName
+ * POST /mcp/stop/:serverName
  * Stop an MCP server
  */
-mcpRouter.post("/stop/:workspaceId/:serverName", async (c) => {
-  const workspaceId = c.req.param("workspaceId");
+mcpRouter.post("/stop/:serverName", async (c) => {
   const serverName = c.req.param("serverName");
 
-  const result = await stopMcpServer(workspaceId, serverName);
-  if (result.success) await refreshWorkspaceSessionTools(workspaceId);
+  const result = await stopMcpServer(serverName);
+  if (result.success) await refreshAllSessionTools();
   return c.json(result);
 });
 
 /**
- * PATCH /mcp/enabled/:workspaceId/:serverName
+ * PATCH /mcp/enabled/:serverName
  * Enable or disable an MCP server
  */
-mcpRouter.patch("/enabled/:workspaceId/:serverName", async (c) => {
-  const workspaceId = c.req.param("workspaceId");
+mcpRouter.patch("/enabled/:serverName", async (c) => {
   const serverName = c.req.param("serverName");
   const { enabled } = await c.req.json<{ enabled: boolean }>();
 
-  setServerEnabled(workspaceId, serverName, enabled);
-  await refreshWorkspaceSessionTools(workspaceId);
+  setServerEnabled(serverName, enabled);
+  await refreshAllSessionTools();
   return c.json({ success: true });
 });
 

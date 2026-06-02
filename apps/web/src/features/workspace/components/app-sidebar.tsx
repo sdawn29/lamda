@@ -514,7 +514,7 @@ export function AppSidebar() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-full gap-2 text-xs"
+              className="group/new-thread h-8 w-full gap-2 text-xs"
               onClick={() =>
                 navigate({
                   to: "/new",
@@ -526,20 +526,20 @@ export function AppSidebar() {
               New Thread
               <ShortcutKbd
                 binding={newThreadBinding}
-                className="ml-auto opacity-55"
+                className="ml-auto opacity-0 transition-opacity group-hover/new-thread:opacity-55"
               />
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-full gap-2 text-xs"
+              className="group/search h-8 w-full gap-2 text-xs"
               onClick={openPalette}
             >
               <Search className="size-3.5" />
               Search
               <ShortcutKbd
                 binding={openPaletteBinding}
-                className="ml-auto opacity-55"
+                className="ml-auto opacity-0 transition-opacity group-hover/search:opacity-55"
               />
             </Button>
           </div>

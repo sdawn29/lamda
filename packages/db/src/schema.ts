@@ -155,10 +155,7 @@ export const workspaceTasks = sqliteTable("workspace_tasks", {
 
 export const mcpServers = sqliteTable("mcp_servers", {
   id: text("id").primaryKey(),
-  workspaceId: text("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   command: text("command").notNull(),
   args: text("args"), // JSON array stored as string
   env: text("env"), // JSON object stored as string

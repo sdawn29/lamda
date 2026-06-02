@@ -1,12 +1,19 @@
 import type React from "react"
-import { useMemo, useState } from "react"
-import { Search, X } from "lucide-react"
-import { Link, useMatchRoute } from "@tanstack/react-router"
+import { useMemo, useRef, useState } from "react"
+import { ArrowLeft, Search, X } from "lucide-react"
+import { Link, useMatchRoute, useRouter } from "@tanstack/react-router"
 
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
+import { ShortcutKbd } from "@/shared/ui/kbd"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
+import { useShortcutBinding } from "@/shared/components/keyboard-shortcuts-provider"
+import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
+import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
+import { useWorkspace } from "@/features/workspace"
 import { cn } from "@/shared/lib/utils"
+import { useAppSettings } from "../queries"
 import {
   matchesSearch,
   SETTINGS_GROUPS,
@@ -45,6 +52,62 @@ function SidebarLink({ section }: { section: SettingsSectionMeta }) {
   )
 }
 
+function BackToThreadsButton() {
+  const router = useRouter()
+  const closeBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_SETTINGS)
+  const { workspaces } = useWorkspace()
+  const { data: settings } = useAppSettings()
+
+  // Snapshot the thread that was active when settings was opened. Captured on
+  // first render and frozen so navigating between sections doesn't change it.
+  const initialThreadIdRef = useRef<string | null>(null)
+  if (initialThreadIdRef.current === null) {
+    const saved = settings?.[APP_SETTINGS_KEYS.ACTIVE_THREAD_ID]
+    if (typeof saved === "string" && saved) {
+      initialThreadIdRef.current = saved
+    }
+  }
+
+  const handleClose = () => {
+    const threadId = initialThreadIdRef.current
+    const allThreads = workspaces.flatMap((w) => w.threads)
+    const exists = threadId && allThreads.some((t) => t.id === threadId)
+    if (exists && threadId) {
+      router.navigate({
+        to: "/workspace/$threadId",
+        params: { threadId },
+      })
+    } else {
+      router.navigate({ to: "/" })
+    }
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClose}
+            aria-label="Back to threads"
+            className="h-7 w-full justify-start gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span className="text-xs font-medium">Threads</span>
+          </Button>
+        }
+      />
+      <TooltipContent side="right">
+        Back to threads
+        {closeBinding && (
+          <ShortcutKbd binding={closeBinding} className="ml-1" />
+        )}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 export function SettingsSidebar() {
   const [search, setSearch] = useState("")
 
@@ -74,15 +137,9 @@ export function SettingsSidebar() {
         style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       />
 
-      {/* Header */}
-      <div className="flex shrink-0 items-center gap-2 px-4 pb-2">
-        <span
-          className="text-base leading-none font-black"
-          style={{ color: "#d4a017" }}
-        >
-          Λ
-        </span>
-        <h1 className="text-[13px] font-semibold tracking-tight">Settings</h1>
+      {/* Back to threads */}
+      <div className="px-2 pb-2">
+        <BackToThreadsButton />
       </div>
 
       {/* Search */}
@@ -143,9 +200,17 @@ export function SettingsSidebar() {
 
       {/* Footer */}
       <div className="flex shrink-0 items-center justify-between gap-2 border-t border-sidebar-border px-4 py-2.5">
-        <span className="text-[11px] font-medium text-muted-foreground">
-          Lamda
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="text-base leading-none font-black"
+            style={{ color: "#d4a017" }}
+          >
+            Λ
+          </span>
+          <span className="text-[11px] font-medium text-muted-foreground">
+            Lamda
+          </span>
+        </div>
         {import.meta.env.DEV ? (
           <Badge variant="outline" className="font-mono text-[10px]">
             dev

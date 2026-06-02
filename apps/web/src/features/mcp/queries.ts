@@ -5,44 +5,41 @@ const mcpRootKey = ["mcp"] as const
 
 export const mcpKeys = {
   all: mcpRootKey,
-  settings: (workspaceId: string) => [...mcpRootKey, "settings", workspaceId] as const,
-  status: (workspaceId: string) => [...mcpRootKey, "status", workspaceId] as const,
-  tools: (workspaceId: string) => [...mcpRootKey, "tools", workspaceId] as const,
+  settings: () => [...mcpRootKey, "settings"] as const,
+  status: () => [...mcpRootKey, "status"] as const,
+  tools: () => [...mcpRootKey, "tools"] as const,
 }
 
 /**
- * Fetch MCP settings for a workspace
+ * Fetch MCP settings (application-wide)
  */
-export function useMcpSettings(workspaceId: string) {
+export function useMcpSettings() {
   return useQuery({
-    queryKey: mcpKeys.settings(workspaceId),
-    queryFn: ({ signal }) => fetchMcpSettings(workspaceId, signal),
+    queryKey: mcpKeys.settings(),
+    queryFn: ({ signal }) => fetchMcpSettings(signal),
     staleTime: 30 * 1000,
-    enabled: !!workspaceId,
   })
 }
 
 /**
- * Fetch MCP server status for a workspace
+ * Fetch MCP server status (application-wide)
  */
-export function useMcpServerStatus(workspaceId: string) {
+export function useMcpServerStatus() {
   return useQuery({
-    queryKey: mcpKeys.status(workspaceId),
-    queryFn: ({ signal }) => fetchMcpServerStatus(workspaceId, signal),
+    queryKey: mcpKeys.status(),
+    queryFn: ({ signal }) => fetchMcpServerStatus(signal),
     staleTime: 10 * 1000,
-    enabled: !!workspaceId,
     refetchInterval: 30 * 1000, // Refresh status periodically
   })
 }
 
 /**
- * Fetch available MCP tools for a workspace
+ * Fetch available MCP tools (application-wide)
  */
-export function useMcpTools(workspaceId: string) {
+export function useMcpTools() {
   return useQuery({
-    queryKey: mcpKeys.tools(workspaceId),
-    queryFn: ({ signal }) => fetchMcpTools(workspaceId, signal),
+    queryKey: mcpKeys.tools(),
+    queryFn: ({ signal }) => fetchMcpTools(signal),
     staleTime: 30 * 1000,
-    enabled: !!workspaceId,
   })
 }

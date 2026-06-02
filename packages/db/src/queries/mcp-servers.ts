@@ -1,11 +1,10 @@
-import { eq, and } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { db } from "../client.js"
 import { mcpServers } from "../schema.js"
 import type { McpServerConfig } from "@lamda/mcp"
 
 export interface DbMcpServer {
   id: string
-  workspaceId: string
   name: string
   command: string
   args: string | null
@@ -17,35 +16,31 @@ export interface DbMcpServer {
 }
 
 /**
- * Get all MCP servers for a workspace
+ * Get all MCP servers (application-wide)
  */
-export function getMcpServers(workspaceId: string): DbMcpServer[] {
+export function getMcpServers(): DbMcpServer[] {
+  return db.select().from(mcpServers).all()
+}
+
+/**
+ * Get enabled MCP servers (application-wide)
+ */
+export function getEnabledMcpServers(): DbMcpServer[] {
   return db
     .select()
     .from(mcpServers)
-    .where(eq(mcpServers.workspaceId, workspaceId))
+    .where(eq(mcpServers.enabled, true))
     .all()
 }
 
 /**
- * Get enabled MCP servers for a workspace
+ * Get a single MCP server by name
  */
-export function getEnabledMcpServers(workspaceId: string): DbMcpServer[] {
+export function getMcpServer(name: string): DbMcpServer | undefined {
   return db
     .select()
     .from(mcpServers)
-    .where(and(eq(mcpServers.workspaceId, workspaceId), eq(mcpServers.enabled, true)))
-    .all()
-}
-
-/**
- * Get a single MCP server by name and workspace
- */
-export function getMcpServer(workspaceId: string, name: string): DbMcpServer | undefined {
-  return db
-    .select()
-    .from(mcpServers)
-    .where(and(eq(mcpServers.workspaceId, workspaceId), eq(mcpServers.name, name)))
+    .where(eq(mcpServers.name, name))
     .get()
 }
 
@@ -53,7 +48,6 @@ export function getMcpServer(workspaceId: string, name: string): DbMcpServer | u
  * Create or update an MCP server
  */
 export function upsertMcpServer(
-  workspaceId: string,
   config: McpServerConfig & { id?: string; enabled?: boolean }
 ): void {
   const id = config.id ?? crypto.randomUUID()
@@ -62,7 +56,6 @@ export function upsertMcpServer(
   db.insert(mcpServers)
     .values({
       id,
-      workspaceId,
       name: config.name,
       command: config.command,
       args: config.args ? JSON.stringify(config.args) : null,
@@ -73,7 +66,7 @@ export function upsertMcpServer(
       createdAt,
     })
     .onConflictDoUpdate({
-      target: [mcpServers.workspaceId, mcpServers.name],
+      target: mcpServers.name,
       set: {
         command: config.command,
         args: config.args ? JSON.stringify(config.args) : null,
@@ -87,17 +80,15 @@ export function upsertMcpServer(
 }
 
 /**
- * Save multiple MCP servers (replaces all existing for workspace)
+ * Save multiple MCP servers (replaces all existing)
  */
-export function saveMcpServers(workspaceId: string, configs: McpServerConfig[]): void {
+export function saveMcpServers(configs: McpServerConfig[]): void {
   // Preserve existing enabled states before wiping
-  const existing = getMcpServers(workspaceId)
+  const existing = getMcpServers()
   const enabledMap = new Map(existing.map((s) => [s.name, s.enabled]))
 
   // Delete existing servers
-  db.delete(mcpServers)
-    .where(eq(mcpServers.workspaceId, workspaceId))
-    .run()
+  db.delete(mcpServers).run()
 
   // Insert new servers, restoring enabled state for servers that already existed
   const now = Date.now()
@@ -105,7 +96,6 @@ export function saveMcpServers(workspaceId: string, configs: McpServerConfig[]):
     db.insert(mcpServers)
       .values({
         id: crypto.randomUUID(),
-        workspaceId,
         name: config.name,
         command: config.command,
         args: config.args ? JSON.stringify(config.args) : null,
@@ -122,19 +112,17 @@ export function saveMcpServers(workspaceId: string, configs: McpServerConfig[]):
 /**
  * Delete an MCP server
  */
-export function deleteMcpServer(workspaceId: string, name: string): void {
-  db.delete(mcpServers)
-    .where(and(eq(mcpServers.workspaceId, workspaceId), eq(mcpServers.name, name)))
-    .run()
+export function deleteMcpServer(name: string): void {
+  db.delete(mcpServers).where(eq(mcpServers.name, name)).run()
 }
 
 /**
  * Update server enabled state
  */
-export function setMcpServerEnabled(workspaceId: string, name: string, enabled: boolean): void {
+export function setMcpServerEnabled(name: string, enabled: boolean): void {
   db.update(mcpServers)
     .set({ enabled })
-    .where(and(eq(mcpServers.workspaceId, workspaceId), eq(mcpServers.name, name)))
+    .where(eq(mcpServers.name, name))
     .run()
 }
 

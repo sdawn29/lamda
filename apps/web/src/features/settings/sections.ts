@@ -9,6 +9,7 @@ import {
   Keyboard,
   MessageSquare,
   Palette,
+  Plug,
   RefreshCw,
   Server,
 } from "lucide-react"
@@ -154,6 +155,24 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
       "shortcut",
       "binding",
       "keys",
+    ],
+  },
+  {
+    slug: "mcp",
+    label: "MCP Servers",
+    title: "MCP Servers",
+    description:
+      "Connect external tools to the agent via Model Context Protocol. Servers are shared across all workspaces.",
+    icon: Plug,
+    group: "system",
+    keywords: [
+      "mcp",
+      "model context protocol",
+      "server",
+      "tools",
+      "integration",
+      "external",
+      "plugin",
     ],
   },
   {

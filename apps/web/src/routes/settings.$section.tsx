@@ -13,6 +13,7 @@ import { LocalModelsSection } from "@/features/settings/sections/local-models"
 import { GitSection } from "@/features/settings/sections/git"
 import { ShortcutsSection } from "@/features/settings/sections/shortcuts"
 import { LspSection } from "@/features/settings/sections/lsp"
+import { McpSection } from "@/features/settings/sections/mcp"
 import { RetrySection } from "@/features/settings/sections/retry"
 import { UpdatesSection } from "@/features/settings/sections/updates"
 import { DataSection } from "@/features/settings/sections/data"
@@ -26,12 +27,21 @@ const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
   git: GitSection,
   shortcuts: ShortcutsSection,
   lsp: LspSection,
+  mcp: McpSection,
   retry: RetrySection,
   updates: UpdatesSection,
   data: DataSection,
 }
 
+interface SettingsSectionSearch {
+  /** Active MCP server form: "new" to add, or a server name to edit. */
+  server?: string
+}
+
 export const Route = createFileRoute("/settings/$section")({
+  validateSearch: (search: Record<string, unknown>): SettingsSectionSearch => ({
+    server: typeof search.server === "string" ? search.server : undefined,
+  }),
   beforeLoad: ({ params }) => {
     const section = findSettingsSection(params.section)
     const Component = SECTION_COMPONENTS[params.section]
@@ -48,8 +58,14 @@ export const Route = createFileRoute("/settings/$section")({
 
 function SettingsSectionRoute() {
   const { section: slug } = Route.useParams()
+  const { server } = Route.useSearch()
   const section = findSettingsSection(slug)!
   const Component = SECTION_COMPONENTS[slug]!
+
+  // The MCP form takes over the full page, providing its own header/chrome.
+  if (slug === "mcp" && server) {
+    return <Component />
+  }
 
   return (
     <SettingsContent section={section}>

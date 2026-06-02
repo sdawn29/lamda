@@ -9,9 +9,9 @@ import React, {
 } from "react"
 import {
   Outlet,
-  useLocation,
   useParams,
   useRouter,
+  useRouterState,
   useSearch,
 } from "@tanstack/react-router"
 import { ChevronLeft, ChevronRight, PanelRight } from "lucide-react"
@@ -226,8 +226,19 @@ export function MainContentArea() {
 }
 
 export function WorkspaceLayout() {
-  const { pathname } = useLocation()
-  const isSettingsRoute = pathname.startsWith("/settings")
+  // Derive the active layout from the *committed* matches rather than
+  // useLocation(). The router updates the location store synchronously at the
+  // start of a navigation (before the new route's matches commit inside the
+  // transition), so reading pathname here would flip this branch a frame
+  // before the <Outlet /> swaps — briefly rendering the previous page's
+  // content without its chrome. Committed matches stay in lockstep with the
+  // Outlet, eliminating that flash.
+  const isSettingsRoute = useRouterState({
+    select: (s) => s.matches.some((m) => m.routeId === "/settings"),
+  })
+  const isOnboardRoute = useRouterState({
+    select: (s) => s.matches.some((m) => m.routeId === "/onboard"),
+  })
   const { isLoading, workspaces } = useWorkspace()
   const { threadId: activeThreadId } = useParams({ strict: false }) as {
     threadId?: string
@@ -402,7 +413,7 @@ export function WorkspaceLayout() {
     )
   }
 
-  if (pathname === "/onboard") {
+  if (isOnboardRoute) {
     return (
       <div className="h-svh">
         <Outlet />

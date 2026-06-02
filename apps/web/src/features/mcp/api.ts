@@ -2,33 +2,31 @@ import { apiFetch } from "@/shared/lib/client"
 import type { McpServerConfig } from "./types"
 
 // ── MCP Settings ────────────────────────────────────────────────────────────────
+//
+// MCP servers are scoped application-wide — configured once and shared across
+// every workspace.
 
 export type McpToolList = Array<{ name: string; description?: string }>
 
 export type McpSettings = { servers: McpServerConfig[] }
 
 /**
- * Fetch MCP settings for the current workspace
+ * Fetch MCP settings
  */
 export async function fetchMcpSettings(
-  workspaceId: string,
   signal?: AbortSignal
 ): Promise<McpSettings> {
-  const res = await apiFetch<{ settings: McpSettings }>(
-    `/mcp/settings/${encodeURIComponent(workspaceId)}`,
-    { signal }
-  )
+  const res = await apiFetch<{ settings: McpSettings }>("/mcp/settings", {
+    signal,
+  })
   return res.settings
 }
 
 /**
- * Save MCP settings for a workspace
+ * Save MCP settings
  */
-export async function saveMcpSettings(
-  workspaceId: string,
-  settings: McpSettings
-): Promise<void> {
-  await apiFetch(`/mcp/settings/${encodeURIComponent(workspaceId)}`, {
+export async function saveMcpSettings(settings: McpSettings): Promise<void> {
+  await apiFetch("/mcp/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ settings }),
@@ -39,11 +37,10 @@ export async function saveMcpSettings(
  * List available tools from connected MCP servers
  */
 export async function fetchMcpTools(
-  workspaceId: string,
   signal?: AbortSignal
 ): Promise<Array<{ serverName: string; name: string; description?: string }>> {
   const res = await apiFetch<{ tools: Array<{ serverName: string; name: string; description?: string }> }>(
-    `/mcp/tools/${encodeURIComponent(workspaceId)}`,
+    "/mcp/tools",
     { signal }
   )
   return res.tools
@@ -69,14 +66,13 @@ export async function testMcpConnection(
 }
 
 /**
- * Get MCP server status for a workspace
+ * Get MCP server status
  */
 export async function fetchMcpServerStatus(
-  workspaceId: string,
   signal?: AbortSignal
 ): Promise<Array<{ name: string; connected: boolean; toolCount: number; error?: string; enabled?: boolean }>> {
   const res = await apiFetch<{ servers: Array<{ name: string; connected: boolean; toolCount: number; error?: string; enabled?: boolean }> }>(
-    `/mcp/status/${encodeURIComponent(workspaceId)}`,
+    "/mcp/status",
     { signal }
   )
   return res.servers
@@ -86,11 +82,10 @@ export async function fetchMcpServerStatus(
  * Start an MCP server
  */
 export async function startMcpServer(
-  workspaceId: string,
   serverName: string
 ): Promise<{ success: boolean; error?: string; toolCount?: number }> {
   const res = await apiFetch<{ success: boolean; error?: string; toolCount?: number }>(
-    `/mcp/start/${encodeURIComponent(workspaceId)}/${encodeURIComponent(serverName)}`,
+    `/mcp/start/${encodeURIComponent(serverName)}`,
     { method: "POST" }
   )
   return res
@@ -100,11 +95,10 @@ export async function startMcpServer(
  * Stop an MCP server
  */
 export async function stopMcpServer(
-  workspaceId: string,
   serverName: string
 ): Promise<{ success: boolean; error?: string }> {
   const res = await apiFetch<{ success: boolean; error?: string }>(
-    `/mcp/stop/${encodeURIComponent(workspaceId)}/${encodeURIComponent(serverName)}`,
+    `/mcp/stop/${encodeURIComponent(serverName)}`,
     { method: "POST" }
   )
   return res
@@ -114,11 +108,10 @@ export async function stopMcpServer(
  * Enable or disable an MCP server
  */
 export async function setMcpServerEnabled(
-  workspaceId: string,
   serverName: string,
   enabled: boolean
 ): Promise<void> {
-  await apiFetch(`/mcp/enabled/${encodeURIComponent(workspaceId)}/${encodeURIComponent(serverName)}`, {
+  await apiFetch(`/mcp/enabled/${encodeURIComponent(serverName)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ enabled }),
