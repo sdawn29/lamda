@@ -150,7 +150,7 @@ function RightSidebarControls() {
 
   return (
     <div
-      className="fixed top-0 right-0 z-[60] flex h-11 items-center gap-0.5 px-2"
+      className="fixed top-px right-0 z-60 flex h-11 items-center gap-0.5 px-2"
       style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
     >
       <Tooltip>
@@ -305,7 +305,10 @@ export function WorkspaceLayout() {
       const onMove = (ev: MouseEvent) => {
         if (!isTerminalDragging.current) return
         const delta = terminalDragStartY.current - ev.clientY
-        const next = Math.max(80, Math.min(800, terminalDragStartHeight.current + delta))
+        const next = Math.max(
+          80,
+          Math.min(800, terminalDragStartHeight.current + delta)
+        )
         setTerminalHeight(next)
       }
 
@@ -345,9 +348,7 @@ export function WorkspaceLayout() {
 
   const activeTerminalOpen =
     !diffFullscreen &&
-    (terminalHost
-      ? (terminalStates[terminalHost.id]?.isOpen ?? false)
-      : false)
+    (terminalHost ? (terminalStates[terminalHost.id]?.isOpen ?? false) : false)
 
   // Keep the terminal panel mounted as long as any workspace has live tabs, so
   // switching threads between workspaces doesn't tear down PTYs that are still

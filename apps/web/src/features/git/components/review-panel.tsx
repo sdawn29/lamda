@@ -693,10 +693,12 @@ const FileContent = memo(function FileContent({
   filePath,
   openWithAppId,
   workspacePath,
+  initialScrollToLine,
 }: {
   filePath: string
   openWithAppId?: string | null
   workspacePath?: string
+  initialScrollToLine?: number
 }) {
   const [content, setContent] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -707,6 +709,10 @@ const FileContent = memo(function FileContent({
   const [markdownPreview, setMarkdownPreview] = useState(false)
   const [htmlPreview, setHtmlPreview] = useState(true)
   const [scrollToLine, setScrollToLine] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (initialScrollToLine) setScrollToLine(initialScrollToLine)
+  }, [initialScrollToLine])
 
   const workspaceId = useResolveWorkspaceId(workspacePath)
   const lsp = useLspConnection(workspaceId)
@@ -961,8 +967,13 @@ const FileContent = memo(function FileContent({
               diagnostics={diagnostics}
               connection={lsp}
               filePath={lspFilePath}
-              onOpenFile={(target, title) =>
-                addFileTab({ title, filePath: target, workspacePath })
+              onOpenFile={(target, title, line) =>
+                addFileTab({
+                  title,
+                  filePath: target,
+                  workspacePath,
+                  scrollToLine: line,
+                })
               }
               onAddCommentContext={(context) => {
                 const contextPath =
@@ -1201,6 +1212,7 @@ export const ReviewPanel = memo(function ReviewPanel({
               workspacePath={
                 currentWorkspacePath ?? activeFileTab.workspacePath
               }
+              initialScrollToLine={activeFileTab.scrollToLine}
             />
           ) : (
             <SourceControlContent

@@ -35,7 +35,8 @@ interface FileContentViewProps {
   filePath: string
   openWithAppId?: string | null
   workspacePath?: string
-  onOpenFile?: (filePath: string, title: string) => void
+  onOpenFile?: (filePath: string, title: string, line?: number) => void
+  initialScrollToLine?: number
 }
 
 export const FileContentView = memo(function FileContentView({
@@ -43,6 +44,7 @@ export const FileContentView = memo(function FileContentView({
   openWithAppId,
   workspacePath,
   onOpenFile,
+  initialScrollToLine,
 }: FileContentViewProps) {
   const [content, setContent] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -52,6 +54,10 @@ export const FileContentView = memo(function FileContentView({
   const [htmlPreview, setHtmlPreview] = useState(true)
   const [scrollToLine, setScrollToLine] = useState<number | null>(null)
   const chatActions = useChatActions()
+
+  useEffect(() => {
+    if (initialScrollToLine) setScrollToLine(initialScrollToLine)
+  }, [initialScrollToLine])
 
   const workspaceId = useResolveWorkspaceId(workspacePath)
   const lsp = useLspConnection(workspaceId)
@@ -302,7 +308,9 @@ export const FileContentView = memo(function FileContentView({
               diagnostics={diagnostics}
               connection={lsp}
               filePath={lspFilePath}
-              onOpenFile={(target, title) => onOpenFile?.(target, title)}
+              onOpenFile={(target, title, line) =>
+                onOpenFile?.(target, title, line)
+              }
               onAddCommentContext={(context) => {
                 const contextPath =
                   workspacePath && context.filePath.startsWith(workspacePath)

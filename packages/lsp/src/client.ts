@@ -24,6 +24,7 @@ import type {
   DocumentSymbol,
   SymbolInformation,
   Position,
+  SignatureHelp,
 } from "vscode-languageserver-protocol";
 
 export interface LspClientOptions {
@@ -122,6 +123,13 @@ export class LspClient {
           synchronization: { didSave: false, willSave: false, dynamicRegistration: false },
           hover: { contentFormat: ["markdown", "plaintext"] },
           definition: { linkSupport: false },
+          signatureHelp: {
+            dynamicRegistration: false,
+            signatureInformation: {
+              documentationFormat: ["markdown", "plaintext"],
+              parameterInformation: { labelOffsetSupport: true },
+            },
+          },
           references: {},
           documentSymbol: { hierarchicalDocumentSymbolSupport: true },
           publishDiagnostics: { relatedInformation: false },
@@ -222,6 +230,17 @@ export class LspClient {
   ): Promise<Location | Location[] | LocationLink[] | null> {
     await this.starting;
     return this.connection.sendRequest("textDocument/definition", {
+      textDocument: { uri: filePathToUri(filePath) },
+      position,
+    });
+  }
+
+  async signatureHelp(
+    filePath: string,
+    position: Position,
+  ): Promise<SignatureHelp | null> {
+    await this.starting;
+    return this.connection.sendRequest<SignatureHelp | null>("textDocument/signatureHelp", {
       textDocument: { uri: filePathToUri(filePath) },
       position,
     });

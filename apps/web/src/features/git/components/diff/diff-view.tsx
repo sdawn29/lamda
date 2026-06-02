@@ -64,7 +64,7 @@ export function DiffView({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-border/60 bg-background font-mono text-xs",
+        "overflow-hidden rounded-md border border-border/50 bg-card/40 font-mono text-xs",
         className
       )}
     >

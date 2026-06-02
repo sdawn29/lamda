@@ -17,6 +17,7 @@ import type {
   Location,
   LocationLink,
   Position,
+  SignatureHelp,
 } from "./types"
 
 interface PendingRequest {
@@ -184,6 +185,18 @@ export class LspConnection {
       method: "textDocument/definition",
       params: { textDocument: { uri: "" }, position },
     })) as Location | Location[] | LocationLink[] | null
+  }
+
+  async signatureHelp(
+    filePath: string,
+    position: Position,
+  ): Promise<SignatureHelp | null> {
+    return (await this.send({
+      kind: "request",
+      filePath,
+      method: "textDocument/signatureHelp",
+      params: { textDocument: { uri: "" }, position },
+    })) as SignatureHelp | null
   }
 
   async references(filePath: string, position: Position): Promise<Location[] | null> {

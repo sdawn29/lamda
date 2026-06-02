@@ -34,14 +34,37 @@ export interface LocationLink {
   originSelectionRange?: Range
 }
 
+export interface MarkupContent {
+  kind: "markdown" | "plaintext"
+  value: string
+}
+
 export type HoverContents =
   | string
-  | { kind: "markdown" | "plaintext"; value: string }
+  | MarkupContent
   | Array<string | { kind: "markdown" | "plaintext"; value: string; language?: string }>
 
 export interface Hover {
   contents: HoverContents
   range?: Range
+}
+
+export interface ParameterInformation {
+  label: string | [number, number]
+  documentation?: string | MarkupContent
+}
+
+export interface SignatureInformation {
+  label: string
+  documentation?: string | MarkupContent
+  parameters?: ParameterInformation[]
+  activeParameter?: number
+}
+
+export interface SignatureHelp {
+  signatures: SignatureInformation[]
+  activeSignature?: number
+  activeParameter?: number
 }
 
 export interface DocumentSymbol {

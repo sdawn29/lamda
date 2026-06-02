@@ -196,8 +196,10 @@ export async function requestForFile<T>(
   const absPath = resolveAbsolutePath(workspacePath, filePath);
   const entry = await getEntryForFile(workspaceId, absPath);
   if (!entry) return null;
-  // Rewrite textDocument.uri to absolute file URI in case the caller sent a relative path.
-  if (params && typeof params === "object" && params.textDocument?.uri) {
+  // Rewrite textDocument.uri to the absolute file URI. Web callers send a
+  // placeholder URI, and language servers need the real opened document URI
+  // for hover, definition, signature help, etc.
+  if (params && typeof params === "object" && params.textDocument) {
     params.textDocument.uri = filePathToUri(absPath);
   }
   return entry.client.request<T>(method, params);

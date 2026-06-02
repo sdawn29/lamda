@@ -12,6 +12,7 @@ import type {
   DocumentSymbol,
   SymbolInformation,
   Position,
+  SignatureHelp,
 } from "vscode-languageserver-protocol";
 
 /**
@@ -40,4 +41,4 @@ export interface DiagnosticsUpdate {
   diagnostics: Diagnostic[];
 }
 
-export type { Diagnostic, Hover, Location, DocumentSymbol, SymbolInformation, Position };
+export type { Diagnostic, Hover, Location, DocumentSymbol, SymbolInformation, Position, SignatureHelp };

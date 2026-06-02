@@ -27,4 +27,5 @@ export type {
   DocumentSymbol,
   SymbolInformation,
   Position,
+  SignatureHelp,
 } from "./types.js";

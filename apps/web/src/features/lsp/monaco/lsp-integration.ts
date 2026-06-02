@@ -17,7 +17,9 @@ import type {
   Location,
   LocationLink,
   LspConnection,
+  MarkupContent,
   Range,
+  SignatureHelp,
 } from ".."
 import {
   SEVERITY_ERROR,
@@ -45,6 +47,11 @@ export function unregisterModelLsp(uri: string) {
 
 let providersRegistered = false
 
+function languageSelector(): languages.LanguageSelector {
+  const ids = monaco.languages.getLanguages().map((l) => l.id)
+  return ids.length > 0 ? ids : "*"
+}
+
 /**
  * Register the hover and definition providers once, for all languages, plus a
  * single editor opener. This lets Monaco drive go-to-definition natively
@@ -58,7 +65,9 @@ export function ensureLspProviders() {
   if (providersRegistered) return
   providersRegistered = true
 
-  monaco.languages.registerDefinitionProvider("*", {
+  const selector = languageSelector()
+
+  monaco.languages.registerDefinitionProvider(selector, {
     async provideDefinition(model, position) {
       const entry = registry.get(model.uri.toString())
       if (!entry?.connection || !entry.filePath) return null
@@ -97,7 +106,7 @@ export function ensureLspProviders() {
     },
   })
 
-  monaco.languages.registerHoverProvider("*", {
+  monaco.languages.registerHoverProvider(selector, {
     async provideHover(model, position) {
       const entry = registry.get(model.uri.toString())
       if (!entry?.connection || !entry.filePath) return null
@@ -126,6 +135,36 @@ export function ensureLspProviders() {
       }
     },
   })
+
+  monaco.languages.registerSignatureHelpProvider(selector, {
+    signatureHelpTriggerCharacters: ["(", ",", "<"],
+    signatureHelpRetriggerCharacters: [")"],
+    async provideSignatureHelp(model, position) {
+      const entry = registry.get(model.uri.toString())
+      if (!entry?.connection || !entry.filePath) return null
+      let result: SignatureHelp | null
+      try {
+        result = await entry.connection.signatureHelp(entry.filePath, {
+          line: position.lineNumber - 1,
+          character: position.column - 1,
+        })
+      } catch {
+        return null
+      }
+      const value = signatureHelpToMonaco(result)
+      if (!value) return null
+      return {
+        value,
+        dispose: () => {},
+      }
+    },
+  })
+}
+
+function markdownValue(value: string | MarkupContent | undefined) {
+  if (!value) return undefined
+  if (typeof value === "string") return value
+  return value.value
 }
 
 export function flattenHover(hover: Hover | null | undefined): string {
@@ -141,6 +180,26 @@ export function flattenHover(hover: Hover | null | undefined): string {
   }
   if (c && typeof c === "object" && "value" in c) return c.value.trim()
   return ""
+}
+
+function signatureHelpToMonaco(
+  help: SignatureHelp | null | undefined
+): languages.SignatureHelp | null {
+  if (!help?.signatures.length) return null
+  return {
+    activeSignature: help.activeSignature ?? 0,
+    activeParameter: help.activeParameter ?? 0,
+    signatures: help.signatures.map((sig) => ({
+      label: sig.label,
+      documentation: markdownValue(sig.documentation),
+      parameters:
+        sig.parameters?.map((param) => ({
+          label: param.label,
+          documentation: markdownValue(param.documentation),
+        })) ?? [],
+      activeParameter: sig.activeParameter,
+    })),
+  }
 }
 
 export function diagnosticsToMarkers(

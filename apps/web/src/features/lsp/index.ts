@@ -17,8 +17,12 @@ export type {
   Hover,
   Location,
   LocationLink,
+  MarkupContent,
+  ParameterInformation,
   Position,
   Range,
+  SignatureHelp,
+  SignatureInformation,
   SymbolInformation,
 } from "./types"
 export {

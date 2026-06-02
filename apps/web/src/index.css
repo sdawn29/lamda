@@ -399,24 +399,98 @@
     transition: background 0.7s ease-out;
   }
 
+  .lamda-monaco-diff-viewer {
+    --lamda-diff-added: var(--chart-2);
+    --lamda-diff-removed: var(--destructive);
+    --lamda-diff-gutter-bg: color-mix(in srgb, var(--card) 72%, var(--background));
+    --lamda-diff-line-alpha: 10%;
+    --lamda-diff-gutter-alpha: 16%;
+    --lamda-diff-char-alpha: 22%;
+    --lamda-diff-border-alpha: 28%;
+    background: var(--card);
+    color: var(--foreground);
+  }
+  .lamda-monaco-diff-viewer .monaco-diff-editor {
+    background: var(--card) !important;
+  }
+  .lamda-monaco-diff-viewer
+    :is(.monaco-diff-editor, .monaco-editor, .overflow-guard) {
+    border-radius: inherit;
+  }
+  .lamda-monaco-diff-viewer .monaco-editor,
+  .lamda-monaco-diff-viewer .monaco-editor-background,
+  .lamda-monaco-diff-viewer .monaco-editor .inputarea.ime-input,
+  .lamda-monaco-diff-viewer .monaco-editor .decorationsOverviewRuler,
+  .lamda-monaco-diff-viewer .monaco-editor .scroll-decoration {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-editor .margin,
+  .lamda-monaco-diff-viewer .monaco-editor .glyph-margin {
+    background: var(--lamda-diff-gutter-bg) !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-editor .line-numbers {
+    background: transparent !important;
+    color: color-mix(in srgb, var(--muted-foreground) 78%, transparent) !important;
+    font-variant-numeric: tabular-nums;
+  }
+  .lamda-monaco-diff-viewer .monaco-diff-editor .diffOverview {
+    display: none !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-diff-editor .diffViewport {
+    display: none !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-diff-editor .diff-review-line-number {
+    color: var(--muted-foreground) !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-diff-editor .diff-review {
+    background: color-mix(in srgb, var(--secondary) 42%, transparent) !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-diff-editor .editor.modified {
+    box-shadow: inset 1px 0 0 color-mix(in srgb, var(--border) 80%, transparent);
+  }
+  .lamda-monaco-diff-viewer .view-overlays .current-line {
+    border-color: transparent !important;
+  }
+
   /* Monaco diff line-number highlights. Monaco already colors the changed
      gutter rows; these decorations make the number text and its immediate cell
      carry the same added/removed signal. */
-  .monaco-editor .line-numbers.lamda-diff-line-number-added {
-    color: rgb(34 197 94) !important;
-    background: color-mix(in srgb, rgb(34 197 94) 14%, transparent) !important;
+  .lamda-monaco-diff-viewer
+    .monaco-editor
+    .line-numbers.lamda-diff-line-number-added {
+    color: var(--lamda-diff-added) !important;
+    background: color-mix(
+      in srgb,
+      var(--lamda-diff-added) var(--lamda-diff-gutter-alpha),
+      transparent
+    ) !important;
     font-weight: 600 !important;
   }
-  .monaco-editor .lamda-diff-margin-added {
-    background: color-mix(in srgb, rgb(34 197 94) 14%, transparent) !important;
+  .lamda-monaco-diff-viewer .monaco-editor .lamda-diff-margin-added {
+    background: color-mix(
+      in srgb,
+      var(--lamda-diff-added) var(--lamda-diff-gutter-alpha),
+      transparent
+    ) !important;
   }
-  .monaco-editor .line-numbers.lamda-diff-line-number-removed {
-    color: rgb(244 63 94) !important;
-    background: color-mix(in srgb, rgb(244 63 94) 14%, transparent) !important;
+  .lamda-monaco-diff-viewer
+    .monaco-editor
+    .line-numbers.lamda-diff-line-number-removed {
+    color: var(--lamda-diff-removed) !important;
+    background: color-mix(
+      in srgb,
+      var(--lamda-diff-removed) var(--lamda-diff-gutter-alpha),
+      transparent
+    ) !important;
     font-weight: 600 !important;
   }
-  .monaco-editor .lamda-diff-margin-removed {
-    background: color-mix(in srgb, rgb(244 63 94) 14%, transparent) !important;
+  .lamda-monaco-diff-viewer .monaco-editor .lamda-diff-margin-removed {
+    background: color-mix(
+      in srgb,
+      var(--lamda-diff-removed) var(--lamda-diff-gutter-alpha),
+      transparent
+    ) !important;
   }
   .lamda-monaco-diff-viewer .monaco-editor .insert-sign,
   .lamda-monaco-diff-viewer .monaco-diff-editor .insert-sign,
@@ -428,24 +502,50 @@
   .lamda-monaco-diff-viewer .monaco-diff-editor .line-insert,
   .lamda-monaco-diff-viewer .monaco-editor .gutter-insert,
   .lamda-monaco-diff-viewer .monaco-diff-editor .gutter-insert {
-    background-color: color-mix(in srgb, rgb(34 197 94) 14%, transparent) !important;
+    background-color: color-mix(
+      in srgb,
+      var(--lamda-diff-added) var(--lamda-diff-line-alpha),
+      transparent
+    ) !important;
   }
   .lamda-monaco-diff-viewer .monaco-editor .char-insert,
   .lamda-monaco-diff-viewer .monaco-diff-editor .char-insert {
-    background-color: color-mix(in srgb, rgb(34 197 94) 24%, transparent) !important;
-    border-color: color-mix(in srgb, rgb(34 197 94) 34%, transparent) !important;
+    background-color: color-mix(
+      in srgb,
+      var(--lamda-diff-added) var(--lamda-diff-char-alpha),
+      transparent
+    ) !important;
+    border-color: color-mix(
+      in srgb,
+      var(--lamda-diff-added) var(--lamda-diff-border-alpha),
+      transparent
+    ) !important;
+    border-radius: 3px !important;
   }
   .lamda-monaco-diff-viewer .monaco-editor .line-delete,
   .lamda-monaco-diff-viewer .monaco-diff-editor .line-delete,
   .lamda-monaco-diff-viewer .monaco-editor .gutter-delete,
   .lamda-monaco-diff-viewer .monaco-diff-editor .gutter-delete {
-    background-color: color-mix(in srgb, rgb(244 63 94) 14%, transparent) !important;
+    background-color: color-mix(
+      in srgb,
+      var(--lamda-diff-removed) var(--lamda-diff-line-alpha),
+      transparent
+    ) !important;
   }
   .lamda-monaco-diff-viewer .monaco-editor .char-delete,
   .lamda-monaco-diff-viewer .monaco-diff-editor .char-delete,
   .lamda-monaco-diff-viewer .monaco-editor .inline-deleted-text {
-    background-color: color-mix(in srgb, rgb(244 63 94) 24%, transparent) !important;
-    border-color: color-mix(in srgb, rgb(244 63 94) 34%, transparent) !important;
+    background-color: color-mix(
+      in srgb,
+      var(--lamda-diff-removed) var(--lamda-diff-char-alpha),
+      transparent
+    ) !important;
+    border-color: color-mix(
+      in srgb,
+      var(--lamda-diff-removed) var(--lamda-diff-border-alpha),
+      transparent
+    ) !important;
+    border-radius: 3px !important;
   }
 
   /* ── Monaco native widgets ─────────────────────────────────────────────

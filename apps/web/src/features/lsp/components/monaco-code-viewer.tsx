@@ -64,6 +64,12 @@ interface MonacoCodeViewerProps {
 const MARKER_OWNER = "lsp"
 const COMPOSER_HEIGHT = 188
 
+function targetLineNumber(target: MonacoEditor.IMouseTarget): number | null {
+  return (
+    target.position?.lineNumber ?? target.range?.startLineNumber ?? null
+  )
+}
+
 /** Convert a CSS font-size ("0.75rem", "12px", "13") to a Monaco px number. */
 function toPx(fontSize: string | undefined): number {
   if (!fontSize) return 12
@@ -92,6 +98,7 @@ export default function MonacoCodeViewer({
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null)
   const disposablesRef = useRef<IDisposable[]>([])
+  const registeredModelUriRef = useRef<string | null>(null)
 
   const commentEnabled = !!onAddCommentContext && !!filePath
 
@@ -208,15 +215,23 @@ export default function MonacoCodeViewer({
     ensureLspProviders()
   }, [])
 
+  const syncModelRegistration = useCallback(() => {
+    const modelUri = editorRef.current?.getModel()?.uri.toString() ?? null
+    const previousUri = registeredModelUriRef.current
+    if (previousUri === modelUri) return
+
+    if (previousUri) unregisterModelLsp(previousUri)
+    if (modelUri) registerModelLsp(modelUri, lspEntry.current)
+    registeredModelUriRef.current = modelUri
+  }, [])
+
   const handleMount: OnMount = useCallback(
     (editor, monaco) => {
       editorRef.current = editor
       monacoRef.current = monaco
 
-      const model = editor.getModel()
-      if (model) {
-        registerModelLsp(model.uri.toString(), lspEntry.current)
-      }
+      syncModelRegistration()
+      disposablesRef.current.push(editor.onDidChangeModel(syncModelRegistration))
 
       const editorDomNode = editor.getDomNode()
       const clearFindCloseTooltip = () => {
@@ -243,7 +258,7 @@ export default function MonacoCodeViewer({
       disposablesRef.current.push(
         editor.onMouseMove((e) => {
           if (!commentEnabledRef.current) return
-          const line = e.target.position?.lineNumber ?? -1
+          const line = targetLineNumber(e.target) ?? -1
           if (line === hoveredLine) return
           hoveredLine = line
           glyphCollection.set(
@@ -272,7 +287,7 @@ export default function MonacoCodeViewer({
       // Monaco via the registered definition provider + editor opener.
       disposablesRef.current.push(
         editor.onMouseDown((e) => {
-          const line = e.target.position?.lineNumber
+          const line = targetLineNumber(e.target)
           if (
             commentEnabledRef.current &&
             e.target.type === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS &&
@@ -283,8 +298,12 @@ export default function MonacoCodeViewer({
         })
       )
     },
-    [openComposer]
+    [openComposer, syncModelRegistration]
   )
+
+  useEffect(() => {
+    syncModelRegistration()
+  }, [modelPath, syncModelRegistration])
 
   // Push LSP diagnostics into Monaco as markers.
   useEffect(() => {
@@ -323,8 +342,10 @@ export default function MonacoCodeViewer({
     return () => {
       for (const d of disposablesRef.current) d.dispose()
       disposablesRef.current = []
-      const model = editorRef.current?.getModel()
-      if (model) unregisterModelLsp(model.uri.toString())
+      if (registeredModelUriRef.current) {
+        unregisterModelLsp(registeredModelUriRef.current)
+        registeredModelUriRef.current = null
+      }
     }
   }, [])
 

@@ -15,6 +15,7 @@ export interface FileMainTab {
   title: string
   workspacePath?: string
   openWithAppId?: string | null
+  scrollToLine?: number
 }
 
 export type MainTab = ThreadMainTab | FileMainTab
@@ -55,7 +56,14 @@ const useMainTabsStore = create<MainTabsState>((set) => ({
         (item) => item.type === "file" && item.filePath === tab.filePath
       )
       if (existing) {
-        return { activeTabId: existing.id }
+        return {
+          activeTabId: existing.id,
+          tabs: state.tabs.map((item) =>
+            item.id === existing.id && item.type === "file"
+              ? { ...item, scrollToLine: tab.scrollToLine }
+              : item
+          ),
+        }
       }
       const id = `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       const newTab: FileMainTab = { id, type: "file", ...tab }
