@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, useCallback, memo } from "react"
-import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { FileHeader } from "@/features/git/components/file-header"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
@@ -205,12 +204,7 @@ export const FileContentView = memo(function FileContentView({
             openWithAppId={effectiveAppId}
           />
         </div>
-        <div className="flex flex-1 items-center justify-center">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" />
-            Loading file…
-          </div>
-        </div>
+        <div className="flex-1" />
       </div>
     )
   }

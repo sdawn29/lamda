@@ -15,7 +15,6 @@ import {
 } from "react"
 import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react"
 import type { editor as MonacoEditor, IDisposable } from "monaco-editor"
-import { Loader2 } from "lucide-react"
 import { useTheme } from "@/shared/components/theme-provider"
 import { Button } from "@/shared/ui/button"
 import { Card, CardContent } from "@/shared/ui/card"
@@ -401,12 +400,7 @@ export default function MonacoCodeViewer({
         beforeMount={beforeMount}
         onMount={handleMount}
         keepCurrentModel={false}
-        loading={
-          <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" />
-            Loading…
-          </div>
-        }
+        loading={null}
         options={{
           readOnly: true,
           domReadOnly: true,

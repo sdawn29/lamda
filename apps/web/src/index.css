@@ -399,6 +399,55 @@
     transition: background 0.7s ease-out;
   }
 
+  /* Monaco diff line-number highlights. Monaco already colors the changed
+     gutter rows; these decorations make the number text and its immediate cell
+     carry the same added/removed signal. */
+  .monaco-editor .line-numbers.lamda-diff-line-number-added {
+    color: rgb(34 197 94) !important;
+    background: color-mix(in srgb, rgb(34 197 94) 14%, transparent) !important;
+    font-weight: 600 !important;
+  }
+  .monaco-editor .lamda-diff-margin-added {
+    background: color-mix(in srgb, rgb(34 197 94) 14%, transparent) !important;
+  }
+  .monaco-editor .line-numbers.lamda-diff-line-number-removed {
+    color: rgb(244 63 94) !important;
+    background: color-mix(in srgb, rgb(244 63 94) 14%, transparent) !important;
+    font-weight: 600 !important;
+  }
+  .monaco-editor .lamda-diff-margin-removed {
+    background: color-mix(in srgb, rgb(244 63 94) 14%, transparent) !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-editor .insert-sign,
+  .lamda-monaco-diff-viewer .monaco-diff-editor .insert-sign,
+  .lamda-monaco-diff-viewer .monaco-editor .delete-sign,
+  .lamda-monaco-diff-viewer .monaco-diff-editor .delete-sign {
+    display: none !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-editor .line-insert,
+  .lamda-monaco-diff-viewer .monaco-diff-editor .line-insert,
+  .lamda-monaco-diff-viewer .monaco-editor .gutter-insert,
+  .lamda-monaco-diff-viewer .monaco-diff-editor .gutter-insert {
+    background-color: color-mix(in srgb, rgb(34 197 94) 14%, transparent) !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-editor .char-insert,
+  .lamda-monaco-diff-viewer .monaco-diff-editor .char-insert {
+    background-color: color-mix(in srgb, rgb(34 197 94) 24%, transparent) !important;
+    border-color: color-mix(in srgb, rgb(34 197 94) 34%, transparent) !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-editor .line-delete,
+  .lamda-monaco-diff-viewer .monaco-diff-editor .line-delete,
+  .lamda-monaco-diff-viewer .monaco-editor .gutter-delete,
+  .lamda-monaco-diff-viewer .monaco-diff-editor .gutter-delete {
+    background-color: color-mix(in srgb, rgb(244 63 94) 14%, transparent) !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-editor .char-delete,
+  .lamda-monaco-diff-viewer .monaco-diff-editor .char-delete,
+  .lamda-monaco-diff-viewer .monaco-editor .inline-deleted-text {
+    background-color: color-mix(in srgb, rgb(244 63 94) 24%, transparent) !important;
+    border-color: color-mix(in srgb, rgb(244 63 94) 34%, transparent) !important;
+  }
+
   /* ── Monaco native widgets ─────────────────────────────────────────────
      Make Monaco's floating chrome match the app design system. Colors come
      from the editor theme (see lsp-integration.ts `editorColors`); what the

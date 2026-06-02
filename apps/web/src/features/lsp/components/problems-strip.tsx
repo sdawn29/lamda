@@ -89,7 +89,14 @@ export function ProblemsStrip({
   )
 
   return (
-    <div className={cn("bg-muted/10 text-xs", atBottom ? "border-t" : "border-b")}>
+    <div
+      className={cn(
+        "bg-muted/10 text-xs",
+        atBottom
+          ? "mx-2 mb-2 overflow-hidden rounded-lg border border-border/50 shadow-sm"
+          : "border-b",
+      )}
+    >
       {atBottom ? (
         <>
           {list}
