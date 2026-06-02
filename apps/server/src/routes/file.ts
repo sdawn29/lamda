@@ -1,5 +1,7 @@
 import { Hono } from "hono";
-import { readFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import { Readable } from "node:stream";
 import { extname } from "node:path";
 
 const BINARY_MIME_TYPES: Record<string, string> = {
@@ -21,6 +23,49 @@ const TEXT_MIME_TYPES: Record<string, string> = {
   ".htm": "text/html; charset=utf-8",
 };
 
+function contentTypeFor(ext: string): string {
+  return (
+    BINARY_MIME_TYPES[ext] ?? TEXT_MIME_TYPES[ext] ?? "text/plain; charset=utf-8"
+  );
+}
+
+/**
+ * Parses an HTTP `Range` header against a known file size. Supports a single
+ * `bytes=start-end`, open-ended `bytes=start-`, and suffix `bytes=-N` forms.
+ * Returns inclusive {start, end} byte offsets, or null when the range is
+ * absent/malformed/unsatisfiable (the caller decides 200 vs 416).
+ */
+function parseRange(
+  header: string,
+  size: number,
+): { start: number; end: number } | null {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!match) return null;
+
+  const [, startStr, endStr] = match;
+  if (startStr === "" && endStr === "") return null;
+
+  let start: number;
+  let end: number;
+
+  if (startStr === "") {
+    // Suffix range: the last N bytes.
+    const suffix = Number.parseInt(endStr, 10);
+    if (Number.isNaN(suffix) || suffix === 0) return null;
+    start = Math.max(0, size - suffix);
+    end = size - 1;
+  } else {
+    start = Number.parseInt(startStr, 10);
+    end = endStr === "" ? size - 1 : Number.parseInt(endStr, 10);
+    if (Number.isNaN(start)) return null;
+    if (Number.isNaN(end)) end = size - 1;
+    end = Math.min(end, size - 1);
+  }
+
+  if (start < 0 || start > end || start >= size) return null;
+  return { start, end };
+}
+
 const file = new Hono();
 
 file.get("/file", async (c) => {
@@ -29,28 +74,56 @@ file.get("/file", async (c) => {
     return c.json({ error: "path query param is required" }, 400);
   }
 
+  let fileStat;
   try {
-    const ext = extname(path).toLowerCase();
-    const binaryMime = BINARY_MIME_TYPES[ext];
-    if (binaryMime) {
-      const buffer = await readFile(path);
-      return c.body(buffer, 200, { "Content-Type": binaryMime });
-    }
-    const content = await readFile(path, "utf-8");
-    const textMime = TEXT_MIME_TYPES[ext];
-    if (textMime) {
-      return c.body(content, 200, { "Content-Type": textMime });
-    }
-    return c.text(content);
+    fileStat = await stat(path);
   } catch (err: any) {
-    if (err.code === "EISDIR") {
-      return c.json({ error: "path is a directory, not a file" }, 400);
-    }
     return c.json(
       { error: err instanceof Error ? err.message : String(err) },
       500,
     );
   }
+
+  if (fileStat.isDirectory()) {
+    return c.json({ error: "path is a directory, not a file" }, 400);
+  }
+
+  const ext = extname(path).toLowerCase();
+  const contentType = contentTypeFor(ext);
+  const size = fileStat.size;
+
+  const rangeHeader = c.req.header("range");
+  const range = rangeHeader ? parseRange(rangeHeader, size) : null;
+
+  // A Range header that can't be satisfied gets a 416 with the full size.
+  if (rangeHeader && !range && size > 0) {
+    return c.body(null, 416, {
+      "Content-Range": `bytes */${size}`,
+      "Accept-Ranges": "bytes",
+    });
+  }
+
+  const start = range ? range.start : 0;
+  const end = range ? range.end : Math.max(0, size - 1);
+  const length = size === 0 ? 0 : end - start + 1;
+
+  // Empty files have no satisfiable byte range; stream the whole (empty) file.
+  const nodeStream =
+    size === 0 ? createReadStream(path) : createReadStream(path, { start, end });
+  const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+
+  const headers: Record<string, string> = {
+    "Content-Type": contentType,
+    "Accept-Ranges": "bytes",
+    "Content-Length": String(length),
+  };
+
+  if (range) {
+    headers["Content-Range"] = `bytes ${start}-${end}/${size}`;
+    return c.body(webStream, 206, headers);
+  }
+
+  return c.body(webStream, 200, headers);
 });
 
 export default file;
