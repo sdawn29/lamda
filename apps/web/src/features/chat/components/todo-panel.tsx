@@ -90,6 +90,106 @@ export function deriveGoalsFromMessages(messages: Message[]): {
   return { goals, isLive }
 }
 
+export interface CompletedGoalList {
+  /** Every goal in the list, in first-seen order, in its final (done) snapshot. */
+  goals: TodoGoal[]
+  /** Index of the todo message where the last goal of the list completed. */
+  messageIndex: number
+}
+
+/**
+ * Group goals into "lists" and return only those whose every member has
+ * completed, so a finished list docks inline as a single unit rather than
+ * leaking individual goals as they finish.
+ *
+ * Goals belong to the same list if they ever co-occur in a snapshot (computed
+ * transitively via union-find — goals are deleted one at a time as they finish,
+ * so a single all-completed snapshot never exists, but each completed goal
+ * still shares at least one earlier snapshot with the rest of its list). A goal
+ * surfaces as completed in the final snapshot returned just before it is
+ * deleted from the DB; we anchor the list to the latest such completion so it
+ * lands at the turn where the whole list wrapped up.
+ */
+export function deriveCompletedGoalLists(
+  messages: Message[],
+): CompletedGoalList[] {
+  // Union-find over goal ids.
+  const parent = new Map<string, string>()
+  const ensure = (x: string) => {
+    if (!parent.has(x)) parent.set(x, x)
+  }
+  const find = (x: string): string => {
+    let root = x
+    while (parent.get(root) !== root) root = parent.get(root)!
+    let cur = x
+    while (parent.get(cur) !== root) {
+      const next = parent.get(cur)!
+      parent.set(cur, root)
+      cur = next
+    }
+    return root
+  }
+  const union = (a: string, b: string) => {
+    ensure(a)
+    ensure(b)
+    parent.set(find(a), find(b))
+  }
+
+  const latest = new Map<string, TodoGoal>() // latest snapshot of each goal
+  const firstSeen = new Map<string, number>() // appearance order, for stable sort
+  const completedAt = new Map<string, number>() // message index of first completion
+  let order = 0
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    if (msg.role !== "tool" || msg.toolName.toLowerCase() !== "todo") continue
+    // Only trust committed (non-streaming) snapshots so a partial mid-update
+    // doesn't anchor a goal that isn't actually finished yet.
+    if (msg.status === "running") continue
+
+    const parsed = extractGoals(msg)
+    if (!parsed || parsed.length === 0) continue
+
+    // Co-occurrence: everything in this snapshot is part of one list.
+    parsed.forEach((g) => ensure(g.id))
+    for (let k = 1; k < parsed.length; k++) union(parsed[0].id, parsed[k].id)
+
+    for (const goal of parsed) {
+      if (!firstSeen.has(goal.id)) firstSeen.set(goal.id, order++)
+      latest.set(goal.id, goal)
+      if (goal.status === "completed" && !completedAt.has(goal.id)) {
+        completedAt.set(goal.id, i)
+      }
+    }
+  }
+
+  // Bucket goal ids by their list root.
+  const lists = new Map<string, string[]>()
+  for (const id of parent.keys()) {
+    const root = find(id)
+    const arr = lists.get(root) ?? []
+    arr.push(id)
+    lists.set(root, arr)
+  }
+
+  const result: CompletedGoalList[] = []
+  for (const ids of lists.values()) {
+    // Only emit once every goal in the list has completed.
+    if (!ids.every((id) => completedAt.has(id))) continue
+    const ordered = ids
+      .slice()
+      .sort((a, b) => (firstSeen.get(a) ?? 0) - (firstSeen.get(b) ?? 0))
+    const goals = ordered
+      .map((id) => latest.get(id))
+      .filter((g): g is TodoGoal => g != null)
+    const messageIndex = Math.max(...ordered.map((id) => completedAt.get(id)!))
+    result.push({ goals, messageIndex })
+  }
+
+  result.sort((a, b) => a.messageIndex - b.messageIndex)
+  return result
+}
+
 // ── Checkbox ──────────────────────────────────────────────────────────────────
 
 function Checkbox({ status }: { status: TodoStatus }) {
@@ -182,25 +282,20 @@ function GoalSection({
   )
 }
 
-// ── TodoPanel ─────────────────────────────────────────────────────────────────
+// ── TodoListCard (presentational) ─────────────────────────────────────────────
 
-interface TodoPanelProps {
-  messages: Message[]
-}
-
-export const TodoPanel = memo(function TodoPanel({ messages }: TodoPanelProps) {
+function TodoListCard({ goals, isLive }: { goals: TodoGoal[]; isLive: boolean }) {
   const [expanded, setExpanded] = useState(false)
 
-  const { goals, isLive } = useMemo(
-    () => deriveGoalsFromMessages(messages),
-    [messages],
-  )
-
-  if (goals.length === 0) return null
-
   const totalTasks = goals.reduce((n, g) => n + g.tasks.length, 0)
+  // A goal marked "completed" counts all its tasks as done — individual tasks
+  // may have been skipped or left pending when the goal was closed out.
   const completedTasks = goals.reduce(
-    (n, g) => n + g.tasks.filter((t) => t.status === "completed").length,
+    (n, g) =>
+      n +
+      (g.status === "completed"
+        ? g.tasks.length
+        : g.tasks.filter((t) => t.status === "completed").length),
     0,
   )
   const allDone = totalTasks > 0 && completedTasks === totalTasks
@@ -258,4 +353,39 @@ export const TodoPanel = memo(function TodoPanel({ messages }: TodoPanelProps) {
       </div>
     </div>
   )
+}
+
+// ── TodoPanel (floating, live goals) ──────────────────────────────────────────
+
+interface TodoPanelProps {
+  messages: Message[]
+}
+
+/**
+ * Sticky panel above the input that tracks the currently-active todo list while
+ * the agent is working. Completed goals are cleared here and re-rendered inline
+ * via {@link CompletedTodoPanel} anchored to the turn they finished in.
+ */
+export const TodoPanel = memo(function TodoPanel({ messages }: TodoPanelProps) {
+  const { goals, isLive } = useMemo(
+    () => deriveGoalsFromMessages(messages),
+    [messages],
+  )
+
+  if (goals.length === 0) return null
+
+  return <TodoListCard goals={goals} isLive={isLive} />
+})
+
+// ── CompletedTodoPanel (inline, docked into the conversation) ──────────────────
+
+/** A finished todo list docked inline within the message rows. */
+export const CompletedTodoPanel = memo(function CompletedTodoPanel({
+  goals,
+}: {
+  goals: TodoGoal[]
+}) {
+  if (goals.length === 0) return null
+
+  return <TodoListCard goals={goals} isLive={false} />
 })

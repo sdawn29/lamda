@@ -143,6 +143,119 @@ function isReadTool(toolName: string, args: unknown): boolean {
   return (name === "read" || name === "plan_read") && getReadFilePath(args) !== null
 }
 
+/**
+ * Formats the line range a Read covers from its `offset` (1-based start line)
+ * and `limit` (line count) args, e.g. "L40–89", "L40+", or null for a full read.
+ */
+function getReadLineRange(args: unknown): string | null {
+  if (typeof args !== "object" || args === null) return null
+  const a = args as Record<string, unknown>
+  const offset =
+    typeof a.offset === "number" && Number.isFinite(a.offset) ? a.offset : null
+  const limit =
+    typeof a.limit === "number" && Number.isFinite(a.limit) ? a.limit : null
+  if (offset === null && limit === null) return null
+  const start = offset ?? 1
+  if (limit === null) return `L${start}+`
+  const end = start + limit - 1
+  return start === end ? `L${start}` : `L${start}–${end}`
+}
+
+// ── Todo tool description ──────────────────────────────────────────────────────
+
+interface TodoTaskLite {
+  id: string
+  content: string
+  status: string
+}
+interface TodoGoalLite {
+  id: string
+  description: string
+  status: string
+  tasks: TodoTaskLite[]
+}
+
+/** Parse the `goals` snapshot out of a todo tool result, if present. */
+function parseTodoGoals(msg: ToolMessage): TodoGoalLite[] | null {
+  const text = getResultText(msg)
+  if (!text) return null
+  try {
+    const obj = JSON.parse(text) as Record<string, unknown>
+    if (Array.isArray(obj.goals)) return obj.goals as TodoGoalLite[]
+  } catch {
+    /* ignore non-JSON results */
+  }
+  return null
+}
+
+/** Find a task by id across every goal in the snapshot. */
+function findTodoTask(
+  goals: TodoGoalLite[] | null,
+  id: string,
+): TodoTaskLite | null {
+  if (!goals || !id) return null
+  for (const g of goals) {
+    const t = g.tasks?.find((task) => task.id === id)
+    if (t) return t
+  }
+  return null
+}
+
+type TodoTone = "active" | "done" | "error"
+
+/**
+ * Build a verbose label for a todo tool call, naming the concrete task that was
+ * created / started / completed rather than a generic "Task updated".
+ */
+function describeTodo(msg: ToolMessage): { label: string; tone: TodoTone } {
+  if (msg.status === "error") return { label: "todo failed", tone: "error" }
+
+  const a =
+    typeof msg.args === "object" && msg.args !== null
+      ? (msg.args as Record<string, unknown>)
+      : {}
+  const op = typeof a.operation === "string" ? a.operation : undefined
+  const running = msg.status === "running"
+
+  if (op === "create") {
+    const goal = typeof a.goal === "string" ? a.goal.trim() : null
+    const n = Array.isArray(a.items) ? a.items.length : 0
+    if (running) {
+      return { label: goal ? `Creating "${goal}"…` : "Creating tasks…", tone: "active" }
+    }
+    const count = `${n} task${n === 1 ? "" : "s"}`
+    return { label: goal ? `Created "${goal}" · ${count}` : "Tasks created", tone: "done" }
+  }
+
+  if (op === "update") {
+    const id = typeof a.id === "string" ? a.id : ""
+    const status = typeof a.status === "string" ? a.status : undefined
+    const task = findTodoTask(parseTodoGoals(msg), id)
+    const content =
+      task?.content ?? (typeof a.content === "string" ? a.content.trim() : null)
+
+    if (status === "completed") {
+      if (content) return { label: `Completed "${content}"`, tone: "done" }
+      return { label: running ? "Completing task…" : "Task completed", tone: "done" }
+    }
+    if (status === "in_progress") {
+      if (content) return { label: `Working on "${content}"`, tone: running ? "active" : "done" }
+      return { label: running ? "Starting task…" : "Task in progress", tone: "active" }
+    }
+    if (content) return { label: `Updated: ${content}`, tone: "done" }
+    return { label: running ? "Updating task…" : "Task updated", tone: "done" }
+  }
+
+  if (op === "delete") {
+    const id = typeof a.id === "string" ? a.id : ""
+    const content = findTodoTask(parseTodoGoals(msg), id)?.content
+    if (content) return { label: `Removed: ${content}`, tone: "done" }
+    return { label: running ? "Removing task…" : "Task removed", tone: "done" }
+  }
+
+  return { label: running ? "Loading tasks…" : "Tasks", tone: "done" }
+}
+
 // ── ReadView ───────────────────────────────────────────────────────────────────
 
 function ReadView({
@@ -200,6 +313,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const diff = isEdit ? getEditDiff(msg.result) : null
   const isRead = isReadTool(normalizedToolName, msg.args)
   const readFilePath = isRead ? getReadFilePath(msg.args) : null
+  const readLineRange = isRead ? getReadLineRange(msg.args) : null
   const isWrite =
     (normalizedToolName === "write" || normalizedToolName === "plan_write") &&
     isWriteArgs(msg.args)
@@ -216,44 +330,44 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     }
   }, [])
 
-  // Todo tool: render as a tiny inline pill — the full state lives in TodoPanel
-  // above the input, so we don't duplicate the card here.
+  // Todo tool: render as a tiny inline pill that names the concrete task — the
+  // full list state lives in TodoPanel above the input, so we don't duplicate
+  // the card here.
   if (normalizedToolName === "todo") {
-    const todoOp = (typeof msg.args === "object" && msg.args !== null)
-      ? (msg.args as Record<string, unknown>).operation as string | undefined
-      : undefined
+    const todo = describeTodo(msg)
+    const todoArgs =
+      typeof msg.args === "object" && msg.args !== null
+        ? (msg.args as Record<string, unknown>)
+        : {}
+    const isCompleted =
+      msg.status === "done" &&
+      todoArgs.operation === "update" &&
+      todoArgs.status === "completed"
     return (
       <div
-        className={cn("flex items-center gap-1.5 text-xs", isNew && "animate-chat-message-in")}
+        className={cn("flex items-center gap-1.5 text-sm", isNew && "animate-chat-message-in")}
         style={isNew && entryDelayMs > 0 ? { animationDelay: `${entryDelayMs}ms` } : undefined}
       >
-        {msg.status === "running" ? (
-          <CircleDotIcon className="h-3 w-3 shrink-0 animate-pulse text-blue-500/60" />
-        ) : msg.status === "error" ? (
+        {msg.status === "error" ? (
           <AlertCircleIcon className="h-3 w-3 shrink-0 text-destructive/60" />
+        ) : msg.status === "running" ? (
+          <CircleDotIcon className="h-3 w-3 shrink-0 animate-pulse text-blue-500/60" />
+        ) : isCompleted ? (
+          <CheckIcon className="h-3 w-3 shrink-0 text-muted-foreground/45" strokeWidth={2.5} />
         ) : (
           <ListTodoIcon className="h-3 w-3 shrink-0 text-muted-foreground/30" />
         )}
         <span
           className={cn(
-            msg.status === "running"
+            "min-w-0 truncate",
+            todo.tone === "active"
               ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground/70 to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
-              : msg.status === "error"
+              : todo.tone === "error"
                 ? "text-destructive/60"
-                : "text-muted-foreground/35",
+                : "text-muted-foreground/45",
           )}
         >
-          {msg.status === "running"
-            ? todoOp === "create" ? "Creating tasks…"
-            : todoOp === "update" ? "Updating task…"
-            : todoOp === "delete" ? "Removing task…"
-            : "Loading tasks…"
-          : msg.status === "error"
-            ? "todo failed"
-            : todoOp === "create" ? "Tasks created"
-            : todoOp === "update" ? "Task updated"
-            : todoOp === "delete" ? "Task removed"
-            : "Tasks"}
+          {todo.label}
         </span>
       </div>
     )
@@ -336,12 +450,12 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       {/* Trigger row — text accordion style */}
       <button
         type="button"
-        className="flex items-center gap-1.5 text-left"
+        className="flex w-full min-w-0 items-center gap-1.5 text-left"
         onClick={toggle}
         aria-expanded={expanded}
       >
         <span className={cn(
-          "text-sm font-medium",
+          "shrink-0 text-sm font-medium",
           msg.status === "running"
             ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
             : msg.status === "error"
@@ -357,8 +471,14 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             <span className="truncate">{fileBasename(filePath)}</span>
           </span>
         ) : summary ? (
-          <span className="truncate text-sm text-muted-foreground/35">{summary}</span>
+          <span className="min-w-0 truncate text-sm text-muted-foreground/35">{summary}</span>
         ) : null}
+
+        {readLineRange && (
+          <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground/35">
+            {readLineRange}
+          </span>
+        )}
 
         {editCounts && (editCounts.added > 0 || editCounts.removed > 0) && (
           <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-xs tabular-nums">

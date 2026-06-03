@@ -112,14 +112,19 @@ function tryFinalizeGoal(goalId: string, threadId: string): TodoGoal[] | null {
   if (remaining.length === 0 || !remaining.every((t) => t.status === "completed")) {
     return null
   }
-  // Build the response snapshot without the completing goal so the panel
-  // disappears on this very call — no "all done" flash needed.
-  const activeGoals = snapshot(threadId).filter((g) => g.id !== goalId)
+  // Build the response snapshot with the finishing goal marked "completed".
+  // The floating TodoPanel filters completed goals out, so it disappears on
+  // this very call; the inline CompletedTodoPanel keys off this completed
+  // snapshot to dock the finished list into the conversation. Goal rows are
+  // never set to "completed" in the DB, so we override the status here.
+  const finalGoals = snapshot(threadId).map((g) =>
+    g.id === goalId ? { ...g, status: "completed" as GoalStatus } : g,
+  )
   // Schedule the actual DB deletion in the background.
   setImmediate(() => {
     try { deleteGoalWithTasks(goalId) } catch { /* ignore */ }
   })
-  return activeGoals
+  return finalGoals
 }
 
 // ── Tool factory ──────────────────────────────────────────────────────────────

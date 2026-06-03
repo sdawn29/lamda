@@ -87,7 +87,13 @@ import { forkSession, listMessages } from "../api"
 import { blocksToMessages, type MessageBlock } from "../types"
 import { workspaceKeys } from "@/features/workspace/queries"
 import { MESSAGES_PAGE_SIZE, type MessagesInfiniteData } from "../queries"
-import { TodoPanel } from "./todo-panel"
+import {
+  TodoPanel,
+  CompletedTodoPanel,
+  deriveCompletedGoalLists,
+  type CompletedGoalList,
+  type TodoGoal,
+} from "./todo-panel"
 
 type MessageGroup =
   | {
@@ -292,6 +298,42 @@ function buildTurnCardsByGroup(
   }
 
   return cardsByGroup
+}
+
+// Map each fully-completed todo list to the group that contains the todo tool
+// message where its last goal finished, so the whole list docks inline next to
+// that turn as a single card.
+function buildCompletedTodosByGroup(
+  groups: MessageGroup[],
+  lists: CompletedGoalList[]
+): Map<number, TodoGoal[][]> {
+  const map = new Map<number, TodoGoal[][]>()
+  if (lists.length === 0) return map
+
+  const groupOfMessage = (msgIndex: number): number => {
+    for (let g = 0; g < groups.length; g++) {
+      const group = groups[g]
+      if (group.type === "regular") {
+        if (group.index === msgIndex) return g
+      } else if (
+        msgIndex >= group.startIndex &&
+        msgIndex < group.startIndex + group.messages.length
+      ) {
+        return g
+      }
+    }
+    return -1
+  }
+
+  for (const { goals, messageIndex } of lists) {
+    const g = groupOfMessage(messageIndex)
+    if (g === -1) continue
+    const bucket = map.get(g) ?? []
+    bucket.push(goals)
+    map.set(g, bucket)
+  }
+
+  return map
 }
 
 // Pending initial inputs keyed by threadId — used to pre-fill the textbox
@@ -644,6 +686,15 @@ export function ChatView({
   const turnCardsByGroup = useMemo(
     () => buildTurnCardsByGroup(groupedMessages, turns),
     [groupedMessages, turns]
+  )
+
+  const completedTodosByGroup = useMemo(
+    () =>
+      buildCompletedTodosByGroup(
+        groupedMessages,
+        deriveCompletedGoalLists(visibleMessages)
+      ),
+    [groupedMessages, visibleMessages]
   )
 
   // Stable per-group keys derived from message identity rather than position,
@@ -1215,10 +1266,20 @@ export function ChatView({
               }
 
               const turnCards = turnCardsByGroup.get(groupIndex) ?? []
+              const completedTodoLists =
+                completedTodosByGroup.get(groupIndex) ?? []
 
               return (
                 <div key={itemKey}>
                   {content}
+                  {completedTodoLists.map((goals) => (
+                    <div
+                      key={`todo-${goals[0]?.id ?? groupIndex}`}
+                      className="mx-auto w-full max-w-3xl px-6 pb-3"
+                    >
+                      <CompletedTodoPanel goals={goals} />
+                    </div>
+                  ))}
                   {turnCards.map((turn) =>
                     isPlanOnlyTurn(turn) ? (
                       <PlanChangesCard
