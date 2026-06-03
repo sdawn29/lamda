@@ -101,7 +101,20 @@ export interface OAuthProvider {
 
 export type OAuthWsEvent =
   | { type: "auth_url"; url: string; instructions?: string }
+  | {
+      type: "device_code"
+      userCode: string
+      verificationUri: string
+      expiresInSeconds?: number
+      intervalSeconds?: number
+    }
   | { type: "prompt"; promptId: string; message: string; placeholder?: string }
+  | {
+      type: "select"
+      promptId: string
+      message: string
+      options: { id: string; label: string }[]
+    }
   | { type: "progress"; message: string }
   | { type: "done" }
   | { type: "error"; message: string }

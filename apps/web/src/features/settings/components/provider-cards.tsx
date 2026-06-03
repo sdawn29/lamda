@@ -133,6 +133,13 @@ type LoginState =
       instructions?: string
     }
   | {
+      status: "waiting_device_code"
+      providerId: string
+      loginId: string
+      userCode: string
+      verificationUri: string
+    }
+  | {
       status: "waiting_prompt"
       providerId: string
       loginId: string
@@ -140,12 +147,33 @@ type LoginState =
       message: string
       placeholder?: string
     }
+  | {
+      status: "waiting_select"
+      providerId: string
+      loginId: string
+      promptId: string
+      message: string
+      options: { id: string; label: string }[]
+    }
   | { status: "done"; providerId: string }
   | { status: "error"; providerId: string; message: string }
 
 type OAuthWsEvent =
   | { type: "auth_url"; url: string; instructions?: string }
+  | {
+      type: "device_code"
+      userCode: string
+      verificationUri: string
+      expiresInSeconds?: number
+      intervalSeconds?: number
+    }
   | { type: "prompt"; promptId: string; message: string; placeholder?: string }
+  | {
+      type: "select"
+      promptId: string
+      message: string
+      options: { id: string; label: string }[]
+    }
   | { type: "progress"; message: string }
   | { type: "done" }
   | { type: "error"; message: string }
@@ -236,6 +264,15 @@ export function SubscriptionsCard() {
           instructions: event.instructions,
         })
         void handleOpenExternal(event.url)
+      } else if (event.type === "device_code") {
+        setLoginState({
+          status: "waiting_device_code",
+          providerId,
+          loginId,
+          userCode: event.userCode,
+          verificationUri: event.verificationUri,
+        })
+        void handleOpenExternal(event.verificationUri)
       } else if (event.type === "prompt") {
         setPromptValue("")
         setLoginState({
@@ -245,6 +282,15 @@ export function SubscriptionsCard() {
           promptId: event.promptId,
           message: event.message,
           placeholder: event.placeholder,
+        })
+      } else if (event.type === "select") {
+        setLoginState({
+          status: "waiting_select",
+          providerId,
+          loginId,
+          promptId: event.promptId,
+          message: event.message,
+          options: event.options,
         })
       } else if (event.type === "done") {
         completed = true
@@ -303,11 +349,32 @@ export function SubscriptionsCard() {
     }
   }
 
+  async function handleSelectOption(optionId: string) {
+    if (loginState.status !== "waiting_select") return
+    const { loginId, promptId, providerId } = loginState
+    setLoginState((s) => ({ ...s, status: "connecting" }) as LoginState)
+    try {
+      await respondToOAuthPromptMutation.mutateAsync({
+        loginId,
+        promptId,
+        value: optionId,
+      })
+    } catch (err) {
+      setLoginState({
+        status: "error",
+        providerId,
+        message: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
   async function handleAbort() {
     closeWebSocket()
     if (
       loginState.status === "waiting_auth" ||
+      loginState.status === "waiting_device_code" ||
       loginState.status === "waiting_prompt" ||
+      loginState.status === "waiting_select" ||
       loginState.status === "connecting"
     ) {
       try {
@@ -467,6 +534,54 @@ export function SubscriptionsCard() {
                         >
                           Submit
                         </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isActive && loginState.status === "waiting_device_code" && (
+                    <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                      <div className="flex items-start gap-2">
+                        <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium">
+                            Enter this code to authenticate
+                          </p>
+                          <p className="mt-1 font-mono text-sm font-semibold tracking-widest">
+                            {loginState.userCode}
+                          </p>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto justify-start px-0"
+                            onClick={() =>
+                              void handleOpenExternal(loginState.verificationUri)
+                            }
+                          >
+                            <ExternalLink data-icon="inline-start" />
+                            Open verification page
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {isActive && loginState.status === "waiting_select" && (
+                    <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                      <p className="mb-2 text-xs font-medium">
+                        {loginState.message}
+                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        {loginState.options.map((opt) => (
+                          <Button
+                            key={opt.id}
+                            variant="outline"
+                            size="sm"
+                            className="h-7 justify-start text-xs"
+                            onClick={() => handleSelectOption(opt.id)}
+                          >
+                            {opt.label}
+                          </Button>
+                        ))}
                       </div>
                     </div>
                   )}

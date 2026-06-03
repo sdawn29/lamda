@@ -134,6 +134,13 @@ export interface ManagedSessionHandle {
   setThinkingLevel(level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh"): void
   /** Path to the persisted session file, or undefined for in-memory sessions. */
   readonly sessionFile: string | undefined
+  /**
+   * Set a user-defined display name for the session. Persisted to the session
+   * file (via a `session_info` entry) so resumed/listed sessions show the name.
+   */
+  setName(name: string): void
+  /** Get the current user-defined session display name, or undefined if unset. */
+  getName(): string | undefined
   /** Abort the current agent turn. */
   abort(): Promise<void>
   /** Dispose the session and free resources. */

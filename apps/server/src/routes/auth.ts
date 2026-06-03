@@ -32,6 +32,7 @@ auth.post("/auth/oauth/:providerId/login", async (c) => {
     sseQueue: [],
     sseFlush: null,
     promptResolvers: new Map(),
+    selectResolvers: new Map(),
     abortController: new AbortController(),
     rejectManualInput: null,
     createdAt: Date.now(),
@@ -58,6 +59,14 @@ auth.post("/auth/oauth/:providerId/login", async (c) => {
           url: info.url,
           instructions: info.instructions,
         }),
+      onDeviceCode: (info) =>
+        emit({
+          type: "device_code",
+          userCode: info.userCode,
+          verificationUri: info.verificationUri,
+          expiresInSeconds: info.expiresInSeconds,
+          intervalSeconds: info.intervalSeconds,
+        }),
       onProgress: (message) => emit({ type: "progress", message }),
       onPrompt: (prompt) => {
         const promptId = randomUUID();
@@ -69,6 +78,18 @@ auth.post("/auth/oauth/:providerId/login", async (c) => {
         });
         return new Promise<string>((resolve) => {
           login.promptResolvers.set(promptId, resolve);
+        });
+      },
+      onSelect: (prompt) => {
+        const promptId = randomUUID();
+        emit({
+          type: "select",
+          promptId,
+          message: prompt.message,
+          options: prompt.options.map((o) => ({ id: o.id, label: o.label })),
+        });
+        return new Promise<string | undefined>((resolve) => {
+          login.selectResolvers.set(promptId, resolve);
         });
       },
       onManualCodeInput: () => manualInputPromise,
@@ -101,12 +122,23 @@ auth.post("/auth/oauth/:loginId/respond", async (c) => {
     .catch((): { promptId?: string; value?: string } => ({}));
   if (!body.promptId) return c.json({ error: "promptId is required" }, 400);
 
-  const resolver = login.promptResolvers.get(body.promptId);
-  if (!resolver) return c.json({ error: "Prompt not found" }, 404);
+  // A pending request is either a free-text prompt or an interactive selector.
+  const promptResolver = login.promptResolvers.get(body.promptId);
+  if (promptResolver) {
+    login.promptResolvers.delete(body.promptId);
+    promptResolver(body.value ?? "");
+    return c.json({ ok: true });
+  }
 
-  login.promptResolvers.delete(body.promptId);
-  resolver(body.value ?? "");
-  return c.json({ ok: true });
+  const selectResolver = login.selectResolvers.get(body.promptId);
+  if (selectResolver) {
+    login.selectResolvers.delete(body.promptId);
+    // An empty value cancels the selector (resolves to undefined).
+    selectResolver(body.value ? body.value : undefined);
+    return c.json({ ok: true });
+  }
+
+  return c.json({ error: "Prompt not found" }, 404);
 });
 
 auth.post("/auth/oauth/:loginId/abort", (c) => {
@@ -115,6 +147,9 @@ auth.post("/auth/oauth/:loginId/abort", (c) => {
   if (!login) return c.json({ error: "Login session not found" }, 404);
   login.abortController.abort();
   login.rejectManualInput?.(new Error("Login aborted"));
+  // Cancel any pending interactive selector so the SDK login promise unwinds.
+  for (const resolve of login.selectResolvers.values()) resolve(undefined);
+  login.selectResolvers.clear();
   activeLogins.delete(loginId);
   return c.json({ ok: true });
 });

@@ -28,7 +28,20 @@ export async function writeAuthJson(data: AuthJson): Promise<void> {
 
 export type OAuthSseEvent =
   | { type: "auth_url"; url: string; instructions?: string }
+  | {
+      type: "device_code";
+      userCode: string;
+      verificationUri: string;
+      expiresInSeconds?: number;
+      intervalSeconds?: number;
+    }
   | { type: "prompt"; promptId: string; message: string; placeholder?: string }
+  | {
+      type: "select";
+      promptId: string;
+      message: string;
+      options: { id: string; label: string }[];
+    }
   | { type: "progress"; message: string }
   | { type: "done" }
   | { type: "error"; message: string };
@@ -37,6 +50,8 @@ export interface ActiveLogin {
   sseQueue: OAuthSseEvent[];
   sseFlush: (() => void) | null;
   promptResolvers: Map<string, (value: string) => void>;
+  /** Resolvers for interactive selector prompts (device-code login method, etc). */
+  selectResolvers: Map<string, (value: string | undefined) => void>;
   abortController: AbortController;
   rejectManualInput: ((err: Error) => void) | null;
   createdAt: number;

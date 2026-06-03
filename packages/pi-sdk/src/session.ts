@@ -54,6 +54,8 @@ function buildRuntimeHandle(runtime: AgentSessionRuntime): ManagedSessionHandle 
       session.setActiveToolsByName(next)
     },
     get sessionFile() { return runtime.session.sessionFile },
+    setName: (name) => runtime.session.setSessionName(name),
+    getName: () => runtime.session.sessionName,
     getContextUsage() {
       const usage = (runtime.session as any).getContextUsage()
       if (!usage) return undefined
