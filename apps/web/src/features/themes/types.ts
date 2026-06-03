@@ -10,6 +10,8 @@
 
 import type { CSSProperties } from "react"
 
+import type { CodePaletteSet } from "./code-tokens"
+
 /** User-facing color-scheme preference. `system` follows the OS. */
 export type ThemeMode = "dark" | "light" | "system"
 
@@ -86,6 +88,12 @@ export interface ColorTheme {
   radius?: string
   light: ThemePalette
   dark: ThemePalette
+  /**
+   * Syntax-highlighting colors for the editor and Markdown code blocks. Falls
+   * back to the fixed Fleet defaults when absent (see `code-tokens.ts`); only
+   * the custom theme overrides them.
+   */
+  code?: CodePaletteSet
   /** Hand-tuned code palettes; generated from the UI tokens when absent. */
   syntax?: {
     light: SyntaxThemeSet
@@ -106,5 +114,7 @@ export function themeRadius(theme: ColorTheme): string {
 export interface CustomThemeData {
   light: ThemePalette
   dark: ThemePalette
+  /** Editable syntax-highlighting colors (seeded from the Fleet defaults). */
+  code: CodePaletteSet
   radius: string
 }

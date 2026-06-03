@@ -1,38 +1,41 @@
 /**
- * Derive code-highlighting palettes from a theme's UI tokens.
+ * Build the Prism + hljs code-highlighting palettes from a theme's code tokens.
  *
- * Hand-authoring a Prism + hljs palette for every theme is a lot of surface and
- * drifts out of sync. Instead we map the theme's structural tokens onto
- * syntax roles so any theme — including user-created ones — gets coherent,
- * on-brand code highlighting for free. Themes that want pixel-perfect control
- * can still ship an explicit `syntax` set (see {@link ColorTheme}).
+ * The {@link CodePalette} (Fleet defaults, overridable on the custom theme)
+ * carries the syntax hues; a few non-code roles (surface, diff add/remove) come
+ * from the UI palette. Themes that want pixel-perfect control can still ship an
+ * explicit `syntax` set (see {@link ColorTheme}).
  */
 
+import type { CodePalette } from "./code-tokens"
 import type { SyntaxTheme, SyntaxThemeSet, ThemePalette } from "./types"
 
 const MONO = "var(--font-mono, ui-monospace, monospace)"
 
 /**
- * Assign theme tokens to syntax roles. The five chart colors carry the
- * semantic hues; foreground/muted-foreground handle plain text and comments.
+ * Assign code + UI tokens to syntax roles. The code palette carries the
+ * semantic hues; the UI palette supplies the surface and diff add/remove tints.
  */
-function roles(p: ThemePalette) {
+function roles(code: CodePalette, p: ThemePalette) {
   return {
     bg: p.card,
-    text: p.foreground,
-    comment: p["muted-foreground"],
-    keyword: p["chart-1"],
-    string: p["chart-2"],
-    number: p["chart-3"],
-    func: p["chart-4"],
-    property: p["chart-5"],
+    text: code.text,
+    comment: code.comment,
+    keyword: code.keyword,
+    string: code.string,
+    number: code.number,
+    func: code.function,
+    type: code.type,
+    property: code.property,
+    parameter: code.parameter,
+    builtin: code.builtin,
     deleted: p.destructive,
     inserted: p["chart-2"],
   }
 }
 
-export function buildPrismTheme(palette: ThemePalette): SyntaxTheme {
-  const c = roles(palette)
+export function buildPrismTheme(code: CodePalette, palette: ThemePalette): SyntaxTheme {
+  const c = roles(code, palette)
   const base = {
     color: c.text,
     fontFamily: MONO,
@@ -65,7 +68,7 @@ export function buildPrismTheme(palette: ThemePalette): SyntaxTheme {
     namespace: { color: c.text },
 
     property: { color: c.property },
-    tag: { color: c.func },
+    tag: { color: c.type },
     constant: { color: c.number },
     symbol: { color: c.property },
     deleted: { color: c.deleted },
@@ -77,7 +80,7 @@ export function buildPrismTheme(palette: ThemePalette): SyntaxTheme {
     "attr-name": { color: c.property },
     string: { color: c.string },
     char: { color: c.string },
-    builtin: { color: c.func },
+    builtin: { color: c.builtin },
     inserted: { color: c.inserted },
 
     operator: { color: c.text },
@@ -89,7 +92,7 @@ export function buildPrismTheme(palette: ThemePalette): SyntaxTheme {
     keyword: { color: c.keyword },
 
     function: { color: c.func },
-    "class-name": { color: c.func },
+    "class-name": { color: c.type },
 
     regex: { color: c.string },
     important: { color: c.keyword, fontWeight: "bold" },
@@ -105,15 +108,15 @@ export function buildPrismTheme(palette: ThemePalette): SyntaxTheme {
 
     "script-punctuation": { color: c.text },
     spread: { color: c.text },
-    parameter: { color: c.number },
+    parameter: { color: c.parameter },
 
     title: { color: c.text, fontWeight: "bold" },
     "code-snippet": { color: c.string },
   }
 }
 
-export function buildHljsTheme(palette: ThemePalette): SyntaxTheme {
-  const c = roles(palette)
+export function buildHljsTheme(code: CodePalette, palette: ThemePalette): SyntaxTheme {
+  const c = roles(code, palette)
   return {
     hljs: {
       display: "block",
@@ -126,8 +129,8 @@ export function buildHljsTheme(palette: ThemePalette): SyntaxTheme {
     "hljs-quote": { color: c.comment, fontStyle: "italic" },
     "hljs-keyword": { color: c.keyword },
     "hljs-selector-tag": { color: c.keyword },
-    "hljs-type": { color: c.func },
-    "hljs-built_in": { color: c.func },
+    "hljs-type": { color: c.type },
+    "hljs-built_in": { color: c.builtin },
     "hljs-literal": { color: c.keyword },
     "hljs-number": { color: c.number },
     "hljs-string": { color: c.string },
@@ -136,13 +139,13 @@ export function buildHljsTheme(palette: ThemePalette): SyntaxTheme {
     "hljs-formula": { color: c.text },
     "hljs-title": { color: c.func },
     "hljs-title.function_": { color: c.func },
-    "hljs-title.class_": { color: c.func },
-    "hljs-name": { color: c.func },
+    "hljs-title.class_": { color: c.type },
+    "hljs-name": { color: c.type },
     "hljs-section": { color: c.text },
     "hljs-selector-id": { color: c.property },
     "hljs-selector-class": { color: c.property },
     "hljs-variable": { color: c.text },
-    "hljs-params": { color: c.number },
+    "hljs-params": { color: c.parameter },
     "hljs-template-variable": { color: c.text },
     "hljs-attr": { color: c.property },
     "hljs-attribute": { color: c.property },
@@ -163,9 +166,12 @@ export function buildHljsTheme(palette: ThemePalette): SyntaxTheme {
 }
 
 /** Build the full {@link SyntaxThemeSet} (prism + hljs) for one mode. */
-export function buildSyntaxThemeSet(palette: ThemePalette): SyntaxThemeSet {
+export function buildSyntaxThemeSet(
+  code: CodePalette,
+  palette: ThemePalette
+): SyntaxThemeSet {
   return {
-    prism: buildPrismTheme(palette),
-    hljs: buildHljsTheme(palette),
+    prism: buildPrismTheme(code, palette),
+    hljs: buildHljsTheme(code, palette),
   }
 }

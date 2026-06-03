@@ -21,8 +21,9 @@ themes/
 ├── types.ts             — ThemeMode, token keys, ThemePalette, ColorTheme, CustomThemeData
 ├── registry.ts          — built-in themes + getThemeById (default = jellybeans)
 ├── custom-theme.ts      — editable custom theme: (de)serialize, seed, TOKEN_GROUPS
+├── code-tokens.ts       — CodePalette (syntax roles) + fixed Fleet defaults
 ├── apply-theme.ts       — injects :root/.dark CSS vars into a managed <style>
-├── syntax-builder.ts    — derives Prism/hljs palettes from UI tokens
+├── syntax-builder.ts    — builds Prism/hljs palettes from the code tokens
 ├── terminal-theme.ts    — derives an xterm.js ITheme from UI tokens
 ├── theme-engine.tsx     — ThemeProvider + useTheme (the single source of truth)
 ├── use-syntax-theme.ts  — useSyntaxTheme() hook for code blocks
@@ -44,8 +45,15 @@ themes/
   flash.
 - `useSyntaxTheme()` returns the active theme's `{ prism, hljs }` set for the
   resolved mode — the theme's hand-tuned palette when present, otherwise one
-  derived from its UI tokens. Consumed by chat code blocks, write-view, and
-  tool-call-block.
+  built from its **code tokens** (`syntax-builder.ts`). Consumed by chat code
+  blocks, write-view, and tool-call-block.
+- **Code tokens** (`code-tokens.ts`) are a separate `CodePalette` of syntax
+  roles (text/comment/keyword/string/number/function/type/property/parameter/
+  builtin). They are *not* derived from the UI chart colors: they default to a
+  fixed JetBrains Fleet palette and are overridable only on the custom theme
+  (`ColorTheme.code`). Both the Markdown code blocks and the Monaco editors read
+  them, so code renders identically everywhere; built-ins fall back to the Fleet
+  defaults via `resolveCodePalette`.
 
 ## Custom theme
 
@@ -57,8 +65,10 @@ reconstructed into a `ColorTheme` at runtime by `customThemeFromData`.
 - First time the user selects "Custom", `setColorTheme` seeds it by cloning the
   currently active theme, so they start from a coherent palette.
 - The editor (`theme-editor.tsx`) writes each change straight to the setting via
-  `updateCustomToken` / `setCustomData`; because the engine re-injects on every
-  settings change, edits to the active custom theme preview live.
+  `updateCustomToken` / `updateCustomCodeToken` / `setCustomData`; because the
+  engine re-injects on every settings change, edits to the active custom theme
+  preview live. The "Code tokens" section edits `CustomThemeData.code` and is
+  enabled only while the custom theme is active.
 - `parseCustomData` validates the stored JSON and falls back to the default
   theme for any missing/corrupt field, so a bad setting can never break render.
 - The editor's field layout comes from `TOKEN_GROUPS`; a DEV-only assertion
@@ -81,9 +91,10 @@ derive concrete palettes from the active theme's tokens and re-apply live:
   onto the chart colors + destructive. A "sync theme" effect pushes changes to
   the live `term.options.theme`; the mount effect reads the theme from a ref so
   a theme change never tears down the running session.
-- **Monaco** (`lsp-integration.ts`) maps tokens onto Monaco's editor/widget
-  colors (`paletteFromTokens` → `editorColors`) and token-color rules
-  (`syntaxRules`, mirroring `syntax-builder`'s roles). The viewers call
+- **Monaco** (`lsp-integration.ts`) maps UI tokens onto Monaco's editor/widget
+  colors (`paletteFromTokens` → `editorColors`) and maps the active theme's
+  **code tokens** (`resolveCodePalette`) onto its token-color rules
+  (`syntaxRules`), so editor highlighting matches the Markdown blocks. The viewers call
   `applyMonacoTheme(activeColorTheme, isDark)` in an effect; theme names stay
   stable, so redefining + `setTheme` re-skins mounted editors. The diff
   viewer's row tints come from CSS `color-mix` over `--chart-*` / `--destructive`

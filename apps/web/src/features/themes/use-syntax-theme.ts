@@ -1,5 +1,6 @@
 import * as React from "react"
 
+import { resolveCodePalette } from "./code-tokens"
 import { buildSyntaxThemeSet } from "./syntax-builder"
 import { useTheme } from "./theme-engine"
 import type { SyntaxThemeSet } from "./types"
@@ -19,6 +20,9 @@ export function useSyntaxTheme(): SyntaxThemeSet {
   return React.useMemo(() => {
     const explicit = activeColorTheme.syntax?.[resolvedTheme]
     if (explicit) return explicit
-    return buildSyntaxThemeSet(activeColorTheme[resolvedTheme])
+    return buildSyntaxThemeSet(
+      resolveCodePalette(activeColorTheme, resolvedTheme),
+      activeColorTheme[resolvedTheme]
+    )
   }, [activeColorTheme, resolvedTheme])
 }

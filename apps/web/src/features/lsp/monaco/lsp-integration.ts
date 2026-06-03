@@ -12,6 +12,7 @@
 import type { editor, languages, Uri } from "monaco-editor"
 import { monaco, ensureMonacoEnvironment } from "./monaco-environment"
 import type { ColorTheme, ThemePalette } from "../../themes/types"
+import { resolveCodePalette, type CodePalette } from "../../themes/code-tokens"
 import type {
   Diagnostic,
   Hover,
@@ -509,20 +510,24 @@ function editorColors(p: Palette): Record<string, string> {
 }
 
 /**
- * Map the theme's tokens onto Monaco token-color rules. Roles mirror the Prism
- * palette in `@/features/themes/syntax-builder`, so the editor and the Markdown
- * code blocks highlight code identically. Rules match by longest dot-separated
- * prefix, so each root (e.g. "string") also styles its language-specific
- * variants ("string.yaml", "string.key.json"); more specific rules override.
+ * Map a {@link CodePalette} onto Monaco token-color rules. The palette defaults
+ * to the fixed Fleet colors and is overridable on the custom theme (see
+ * `@/features/themes/code-tokens`), so the editor matches the Markdown code
+ * blocks. Rules match by longest dot-separated prefix, so each root (e.g.
+ * "string") also styles its language-specific variants ("string.yaml",
+ * "string.key.json"); more specific rules override.
  */
-function syntaxRules(t: ThemePalette): editor.ITokenThemeRule[] {
-  const text = toHex6(t.foreground, "808080")
-  const comment = toHex6(t["muted-foreground"], "6d6d6d")
-  const keyword = toHex6(t["chart-1"], text)
-  const string = toHex6(t["chart-2"], text)
-  const number = toHex6(t["chart-3"], text)
-  const func = toHex6(t["chart-4"], text)
-  const property = toHex6(t["chart-5"], text)
+function syntaxRules(c: CodePalette): editor.ITokenThemeRule[] {
+  const text = toHex6(c.text, "808080")
+  const comment = toHex6(c.comment, "6d6d6d")
+  const keyword = toHex6(c.keyword, text)
+  const string = toHex6(c.string, text)
+  const number = toHex6(c.number, text)
+  const func = toHex6(c.function, text)
+  const type = toHex6(c.type, text)
+  const property = toHex6(c.property, text)
+  const parameter = toHex6(c.parameter, text)
+  const builtin = toHex6(c.builtin, text)
 
   return [
     { token: "", foreground: text },
@@ -544,25 +549,25 @@ function syntaxRules(t: ThemePalette): editor.ITokenThemeRule[] {
     { token: "number", foreground: number },
     { token: "constant", foreground: number },
     { token: "enumMember", foreground: number },
-    { token: "variable.parameter", foreground: number },
-    { token: "parameter", foreground: number },
+    { token: "variable.parameter", foreground: parameter },
+    { token: "parameter", foreground: parameter },
     { token: "function", foreground: func },
     { token: "method", foreground: func },
     { token: "macro", foreground: func },
     { token: "annotation", foreground: func },
     { token: "decorator", foreground: func },
-    { token: "type", foreground: func },
-    { token: "type.identifier", foreground: func },
-    { token: "struct", foreground: func },
-    { token: "class", foreground: func },
-    { token: "interface", foreground: func },
-    { token: "enum", foreground: func },
-    { token: "tag", foreground: func },
-    { token: "metatag", foreground: func },
-    { token: "predefined", foreground: func },
-    { token: "builtin", foreground: func },
-    { token: "support", foreground: func },
-    { token: "variable.predefined", foreground: func },
+    { token: "type", foreground: type },
+    { token: "type.identifier", foreground: type },
+    { token: "struct", foreground: type },
+    { token: "class", foreground: type },
+    { token: "interface", foreground: type },
+    { token: "enum", foreground: type },
+    { token: "tag", foreground: type },
+    { token: "metatag", foreground: type },
+    { token: "predefined", foreground: builtin },
+    { token: "builtin", foreground: builtin },
+    { token: "support", foreground: builtin },
+    { token: "variable.predefined", foreground: builtin },
     { token: "property", foreground: property },
     { token: "key", foreground: property },
     { token: "string.key", foreground: property },
@@ -571,25 +576,25 @@ function syntaxRules(t: ThemePalette): editor.ITokenThemeRule[] {
   ]
 }
 
-type ActiveTheme = Pick<ColorTheme, "light" | "dark">
+type ActiveTheme = Pick<ColorTheme, "light" | "dark" | "code">
 
 /** (Re)define the lamda Monaco themes from the active color theme's palettes. */
 export function ensureThemes(active: ActiveTheme) {
-  const key = JSON.stringify([active.light, active.dark])
+  const key = JSON.stringify([active.light, active.dark, active.code])
   if (key === lastThemeKey) return
   lastThemeKey = key
 
   monaco.editor.defineTheme(DARK_THEME, {
     base: "vs-dark",
     inherit: true,
-    rules: syntaxRules(active.dark),
+    rules: syntaxRules(resolveCodePalette(active, "dark")),
     colors: editorColors(paletteFromTokens(active.dark, "dark")),
   })
 
   monaco.editor.defineTheme(LIGHT_THEME, {
     base: "vs",
     inherit: true,
-    rules: syntaxRules(active.light),
+    rules: syntaxRules(resolveCodePalette(active, "light")),
     colors: editorColors(paletteFromTokens(active.light, "light")),
   })
 }

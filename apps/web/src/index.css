@@ -543,6 +543,25 @@
     overflow: hidden !important;
   }
 
+  /* The code hover is wrapped in `.monaco-resizable-hover`, which is the element
+     that actually carries the visible border + shadow (Monaco hardcodes a 3px
+     radius on it with `box-sizing: content-box`; the inner `.monaco-hover` is
+     borderless). Round and clip THIS wrapper so the visible border matches the
+     app radius, and give it the popover background so the corner curve fills
+     cleanly. The inner `.monaco-hover` must then drop its own (larger) radius —
+     otherwise its background pulls inward from the corners and leaves gaps. */
+  .monaco-editor .monaco-resizable-hover {
+    border-radius: var(--radius) !important;
+    overflow: hidden !important;
+    background: var(--popover) !important;
+    box-shadow: 0 4px 16px -2px rgb(0 0 0 / 0.18) !important;
+  }
+  .monaco-editor .monaco-resizable-hover > .monaco-hover {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
   /* Monaco's overlay-widgets container is sized to the editor width but has no
      height — it's a zero-height box pinned to the top, so a child anchored with
      `bottom` would measure against that collapsed box and land above the

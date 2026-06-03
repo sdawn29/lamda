@@ -14,8 +14,10 @@ import {
   customThemeFromData,
   parseCustomData,
   serializeCustomData,
+  setCustomCodeToken,
   setCustomToken,
 } from "./custom-theme"
+import type { CodeTokenKey } from "./code-tokens"
 import type {
   ColorTheme,
   CustomThemeData,
@@ -65,6 +67,12 @@ type ThemeProviderState = {
   updateCustomToken: (
     mode: ResolvedMode,
     key: ThemeColorKey,
+    value: string
+  ) => void
+  /** Update a single code (syntax) token in one mode of the custom theme. */
+  updateCustomCodeToken: (
+    mode: ResolvedMode,
+    key: CodeTokenKey,
     value: string
   ) => void
 }
@@ -180,6 +188,13 @@ export function ThemeProvider({
     [setCustomData]
   )
 
+  const updateCustomCodeToken = React.useCallback(
+    (mode: ResolvedMode, key: CodeTokenKey, value: string) => {
+      setCustomData(setCustomCodeToken(customDataRef.current, mode, key, value))
+    },
+    [setCustomData]
+  )
+
   const setColorTheme = React.useCallback(
     (id: string) => {
       // First time the user picks "Custom", seed it from whatever is active so
@@ -265,6 +280,7 @@ export function ThemeProvider({
       customData,
       setCustomData,
       updateCustomToken,
+      updateCustomCodeToken,
     }),
     [
       theme,
@@ -278,6 +294,7 @@ export function ThemeProvider({
       customData,
       setCustomData,
       updateCustomToken,
+      updateCustomCodeToken,
     ]
   )
 

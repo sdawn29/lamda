@@ -7,6 +7,17 @@ export {
 } from "./registry"
 export { applyColorTheme, buildThemeCss } from "./apply-theme"
 export { buildSyntaxThemeSet } from "./syntax-builder"
+export {
+  CODE_TOKEN_KEYS,
+  CODE_TOKEN_FIELDS,
+  FLEET_CODE_DARK,
+  FLEET_CODE_LIGHT,
+  defaultCodePalette,
+  resolveCodePalette,
+  type CodePalette,
+  type CodePaletteSet,
+  type CodeTokenKey,
+} from "./code-tokens"
 export { buildTerminalTheme, type TerminalThemeColors } from "./terminal-theme"
 export {
   CUSTOM_THEME_ID,

@@ -13,8 +13,9 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 import { BUILT_IN_THEMES } from "../registry"
 import { customDataFromTheme, TOKEN_GROUPS } from "../custom-theme"
+import { CODE_TOKEN_FIELDS } from "../code-tokens"
 import { useTheme } from "../theme-engine"
-import type { ResolvedMode, ThemeColorKey } from "../types"
+import type { ResolvedMode } from "../types"
 
 /** Native `<input type="color">` only accepts 7-char hex; coerce best-effort. */
 function toHexInput(value: string): string {
@@ -35,6 +36,7 @@ export function ThemeEditor() {
   const {
     customData,
     updateCustomToken,
+    updateCustomCodeToken,
     setCustomData,
     resolvedTheme,
     isCustomActive,
@@ -43,6 +45,7 @@ export function ThemeEditor() {
   // Default to editing whatever mode is currently visible.
   const [editMode, setEditMode] = React.useState<ResolvedMode>(resolvedTheme)
   const palette = customData[editMode]
+  const codePalette = customData.code[editMode]
 
   return (
     <div className="flex flex-col gap-4">
@@ -112,6 +115,28 @@ export function ThemeEditor() {
 
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-1 text-xs font-medium text-muted-foreground">
+            Code tokens
+          </legend>
+          <p className="-mt-1 mb-1 text-xs text-muted-foreground">
+            Syntax colors for the code editor and Markdown code blocks.
+          </p>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
+            {CODE_TOKEN_FIELDS.map((field) => (
+              <TokenRow
+                key={field.key}
+                label={field.label}
+                value={codePalette[field.key]}
+                onChange={(value) =>
+                  updateCustomCodeToken(editMode, field.key, value)
+                }
+                disabled={!isCustomActive}
+              />
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 text-xs font-medium text-muted-foreground">
             Shape
           </legend>
           <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
@@ -144,7 +169,6 @@ function TokenRow({
   value: string
   onChange: (value: string) => void
   disabled?: boolean
-  key?: ThemeColorKey
 }) {
   return (
     <div className="flex items-center justify-between gap-2 py-0.5">

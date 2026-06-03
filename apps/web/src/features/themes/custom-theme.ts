@@ -9,6 +9,11 @@
  */
 
 import {
+  defaultCodePalette,
+  isValidCodePalette,
+  type CodeTokenKey,
+} from "./code-tokens"
+import {
   THEME_COLOR_KEYS,
   themeRadius,
   type ColorTheme,
@@ -30,6 +35,7 @@ export function customThemeFromData(data: CustomThemeData): ColorTheme {
     radius: data.radius,
     light: data.light,
     dark: data.dark,
+    code: { light: data.code.light, dark: data.code.dark },
   }
 }
 
@@ -38,6 +44,10 @@ export function customDataFromTheme(base: ColorTheme): CustomThemeData {
   return {
     light: { ...base.light },
     dark: { ...base.dark },
+    code: {
+      light: { ...(base.code?.light ?? defaultCodePalette("light")) },
+      dark: { ...(base.code?.dark ?? defaultCodePalette("dark")) },
+    },
     radius: themeRadius(base),
   }
 }
@@ -69,9 +79,14 @@ export function parseCustomData(
   if (typeof parsed !== "object" || parsed === null) return fallback
 
   const obj = parsed as Partial<CustomThemeData>
+  const code = obj.code as Partial<CustomThemeData["code"]> | undefined
   return {
     light: isValidPalette(obj.light) ? obj.light : fallback.light,
     dark: isValidPalette(obj.dark) ? obj.dark : fallback.dark,
+    code: {
+      light: isValidCodePalette(code?.light) ? code.light : fallback.code.light,
+      dark: isValidCodePalette(code?.dark) ? code.dark : fallback.code.dark,
+    },
     radius: typeof obj.radius === "string" ? obj.radius : fallback.radius,
   }
 }
@@ -90,6 +105,19 @@ export function setCustomToken(
   return {
     ...data,
     [mode]: { ...data[mode], [key]: value },
+  }
+}
+
+/** Immutably set one code (syntax) token in one mode of the custom data. */
+export function setCustomCodeToken(
+  data: CustomThemeData,
+  mode: "light" | "dark",
+  key: CodeTokenKey,
+  value: string
+): CustomThemeData {
+  return {
+    ...data,
+    code: { ...data.code, [mode]: { ...data.code[mode], [key]: value } },
   }
 }
 
@@ -150,13 +178,13 @@ export const TOKEN_GROUPS: TokenGroup[] = [
     ],
   },
   {
-    title: "Charts & syntax",
+    title: "Charts",
     fields: [
-      { key: "chart-1", label: "Chart 1 / keyword" },
-      { key: "chart-2", label: "Chart 2 / string" },
-      { key: "chart-3", label: "Chart 3 / number" },
-      { key: "chart-4", label: "Chart 4 / function" },
-      { key: "chart-5", label: "Chart 5 / property" },
+      { key: "chart-1", label: "Chart 1" },
+      { key: "chart-2", label: "Chart 2" },
+      { key: "chart-3", label: "Chart 3" },
+      { key: "chart-4", label: "Chart 4" },
+      { key: "chart-5", label: "Chart 5" },
     ],
   },
   {
