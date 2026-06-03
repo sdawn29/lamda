@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
-import { DiffEditor, type BeforeMount } from "@monaco-editor/react"
+import {
+  DiffEditor,
+  type BeforeMount,
+  type DiffOnMount,
+} from "@monaco-editor/react"
 import type { editor as MonacoEditor } from "monaco-editor"
 import { useTheme } from "@/shared/components/theme-provider"
-import {
-  ensureMonacoEnvironment,
-  monaco,
-} from "@/features/lsp/monaco/monaco-environment"
+import { ensureMonacoEnvironment } from "@/features/lsp/monaco/monaco-environment"
 import {
   ensureThemes,
   resolveMonacoLanguage,
   themeNameFor,
 } from "@/features/lsp/monaco/lsp-integration"
+import { registerMonacoLayout } from "./monaco-layout-coordinator"
 import type { DiffMode } from "./types"
 
 ensureMonacoEnvironment()
@@ -22,8 +24,6 @@ interface MonacoDiffViewerProps {
   mode: DiffMode
   maxHeight: string | null
   lineCount: number
-  removedLineNumbers: number[]
-  addedLineNumbers: number[]
 }
 
 export default function MonacoDiffViewer({
@@ -33,14 +33,10 @@ export default function MonacoDiffViewer({
   mode,
   maxHeight,
   lineCount,
-  removedLineNumbers,
-  addedLineNumbers,
 }: MonacoDiffViewerProps) {
   const { resolvedTheme } = useTheme()
-  const originalLineNumberDecorations =
-    useRef<MonacoEditor.IEditorDecorationsCollection | null>(null)
-  const modifiedLineNumberDecorations =
-    useRef<MonacoEditor.IEditorDecorationsCollection | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const editorRef = useRef<MonacoEditor.IStandaloneDiffEditor | null>(null)
   const monacoLanguage = useMemo(
     () => (language ? resolveMonacoLanguage(language) : undefined),
     [language]
@@ -55,47 +51,28 @@ export default function MonacoDiffViewer({
     ensureThemes()
   }, [])
 
-  const updateLineNumberDecorations = useCallback(() => {
-    originalLineNumberDecorations.current?.set(
-      removedLineNumbers.map((lineNumber) => ({
-        range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-        options: {
-          description: "lamda-diff-removed-line-number",
-          isWholeLine: true,
-          marginClassName: "lamda-diff-margin-removed",
-          lineNumberClassName: "lamda-diff-line-number-removed",
-        },
-      }))
-    )
-    modifiedLineNumberDecorations.current?.set(
-      addedLineNumbers.map((lineNumber) => ({
-        range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-        options: {
-          description: "lamda-diff-added-line-number",
-          isWholeLine: true,
-          marginClassName: "lamda-diff-margin-added",
-          lineNumberClassName: "lamda-diff-line-number-added",
-        },
-      }))
-    )
-  }, [addedLineNumbers, removedLineNumbers])
+  // Drive layout via the shared coordinator instead of Monaco's per-editor
+  // `automaticLayout`, so a window resize triggers a single batched pass
+  // across all mounted diffs rather than N synchronous relayouts. Monaco
+  // mounts asynchronously and gives no unmount hook, so we register inside
+  // onMount and keep the disposer in a ref. A mode change remounts the editor
+  // (keyed below) and re-fires onMount, which disposes the prior registration.
+  const disposeLayoutRef = useRef<(() => void) | null>(null)
+  const handleMount: DiffOnMount = useCallback((editor) => {
+    editorRef.current = editor
+    const el = containerRef.current
+    if (!el) return
+    disposeLayoutRef.current?.()
+    disposeLayoutRef.current = registerMonacoLayout(el, editor)
+  }, [])
 
-  const handleMount = useCallback(
-    (editor: MonacoEditor.IStandaloneDiffEditor) => {
-      originalLineNumberDecorations.current = editor
-        .getOriginalEditor()
-        .createDecorationsCollection()
-      modifiedLineNumberDecorations.current = editor
-        .getModifiedEditor()
-        .createDecorationsCollection()
-      updateLineNumberDecorations()
+  useEffect(
+    () => () => {
+      disposeLayoutRef.current?.()
+      disposeLayoutRef.current = null
     },
-    [updateLineNumberDecorations]
+    []
   )
-
-  useEffect(() => {
-    updateLineNumberDecorations()
-  }, [updateLineNumberDecorations])
 
   const options: MonacoEditor.IDiffEditorConstructionOptions = useMemo(
     () => ({
@@ -109,7 +86,7 @@ export default function MonacoDiffViewer({
       renderOverviewRuler: false,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
-      automaticLayout: true,
+      automaticLayout: false,
       fontSize: 12,
       fontFamily:
         "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
@@ -125,7 +102,11 @@ export default function MonacoDiffViewer({
   )
 
   return (
-    <div className="lamda-monaco-diff-viewer" style={{ height }}>
+    <div
+      ref={containerRef}
+      className="lamda-monaco-diff-viewer"
+      style={{ height }}
+    >
       <DiffEditor
         key={mode}
         language={monacoLanguage}

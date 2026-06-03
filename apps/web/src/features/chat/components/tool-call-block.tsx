@@ -473,10 +473,15 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               {/* Done state */}
               {msg.status === "done" && (
                 <>
-                  {isEdit && diff !== null && (
+                  {/* Only mount the (heavy) Monaco diff while expanded. The
+                      collapsible wrapper keeps children in the DOM, so without
+                      this gate every collapsed edit would carry a live editor
+                      whose automatic layout thrashes on window resize. */}
+                  {isEdit && diff !== null && expanded && (
                     <DiffView
                       diff={diff}
                       filePath={(msg.args as { path?: string }).path}
+                      showHeader
                     />
                   )}
 

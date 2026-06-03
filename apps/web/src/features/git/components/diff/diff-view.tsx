@@ -1,9 +1,10 @@
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { cn } from "@/shared/lib/utils"
 import type { DiffMode } from "./types"
 import { detectLanguage } from "./highlight"
 import { parseDiff } from "./parser"
 import { MonacoDiffViewer } from "./monaco-diff-viewer-lazy"
+import { DiffHeader } from "./diff-header"
 
 export type { DiffMode }
 export { detectLanguage }
@@ -15,15 +16,25 @@ interface DiffViewProps {
   mode?: DiffMode
   /** Max height of the scrollable diff body. Defaults to 20rem (320px). Pass null to remove the cap. */
   maxHeight?: string | null
+  /** Show the file/stats/view-toggle toolbar above the diff. Off by default
+   *  so callers that already render their own header are unaffected. */
+  showHeader?: boolean
 }
 
 export function DiffView({
   diff,
   filePath,
   className,
-  mode = "inline",
+  mode: modeProp = "inline",
   maxHeight = "20rem",
+  showHeader = false,
 }: DiffViewProps) {
+  // When the toolbar is shown the view mode becomes locally controllable;
+  // it stays seeded by (and in sync with) the `mode` prop for callers that
+  // drive it externally.
+  const [mode, setMode] = useState<DiffMode>(modeProp)
+  useEffect(() => setMode(modeProp), [modeProp])
+
   const lines = useMemo(() => parseDiff(diff), [diff])
   const diffBuffers = useMemo(() => {
     const originalLines: string[] = []
@@ -68,6 +79,15 @@ export function DiffView({
         className
       )}
     >
+      {showHeader && (
+        <DiffHeader
+          filePath={filePath}
+          added={diffBuffers.addedLineNumbers.length}
+          removed={diffBuffers.removedLineNumbers.length}
+          mode={mode}
+          onModeChange={setMode}
+        />
+      )}
       <MonacoDiffViewer
         original={diffBuffers.original}
         modified={diffBuffers.modified}
@@ -75,8 +95,6 @@ export function DiffView({
         mode={mode}
         maxHeight={maxHeight}
         lineCount={lineCount}
-        removedLineNumbers={diffBuffers.removedLineNumbers}
-        addedLineNumbers={diffBuffers.addedLineNumbers}
       />
     </div>
   )

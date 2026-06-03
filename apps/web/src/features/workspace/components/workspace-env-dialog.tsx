@@ -68,7 +68,7 @@ export function WorkspaceEnvDialog({ workspace, open, onOpenChange }: WorkspaceE
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="flex h-[90vh] w-[90vw] max-w-[90vw] flex-col sm:max-w-[90vw]">
         <DialogHeader>
           <DialogTitle>Environment Variables</DialogTitle>
           <DialogDescription>
@@ -76,7 +76,7 @@ export function WorkspaceEnvDialog({ workspace, open, onOpenChange }: WorkspaceE
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-2 py-1">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto py-1">
           {rows.length > 0 && (
             <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-0.5 pb-0.5">
               <span className="text-xs font-medium text-muted-foreground">Key</span>

@@ -107,10 +107,12 @@
   /* ── Destructive (jellybeans error red) ── */
   --destructive: #902020;
 
-  /* ── Border: subtle separator between bg and card ── */
-  /* ── Input: outline for form fields (between secondary and muted) ── */
-  --border: #eaeae7;
-  --input: #e2e2de;
+  /* ── Border: separator that reads against both bg and card. Sits just
+       below the card/secondary level so card edges are legible and panel
+       borders never invert (lighter than the surface they bound). ── */
+  --border: #e3e3df;
+  /* ── Input: stronger outline so form fields read as recessed wells ── */
+  --input: #d9d9d4;
   --ring: #1a4080;
 
   /* ── Charts (jellybeans syntax colors, darkened for light bg) ── */
@@ -134,46 +136,33 @@
   --sidebar-ring: #1a4080;
 }
 
-/* ── Prose color override (all modes) ────────────────────────────────────
-   Force all prose text to use the theme foreground token so both light and
-   dark modes render consistently against the app's surface colors. ── */
+/* ── Prose theming — single source of truth ──────────────────────────────
+   Every value is a theme token, so this one rule serves both light and dark
+   (the tokens flip under `.dark`) and `prose` / `dark:prose-invert` render
+   identically against the app's surfaces. `!important` beats the Typography
+   plugin's own `--tw-prose-*` defaults. Body/headings track the foreground;
+   secondary marks (counters, bullets, captions) sit back at muted-foreground;
+   links use the primary; rules/borders and code backgrounds use the
+   structural tokens so they stay consistent with the rest of the UI. ── */
 .prose,
+.prose-invert,
 .prose :is(*:not([class~="prose"] *)) {
   --tw-prose-body: var(--foreground) !important;
   --tw-prose-headings: var(--foreground) !important;
   --tw-prose-lead: var(--foreground) !important;
+  --tw-prose-links: var(--primary) !important;
   --tw-prose-bold: var(--foreground) !important;
-  --tw-prose-counters: var(--foreground) !important;
-  --tw-prose-bullets: var(--foreground) !important;
+  --tw-prose-counters: var(--muted-foreground) !important;
+  --tw-prose-bullets: var(--muted-foreground) !important;
+  --tw-prose-hr: var(--border) !important;
   --tw-prose-quotes: var(--foreground) !important;
-  --tw-prose-quote-borders: var(--foreground) !important;
-  --tw-prose-captions: var(--foreground) !important;
-  --tw-prose-code: var(--foreground) !important;
-  --tw-prose-th-borders: var(--border) !important;
-  --tw-prose-td-borders: var(--border) !important;
-}
-
-/* ── Dark mode prose override ─────────────────────────────────────────────
-   Keep the dark-mode invert rule so prose-invert continues to work if used
-   standalone outside the app's theming context. ── */
-.dark .prose-invert,
-.dark .prose-invert :is(*:not([class~="prose"] *)) {
-  --tw-prose-body: var(--foreground) !important;
-  --tw-prose-headings: var(--foreground) !important;
-  --tw-prose-lead: var(--foreground) !important;
-  --tw-prose-links: var(--foreground) !important;
-  --tw-prose-bold: var(--foreground) !important;
-  --tw-prose-counters: var(--foreground) !important;
-  --tw-prose-bullets: var(--foreground) !important;
-  --tw-prose-hr: var(--foreground) !important;
-  --tw-prose-quotes: var(--foreground) !important;
-  --tw-prose-quote-borders: var(--foreground) !important;
-  --tw-prose-captions: var(--foreground) !important;
+  --tw-prose-quote-borders: var(--border) !important;
+  --tw-prose-captions: var(--muted-foreground) !important;
   --tw-prose-code: var(--foreground) !important;
   --tw-prose-pre-code: var(--foreground) !important;
-  --tw-prose-pre-bg: var(--foreground) !important;
-  --tw-prose-th-borders: var(--foreground) !important;
-  --tw-prose-td-borders: var(--foreground) !important;
+  --tw-prose-pre-bg: var(--muted) !important;
+  --tw-prose-th-borders: var(--border) !important;
+  --tw-prose-td-borders: var(--border) !important;
 }
 
 /* ── Jellybeans Dark ──────────────────────────────────────────────── */
@@ -230,32 +219,6 @@
   --sidebar-accent-foreground: #e8e8d3;
   --sidebar-border: #141414;
   --sidebar-ring: #3a6090;
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   PROSE STYLES — Use CSS variables so colors follow the theme
-   ════════════════════════════════════════════════════════════════════ */
-@layer components {
-  /* Base prose: use CSS variables for all color tokens */
-  .prose,
-  .prose-invert {
-    --tw-prose-body: var(--foreground);
-    --tw-prose-headings: var(--foreground);
-    --tw-prose-lead: var(--foreground);
-    --tw-prose-links: var(--primary);
-    --tw-prose-bold: var(--foreground);
-    --tw-prose-counters: var(--muted-foreground);
-    --tw-prose-bullets: var(--muted-foreground);
-    --tw-prose-hr: var(--border);
-    --tw-prose-quotes: var(--foreground);
-    --tw-prose-quote-borders: var(--border);
-    --tw-prose-captions: var(--muted-foreground);
-    --tw-prose-code: var(--foreground);
-    --tw-prose-pre-code: var(--foreground);
-    --tw-prose-pre-bg: var(--muted);
-    --tw-prose-th-borders: var(--border);
-    --tw-prose-td-borders: var(--border);
-  }
 }
 
 /* ── Thinking shimmer animation ────────────────────────────────────────── */
@@ -399,14 +362,22 @@
     transition: background 0.7s ease-out;
   }
 
+  /* ── Monaco diff viewer ────────────────────────────────────────────────
+     A bespoke skin over Monaco's diff editor so it reads as a first-class
+     surface in the app: changed rows carry a left accent bar plus a soft
+     tint, word-level edits get a rounded "chip", and the gutter / fillers
+     all derive from the same design tokens as the rest of the UI. */
   .lamda-monaco-diff-viewer {
-    --lamda-diff-added: var(--chart-2);
-    --lamda-diff-removed: var(--destructive);
-    --lamda-diff-gutter-bg: color-mix(in srgb, var(--card) 72%, var(--background));
-    --lamda-diff-line-alpha: 10%;
-    --lamda-diff-gutter-alpha: 16%;
-    --lamda-diff-char-alpha: 22%;
-    --lamda-diff-border-alpha: 28%;
+    /* Base hues, deepened with a touch of black so row tints and chips read
+       darker / richer rather than washed out. */
+    --lamda-diff-added: color-mix(in srgb, var(--chart-2) 72%, black);
+    --lamda-diff-removed: color-mix(in srgb, var(--destructive) 72%, black);
+    --lamda-diff-gutter-bg: color-mix(in srgb, var(--card) 60%, var(--background));
+    --lamda-diff-line-alpha: 18%;
+    --lamda-diff-char-alpha: 38%;
+    --lamda-diff-border-alpha: 50%;
+    --lamda-diff-bar-alpha: 100%;
+    --lamda-diff-bar-width: 2px;
     background: var(--card);
     color: var(--foreground);
   }
@@ -428,11 +399,13 @@
   .lamda-monaco-diff-viewer .monaco-editor .margin,
   .lamda-monaco-diff-viewer .monaco-editor .glyph-margin {
     background: var(--lamda-diff-gutter-bg) !important;
+    box-shadow: inset -1px 0 0 color-mix(in srgb, var(--border) 70%, transparent);
   }
   .lamda-monaco-diff-viewer .monaco-editor .line-numbers {
     background: transparent !important;
-    color: color-mix(in srgb, var(--muted-foreground) 78%, transparent) !important;
+    color: color-mix(in srgb, var(--muted-foreground) 72%, transparent) !important;
     font-variant-numeric: tabular-nums;
+    transition: color 0.1s ease;
   }
   .lamda-monaco-diff-viewer .monaco-diff-editor .diffOverview {
     display: none !important;
@@ -446,67 +419,40 @@
   .lamda-monaco-diff-viewer .monaco-diff-editor .diff-review {
     background: color-mix(in srgb, var(--secondary) 42%, transparent) !important;
   }
+  /* Crisp divider between the two panes in side-by-side mode. */
   .lamda-monaco-diff-viewer .monaco-diff-editor .editor.modified {
-    box-shadow: inset 1px 0 0 color-mix(in srgb, var(--border) 80%, transparent);
+    box-shadow: inset 1px 0 0 color-mix(in srgb, var(--border) 90%, transparent);
   }
   .lamda-monaco-diff-viewer .view-overlays .current-line {
     border-color: transparent !important;
   }
 
-  /* Monaco diff line-number highlights. Monaco already colors the changed
-     gutter rows; these decorations make the number text and its immediate cell
-     carry the same added/removed signal. */
-  .lamda-monaco-diff-viewer
-    .monaco-editor
-    .line-numbers.lamda-diff-line-number-added {
-    color: var(--lamda-diff-added) !important;
-    background: color-mix(
-      in srgb,
-      var(--lamda-diff-added) var(--lamda-diff-gutter-alpha),
-      transparent
-    ) !important;
-    font-weight: 600 !important;
-  }
-  .lamda-monaco-diff-viewer .monaco-editor .lamda-diff-margin-added {
-    background: color-mix(
-      in srgb,
-      var(--lamda-diff-added) var(--lamda-diff-gutter-alpha),
-      transparent
-    ) !important;
-  }
-  .lamda-monaco-diff-viewer
-    .monaco-editor
-    .line-numbers.lamda-diff-line-number-removed {
-    color: var(--lamda-diff-removed) !important;
-    background: color-mix(
-      in srgb,
-      var(--lamda-diff-removed) var(--lamda-diff-gutter-alpha),
-      transparent
-    ) !important;
-    font-weight: 600 !important;
-  }
-  .lamda-monaco-diff-viewer .monaco-editor .lamda-diff-margin-removed {
-    background: color-mix(
-      in srgb,
-      var(--lamda-diff-removed) var(--lamda-diff-gutter-alpha),
-      transparent
-    ) !important;
-  }
   .lamda-monaco-diff-viewer .monaco-editor .insert-sign,
   .lamda-monaco-diff-viewer .monaco-diff-editor .insert-sign,
   .lamda-monaco-diff-viewer .monaco-editor .delete-sign,
   .lamda-monaco-diff-viewer .monaco-diff-editor .delete-sign {
     display: none !important;
   }
+  /* Inserted rows: soft tint on the content + a solid left accent bar that
+     reads as the row's status edge (mirrors the gutter accent). */
   .lamda-monaco-diff-viewer .monaco-editor .line-insert,
-  .lamda-monaco-diff-viewer .monaco-diff-editor .line-insert,
-  .lamda-monaco-diff-viewer .monaco-editor .gutter-insert,
-  .lamda-monaco-diff-viewer .monaco-diff-editor .gutter-insert {
+  .lamda-monaco-diff-viewer .monaco-diff-editor .line-insert {
     background-color: color-mix(
       in srgb,
       var(--lamda-diff-added) var(--lamda-diff-line-alpha),
       transparent
     ) !important;
+    box-shadow: inset var(--lamda-diff-bar-width) 0 0
+      color-mix(
+        in srgb,
+        var(--lamda-diff-added) var(--lamda-diff-bar-alpha),
+        transparent
+      ) !important;
+  }
+  /* Keep the gutter (line-number column) neutral — no add/remove tint. */
+  .lamda-monaco-diff-viewer .monaco-editor .gutter-insert,
+  .lamda-monaco-diff-viewer .monaco-diff-editor .gutter-insert {
+    background-color: transparent !important;
   }
   .lamda-monaco-diff-viewer .monaco-editor .char-insert,
   .lamda-monaco-diff-viewer .monaco-diff-editor .char-insert {
@@ -522,15 +468,24 @@
     ) !important;
     border-radius: 3px !important;
   }
+  /* Removed rows: same treatment in the destructive hue. */
   .lamda-monaco-diff-viewer .monaco-editor .line-delete,
-  .lamda-monaco-diff-viewer .monaco-diff-editor .line-delete,
-  .lamda-monaco-diff-viewer .monaco-editor .gutter-delete,
-  .lamda-monaco-diff-viewer .monaco-diff-editor .gutter-delete {
+  .lamda-monaco-diff-viewer .monaco-diff-editor .line-delete {
     background-color: color-mix(
       in srgb,
       var(--lamda-diff-removed) var(--lamda-diff-line-alpha),
       transparent
     ) !important;
+    box-shadow: inset var(--lamda-diff-bar-width) 0 0
+      color-mix(
+        in srgb,
+        var(--lamda-diff-removed) var(--lamda-diff-bar-alpha),
+        transparent
+      ) !important;
+  }
+  .lamda-monaco-diff-viewer .monaco-editor .gutter-delete,
+  .lamda-monaco-diff-viewer .monaco-diff-editor .gutter-delete {
+    background-color: transparent !important;
   }
   .lamda-monaco-diff-viewer .monaco-editor .char-delete,
   .lamda-monaco-diff-viewer .monaco-diff-editor .char-delete,
@@ -546,6 +501,16 @@
       transparent
     ) !important;
     border-radius: 3px !important;
+  }
+  /* Empty filler rows (the blank space opposite an add/remove in split view)
+     get a faint hatch-free muted wash instead of Monaco's stock grey block. */
+  .lamda-monaco-diff-viewer .monaco-editor .diagonal-fill {
+    background-image: none !important;
+    background-color: color-mix(
+      in srgb,
+      var(--muted) 40%,
+      transparent
+    ) !important;
   }
 
   /* ── Monaco native widgets ─────────────────────────────────────────────
