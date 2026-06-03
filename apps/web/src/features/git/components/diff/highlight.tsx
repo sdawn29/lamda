@@ -1,4 +1,6 @@
 import type { ReactNode } from "react"
+import { cn } from "@/shared/lib/utils"
+import { renderWithWordDiff } from "./word-diff"
 import { refractor } from "refractor/core"
 import bash from "refractor/bash"
 import c from "refractor/c"
@@ -22,6 +24,7 @@ import tsx from "refractor/tsx"
 import typescript from "refractor/typescript"
 import yaml from "refractor/yaml"
 import type {
+  CharRange,
   DiffLine,
   FlatToken,
   HastNode,
@@ -170,6 +173,63 @@ export function renderTokens(
       </span>
     )
   })
+}
+
+/**
+ * Renders the content cell of a diff line — either the "skipped" ellipsis,
+ * word-diff highlighted segments, or syntax-highlighted tokens. Shared by the
+ * inline (DiffRow) and side-by-side renderers.
+ */
+export function DiffLineContent({
+  line,
+  tokens,
+  themeStyle,
+  wordDiffRanges,
+  isAdded,
+  paddingClass = "pl-3",
+}: {
+  line: DiffLine
+  tokens: FlatToken[]
+  themeStyle: ThemeStyle
+  wordDiffRanges?: CharRange[]
+  isAdded: boolean
+  paddingClass?: string
+}): ReactNode {
+  const isSkipped = line.kind === "skipped"
+  return (
+    <span
+      className={cn(
+        "w-max shrink-0 whitespace-pre",
+        paddingClass,
+        isSkipped &&
+          "font-mono text-[10px] italic text-muted-foreground/40"
+      )}
+    >
+      {isSkipped ? (
+        "⋯"
+      ) : wordDiffRanges && wordDiffRanges.length > 0 ? (
+        renderWithWordDiff(line.content, wordDiffRanges).map((part, i) =>
+          part.highlighted ? (
+            <span
+              key={i}
+              className={cn(
+                "rounded-sm",
+                isAdded
+                  ? "bg-emerald-500/30 dark:bg-emerald-400/25"
+                  : "bg-rose-500/30 dark:bg-rose-400/25"
+              )}
+            >
+              {part.text}
+            </span>
+          ) : (
+            <span key={i}>{part.text}</span>
+          )
+        )
+      ) : (
+        renderTokens(tokens, themeStyle)
+      )}
+    </span>
+  )
 }
 
 export function buildHighlightMap(

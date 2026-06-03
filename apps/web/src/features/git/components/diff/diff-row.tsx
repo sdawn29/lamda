@@ -1,8 +1,7 @@
 import { memo } from "react"
 import { cn } from "@/shared/lib/utils"
 import type { CharRange, DiffLine, HighlightMap, ThemeStyle } from "./types"
-import { getLineTokens, renderTokens } from "./highlight"
-import { renderWithWordDiff } from "./word-diff"
+import { getLineTokens, DiffLineContent } from "./highlight"
 
 interface DiffRowProps {
   line: DiffLine
@@ -90,36 +89,14 @@ export const DiffRow = memo(function DiffRow({
       </div>
 
       {/* Content */}
-      <span
-        className={cn(
-          "w-max shrink-0 pl-3 whitespace-pre",
-          line.kind === "skipped" && "font-mono text-[10px] italic text-muted-foreground/40"
-        )}
-      >
-        {line.kind === "skipped" ? (
-          "⋯"
-        ) : wordDiffRanges && wordDiffRanges.length > 0 ? (
-          renderWithWordDiff(line.content, wordDiffRanges).map((part, i) =>
-            part.highlighted ? (
-              <span
-                key={i}
-                className={cn(
-                  "rounded-sm",
-                  isAdded
-                    ? "bg-emerald-500/30 dark:bg-emerald-400/25"
-                    : "bg-rose-500/30 dark:bg-rose-400/25"
-                )}
-              >
-                {part.text}
-              </span>
-            ) : (
-              <span key={i}>{part.text}</span>
-            )
-          )
-        ) : (
-          renderTokens(tokens, themeStyle)
-        )}
-      </span>
+      <DiffLineContent
+        line={line}
+        tokens={tokens}
+        themeStyle={themeStyle}
+        wordDiffRanges={wordDiffRanges}
+        isAdded={isAdded}
+        paddingClass="pl-3"
+      />
     </div>
   )
 })

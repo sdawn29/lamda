@@ -155,6 +155,7 @@ function ConfigureProviderDialog({
     edit ? (edit.config.models.some((m) => m.reasoning) ?? false) : false,
   )
   const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
 
   const preset = presetForId(presetId)
   const isCustom = preset.custom ?? false
@@ -180,6 +181,7 @@ function ConfigureProviderDialog({
 
   function handleSave() {
     setError(null)
+    setWarning(null)
     const id = providerId.trim()
     if (!id) {
       setError("Provider id is required.")
@@ -218,6 +220,13 @@ function ConfigureProviderDialog({
         onSuccess: (res) => {
           if (res?.error) {
             setError(res.error)
+            return
+          }
+          // The provider is persisted, but the endpoint didn't respond — keep
+          // the dialog open so the user can correct the base URL (re-saving a
+          // reachable URL clears this and closes).
+          if (res?.warning) {
+            setWarning(res.warning)
             return
           }
           onClose()
@@ -392,6 +401,13 @@ function ConfigureProviderDialog({
             <p className="flex items-start gap-1.5 text-xs text-destructive">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span className="whitespace-pre-wrap">{error}</span>
+            </p>
+          )}
+
+          {warning && !error && (
+            <p className="flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-500">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span className="whitespace-pre-wrap">{warning}</span>
             </p>
           )}
         </FieldGroup>

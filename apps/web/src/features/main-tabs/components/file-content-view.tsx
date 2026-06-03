@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, memo } from "react"
+import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { FileHeader } from "@/features/git/components/file-header"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
@@ -37,6 +38,12 @@ interface FileContentViewProps {
   workspacePath?: string
   onOpenFile?: (filePath: string, title: string, line?: number) => void
   initialScrollToLine?: number
+  /**
+   * "tab" (default) renders for the main tab area: bordered/muted header,
+   * blank loading state. "panel" renders for the embedded review sidebar:
+   * transparent header, spinner while loading, sidebar-colored code gutter.
+   */
+  variant?: "tab" | "panel"
 }
 
 export const FileContentView = memo(function FileContentView({
@@ -45,7 +52,10 @@ export const FileContentView = memo(function FileContentView({
   workspacePath,
   onOpenFile,
   initialScrollToLine,
+  variant = "tab",
 }: FileContentViewProps) {
+  const isPanel = variant === "panel"
+  const headerWrapperClass = isPanel ? "bg-transparent" : "border-b bg-muted/20"
   const [content, setContent] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -203,14 +213,23 @@ export const FileContentView = memo(function FileContentView({
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b bg-muted/20">
+        <div className={headerWrapperClass}>
           <FileHeader
             pathParts={pathParts}
             filePath={filePath}
             openWithAppId={effectiveAppId}
           />
         </div>
-        <div className="flex-1" />
+        {isPanel ? (
+          <div className="flex flex-1 items-center justify-center">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              Loading file…
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1" />
+        )}
       </div>
     )
   }
@@ -218,7 +237,7 @@ export const FileContentView = memo(function FileContentView({
   if (error) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b bg-muted/20">
+        <div className={headerWrapperClass}>
           <FileHeader
             pathParts={pathParts}
             filePath={filePath}
@@ -236,7 +255,7 @@ export const FileContentView = memo(function FileContentView({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b bg-muted/20">
+      <div className={headerWrapperClass}>
         <FileHeader
           pathParts={pathParts}
           filePath={filePath}
@@ -264,6 +283,7 @@ export const FileContentView = memo(function FileContentView({
         <div
           className={cn(
             "min-h-0 flex-1 overflow-auto rounded-lg border border-border/50",
+            isPanel && "[--code-gutter-bg:var(--sidebar)]",
             isImage && "flex items-center justify-center p-4",
             isHtml && htmlPreview && "overflow-hidden",
             !isImage &&

@@ -74,8 +74,8 @@ export async function fetchLocalProviders(
 export async function saveLocalProvider(
   id: string,
   config: LocalProviderConfig,
-): Promise<{ error?: string }> {
-  return apiFetch<{ ok: boolean; error?: string }>(
+): Promise<{ error?: string; warning?: string }> {
+  return apiFetch<{ ok: boolean; error?: string; warning?: string }>(
     `/local-providers/${encodeURIComponent(id)}`,
     {
       method: "PUT",
