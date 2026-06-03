@@ -10,7 +10,7 @@
 // actually change. Net effect: at most one batched layout pass per frame.
 
 interface Layoutable {
-  layout: () => void
+  layout: (dimension?: { width: number; height: number }) => void
 }
 
 const registry = new Map<Element, Layoutable>()
@@ -19,13 +19,25 @@ let pending: Set<Element> | null = null
 let rafId = 0
 let observer: ResizeObserver | null = null
 
+function measure(el: Element): { w: number; h: number } {
+  const node = el as HTMLElement
+  return { w: node.clientWidth, h: node.clientHeight }
+}
+
+function relayout(el: Element, size: { w: number; h: number }) {
+  // Pass explicit dimensions rather than relying on Monaco's no-arg
+  // `layout()` self-measure, which can be a no-op depending on the editor's
+  // internal observer state — leaving the diff stuck at its creation size.
+  registry.get(el)?.layout({ width: size.w, height: size.h })
+}
+
 function flush() {
   rafId = 0
   const targets = pending
   pending = null
   if (!targets) return
   for (const el of targets) {
-    registry.get(el)?.layout()
+    relayout(el, lastSize.get(el) ?? measure(el))
   }
 }
 
@@ -59,6 +71,15 @@ export function registerMonacoLayout(
 ): () => void {
   const ro = ensureObserver()
   registry.set(el, target)
+  // Lay out synchronously on registration so the editor is correctly sized on
+  // first paint instead of waiting for the ResizeObserver's async first
+  // delivery (which, for an unchanged box, may never re-fire). Seed `lastSize`
+  // so that first delivery is correctly skipped as a no-op.
+  const size = measure(el)
+  if (size.w > 0 && size.h > 0) {
+    lastSize.set(el, size)
+    relayout(el, size)
+  }
   ro?.observe(el)
   return () => {
     registry.delete(el)

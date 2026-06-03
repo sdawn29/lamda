@@ -1,9 +1,12 @@
-import { memo, useState } from "react"
+import { memo, useEffect, useRef, useState } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { PluggableList } from "unified"
 import {
   AlertCircleIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  CopyIcon,
   GitForkIcon,
   SparklesIcon,
   Undo2,
@@ -93,6 +96,95 @@ const THINKING_LEVEL_LABELS: Record<string, string> = {
   xhigh: "Max",
 }
 
+// Inline error attached to an assistant turn. Mirrors the pending-error banner
+// (chat-error-alert): collapsed to a single line, expandable to the full text.
+function ErrorMessageBlock({ message }: { message: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    }
+  }, [])
+
+  const isExpandable = message.length > 80 || message.includes("\n")
+
+  function toggle() {
+    if (!isExpandable) return
+    setExpanded((prev) => !prev)
+  }
+
+  function handleCopy(e: React.MouseEvent) {
+    e.stopPropagation()
+    void navigator.clipboard.writeText(message)
+    setCopied(true)
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    copyTimerRef.current = setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="w-full overflow-hidden rounded-lg border border-destructive/30 text-xs transition-colors">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={isExpandable ? expanded : undefined}
+        className={cn(
+          "flex w-full items-center gap-2 px-2.5 py-1.5 text-left",
+          !isExpandable && "cursor-default"
+        )}
+      >
+        <span className="flex shrink-0 items-center gap-1.5 rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
+          <AlertCircleIcon className="h-3 w-3 shrink-0" />
+          <span className="leading-none">Error</span>
+        </span>
+        <span className="min-w-0 flex-1 truncate text-muted-foreground/70">
+          {!expanded && message}
+        </span>
+        {isExpandable && (
+          <ChevronRightIcon
+            className={cn(
+              "h-3 w-3 shrink-0 text-muted-foreground/40 transition-transform duration-200",
+              expanded && "rotate-90"
+            )}
+          />
+        )}
+      </button>
+
+      <div
+        className={cn(
+          "grid transition-all duration-300 ease-in-out",
+          expanded && isExpandable ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        )}
+      >
+        <div className="overflow-hidden">
+          <div className="group/copy relative border-t border-destructive/15 bg-destructive/[0.04]">
+            <pre className="max-h-64 overflow-auto px-2.5 py-2 pr-9 text-[11px] leading-relaxed break-all whitespace-pre-wrap text-foreground/80">
+              {message}
+            </pre>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className={cn(
+                "absolute top-1.5 right-1.5 shrink-0 rounded p-1 text-muted-foreground/40 opacity-0 transition-colors group-hover/copy:opacity-100 hover:bg-destructive/10 hover:text-muted-foreground",
+                copied && "text-emerald-500 opacity-100"
+              )}
+              aria-label="Copy error"
+            >
+              {copied ? (
+                <CheckIcon className="h-3 w-3" />
+              ) : (
+                <CopyIcon className="h-3 w-3" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const AssistantMessageBlock = memo(function AssistantMessageBlock({
   message,
   showThinking,
@@ -145,19 +237,7 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
         </div>
       )}
 
-      {hasError && (
-        <div className="w-full rounded-lg border border-destructive/30 text-xs transition-colors">
-          <div className="flex items-center gap-2 px-2.5 py-1.5">
-            <span className="flex shrink-0 items-center gap-1.5 rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
-              <AlertCircleIcon className="h-3 w-3 shrink-0" />
-              <span className="leading-none">Error</span>
-            </span>
-            <span className="min-w-0 flex-1 truncate text-muted-foreground/70">
-              {message.errorMessage}
-            </span>
-          </div>
-        </div>
-      )}
+      {hasError && <ErrorMessageBlock message={message.errorMessage!} />}
 
       {isLastInTurn && !hasError && (
         <div className="flex items-center gap-3">
