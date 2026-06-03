@@ -11,6 +11,7 @@
  */
 import type { editor, languages, Uri } from "monaco-editor"
 import { monaco, ensureMonacoEnvironment } from "./monaco-environment"
+import type { ColorTheme, ThemePalette } from "../../themes/types"
 import type {
   Diagnostic,
   Hover,
@@ -313,14 +314,15 @@ export function resolveMonacoLanguage(language: string): string | undefined {
 
 const DARK_THEME = "lamda-dark"
 const LIGHT_THEME = "lamda-light"
-let themesDefined = false
+/** Signature of the last applied theme, to skip redundant redefines. */
+let lastThemeKey: string | null = null
 
 /**
- * The app's design tokens (see apps/web/src/index.css), duplicated here as hex
- * so Monaco's theme API — which only accepts literal colors, not CSS variables —
- * can render its native widgets (hover, suggest, peek, find, context menu,
- * scrollbars) against the same palette as the rest of the UI. Keep in sync with
- * the `:root` / `.dark` blocks in index.css.
+ * Monaco's theme API only accepts literal colors, not CSS variables, so the
+ * active color theme's tokens (which otherwise drive the UI via CSS custom
+ * properties) are mapped onto this intermediate palette and then onto Monaco's
+ * editor/widget color tokens. Derived live from the active theme so the editor
+ * — including all native widgets — re-skins with the rest of the app.
  */
 interface Palette {
   background: string
@@ -342,42 +344,47 @@ interface Palette {
   shadow: number
 }
 
-const LIGHT_PALETTE: Palette = {
-  background: "#f7f7f5",
-  foreground: "#1c1c1c",
-  popover: "#f0f0ed",
-  secondary: "#e8e8e4",
-  muted: "#dcdcd8",
-  mutedForeground: "#6b6b6b",
-  accent: "#d0d0cb",
-  primary: "#1a4080",
-  border: "#eaeae7",
-  input: "#e2e2de",
-  destructive: "#902020",
-  lineNumber: "#b0b0b0",
-  lineNumberActive: "#505050",
-  warning: "#b45309",
-  info: "#2563eb",
-  shadow: 0.12,
+/** Coerce a token value to a 6-digit hex (no `#`); falls back when not hex. */
+function toHex6(value: string, fallback: string): string {
+  const v = value.trim()
+  const m6 = /^#([0-9a-fA-F]{6})$/.exec(v)
+  if (m6) return m6[1].toLowerCase()
+  const m3 = /^#([0-9a-fA-F]{3})$/.exec(v)
+  if (m3)
+    return m3[1]
+      .split("")
+      .map((c) => c + c)
+      .join("")
+      .toLowerCase()
+  return fallback
 }
 
-const DARK_PALETTE: Palette = {
-  background: "#0d0d0d",
-  foreground: "#e8e8d3",
-  popover: "#161616",
-  secondary: "#222222",
-  muted: "#2b2b2b",
-  mutedForeground: "#9e9e9e",
-  accent: "#393939",
-  primary: "#3a6090",
-  border: "#1e1e1e",
-  input: "#252525",
-  destructive: "#cc3333",
-  lineNumber: "#5a5a5a",
-  lineNumberActive: "#a0a0a0",
-  warning: "#f59e0b",
-  info: "#60a5fa",
-  shadow: 0.4,
+/** Like {@link toHex6} but prefixed with `#` for Monaco color (not token) slots. */
+function hexColor(value: string, fallback: string): string {
+  return `#${toHex6(value, fallback.replace(/^#/, ""))}`
+}
+
+/** Map the app theme tokens onto Monaco's intermediate {@link Palette}. */
+function paletteFromTokens(t: ThemePalette, mode: "light" | "dark"): Palette {
+  const isDark = mode === "dark"
+  return {
+    background: hexColor(t.background, isDark ? "0d0d0d" : "f7f7f5"),
+    foreground: hexColor(t.foreground, isDark ? "e8e8d3" : "1c1c1c"),
+    popover: hexColor(t.popover, isDark ? "161616" : "f0f0ed"),
+    secondary: hexColor(t.secondary, isDark ? "222222" : "e8e8e4"),
+    muted: hexColor(t.muted, isDark ? "2b2b2b" : "dcdcd8"),
+    mutedForeground: hexColor(t["muted-foreground"], isDark ? "9e9e9e" : "6b6b6b"),
+    accent: hexColor(t.accent, isDark ? "393939" : "d0d0cb"),
+    primary: hexColor(t.primary, isDark ? "3a6090" : "1a4080"),
+    border: hexColor(t.border, isDark ? "1e1e1e" : "eaeae7"),
+    input: hexColor(t.input, isDark ? "252525" : "e2e2de"),
+    destructive: hexColor(t.destructive, isDark ? "cc3333" : "902020"),
+    lineNumber: hexColor(t["muted-foreground"], isDark ? "5a5a5a" : "b0b0b0"),
+    lineNumberActive: hexColor(t.foreground, isDark ? "a0a0a0" : "505050"),
+    warning: hexColor(t["chart-3"], isDark ? "f59e0b" : "b45309"),
+    info: hexColor(t["chart-1"], isDark ? "60a5fa" : "2563eb"),
+    shadow: isDark ? 0.4 : 0.12,
+  }
 }
 
 /** Append an alpha channel (0–1) to a #RRGGBB hex, yielding #RRGGBBAA. */
@@ -501,117 +508,100 @@ function editorColors(p: Palette): Record<string, string> {
   }
 }
 
-/** Jellybeans-derived themes so Monaco matches the Prism viewer it replaces. */
-export function ensureThemes() {
-  if (themesDefined) return
-  themesDefined = true
+/**
+ * Map the theme's tokens onto Monaco token-color rules. Roles mirror the Prism
+ * palette in `@/features/themes/syntax-builder`, so the editor and the Markdown
+ * code blocks highlight code identically. Rules match by longest dot-separated
+ * prefix, so each root (e.g. "string") also styles its language-specific
+ * variants ("string.yaml", "string.key.json"); more specific rules override.
+ */
+function syntaxRules(t: ThemePalette): editor.ITokenThemeRule[] {
+  const text = toHex6(t.foreground, "808080")
+  const comment = toHex6(t["muted-foreground"], "6d6d6d")
+  const keyword = toHex6(t["chart-1"], text)
+  const string = toHex6(t["chart-2"], text)
+  const number = toHex6(t["chart-3"], text)
+  const func = toHex6(t["chart-4"], text)
+  const property = toHex6(t["chart-5"], text)
+
+  return [
+    { token: "", foreground: text },
+    { token: "comment", foreground: comment, fontStyle: "italic" },
+    { token: "keyword", foreground: keyword },
+    { token: "keyword.json", foreground: keyword },
+    { token: "boolean", foreground: keyword },
+    { token: "operator", foreground: text },
+    { token: "operators", foreground: text },
+    { token: "delimiter", foreground: text },
+    { token: "identifier", foreground: text },
+    { token: "variable", foreground: text },
+    { token: "namespace", foreground: text },
+    { token: "string", foreground: string },
+    { token: "string.value.json", foreground: string },
+    { token: "string.escape", foreground: keyword },
+    { token: "regexp", foreground: string },
+    { token: "attribute.value", foreground: string },
+    { token: "number", foreground: number },
+    { token: "constant", foreground: number },
+    { token: "enumMember", foreground: number },
+    { token: "variable.parameter", foreground: number },
+    { token: "parameter", foreground: number },
+    { token: "function", foreground: func },
+    { token: "method", foreground: func },
+    { token: "macro", foreground: func },
+    { token: "annotation", foreground: func },
+    { token: "decorator", foreground: func },
+    { token: "type", foreground: func },
+    { token: "type.identifier", foreground: func },
+    { token: "struct", foreground: func },
+    { token: "class", foreground: func },
+    { token: "interface", foreground: func },
+    { token: "enum", foreground: func },
+    { token: "tag", foreground: func },
+    { token: "metatag", foreground: func },
+    { token: "predefined", foreground: func },
+    { token: "builtin", foreground: func },
+    { token: "support", foreground: func },
+    { token: "variable.predefined", foreground: func },
+    { token: "property", foreground: property },
+    { token: "key", foreground: property },
+    { token: "string.key", foreground: property },
+    { token: "string.key.json", foreground: property },
+    { token: "attribute.name", foreground: property },
+  ]
+}
+
+type ActiveTheme = Pick<ColorTheme, "light" | "dark">
+
+/** (Re)define the lamda Monaco themes from the active color theme's palettes. */
+export function ensureThemes(active: ActiveTheme) {
+  const key = JSON.stringify([active.light, active.dark])
+  if (key === lastThemeKey) return
+  lastThemeKey = key
 
   monaco.editor.defineTheme(DARK_THEME, {
     base: "vs-dark",
     inherit: true,
-    // Rules are matched by longest dot-separated prefix, so each root (e.g.
-    // "string") also styles its language-specific variants ("string.yaml",
-    // "string.key.json"); more specific rules below override where fleet differs.
-    rules: [
-      { token: "", foreground: "d6d6dd" },
-      { token: "comment", foreground: "6d6d6d", fontStyle: "italic" },
-      { token: "keyword", foreground: "83d6c5" },
-      { token: "operator", foreground: "d6d6dd" },
-      { token: "operators", foreground: "d6d6dd" },
-      { token: "delimiter", foreground: "d6d6dd" },
-      { token: "string", foreground: "e394dc" },
-      { token: "string.escape", foreground: "83d6c5" },
-      { token: "regexp", foreground: "d6d6dd" },
-      { token: "number", foreground: "ebc88d" },
-      { token: "boolean", foreground: "83d6c5" },
-      { token: "constant", foreground: "ebc88d" },
-      { token: "type", foreground: "87c3ff" },
-      { token: "type.identifier", foreground: "87c3ff" },
-      { token: "struct", foreground: "87c3ff" },
-      { token: "class", foreground: "87c3ff" },
-      { token: "interface", foreground: "87c3ff" },
-      { token: "enum", foreground: "87c3ff" },
-      { token: "enumMember", foreground: "ebc88d" },
-      { token: "namespace", foreground: "d1d1d1" },
-      { token: "function", foreground: "ebc88d" },
-      { token: "method", foreground: "ebc88d" },
-      { token: "macro", foreground: "ebc88d" },
-      { token: "identifier", foreground: "d6d6dd" },
-      { token: "variable", foreground: "d6d6dd" },
-      { token: "variable.predefined", foreground: "82d2ce" },
-      { token: "variable.parameter", foreground: "f8c762" },
-      { token: "parameter", foreground: "f8c762" },
-      { token: "predefined", foreground: "82d2ce" },
-      { token: "builtin", foreground: "82d2ce" },
-      { token: "support", foreground: "82d2ce" },
-      { token: "property", foreground: "af9cff" },
-      { token: "key", foreground: "af9cff" },
-      { token: "string.key", foreground: "af9cff" },
-      // The base vs-dark theme ships JSON-specific rules that would otherwise
-      // win over the generic ones above (we inherit), so override them too.
-      { token: "string.key.json", foreground: "af9cff" },
-      { token: "string.value.json", foreground: "e394dc" },
-      { token: "keyword.json", foreground: "83d6c5" },
-      { token: "annotation", foreground: "ebc88d" },
-      { token: "decorator", foreground: "ebc88d" },
-      { token: "tag", foreground: "87c3ff" },
-      { token: "metatag", foreground: "87c3ff" },
-      { token: "attribute.name", foreground: "aaa0fa" },
-      { token: "attribute.value", foreground: "e394dc" },
-    ],
-    colors: editorColors(DARK_PALETTE),
+    rules: syntaxRules(active.dark),
+    colors: editorColors(paletteFromTokens(active.dark, "dark")),
   })
 
   monaco.editor.defineTheme(LIGHT_THEME, {
     base: "vs",
     inherit: true,
-    rules: [
-      { token: "", foreground: "1a1a1a" },
-      { token: "comment", foreground: "6d6d6d", fontStyle: "italic" },
-      { token: "keyword", foreground: "006b5e" },
-      { token: "operator", foreground: "1a1a1a" },
-      { token: "operators", foreground: "1a1a1a" },
-      { token: "delimiter", foreground: "1a1a1a" },
-      { token: "string", foreground: "9a1a95" },
-      { token: "string.escape", foreground: "006b5e" },
-      { token: "regexp", foreground: "555555" },
-      { token: "number", foreground: "8a5a00" },
-      { token: "boolean", foreground: "006b5e" },
-      { token: "constant", foreground: "8a5a00" },
-      { token: "type", foreground: "1565c0" },
-      { token: "type.identifier", foreground: "1565c0" },
-      { token: "struct", foreground: "1565c0" },
-      { token: "class", foreground: "1565c0" },
-      { token: "interface", foreground: "1565c0" },
-      { token: "enum", foreground: "1565c0" },
-      { token: "enumMember", foreground: "8a5a00" },
-      { token: "namespace", foreground: "333333" },
-      { token: "function", foreground: "7a5000" },
-      { token: "method", foreground: "7a5000" },
-      { token: "macro", foreground: "7a5000" },
-      { token: "identifier", foreground: "1a1a1a" },
-      { token: "variable", foreground: "1a1a1a" },
-      { token: "variable.predefined", foreground: "00695c" },
-      { token: "variable.parameter", foreground: "806000" },
-      { token: "parameter", foreground: "806000" },
-      { token: "predefined", foreground: "00695c" },
-      { token: "builtin", foreground: "00695c" },
-      { token: "support", foreground: "00695c" },
-      { token: "property", foreground: "6438b0" },
-      { token: "key", foreground: "6438b0" },
-      { token: "string.key", foreground: "6438b0" },
-      { token: "string.key.json", foreground: "6438b0" },
-      { token: "string.value.json", foreground: "9a1a95" },
-      { token: "keyword.json", foreground: "006b5e" },
-      { token: "annotation", foreground: "7a5000" },
-      { token: "decorator", foreground: "7a5000" },
-      { token: "tag", foreground: "1565c0" },
-      { token: "metatag", foreground: "1565c0" },
-      { token: "attribute.name", foreground: "5540c0" },
-      { token: "attribute.value", foreground: "9a1a95" },
-    ],
-    colors: editorColors(LIGHT_PALETTE),
+    rules: syntaxRules(active.light),
+    colors: editorColors(paletteFromTokens(active.light, "light")),
   })
+}
+
+/**
+ * Define the themes from the active palette and apply the one for the current
+ * mode. Call this on theme/mode change to re-skin all mounted editors live
+ * (the theme name stays stable, so redefining + `setTheme` refreshes them).
+ */
+export function applyMonacoTheme(active: ActiveTheme, isDark: boolean) {
+  ensureThemes(active)
+  monaco.editor.setTheme(themeNameFor(isDark))
 }
 
 export function themeNameFor(isDark: boolean): string {

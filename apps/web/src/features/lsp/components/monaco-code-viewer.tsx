@@ -29,6 +29,7 @@ import type { Diagnostic } from "../types"
 import { LspConnection } from "../client"
 import { ensureMonacoEnvironment } from "../monaco/monaco-environment"
 import {
+  applyMonacoTheme,
   diagnosticsToMarkers,
   ensureLspProviders,
   ensureThemes,
@@ -92,7 +93,7 @@ export default function MonacoCodeViewer({
   onAddCommentContext,
   scrollToLine,
 }: MonacoCodeViewerProps) {
-  const { resolvedTheme } = useTheme()
+  const { resolvedTheme, activeColorTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null)
@@ -211,9 +212,16 @@ export default function MonacoCodeViewer({
   }, [composerLine])
 
   const beforeMount: BeforeMount = useCallback(() => {
-    ensureThemes()
+    ensureThemes(activeColorTheme)
     ensureLspProviders()
-  }, [])
+  }, [activeColorTheme])
+
+  // Re-skin the editor (and all native widgets) when the color theme or mode
+  // changes. The theme name stays stable, so redefining + setTheme refreshes
+  // any already-mounted editor live.
+  useEffect(() => {
+    applyMonacoTheme(activeColorTheme, isDark)
+  }, [activeColorTheme, isDark])
 
   const syncModelRegistration = useCallback(() => {
     const modelUri = editorRef.current?.getModel()?.uri.toString() ?? null

@@ -1,9 +1,10 @@
-import { useEffect, useRef, memo } from "react"
+import { useEffect, useMemo, useRef, memo } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
 import { Plus, Trash2, X, TerminalSquare } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { useTheme } from "@/shared/components/theme-provider"
+import { buildTerminalTheme } from "@/features/themes"
 import { useTerminal } from "../store"
 import { getServerUrl } from "@/shared/lib/client"
 import { cn } from "@/shared/lib/utils"
@@ -11,56 +12,6 @@ import "@xterm/xterm/css/xterm.css"
 
 const TERMINAL_OUTPUT_FLUSH_MS = 16
 const TERMINAL_IMMEDIATE_FLUSH_THRESHOLD = 8_192
-
-// Fleet terminal colors — from "terminal.*" entries in the theme JSON
-const DARK_TERMINAL_THEME = {
-  background: "#0d0d0d",
-  foreground: "#d6d6dd",
-  cursor: "#d6d6dd",
-  cursorAccent: "#5b51ec",
-  selectionBackground: "#636262",
-  black: "#676767",
-  red: "#f14c4c",
-  green: "#15ac91",
-  yellow: "#e5b95c",
-  blue: "#4c9df3",
-  magenta: "#e567dc",
-  cyan: "#75d3ba",
-  white: "#d6d6dd",
-  brightBlack: "#676767",
-  brightRed: "#f14c4c",
-  brightGreen: "#15ac91",
-  brightYellow: "#e5b95c",
-  brightBlue: "#4c9df3",
-  brightMagenta: "#e567dc",
-  brightCyan: "#75d3ba",
-  brightWhite: "#d6d6dd",
-}
-
-// Fleet-derived light terminal — same hues, darkened for white background
-const LIGHT_TERMINAL_THEME = {
-  background: "#f3efe8",
-  foreground: "#1a1a1a",
-  cursor: "#228df2",
-  cursorAccent: "#ffffff",
-  selectionBackground: "#d1e8ff",
-  black: "#2a2a2a",
-  red: "#c01010",
-  green: "#007a60",
-  yellow: "#8a5a00",
-  blue: "#1565c0",
-  magenta: "#9a1a95",
-  cyan: "#006b5e",
-  white: "#6b6b6b",
-  brightBlack: "#6b6b6b",
-  brightRed: "#f14c4c",
-  brightGreen: "#15ac91",
-  brightYellow: "#c48820",
-  brightBlue: "#228df2",
-  brightMagenta: "#b020b0",
-  brightCyan: "#0e7a6e",
-  brightWhite: "#2a2a2a",
-}
 
 // ─── Single terminal instance (keeps mounted when inactive for session persistence) ───
 
@@ -81,13 +32,21 @@ const TerminalInstance = memo(function TerminalInstance({
   initialCommand,
   onTitleChange,
 }: TerminalInstanceProps) {
-  const { resolvedTheme } = useTheme()
+  const { resolvedTheme, activeColorTheme } = useTheme()
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
-  const terminalTheme =
-    resolvedTheme === "dark" ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME
+  const terminalTheme = useMemo(
+    () => buildTerminalTheme(activeColorTheme[resolvedTheme]),
+    [activeColorTheme, resolvedTheme]
+  )
+  // Latest theme for the mount effect (which must not re-run on theme change,
+  // or it would tear down and recreate the live terminal session).
+  const terminalThemeRef = useRef(terminalTheme)
+  useEffect(() => {
+    terminalThemeRef.current = terminalTheme
+  }, [terminalTheme])
 
   // Mount xterm + WebSocket once — cwd is fixed at tab creation time and never changes
   useEffect(() => {
@@ -100,9 +59,7 @@ const TerminalInstance = memo(function TerminalInstance({
       fontFamily:
         '"JetBrains Mono", "Menlo", "Monaco", "Courier New", monospace',
       scrollback: 5000,
-      theme: document.documentElement.classList.contains("dark")
-        ? DARK_TERMINAL_THEME
-        : LIGHT_TERMINAL_THEME,
+      theme: terminalThemeRef.current,
       linkHandler: {
         activate: (_event, uri) => {
           window.open(uri, "_blank", "noopener,noreferrer")

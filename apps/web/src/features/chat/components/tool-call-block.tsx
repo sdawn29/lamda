@@ -8,12 +8,11 @@ import {
   ListTodoIcon,
 } from "lucide-react"
 import { FileIcon } from "@/shared/ui/file-icon"
-import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 
 import { cn } from "@/shared/lib/utils"
 import { LivePre } from "./live-pre"
 import { DiffView, detectLanguage, parseDiffCounts } from "@/features/git"
-import { useTheme } from "@/shared/components/theme-provider"
+import { useSyntaxTheme } from "@/features/themes"
 import { RollingTimerText } from "./working-block"
 import { WriteView } from "./write-view"
 import { PlanSavedCard } from "./plan-saved-card"
@@ -155,11 +154,7 @@ function ReadView({
   filePath: string
   live: boolean
 }) {
-  const { theme } = useTheme()
-  const isDark =
-    theme === "dark" ||
-    (theme === "system" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches)
+  const syntax = useSyntaxTheme()
   const language = detectLanguage(filePath) ?? "text"
 
   return (
@@ -174,7 +169,7 @@ function ReadView({
         <PrismCode
           code={text}
           language={language}
-          style={isDark ? jellybeansdark : jellybeanslight}
+          style={syntax.prism}
           fontSize="0.75rem"
           opacity={live ? 0.5 : 0.72}
         />

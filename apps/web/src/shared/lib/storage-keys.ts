@@ -4,6 +4,8 @@ export const APP_SETTINGS_KEYS = {
   SHOW_THINKING: "show_thinking",
   THINKING_PHRASES: "thinking_phrases",
   THEME: "theme",
+  COLOR_THEME: "color_theme",
+  CUSTOM_THEME: "custom_theme",
   KEYBOARD_SHORTCUTS: "keyboard_shortcuts",
 } as const
 

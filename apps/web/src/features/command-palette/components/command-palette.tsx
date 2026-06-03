@@ -12,6 +12,8 @@ import {
   MessageSquareIcon,
   RefreshCwIcon,
   Loader2,
+  PaletteIcon,
+  CheckIcon,
 } from "lucide-react"
 import {
   Command,
@@ -68,7 +70,7 @@ export function CommandPalette() {
       params: { section: DEFAULT_SETTINGS_SECTION },
     })
   }, [navigate])
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, colorTheme, setColorTheme, colorThemes } = useTheme()
 
   const activeWorkspace =
     workspaces.find((ws) => ws.threads.some((t) => t.id === activeThreadId)) ??
@@ -286,6 +288,24 @@ export function CommandPalette() {
               <RefreshCwIcon />
               Reload Window
             </CommandItem>
+          </CommandGroup>
+
+          <CommandSeparator />
+
+          <CommandGroup heading="Color Theme">
+            {colorThemes.map((ct) => (
+              <CommandItem
+                key={ct.id}
+                value={`color theme palette ${ct.name}`}
+                onSelect={() => run(() => setColorTheme(ct.id))}
+              >
+                {ct.id === colorTheme ? <CheckIcon /> : <PaletteIcon />}
+                {ct.name}
+                {ct.id === colorTheme && (
+                  <CommandShortcut>Active</CommandShortcut>
+                )}
+              </CommandItem>
+            ))}
           </CommandGroup>
         </CommandList>
       </Command>

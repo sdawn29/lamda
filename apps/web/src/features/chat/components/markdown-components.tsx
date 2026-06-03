@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react"
-import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
 import type { Components } from "react-markdown"
-import { useTheme } from "@/shared/components/theme-provider"
+import { useSyntaxTheme } from "@/features/themes"
 import { Check, Copy } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
@@ -47,11 +46,7 @@ function CodeBlock({
   className?: string
   children?: React.ReactNode
 }) {
-  const { theme } = useTheme()
-  const isDark =
-    theme === "dark" ||
-    (theme === "system" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches)
+  const syntax = useSyntaxTheme()
   const match = /language-(\w+)/.exec(className ?? "")
   const code = String(children).replace(/\n$/, "")
 
@@ -69,7 +64,7 @@ function CodeBlock({
           <PrismCode
             code={code}
             language={match[1]}
-            style={isDark ? jellybeansdark : jellybeanslight}
+            style={syntax.prism}
             showLineNumbers
             fontSize="0.75rem"
           />

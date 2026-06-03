@@ -8,6 +8,7 @@ import type { editor as MonacoEditor } from "monaco-editor"
 import { useTheme } from "@/shared/components/theme-provider"
 import { ensureMonacoEnvironment } from "@/features/lsp/monaco/monaco-environment"
 import {
+  applyMonacoTheme,
   ensureThemes,
   resolveMonacoLanguage,
   themeNameFor,
@@ -34,7 +35,7 @@ export default function MonacoDiffViewer({
   maxHeight,
   lineCount,
 }: MonacoDiffViewerProps) {
-  const { resolvedTheme } = useTheme()
+  const { resolvedTheme, activeColorTheme } = useTheme()
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<MonacoEditor.IStandaloneDiffEditor | null>(null)
   const monacoLanguage = useMemo(
@@ -48,8 +49,13 @@ export default function MonacoDiffViewer({
   }, [lineCount, maxHeight])
 
   const beforeMount: BeforeMount = useCallback(() => {
-    ensureThemes()
-  }, [])
+    ensureThemes(activeColorTheme)
+  }, [activeColorTheme])
+
+  // Re-skin live when the color theme or mode changes.
+  useEffect(() => {
+    applyMonacoTheme(activeColorTheme, resolvedTheme === "dark")
+  }, [activeColorTheme, resolvedTheme])
 
   // Drive layout via the shared coordinator instead of Monaco's per-editor
   // `automaticLayout`, so a window resize triggers a single batched pass

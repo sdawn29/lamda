@@ -1,8 +1,7 @@
 import { lazy, Suspense } from "react"
 
 import { detectLanguage } from "@/features/git"
-import { jellybeansdark, jellybeanslight } from "@/shared/lib/syntax-theme"
-import { useTheme } from "@/shared/components/theme-provider"
+import { useSyntaxTheme } from "@/features/themes"
 
 const PrismCode = lazy(() => import("./prism-code"))
 
@@ -13,11 +12,7 @@ interface WriteViewProps {
 }
 
 export function WriteView({ content, filePath, live }: WriteViewProps) {
-  const { theme } = useTheme()
-  const isDark =
-    theme === "dark" ||
-    (theme === "system" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches)
+  const syntax = useSyntaxTheme()
   const language = detectLanguage(filePath) ?? "text"
 
   return (
@@ -32,7 +27,7 @@ export function WriteView({ content, filePath, live }: WriteViewProps) {
         <PrismCode
           code={content}
           language={language}
-          style={isDark ? jellybeansdark : jellybeanslight}
+          style={syntax.prism}
           fontSize="0.75rem"
           showLineNumbers={true}
           opacity={live ? 0.6 : 0.85}
