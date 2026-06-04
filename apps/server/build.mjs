@@ -78,10 +78,6 @@ cpSync(fileUriSrc, resolve("dist/addons/file-uri-to-path"), { recursive: true })
 const nodePtySrc = resolvePackageDir("node-pty");
 cpSync(nodePtySrc, resolve("dist/addons/node-pty"), { recursive: true });
 
-// @silvia-odwyer/photon-node (no runtime npm deps)
-const addonSrc = resolvePackageDir("@silvia-odwyer/photon-node");
-cpSync(addonSrc, resolve("dist/addons/@silvia-odwyer/photon-node"), { recursive: true });
-
 // @earendil-works/pi-coding-agent reads its own package.json at module load to
 // pick up `version`, `piConfig.name`, and `piConfig.configDir`. Once bundled
 // into server.cjs, the SDK's getPackageDir() walks up from __dirname (= dist/
@@ -93,6 +89,19 @@ cpSync(addonSrc, resolve("dist/addons/@silvia-odwyer/photon-node"), { recursive:
 // to walking the node_modules chain directly.
 const piPackageDir = findPackageRoot("@earendil-works/pi-coding-agent");
 copyFileSync(resolve(piPackageDir, "package.json"), resolve("dist/package.json"));
+
+// @silvia-odwyer/photon-node is a dependency of @earendil-works/pi-coding-agent and
+// may not be hoisted to a top-level node_modules — fall back to its nested location.
+let addonSrc;
+try {
+  addonSrc = resolvePackageDir("@silvia-odwyer/photon-node");
+} catch {
+  addonSrc = resolve(piPackageDir, "node_modules/@silvia-odwyer/photon-node");
+  if (!existsSync(resolve(addonSrc, "package.json"))) {
+    throw new Error("Cannot find @silvia-odwyer/photon-node in hoisted or nested node_modules");
+  }
+}
+cpSync(addonSrc, resolve("dist/addons/@silvia-odwyer/photon-node"), { recursive: true });
 
 const REQUIRED_ADDONS = [
   "better-sqlite3",
