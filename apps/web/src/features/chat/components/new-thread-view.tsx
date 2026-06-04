@@ -46,6 +46,14 @@ interface NewThreadViewProps {
   initialWorkspaceId?: string
 }
 
+// Derive a provisional thread title from the user's first message. Shown
+// immediately (in place of "New Thread") until the generated title arrives.
+function deriveTitleFromMessage(text: string): string {
+  const firstLine = text.trim().split("\n")[0]?.trim() ?? ""
+  if (!firstLine) return "New Thread"
+  return firstLine.length > 80 ? `${firstLine.slice(0, 80).trimEnd()}…` : firstLine
+}
+
 export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -141,7 +149,11 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         const persistModel = threadModelId
           ? updateThreadModel(thread.id, threadModelId)
           : Promise.resolve()
-        await Promise.all([persistMode, persistModel])
+        // Seed the title with the user's message so it shows up instead of
+        // "New Thread" until the generated title arrives below.
+        const provisionalTitle = deriveTitleFromMessage(text)
+        const persistTitle = updateThreadTitle(thread.id, provisionalTitle)
+        await Promise.all([persistMode, persistModel, persistTitle])
 
         // Sync the workspaces cache with the persisted picks so the route
         // mounts ChatView with the correct initial mode / modelId rather than
@@ -157,6 +169,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
                       ? t
                       : {
                           ...t,
+                          title: provisionalTitle,
                           mode: selectedMode,
                           modelId: threadModelId ?? t.modelId,
                         }

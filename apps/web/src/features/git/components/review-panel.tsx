@@ -191,6 +191,7 @@ const TurnItem = memo(function TurnItem({
                 file={file}
                 sessionId={sessionId}
                 mode={mode}
+                turnId={turn.id}
                 showActions={false}
               />
             ))}

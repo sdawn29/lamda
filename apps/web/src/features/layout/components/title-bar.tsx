@@ -6,6 +6,10 @@ import {
   Trash2,
   Download,
   RefreshCw,
+  Pin,
+  PinOff,
+  Archive,
+  Copy,
 } from "lucide-react"
 import {
   useRouter,
@@ -149,7 +153,14 @@ export function TitleBar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const isSettings = pathname === "/settings"
-  const { workspaces, setThreadTitle, deleteThread } = useWorkspace()
+  const {
+    workspaces,
+    setThreadTitle,
+    deleteThread,
+    archiveThread,
+    pinThread,
+    unpinThread,
+  } = useWorkspace()
   const { toggleSidebar, state: sidebarState } = useSidebar()
   const { isOpen: rightSidebarOpen, togglePanel } = useRightSidebar()
   const toggleDiff = () => togglePanel("changes")
@@ -236,6 +247,26 @@ export function TitleBar() {
     navigate({ to: "/" })
   }
 
+  const handleTogglePin = async () => {
+    if (!urlActiveWorkspace || !urlActiveThread) return
+    if (urlActiveThread.isPinned) {
+      await unpinThread(urlActiveWorkspace.id, urlActiveThread.id)
+    } else {
+      await pinThread(urlActiveWorkspace.id, urlActiveThread.id)
+    }
+  }
+
+  const handleArchiveThread = async () => {
+    if (!urlActiveWorkspace || !urlActiveThread) return
+    await archiveThread(urlActiveWorkspace.id, urlActiveThread.id)
+    navigate({ to: "/" })
+  }
+
+  const handleCopyThreadId = () => {
+    if (!urlActiveThread) return
+    void navigator.clipboard.writeText(urlActiveThread.id)
+  }
+
   const { subscribe, getSnapshot } = useMemo(() => {
     let count = 0
     return {
@@ -277,6 +308,9 @@ export function TitleBar() {
   const terminalBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_TERMINAL)
   const renameBinding = useShortcutBinding(SHORTCUT_ACTIONS.RENAME_THREAD)
 
+  // Empty space in the title bar stays draggable; only interactive controls opt out.
+  const noDrag = { WebkitAppRegion: "no-drag" } as React.CSSProperties
+
   return (
     <div
       className="sticky top-0 z-20 flex h-11 shrink-0 items-center bg-background pl-2"
@@ -289,7 +323,6 @@ export function TitleBar() {
           sidebarState === "collapsed" &&
             (isMac && !isFullscreen ? "pl-48" : "pl-28")
         )}
-        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
         {urlActiveThread ? (
           <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -322,6 +355,7 @@ export function TitleBar() {
                     if (e.key === "Enter") commitRename()
                     if (e.key === "Escape") setIsRenaming(false)
                   }}
+                  style={noDrag}
                   className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
                 />
               </span>
@@ -339,6 +373,7 @@ export function TitleBar() {
                         <Button
                           variant="ghost"
                           size="icon-xs"
+                          style={noDrag}
                           className="ml-0.5 shrink-0 text-muted-foreground/50"
                         />
                       }
@@ -357,7 +392,28 @@ export function TitleBar() {
                       className="ml-auto pl-2"
                     />
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleTogglePin}>
+                    {urlActiveThread.isPinned ? (
+                      <>
+                        <PinOff className="mr-2 h-4 w-4" />
+                        Unpin
+                      </>
+                    ) : (
+                      <>
+                        <Pin className="mr-2 h-4 w-4" />
+                        Pin
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCopyThreadId}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Thread ID
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleArchiveThread}>
+                    <Archive className="mr-2 h-4 w-4" />
+                    Archive
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onClick={handleDeleteThread}
@@ -379,22 +435,27 @@ export function TitleBar() {
           "flex shrink-0 items-center gap-0.5 px-2 transition-[padding-right] duration-200 ease-linear",
           !rightSidebarOpen && "pr-9"
         )}
-        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
         {updateStatus && updateStatus.phase !== "idle" && updateStatus.phase !== "checking" && (
-          <UpdateButton status={updateStatus} />
+          <span className="inline-flex" style={noDrag}>
+            <UpdateButton status={updateStatus} />
+          </span>
         )}
 
-        <TasksDropdown
-          workspaceId={actionWorkspace?.id ?? ""}
-          onRunTask={runTerminalCommand}
-        />
+        <span className="inline-flex" style={noDrag}>
+          <TasksDropdown
+            workspaceId={actionWorkspace?.id ?? ""}
+            onRunTask={runTerminalCommand}
+          />
+        </span>
 
-        <OpenWithButton
-          workspaceId={actionWorkspace?.id}
-          workspacePath={actionWorkspace?.path}
-          openWithAppId={actionWorkspace?.openWithAppId}
-        />
+        <span className="inline-flex" style={noDrag}>
+          <OpenWithButton
+            workspaceId={actionWorkspace?.id}
+            workspacePath={actionWorkspace?.path}
+            openWithAppId={actionWorkspace?.openWithAppId}
+          />
+        </span>
 
         <Tooltip>
           <TooltipTrigger
@@ -403,6 +464,7 @@ export function TitleBar() {
                 pressed={terminalOpen}
                 onPressedChange={() => toggleTerminal()}
                 disabled={!effectiveWorkspacePath}
+                style={noDrag}
                 className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-muted aria-pressed:text-foreground"
               >
                 <TerminalSquare className="size-4" />

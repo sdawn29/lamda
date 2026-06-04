@@ -32,6 +32,8 @@ import {
   gitShowFiles,
   gitShowFileDiff,
   gitRestoreFileFromRef,
+  gitDiffContents,
+  gitFileAtRef,
 } from "@lamda/git";
 import { generateCommitMessage } from "@lamda/pi-sdk";
 import {
@@ -205,9 +207,16 @@ git.post("/session/:id/git/generate-commit-message", async (c) => {
       { error: "No staged changes to generate a message for" },
       400,
     );
-  return c.json({
-    message: await generateCommitMessage(diff, { cwd }, body.promptTemplate),
-  });
+  try {
+    return c.json({
+      message: await generateCommitMessage(diff, { cwd }, body.promptTemplate),
+    });
+  } catch (err) {
+    return c.json(
+      { error: parseGitError(err, "Failed to generate commit message") },
+      500,
+    );
+  }
 });
 
 git.post("/session/:id/git/push", async (c) => {
@@ -465,6 +474,152 @@ git.get("/session/:id/git/turns/:turnId/files", (c) => {
 
   const files = getAgentTurnFiles(turnId);
   return c.json({ files });
+});
+
+// ── Per-turn file diffs ──────────────────────────────────────────────────────
+//
+// A turn's contribution to a file is `content at turn start → content at turn
+// end`, NOT the working tree's current diff against HEAD (which is cumulative
+// across every later turn). We reconstruct both sides from stored snapshots:
+//   • pre  = the turn's preContent for the file (or HEAD content, or "" if the
+//            file was created by the turn)
+//   • post = the preContent recorded by the earliest *later* turn that touched
+//            the same file (its start == our end); or the live working-tree
+//            content when no later turn touched it.
+
+interface TurnFilePair {
+  preText: string;
+  postText: string;
+}
+
+// Resolves the pre/post content of a single file as of `turnIdParam`. Returns
+// null when the file is not part of that turn.
+async function resolveTurnFileContents(
+  sessionId: string,
+  cwd: string,
+  turnIdParam: string,
+  filePath: string,
+): Promise<TurnFilePair | null> {
+  const readWorkingTree = async (): Promise<string> => {
+    try {
+      return await fs.readFile(join(cwd, filePath), "utf8");
+    } catch {
+      return ""; // missing on disk → deleted
+    }
+  };
+
+  const preContentFor = async (
+    file: { wasCreatedByTurn: boolean; preContent: string | null },
+  ): Promise<string> => {
+    if (file.wasCreatedByTurn) return ""; // didn't exist before the turn
+    if (file.preContent !== null) return file.preContent;
+    // Existed but no snapshot stored (was unmodified at HEAD before the turn).
+    return (await gitFileAtRef(cwd, "HEAD", filePath)) ?? "";
+  };
+
+  // Live in-progress turn.
+  if (turnIdParam === "0") {
+    const file = sessionEvents
+      .getLastTurnFiles(sessionId)
+      .find((f) => f.filePath === filePath);
+    if (!file) return null;
+    return {
+      preText: await preContentFor(file),
+      postText: await readWorkingTree(),
+    };
+  }
+
+  const turnId = parseInt(turnIdParam, 10);
+  if (isNaN(turnId)) return null;
+
+  const thisFile = getAgentTurnFiles(turnId).find(
+    (f) => f.filePath === filePath,
+  );
+  if (!thisFile) return null;
+
+  const preText = await preContentFor(thisFile);
+
+  // Find the earliest later turn that touched this file with a real pre-turn
+  // snapshot; that snapshot is this file's content immediately after the current
+  // turn. Skip later turns that recorded it as newly-created (no snapshot, e.g.
+  // the file was committed in between) and fall through to the working tree.
+  const laterTurns = getAgentTurnsFromId(sessionId, turnId + 1);
+  for (const turn of laterTurns) {
+    const next = getAgentTurnFiles(turn.id).find(
+      (f) => f.filePath === filePath,
+    );
+    if (!next || next.wasCreatedByTurn) continue;
+    return { preText, postText: await preContentFor(next) };
+  }
+
+  // No later turn touched it → it still holds this turn's result on disk.
+  return { preText, postText: await readWorkingTree() };
+}
+
+function countDiffLines(diff: string): {
+  additions: number;
+  deletions: number;
+} {
+  let additions = 0;
+  let deletions = 0;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) additions++;
+    else if (line.startsWith("-") && !line.startsWith("---")) deletions++;
+  }
+  return { additions, deletions };
+}
+
+// Unified diff for a single file representing only what this turn changed.
+git.get("/session/:id/git/turns/:turnId/file-diff", async (c) => {
+  const id = c.req.param("id");
+  const cwd = gitCwd(id);
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const file = c.req.query("file");
+  if (!file) return c.json({ error: "file query param is required" }, 400);
+
+  const pair = await resolveTurnFileContents(
+    id,
+    cwd,
+    c.req.param("turnId"),
+    file,
+  );
+  if (!pair) return c.json({ diff: "" });
+  return c.json({ diff: await gitDiffContents(pair.preText, pair.postText, file) });
+});
+
+// Aggregate additions/deletions for everything a turn changed.
+git.get("/session/:id/git/turns/:turnId/diff-stat", async (c) => {
+  const id = c.req.param("id");
+  const cwd = gitCwd(id);
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  const turnIdParam = c.req.param("turnId");
+
+  const files =
+    turnIdParam === "0"
+      ? sessionEvents.getLastTurnFiles(id).map((f) => ({ filePath: f.filePath }))
+      : getAgentTurnFiles(parseInt(turnIdParam, 10) || -1).map((f) => ({
+          filePath: f.filePath,
+        }));
+
+  const perFile = await Promise.all(
+    files.slice(0, 100).map(async (f) => {
+      const pair = await resolveTurnFileContents(id, cwd, turnIdParam, f.filePath);
+      if (!pair) return { additions: 0, deletions: 0 };
+      return countDiffLines(
+        await gitDiffContents(pair.preText, pair.postText, f.filePath),
+      );
+    }),
+  );
+
+  return c.json(
+    perFile.reduce(
+      (acc, next) => ({
+        additions: acc.additions + next.additions,
+        deletions: acc.deletions + next.deletions,
+      }),
+      { additions: 0, deletions: 0 },
+    ),
+  );
 });
 
 // Revert the working tree to the state before a given turn.

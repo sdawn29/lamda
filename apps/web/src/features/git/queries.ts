@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFiles, getWorkspaceBranch, listWorkspaceBranches } from "./api"
+import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFileDiff, getTurnDiffStat, getWorkspaceBranch, listWorkspaceBranches } from "./api"
 import { getBranch, listBranches } from "@/features/chat/api"
 
 const gitRootKey = ["git"] as const
@@ -35,6 +35,8 @@ export const gitKeys = {
     [...gitSessionKey(sessionId), "show-file-diff", sha, filePath] as const,
   turnDiffStat: (sessionId: string, turnId: number) =>
     [...gitSessionKey(sessionId), "turn-diff-stat", turnId] as const,
+  turnFileDiff: (sessionId: string, turnId: number, filePath: string) =>
+    [...gitSessionKey(sessionId), "turn-file-diff", turnId, filePath] as const,
 }
 
 // ── Git status ────────────────────────────────────────────────────────────────
@@ -88,16 +90,8 @@ export function useGitDiffStat(sessionId: string) {
   })
 }
 
-function countDiffLines(diff: string): { additions: number; deletions: number } {
-  let additions = 0
-  let deletions = 0
-  for (const line of diff.split("\n")) {
-    if (line.startsWith("+") && !line.startsWith("+++")) additions++
-    else if (line.startsWith("-") && !line.startsWith("---")) deletions++
-  }
-  return { additions, deletions }
-}
-
+// Additions/deletions for only what a turn changed (server-computed from the
+// per-turn pre/post snapshots, not the cumulative working-tree diff).
 export function useTurnDiffStat(
   sessionId: string,
   turnId: number | undefined,
@@ -110,35 +104,30 @@ export function useTurnDiffStat(
         : ([...gitSessionKey(sessionId), "turn-diff-stat-none"] as const),
     queryFn: async (): Promise<{ additions: number; deletions: number }> => {
       if (turnId === undefined) return { additions: 0, deletions: 0 }
-      const files = await getTurnFiles(sessionId, turnId)
-      if (!files.length) return { additions: 0, deletions: 0 }
-
-      const perFile = await Promise.all(
-        files.slice(0, 100).map(async (file) => {
-          try {
-            const diff = await gitFileDiff(
-              sessionId,
-              file.filePath,
-              file.postStatusCode
-            )
-            return countDiffLines(diff)
-          } catch {
-            return { additions: 0, deletions: 0 }
-          }
-        })
-      )
-
-      return perFile.reduce(
-        (acc, next) => ({
-          additions: acc.additions + next.additions,
-          deletions: acc.deletions + next.deletions,
-        }),
-        { additions: 0, deletions: 0 }
-      )
+      return getTurnDiffStat(sessionId, turnId)
     },
     enabled: enabled && !!sessionId && turnId !== undefined,
     staleTime: 0,
     gcTime: 30 * 1000,
+  })
+}
+
+// Unified diff for a single file showing only what the given turn changed.
+export function useTurnFileDiff(
+  sessionId: string,
+  turnId: number | undefined,
+  filePath: string,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey:
+      turnId !== undefined
+        ? gitKeys.turnFileDiff(sessionId, turnId, filePath)
+        : ([...gitSessionKey(sessionId), "turn-file-diff-none"] as const),
+    queryFn: () => getTurnFileDiff(sessionId, turnId!, filePath),
+    enabled: enabled && !!sessionId && turnId !== undefined && !!filePath,
+    gcTime: 60 * 1000,
+    staleTime: 0,
   })
 }
 

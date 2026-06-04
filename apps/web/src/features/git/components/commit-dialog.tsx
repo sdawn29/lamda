@@ -225,7 +225,11 @@ export function CommitInputSection({
 
   const commitError = commitMutation.error instanceof Error ? commitMutation.error.message : null
   const pushError = pushMutation.error instanceof Error ? pushMutation.error.message : null
-  const error = commitError ?? pushError
+  const generateError =
+    generateCommitMessageMutation.error instanceof Error
+      ? generateCommitMessageMutation.error.message
+      : null
+  const error = commitError ?? pushError ?? generateError
 
   async function handleCommit() {
     if (!message.trim() || staged.length === 0) return
@@ -264,11 +268,14 @@ export function CommitInputSection({
 
   async function handleGenerate() {
     if (generateCommitMessageMutation.isPending) return
+    generateCommitMessageMutation.reset()
     try {
       const promptTemplate = settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? undefined
       const generated = await generateCommitMessageMutation.mutateAsync(promptTemplate)
       setMessage(generated)
-    } catch {}
+    } catch {
+      // Error surfaces via generateCommitMessageMutation.error → shown in Alert.
+    }
   }
 
   const committing = commitMutation.isPending

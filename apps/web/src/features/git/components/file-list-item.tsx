@@ -7,7 +7,7 @@ import { IconButtonWithTooltip } from "@/shared/ui/icon-button-with-tooltip"
 import { DiffView, type DiffMode } from "./diff-view"
 import { StatusBadge, type ChangedFile } from "./status-badge"
 import { DiffStat, parseDiffCounts } from "./diff-stat"
-import { useGitFileDiff, useGitShowFileDiff } from "../queries"
+import { useGitFileDiff, useGitShowFileDiff, useTurnFileDiff } from "../queries"
 import { cn } from "@/shared/lib/utils"
 
 interface FileListItemProps {
@@ -33,6 +33,12 @@ interface FileListItemProps {
   className?: string
   /** When set, fetches diff from the given commit SHA instead of the working tree */
   sha?: string
+  /**
+   * When set, fetches the diff scoped to a single agent turn (only what that
+   * turn changed in this file) instead of the cumulative working-tree diff.
+   * `sessionId` must be the agent session id that owns the turn.
+   */
+  turnId?: number
   /** Pre-fetched diff counts — shown immediately without waiting for the diff to load */
   counts?: { added: number; removed: number }
 }
@@ -50,6 +56,7 @@ export const FileListItem = memo(function FileListItem({
   disabled = false,
   className,
   sha,
+  turnId,
   counts: preloadedCounts,
 }: FileListItemProps) {
   // Internal state for uncontrolled mode
@@ -63,12 +70,13 @@ export const FileListItem = memo(function FileListItem({
 
   const isExpandable = mode !== undefined
   const isCommitMode = !!sha
+  const isTurnMode = turnId !== undefined
 
   const { data: workDiff, isLoading: workDiffLoading } = useGitFileDiff(
     sessionId,
     file.filePath,
     file.raw,
-    !isCommitMode
+    !isCommitMode && !isTurnMode
   )
   const { data: commitDiff, isLoading: commitDiffLoading } = useGitShowFileDiff(
     sessionId,
@@ -76,9 +84,19 @@ export const FileListItem = memo(function FileListItem({
     file.filePath,
     isCommitMode && isExpanded
   )
+  const { data: turnDiff, isLoading: turnDiffLoading } = useTurnFileDiff(
+    sessionId,
+    turnId,
+    file.filePath,
+    isTurnMode && isExpanded
+  )
 
-  const diff = isCommitMode ? commitDiff : workDiff
-  const diffLoading = isCommitMode ? commitDiffLoading : workDiffLoading
+  const diff = isCommitMode ? commitDiff : isTurnMode ? turnDiff : workDiff
+  const diffLoading = isCommitMode
+    ? commitDiffLoading
+    : isTurnMode
+      ? turnDiffLoading
+      : workDiffLoading
   const counts = preloadedCounts ?? (diff != null ? parseDiffCounts(diff) : null)
 
   const handleToggle = useCallback(

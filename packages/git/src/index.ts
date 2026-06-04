@@ -1,5 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const execFileAsync = promisify(execFile);
 const EMPTY_TREE_HASH = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -517,6 +520,84 @@ export async function getAheadBehind(
     return { ahead: isNaN(ahead) ? 0 : ahead, behind: isNaN(behind) ? 0 : behind };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Returns the content of a file as it existed at a given ref (e.g. "HEAD" or a
+ * stash/commit sha): `git show <ref>:<path>`. Returns null if the file does not
+ * exist at that ref or the ref is unreadable.
+ */
+export async function gitFileAtRef(
+  cwd: string,
+  ref: string,
+  filePath: string,
+): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["--no-optional-locks", "show", `${ref}:${filePath}`],
+      { cwd, timeout: 10000, maxBuffer: 50 * 1024 * 1024 },
+    );
+    return stdout;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Produces a unified diff between two in-memory file versions, labeled with the
+ * file path. Used for per-turn diffs where the pre/post content is reconstructed
+ * from stored snapshots rather than live git refs (newly-created files are never
+ * present in `git stash create` checkpoints, so a ref-to-ref diff can't be used).
+ * Returns "" when the two versions are identical.
+ */
+export async function gitDiffContents(
+  preText: string,
+  postText: string,
+  filePath: string,
+): Promise<string> {
+  if (preText === postText) return "";
+  const dir = await mkdtemp(join(tmpdir(), "lamda-turndiff-"));
+  const preFile = join(dir, "pre");
+  const postFile = join(dir, "post");
+  try {
+    await writeFile(preFile, preText);
+    await writeFile(postFile, postText);
+    let raw = "";
+    try {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["diff", "--no-index", "--no-color", "--", preFile, postFile],
+        { timeout: 10000, maxBuffer: 50 * 1024 * 1024 },
+      );
+      raw = stdout;
+    } catch (err: unknown) {
+      // git diff --no-index exits 1 when files differ — that's the expected path.
+      if (
+        err &&
+        typeof err === "object" &&
+        "stdout" in err &&
+        typeof (err as { stdout?: unknown }).stdout === "string"
+      ) {
+        raw = (err as { stdout: string }).stdout;
+      }
+    }
+    // Relabel the temp-file paths in the diff header with the real file path.
+    return raw
+      .split("\n")
+      .map((line) => {
+        if (line.startsWith("diff --git "))
+          return `diff --git a/${filePath} b/${filePath}`;
+        if (line.startsWith("--- ") && line !== "--- /dev/null")
+          return `--- a/${filePath}`;
+        if (line.startsWith("+++ ") && line !== "+++ /dev/null")
+          return `+++ b/${filePath}`;
+        return line;
+      })
+      .join("\n");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 }
 

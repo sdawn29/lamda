@@ -26,6 +26,17 @@ export function isServerUnreachableError(
   )
 }
 
+/** Thrown when the server responds with a non-2xx status. */
+export class ApiError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = "ApiError"
+    this.status = status
+  }
+}
+
 export async function getServerUrl(): Promise<string> {
   if (resolvedServerUrl) return resolvedServerUrl
 
@@ -110,7 +121,14 @@ export async function apiFetch<T>(
   
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(`API ${res.status}: ${text}`)
+    // Prefer the server's structured `{ error }` message when present, so
+    // callers can show a readable message instead of a raw `API 500: {...}`.
+    let message = text
+    try {
+      const parsed = JSON.parse(text) as { error?: unknown }
+      if (parsed && typeof parsed.error === "string") message = parsed.error
+    } catch {}
+    throw new ApiError(res.status, message)
   }
   if (res.status === 204 || res.headers.get("content-length") === "0") {
     return undefined as T

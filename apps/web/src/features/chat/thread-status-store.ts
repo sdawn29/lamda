@@ -159,14 +159,20 @@ function handleGlobalMessage(e: MessageEvent): void {
     }
     if (data.type === "git_status_changed") {
       // Invalidates status, diff-stat, turns, branch, ahead-behind, etc. for all
-      // mounted sessions. Skips per-file diffs (key[3] === "diff") — those are
-      // keyed by (sessionId, filePath, statusCode) and are O(N files) active
-      // observers, so broadcasting against all of them on every .git write causes
-      // a request explosion during active agent runs. File diffs become stale
-      // naturally when the status query updates (new statusCode → new query key).
+      // mounted sessions. Skips per-file diffs (key[3] === "diff") and per-turn
+      // file diffs (key[3] === "turn-file-diff") — those are keyed per file and
+      // are O(N files) active observers, so broadcasting against all of them on
+      // every .git write causes a request explosion during active agent runs.
+      // Working-tree file diffs become stale naturally when the status query
+      // updates (new statusCode → new query key); a completed turn's file diff is
+      // immutable once the next turn lands (its post-state is frozen), and the
+      // in-progress turn's diff refreshes on re-expand (staleTime 0).
       void queryClient.invalidateQueries({
         queryKey: ["git"],
-        predicate: (query) => (query.queryKey as unknown[])[3] !== "diff",
+        predicate: (query) => {
+          const k = (query.queryKey as unknown[])[3]
+          return k !== "diff" && k !== "turn-file-diff"
+        },
       })
     }
   } catch (error) {

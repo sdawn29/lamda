@@ -248,6 +248,27 @@ export async function getTurnFiles(sessionId: string, turnId: number): Promise<T
   return files
 }
 
+export async function getTurnFileDiff(
+  sessionId: string,
+  turnId: number,
+  filePath: string
+): Promise<string> {
+  const params = new URLSearchParams({ file: filePath })
+  const { diff } = await apiFetch<{ diff: string }>(
+    `${base(sessionId)}/turns/${turnId}/file-diff?${params}`
+  )
+  return diff
+}
+
+export async function getTurnDiffStat(
+  sessionId: string,
+  turnId: number
+): Promise<{ additions: number; deletions: number }> {
+  return apiFetch<{ additions: number; deletions: number }>(
+    `${base(sessionId)}/turns/${turnId}/diff-stat`
+  )
+}
+
 export function revertToTurn(sessionId: string, turnId: number): Promise<void> {
   return apiFetch<void>(`${base(sessionId)}/turns/${turnId}/revert`, { method: "POST" })
 }

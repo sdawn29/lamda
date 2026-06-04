@@ -78,7 +78,7 @@ function hasFileExtension(p: string): boolean {
 }
 
 const CHIP_CLASS =
-  "mx-0.5 inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-border bg-input/20 px-2 py-0.5 align-middle text-[0.625rem] font-medium whitespace-nowrap text-foreground/80 select-none dark:bg-input/30 [&>svg]:pointer-events-none [&>svg]:size-2.5!"
+  "mx-0.5 inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-border bg-input/20 px-2 py-0.5 align-middle text-sm font-medium whitespace-nowrap text-foreground/80 select-none dark:bg-input/30 [&>svg]:pointer-events-none [&>svg]:size-3.5!"
 
 function buildChipBase(className?: string): HTMLSpanElement {
   const chip = document.createElement("span")
