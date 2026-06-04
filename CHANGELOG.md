@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.0](../../releases/tag/v0.10.0) — 2026-06-04
+
+### Features
+
+* **mode:** change default mode from 'code' to 'agent' across the application
+* **question:** implement question tool for user interaction with multiple-choice questions
+
+### Bug Fixes
+
+* **chat:** enhance chat message grouping and UI for plan changes and saved cards
+
 ## [0.9.0](../../releases/tag/v0.9.0) — 2026-06-04
 
 ### Features
