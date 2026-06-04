@@ -2,7 +2,6 @@ import { memo, useMemo } from "react"
 import { EyeIcon, ListTodoIcon, PlayIcon } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
-import { cn } from "@/shared/lib/utils"
 import { FileIcon } from "@/shared/ui/file-icon"
 import { useChatActions } from "../contexts/chat-actions-context"
 import type { TurnSummary } from "@/features/git/api"
@@ -39,26 +38,24 @@ export const PlanChangesCard = memo(function PlanChangesCard({
 
   return (
     <div className="mx-auto mb-3 w-full max-w-3xl px-6 py-2">
-      <div
-        className={cn(
-          "overflow-hidden rounded-lg border border-amber-500/30 bg-amber-500/5",
-        )}
-      >
-        <div className="flex items-start gap-2.5 px-3 py-2.5">
-          <ListTodoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+      <div className="overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10">
+        <div className="flex items-start gap-3 px-3 py-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-amber-500/12 text-amber-600 dark:bg-amber-400/12 dark:text-amber-400">
+            <ListTodoIcon className="size-4" />
+          </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-300">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400">
               {planFiles.length === 1 ? "Plan ready" : `${planFiles.length} plans ready`}
             </p>
-            <ul className="mt-1 flex flex-col gap-0.5">
+            <ul className="mt-1.5 flex flex-col gap-1">
               {planFiles.map((rel) => {
                 const fileName = rel.split("/").pop() ?? rel
                 return (
                   <li
                     key={rel}
-                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                    className="flex items-center gap-1.5 text-xs text-foreground/80"
                   >
-                    <FileIcon filename={fileName} className="h-3 w-3 opacity-60" />
+                    <FileIcon filename={fileName} className="size-3 shrink-0 opacity-70" />
                     <span className="truncate font-mono">{rel}</span>
                   </li>
                 )
@@ -68,12 +65,12 @@ export const PlanChangesCard = memo(function PlanChangesCard({
         </div>
 
         {actions && (
-          <div className="flex flex-wrap gap-2 border-t border-amber-500/15 px-3 py-2">
+          <div className="flex flex-wrap gap-2 border-t border-border px-3 py-2.5">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 gap-1.5 border-amber-500/30 bg-transparent text-xs hover:bg-amber-500/10 dark:border-amber-400/30"
+              className="h-7 gap-1.5"
               onClick={() => {
                 const first = planFiles[0]
                 if (!first) return
@@ -83,20 +80,20 @@ export const PlanChangesCard = memo(function PlanChangesCard({
                 actions.openFile(abs, first.split("/").pop())
               }}
             >
-              <EyeIcon className="h-3.5 w-3.5" />
+              <EyeIcon className="size-3.5" />
               Review
             </Button>
             <Button
               type="button"
               size="sm"
-              className="h-7 gap-1.5 bg-amber-500 text-xs text-white hover:bg-amber-500/90"
+              className="h-7 gap-1.5 bg-amber-600 text-white hover:bg-amber-600/90 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
               onClick={() => {
                 const first = planFiles[0]
                 if (!first) return
                 actions.implementPlan(first)
               }}
             >
-              <PlayIcon className="h-3.5 w-3.5" />
+              <PlayIcon className="size-3.5" />
               Implement plan
             </Button>
           </div>

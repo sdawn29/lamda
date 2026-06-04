@@ -265,7 +265,13 @@ function buildTurnCardsByGroup(
   const cardsByGroup = new Map<number, TurnSummary[]>()
   let previousTurnEndedAt = -Infinity
 
-  for (const turn of completedTurns) {
+  const isUserBoundary = (group: MessageGroup): boolean =>
+    group.type === "regular" &&
+    (group.message.role === "user" || group.message.role === "abort")
+
+  for (let t = 0; t < completedTurns.length; t++) {
+    const turn = completedTurns[t]
+    const nextTurnStartedAt = completedTurns[t + 1]?.startedAt ?? Infinity
     let targetIndex = -1
 
     for (let i = 0; i < groupTimes.length; i++) {
@@ -290,6 +296,19 @@ function buildTurnCardsByGroup(
     }
 
     if (targetIndex !== -1) {
+      // Dock the card at the turn's end. The timestamp window above can match an
+      // earlier working block when the assistant streams a closing summary after
+      // its tool calls (that trailing group may have no createdAt yet, or one
+      // just past the window). Advance over any trailing assistant/working groups
+      // belonging to this turn so the card always renders below the whole turn,
+      // stopping at the next user message or the start of the following turn.
+      for (let j = targetIndex + 1; j < groups.length; j++) {
+        if (isUserBoundary(groups[j])) break
+        const createdAt = groupTimes[j]
+        if (createdAt != null && createdAt >= nextTurnStartedAt) break
+        targetIndex = j
+      }
+
       const list = cardsByGroup.get(targetIndex) ?? []
       list.push(turn)
       cardsByGroup.set(targetIndex, list)
@@ -429,25 +448,8 @@ export function ChatView({
         title: fileName,
         workspacePath: rootPath,
       })
-
-      if (selectedMode === "plan") {
-        setSelectedMode("code")
-        updateThreadMode.mutate({ threadId, mode: "code" })
-        toast.success("Plan saved — switched to Code mode", {
-          description: relativePath,
-          action: {
-            label: "Undo",
-            onClick: () => {
-              setSelectedMode("plan")
-              updateThreadMode.mutate({ threadId, mode: "plan" })
-            },
-          },
-        })
-      } else {
-        toast.success("Plan saved", { description: relativePath })
-      }
     },
-    [rootPath, selectedMode, threadId, updateThreadMode]
+    [rootPath]
   )
 
   const { data: turns = [] } = useTurns(sessionId)
@@ -463,11 +465,12 @@ export function ChatView({
         })
       },
       implementPlan: (relativePath) => {
-        if (selectedMode !== "code") {
-          setSelectedMode("code")
-          updateThreadMode.mutate({ threadId, mode: "code" })
-        }
-        const prompt = `Implement the plan in @${relativePath}.`
+        // Always switch to Code mode so the seeded prompt runs as an
+        // implementation. Idempotent if already in Code, and avoids relying on
+        // the (possibly stale) selectedMode captured in this memoized closure.
+        setSelectedMode("code")
+        updateThreadMode.mutate({ threadId, mode: "code" })
+        const prompt = `Implement the plan in @${relativePath}`
         chatTextboxRef.current?.setValue(prompt)
         chatTextboxRef.current?.focus()
       },
@@ -481,7 +484,7 @@ export function ChatView({
         chatTextboxRef.current?.focus()
       },
     }),
-    [rootPath, selectedMode, threadId, updateThreadMode]
+    [rootPath, threadId, updateThreadMode]
   )
 
   const {
