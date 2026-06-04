@@ -12,8 +12,6 @@ import {
   FileJson,
   Settings2,
   Wrench,
-  Play,
-  Square,
   AlertTriangle,
   ArrowLeft,
 } from "lucide-react"
@@ -22,6 +20,7 @@ import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
 import { Separator } from "@/shared/ui/separator"
+import { Switch } from "@/shared/ui/switch"
 import { Textarea } from "@/shared/ui/textarea"
 import {
   Dialog,
@@ -42,7 +41,7 @@ import { cn } from "@/shared/lib/utils"
 import type { McpServerConfig, ServerFormState } from "../types"
 import { createEmptyServerForm, formStateToConfig, configToFormState } from "../types"
 import { useMcpSettings } from "../queries"
-import { useSaveMcpSettings, useTestMcpConnection, useStartMcpServer, useStopMcpServer } from "../mutations"
+import { useSaveMcpSettings, useTestMcpConnection, useSetMcpServerEnabled } from "../mutations"
 
 // ── Environment Variable Row ──────────────────────────────────────────────────
 
@@ -605,121 +604,81 @@ export function ServerListItem({
   onEdit,
   onDelete,
 }: ServerListItemProps) {
-  const startServer = useStartMcpServer()
-  const stopServer = useStopMcpServer()
+  const setEnabled = useSetMcpServerEnabled()
   const [showTools, setShowTools] = useState(false)
 
   const hasTools = tools && tools.length > 0
   const isEnabled = status?.enabled ?? true
   const isConnected = status?.connected ?? false
-  const isLoading = startServer.isPending || stopServer.isPending
 
-  function handleStartStop() {
-    if (isConnected) {
-      stopServer.mutate({ serverName: server.name })
-    } else {
-      startServer.mutate({ serverName: server.name })
-    }
+  // Reflect the pending toggle immediately for a responsive switch.
+  const checked = setEnabled.isPending
+    ? (setEnabled.variables?.enabled ?? isEnabled)
+    : isEnabled
+
+  function toggleEnabled(enabled: boolean) {
+    setEnabled.mutate({ serverName: server.name, enabled })
   }
 
+  // A single quiet status word — no colored indicator dot. The switch already
+  // conveys on/off, so a label only appears while the server is enabled.
+  const statusLabel = !checked
+    ? null
+    : status === undefined
+      ? "Connecting"
+      : isConnected
+        ? "Connected"
+        : status.error
+          ? "Error"
+          : "Starting"
+
   return (
-    <div className={cn("overflow-hidden rounded-lg border bg-card transition-opacity", !isEnabled && "opacity-60")}>
-      {/* Content */}
-      <div className="flex items-start gap-3 px-3 pt-3 pb-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-muted/50">
-          <Terminal className="h-3.5 w-3.5 text-muted-foreground/70" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold leading-tight">{server.name}</p>
-          <code className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground/55">
+    <div className="rounded-md border border-border/40 transition-colors">
+      {/* Row */}
+      <div className="group flex items-center gap-3 px-3 py-2.5">
+        {/* Identity */}
+        <div className={cn("min-w-0 flex-1", !checked && "opacity-50")}>
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-medium leading-tight">{server.name}</p>
+            {statusLabel && (
+              <span
+                className={cn(
+                  "shrink-0 text-[11px] leading-none",
+                  status?.error ? "text-destructive" : "text-muted-foreground",
+                  status === undefined && "animate-pulse"
+                )}
+              >
+                {statusLabel}
+              </span>
+            )}
+          </div>
+          <code className="mt-1 block truncate font-mono text-[11px] text-muted-foreground/60">
             {server.command}
             {server.args?.length ? ` ${server.args.join(" ")}` : ""}
           </code>
-          {server.description && (
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-              {server.description}
-            </p>
-          )}
-          {status?.error && (
-            <p className="mt-1 text-[10px] text-destructive">{status.error}</p>
+          {checked && status?.error && (
+            <p className="mt-1 truncate text-[11px] text-destructive">{status.error}</p>
           )}
         </div>
-      </div>
 
-      {/* Status + Actions bar */}
-      <div className="flex h-9 items-center gap-1 border-t bg-muted/20 px-2">
-        {/* Status indicator */}
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 pl-0.5">
-          {isConnected ? (
-            <span className="relative flex h-1.5 w-1.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-40" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500" />
-            </span>
-          ) : status?.error ? (
-            <span className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-destructive/70" />
-          ) : (
-            <span className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/25" />
-          )}
-          <span
-            className={cn(
-              "text-[10px]",
-              !isEnabled
-                ? "text-muted-foreground"
-                : status === undefined
-                  ? "animate-pulse text-muted-foreground"
-                  : isConnected
-                    ? "font-medium text-green-600 dark:text-green-400"
-                    : status.error
-                      ? "text-destructive"
-                      : "text-muted-foreground"
-            )}
-          >
-            {!isEnabled
-              ? "disabled"
-              : status === undefined
-                ? "connecting…"
-                : isConnected
-                  ? "connected"
-                  : status.error
-                    ? "error"
-                    : "stopped"}
-          </span>
-        </div>
-
-        {/* Actions */}
-        <div className="flex shrink-0 items-center gap-0.5">
-          {hasTools && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowTools(!showTools)}
-              className={cn(
-                "h-7 gap-1.5 px-2 text-[11px] text-muted-foreground hover:text-foreground",
-                showTools && "bg-background text-foreground shadow-sm ring-1 ring-border/60 hover:bg-background"
-              )}
-            >
-              <Wrench className="h-3 w-3" />
-              {tools.length} tool{tools.length !== 1 ? "s" : ""}
-            </Button>
-          )}
-
+        {/* Tools count */}
+        {hasTools && (
           <Button
             variant="ghost"
-            size="icon-sm"
-            onClick={handleStartStop}
-            disabled={!isEnabled || isLoading}
-            title={isConnected ? "Stop server" : "Start server"}
-            className="text-muted-foreground"
-          >
-            {isLoading ? (
-              <Loader2 className="animate-spin" />
-            ) : isConnected ? (
-              <Square className="text-orange-500" />
-            ) : (
-              <Play className="text-green-500" />
+            size="sm"
+            onClick={() => setShowTools(!showTools)}
+            className={cn(
+              "h-6 shrink-0 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground",
+              showTools && "text-foreground"
             )}
+          >
+            <Wrench className="h-3 w-3" />
+            {tools.length}
           </Button>
+        )}
 
+        {/* Edit / Delete */}
+        <div className="flex shrink-0 items-center">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -729,7 +688,6 @@ export function ServerListItem({
           >
             <Edit2 />
           </Button>
-
           <Button
             variant="ghost"
             size="icon-sm"
@@ -740,44 +698,32 @@ export function ServerListItem({
             <Trash2 />
           </Button>
         </div>
+
+        {/* On/off toggle */}
+        <Switch
+          checked={checked}
+          onCheckedChange={toggleEnabled}
+          disabled={setEnabled.isPending}
+          aria-label={`${checked ? "Disable" : "Enable"} ${server.name}`}
+          className="shrink-0"
+        />
       </div>
 
       {/* Collapsible tool list */}
       {showTools && hasTools && (
-        <div className="border-t">
-          <div className="flex h-8 items-center gap-2 bg-muted/30 px-3">
-            <Wrench className="h-3 w-3 text-muted-foreground/50" />
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/50">
-              {tools.length} Tool{tools.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          <div className="p-1.5">
-            {tools.map((tool) => (
-              <div
-                key={tool.name}
-                className="my-1 flex items-center gap-2.5 rounded-md border border-border/40 bg-muted/10 px-2.5 py-2 first:mt-0 last:mb-0"
-              >
-                <div className="min-w-0">
-                  <code className="font-mono text-[10px] font-semibold text-foreground/80">
-                    {tool.name}
-                  </code>
-                  {tool.description && (
-                    <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
-                      {tool.description}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Connected with no tools */}
-      {isEnabled && isConnected && !hasTools && status?.toolCount === 0 && (
-        <div className="flex items-center gap-1.5 border-t bg-muted/10 px-3 py-2">
-          <Wrench className="h-3 w-3 text-muted-foreground/40" />
-          <p className="text-[10px] text-muted-foreground">No tools exposed by this server</p>
+        <div className="space-y-2 border-t border-border/40 px-3 py-2.5">
+          {tools.map((tool) => (
+            <div key={tool.name}>
+              <code className="font-mono text-[11px] font-medium text-foreground/80">
+                {tool.name}
+              </code>
+              {tool.description && (
+                <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                  {tool.description}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

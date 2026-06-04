@@ -37,7 +37,7 @@ import {
 } from "@lamda/git";
 import { generateCommitMessage } from "@lamda/pi-sdk";
 import {
-  listAgentTurnsBySession,
+  listAgentTurns,
   getAgentTurnFiles,
   getAgentTurnsFromId,
   deleteAgentTurnsFrom,
@@ -425,7 +425,11 @@ git.get("/session/:id/git/turns", (c) => {
   const currentTurnStartTime = sessionEvents.getCurrentTurnStartTime(id);
   const liveFiles =
     currentTurnStartTime > 0 ? sessionEvents.getLastTurnFiles(id) : [];
-  const turns = listAgentTurnsBySession(id);
+  // Turns are keyed by the durable threadId, not the ephemeral sessionId (which
+  // is regenerated for every thread on each server start) — otherwise all turn
+  // history would vanish after a restart.
+  const threadId = store.getThreadId(id);
+  const turns = threadId ? listAgentTurns(threadId) : [];
 
   const liveTurn =
     liveFiles.length > 0
@@ -496,6 +500,7 @@ interface TurnFilePair {
 // null when the file is not part of that turn.
 async function resolveTurnFileContents(
   sessionId: string,
+  threadId: string | undefined,
   cwd: string,
   turnIdParam: string,
   filePath: string,
@@ -543,7 +548,9 @@ async function resolveTurnFileContents(
   // snapshot; that snapshot is this file's content immediately after the current
   // turn. Skip later turns that recorded it as newly-created (no snapshot, e.g.
   // the file was committed in between) and fall through to the working tree.
-  const laterTurns = getAgentTurnsFromId(sessionId, turnId + 1);
+  const laterTurns = threadId
+    ? getAgentTurnsFromId(threadId, turnId + 1)
+    : [];
   for (const turn of laterTurns) {
     const next = getAgentTurnFiles(turn.id).find(
       (f) => f.filePath === filePath,
@@ -579,6 +586,7 @@ git.get("/session/:id/git/turns/:turnId/file-diff", async (c) => {
 
   const pair = await resolveTurnFileContents(
     id,
+    store.getThreadId(id),
     cwd,
     c.req.param("turnId"),
     file,
@@ -593,6 +601,7 @@ git.get("/session/:id/git/turns/:turnId/diff-stat", async (c) => {
   const cwd = gitCwd(id);
   if (!cwd) return c.json({ error: "Session not found" }, 404);
   const turnIdParam = c.req.param("turnId");
+  const threadId = store.getThreadId(id);
 
   const files =
     turnIdParam === "0"
@@ -603,7 +612,7 @@ git.get("/session/:id/git/turns/:turnId/diff-stat", async (c) => {
 
   const perFile = await Promise.all(
     files.slice(0, 100).map(async (f) => {
-      const pair = await resolveTurnFileContents(id, cwd, turnIdParam, f.filePath);
+      const pair = await resolveTurnFileContents(id, threadId, cwd, turnIdParam, f.filePath);
       if (!pair) return { additions: 0, deletions: 0 };
       return countDiffLines(
         await gitDiffContents(pair.preText, pair.postText, f.filePath),
@@ -676,8 +685,11 @@ git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
   const turnId = parseInt(turnIdParam, 10);
   if (isNaN(turnId)) return c.json({ error: "Invalid turnId" }, 400);
 
+  const threadId = store.getThreadId(id);
+  if (!threadId) return c.json({ error: "Session not found" }, 404);
+
   // Collect this turn and all subsequent turns (sorted oldest first).
-  const turnsToRevert = getAgentTurnsFromId(id, turnId);
+  const turnsToRevert = getAgentTurnsFromId(threadId, turnId);
   if (!turnsToRevert.length) return c.json({ error: "Turn not found" }, 404);
 
   // For each file, the target state is the preContent of the EARLIEST turn that
@@ -753,7 +765,7 @@ git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
   }
 
   // Remove this turn and all subsequent turns from the DB so they disappear from the sidebar.
-  deleteAgentTurnsFrom(id, turnId);
+  deleteAgentTurnsFrom(threadId, turnId);
 
   return new Response(null, { status: 204 });
 });

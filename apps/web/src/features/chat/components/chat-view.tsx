@@ -385,6 +385,13 @@ export function ChatView({
 
   const [gitError, setGitError] = useState<string | null>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
+  // Height of the floating bottom bar (error alert + todo + textbox). The
+  // scroll area is padded by this so messages can scroll *behind* the input
+  // instead of stopping above it.
+  const [bottomBarHeight, setBottomBarHeight] = useState(0)
+  // Height of just the textbox wrapper — the scroll-to-bottom button is
+  // anchored to its top edge.
+  const [textboxHeight, setTextboxHeight] = useState(0)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(
     initialSelectedModelId
   )
@@ -505,6 +512,8 @@ export function ChatView({
   // preventing user-initiated scroll events from cancelling our animation.
   const programmaticScrollRef = useRef(false)
   const chatTextboxRef = useRef<ChatTextboxHandle>(null)
+  const bottomBarRef = useRef<HTMLDivElement>(null)
+  const textboxWrapRef = useRef<HTMLDivElement>(null)
   // Messages present on the first non-empty render (from cache) skip entry animations.
   // Only messages that arrive after the initial snapshot get animate-in treatment.
   // State (not a ref) so it can be safely read during render.
@@ -882,6 +891,40 @@ export function ChatView({
     return () => ro.disconnect()
   }, [])
 
+  // Track the floating bottom bar's height so the scroll area can reserve
+  // matching padding — keeps the last message resting just above the input
+  // while letting earlier content scroll behind it.
+  useEffect(() => {
+    const el = bottomBarRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      setBottomBarHeight(el.offsetHeight)
+    })
+    ro.observe(el)
+    setBottomBarHeight(el.offsetHeight)
+    return () => ro.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const el = textboxWrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      setTextboxHeight(el.offsetHeight)
+    })
+    ro.observe(el)
+    setTextboxHeight(el.offsetHeight)
+    return () => ro.disconnect()
+  }, [])
+
+  // When the bar grows/shrinks (multi-line input, todo panel appearing) keep
+  // the bottom pinned so the latest message stays glued to the top of the bar.
+  useLayoutEffect(() => {
+    if (!pinnedRef.current) return
+    const el = scrollContainerRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }, [bottomBarHeight])
+
   const showScrollButtonRef = useRef(showScrollButton)
   showScrollButtonRef.current = showScrollButton
 
@@ -1170,7 +1213,8 @@ export function ChatView({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex w-full flex-1 flex-col overflow-y-auto pt-4 pb-4 [overflow-anchor:none] [scrollbar-gutter:stable]"
+          style={{ paddingBottom: bottomBarHeight }}
+          className="flex w-full flex-1 flex-col overflow-y-auto pt-4 [overflow-anchor:none] [scrollbar-gutter:stable]"
         >
           <div ref={messagesContainerRef}>
             {/* Load earlier messages button — visible when older history exists and isn't loading */}
@@ -1310,10 +1354,11 @@ export function ChatView({
           </div>
         </div>
 
-        <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
-
         {showScrollButton && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-40 z-10 flex justify-center">
+          <div
+            style={{ bottom: textboxHeight + 4 }}
+            className="pointer-events-none absolute inset-x-0 z-20 flex justify-center"
+          >
             <Button
               size="sm"
               variant="secondary"
@@ -1325,31 +1370,40 @@ export function ChatView({
           </div>
         )}
 
-        <div className="mx-auto w-full max-w-3xl shrink-0 bg-background px-6 pb-2">
-          <TodoPanel messages={visibleMessages} />
-        </div>
+        {/* Floating bottom bar — the message list scrolls behind it. The
+            gradient fades content out as it slides under the input. */}
+        <div ref={bottomBarRef} className="absolute inset-x-0 bottom-0 z-10">
+          <div className="pointer-events-none h-8 bg-gradient-to-t from-background to-transparent" />
+          <div className="bg-background">
+            <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
 
-        <div className="mx-auto w-full max-w-3xl shrink-0 bg-background px-6 py-2">
-          <ChatTextbox
-            ref={chatTextboxRef}
-            onSend={handleSend}
-            onStop={handleStop}
-            isLoading={isLoading}
-            isAborting={abortSessionMutation.isPending}
-            branch={branch}
-            branches={branches}
-            onBranchSelect={handleBranchSelect}
-            onBranchError={handleGitError}
-            sessionId={sessionId}
-            workspaceId={workspaceId}
-            selectedModelId={selectedModelId}
-            onModelChange={handleModelChange}
-            selectedThinkingLevel={selectedThinkingLevel}
-            onThinkingLevelChange={setSelectedThinkingLevel}
-            mode={selectedMode}
-            onModeChange={handleModeChange}
-            sessionStats={sessionStats}
-          />
+            <div className="mx-auto w-full max-w-3xl px-6 pb-2 empty:hidden">
+              <TodoPanel messages={visibleMessages} />
+            </div>
+
+            <div ref={textboxWrapRef} className="mx-auto w-full max-w-3xl px-6 pb-2">
+              <ChatTextbox
+                ref={chatTextboxRef}
+                onSend={handleSend}
+                onStop={handleStop}
+                isLoading={isLoading}
+                isAborting={abortSessionMutation.isPending}
+                branch={branch}
+                branches={branches}
+                onBranchSelect={handleBranchSelect}
+                onBranchError={handleGitError}
+                sessionId={sessionId}
+                workspaceId={workspaceId}
+                selectedModelId={selectedModelId}
+                onModelChange={handleModelChange}
+                selectedThinkingLevel={selectedThinkingLevel}
+                onThinkingLevelChange={setSelectedThinkingLevel}
+                mode={selectedMode}
+                onModeChange={handleModeChange}
+                sessionStats={sessionStats}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </ChatActionsProvider>

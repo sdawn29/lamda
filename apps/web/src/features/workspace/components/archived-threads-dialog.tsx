@@ -176,6 +176,8 @@ export function ArchivedThreadsDialog({
   const [pendingDelete, setPendingDelete] = useState<ArchivedThreadDto | null>(
     null
   )
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false)
+  const [isDeletingAll, setIsDeletingAll] = useState(false)
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: archivedQueryKey })
@@ -192,6 +194,17 @@ export function ArchivedThreadsDialog({
     await deleteThread(pendingDelete.id)
     setPendingDelete(null)
     invalidate()
+  }
+
+  async function handleDeleteAll() {
+    setIsDeletingAll(true)
+    try {
+      await Promise.all(threads.map((t) => deleteThread(t.id)))
+    } finally {
+      setIsDeletingAll(false)
+      setConfirmDeleteAll(false)
+      invalidate()
+    }
   }
 
   const filtered = useMemo(() => {
@@ -259,7 +272,19 @@ export function ArchivedThreadsDialog({
 
           <Separator />
 
-          <DialogFooter showCloseButton className="px-4 py-3" />
+          <DialogFooter showCloseButton className="px-4 py-3">
+            {!isLoading && threads.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive/70 hover:text-destructive sm:mr-auto"
+                onClick={() => setConfirmDeleteAll(true)}
+              >
+                <Trash2 className="size-3.5" />
+                Delete all
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -284,6 +309,40 @@ export function ArchivedThreadsDialog({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={handleDelete}>
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmDeleteAll}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingAll) setConfirmDeleteAll(false)
+        }}
+      >
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogMedia className="bg-destructive/10">
+              <Trash2 className="size-4 text-destructive" />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Delete all archived threads?</AlertDialogTitle>
+            <AlertDialogDescription>
+              All {threads.length} archived thread
+              {threads.length === 1 ? "" : "s"} will be permanently deleted.
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingAll}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isDeletingAll}
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeleteAll()
+              }}
+            >
+              {isDeletingAll ? "Deleting…" : "Delete all"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

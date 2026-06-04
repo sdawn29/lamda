@@ -109,16 +109,6 @@ export function listAgentTurns(threadId: string): AgentTurnSummary[] {
   return buildTurnSummaries(turns);
 }
 
-export function listAgentTurnsBySession(sessionId: string): AgentTurnSummary[] {
-  const turns = db
-    .select()
-    .from(agentTurns)
-    .where(eq(agentTurns.sessionId, sessionId))
-    .orderBy(desc(agentTurns.id))
-    .all();
-
-  return buildTurnSummaries(turns);
-}
 
 export function getAgentTurnFiles(turnId: number): AgentTurnFileDetail[] {
   return db
@@ -147,24 +137,26 @@ export function getAgentTurn(turnId: number): AgentTurnSummary | null {
   return buildTurnSummaries([turn])[0] ?? null;
 }
 
-// Returns all turns for a session with id >= fromTurnId, sorted oldest first.
-export function getAgentTurnsFromId(sessionId: string, fromTurnId: number): AgentTurnSummary[] {
+// Returns all turns for a thread with id >= fromTurnId, sorted oldest first.
+// Keyed by threadId (durable) rather than sessionId (regenerated each server
+// start) so turn history survives restarts and session re-creation.
+export function getAgentTurnsFromId(threadId: string, fromTurnId: number): AgentTurnSummary[] {
   const turns = db
     .select()
     .from(agentTurns)
-    .where(and(eq(agentTurns.sessionId, sessionId), gte(agentTurns.id, fromTurnId)))
+    .where(and(eq(agentTurns.threadId, threadId), gte(agentTurns.id, fromTurnId)))
     .orderBy(asc(agentTurns.id))
     .all();
 
   return buildTurnSummaries(turns);
 }
 
-// Deletes a turn and all subsequent turns for a session (id >= fromTurnId).
-export function deleteAgentTurnsFrom(sessionId: string, fromTurnId: number): void {
+// Deletes a turn and all subsequent turns for a thread (id >= fromTurnId).
+export function deleteAgentTurnsFrom(threadId: string, fromTurnId: number): void {
   const turnIds = db
     .select({ id: agentTurns.id })
     .from(agentTurns)
-    .where(and(eq(agentTurns.sessionId, sessionId), gte(agentTurns.id, fromTurnId)))
+    .where(and(eq(agentTurns.threadId, threadId), gte(agentTurns.id, fromTurnId)))
     .all()
     .map((t) => t.id);
 

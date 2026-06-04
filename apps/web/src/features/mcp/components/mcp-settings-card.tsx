@@ -1,10 +1,9 @@
 import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
-import { Server, Plus, Info } from "lucide-react"
-import { Card, CardContent } from "@/shared/ui/card"
+import { Plus } from "lucide-react"
 import { Button } from "@/shared/ui/button"
-import { Alert, AlertDescription } from "@/shared/ui/alert"
-import { Separator } from "@/shared/ui/separator"
+import { Card, CardContent } from "@/shared/ui/card"
+import { Skeleton } from "@/shared/ui/skeleton"
 import { useMcpSettings, useMcpServerStatus, useMcpTools } from "../queries"
 import { useSaveMcpSettings } from "../mutations"
 import type { McpServerConfig } from "../types"
@@ -45,48 +44,40 @@ export function McpSettingsCard() {
     return allTools?.filter((t) => t.serverName === name)
   }
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center p-6">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
     <>
       <Card>
-        <CardContent className="flex flex-col gap-4 p-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Server className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">MCP Servers</p>
-                <p className="text-xs text-muted-foreground">Connect to Model Context Protocol servers</p>
-              </div>
-            </div>
-            <Button size="sm" onClick={() => openForm("new")}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Add Server
+        <CardContent className="flex flex-col gap-3 px-4 py-4">
+          {/* Toolbar */}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              {isLoading
+                ? "Loading…"
+                : servers.length === 0
+                  ? "No servers configured"
+                  : `${servers.length} server${servers.length === 1 ? "" : "s"}`}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => openForm("new")}>
+              <Plus data-icon="inline-start" />
+              Add server
             </Button>
           </div>
 
-          <Separator />
-
           {/* Server list */}
-          {servers.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-6 text-center">
-              <Server className="h-8 w-8 text-muted-foreground/40" />
-              <div>
-                <p className="text-sm text-muted-foreground">No MCP servers configured</p>
-                <p className="text-xs text-muted-foreground">Add a server to enable additional tools for the agent</p>
-              </div>
+          {isLoading ? (
+            <div className="flex flex-col gap-1.5">
+              <Skeleton className="h-12" />
+              <Skeleton className="h-12" />
+            </div>
+          ) : servers.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border/50 px-4 py-10 text-center">
+              <p className="text-sm text-muted-foreground">No MCP servers yet</p>
+              <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground/70">
+                Add a server to extend the agent with additional tools.
+              </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               {servers.map((server: McpServerConfig) => (
                 <ServerListItem
                   key={server.name}
@@ -99,13 +90,6 @@ export function McpSettingsCard() {
               ))}
             </div>
           )}
-
-          <Alert>
-            <Info />
-            <AlertDescription>
-              MCP servers are configured once and shared across all workspaces. Click the play/stop button to start or stop servers. Tools from connected servers are automatically available to the agent.
-            </AlertDescription>
-          </Alert>
         </CardContent>
       </Card>
 

@@ -304,6 +304,12 @@ class SessionEventHub {
   private async capturePreTurnStatus(): Promise<void> {
     if (!this.cwd) return;
     this.currentTurnEmittedFiles.clear();
+    // Clear the previous turn's file snapshot at the START of this turn. Otherwise
+    // getLastTurnFiles() would return the just-completed turn's files while this
+    // turn is in progress, and /git/turns would surface them as a phantom live
+    // turn (id 0) duplicating the already-persisted previous turn.
+    this.lastTurnFiles = [];
+    this.lastTurnChangedRaw = "";
     this.preTurnCheckpointSha = "";
     const timeoutMs = 5_000;
     const deadline = new Promise<never>((_, reject) =>

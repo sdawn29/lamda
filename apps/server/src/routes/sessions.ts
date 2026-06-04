@@ -19,7 +19,7 @@ import {
   finalizeAssistantBlock,
   updateToolBlockResult,
   deleteMessageBlocksFrom,
-  listAgentTurnsBySession,
+  listAgentTurns,
   getAgentTurnFiles,
   getAgentTurnsFromId,
   deleteAgentTurnsFrom,
@@ -416,15 +416,15 @@ sessions.post("/session/:id/revert-to-message", async (c) => {
   }
 
   // ── Revert code changes ─────────────────────────────────────────────────────
-  // Find all agent turns for this session that started at or after the user message.
-  const allTurns = listAgentTurnsBySession(sessionId);
+  // Find all agent turns for this thread that started at or after the user message.
+  const allTurns = listAgentTurns(threadId);
   // allTurns is sorted newest-first; find the oldest turn to revert from.
   const firstTurnToRevert = [...allTurns]
     .reverse()
     .find((t) => t.startedAt >= messageCreatedAt);
 
   if (firstTurnToRevert) {
-    const turnsToRevert = getAgentTurnsFromId(sessionId, firstTurnToRevert.id);
+    const turnsToRevert = getAgentTurnsFromId(threadId, firstTurnToRevert.id);
     const fileTargetMap = new Map<
       string,
       ReturnType<typeof getAgentTurnFiles>[number]
@@ -493,7 +493,7 @@ sessions.post("/session/:id/revert-to-message", async (c) => {
       );
     }
 
-    deleteAgentTurnsFrom(sessionId, firstTurnToRevert.id);
+    deleteAgentTurnsFrom(threadId, firstTurnToRevert.id);
   }
 
   // Also clear any in-progress turn state from the event hub.

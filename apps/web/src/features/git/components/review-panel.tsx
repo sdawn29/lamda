@@ -779,7 +779,7 @@ export const ReviewPanel = memo(function ReviewPanel({
                       <GitCompare className="h-3 w-3" />
                     )}
                     {scView === "turn"
-                      ? "This Turn"
+                      ? "Turns"
                       : scView === "history"
                         ? "History"
                         : "All Changes"}
@@ -793,7 +793,7 @@ export const ReviewPanel = memo(function ReviewPanel({
                   className="flex items-center gap-2"
                 >
                   <History className="h-3.5 w-3.5" />
-                  This Turn
+                  Turns
                   {scView === "turn" && (
                     <Check className="ml-auto h-3 w-3 text-muted-foreground" />
                   )}
