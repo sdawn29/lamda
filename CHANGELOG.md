@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0](../../releases/tag/v0.9.0) — 2026-06-04
+
+### Features
+
+* **update:** enhance update handling with release notes and new update dialog
+* **chat:** add history recall functionality for last sent message using ArrowUp
+* **build:** update handling of @silvia-odwyer/photon-node dependency resolution
+
+### Code Refactoring
+
+* **git:** unify agent turns handling by replacing sessionId with threadId
+
 ## [0.8.0](../../releases/tag/v0.8.0) — 2026-06-04
 
 ### Features
