@@ -26,8 +26,9 @@ type UpdateStatus =
       percent: number;
       bytesPerSecond: number;
       total: number;
+      releaseNotes: string | null;
     }
-  | { phase: "ready"; version: string }
+  | { phase: "ready"; version: string; releaseNotes: string | null }
   | { phase: "error"; message: string };
 
 contextBridge.exposeInMainWorld("electronAPI", {

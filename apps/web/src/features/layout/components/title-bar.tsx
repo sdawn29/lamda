@@ -36,9 +36,8 @@ import {
   useElectronFullscreen,
   useElectronPlatform,
   useElectronUpdateStatus,
-  useDownloadUpdate,
-  useInstallUpdate,
   useAutoUpdateCheck,
+  UpdateDialog,
   type ElectronUpdateStatus,
 } from "@/features/electron"
 import { OpenWithButton } from "./open-with-button"
@@ -53,72 +52,8 @@ import { useMainTabs } from "@/features/main-tabs"
 import { cn } from "@/shared/lib/utils"
 
 function UpdateButton({ status }: { status: ElectronUpdateStatus }) {
-  const downloadUpdate = useDownloadUpdate()
-  const installUpdate = useInstallUpdate()
   const navigate = useNavigate()
-
-  if (status.phase === "available") {
-    return (
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs"
-              onClick={() => downloadUpdate.mutate()}
-              disabled={downloadUpdate.isPending}
-            >
-              <Download className="size-3.5 shrink-0" />
-              {status.version ? `v${status.version} available` : "Update available"}
-            </Button>
-          }
-        />
-        <TooltipContent>Download and install the latest version</TooltipContent>
-      </Tooltip>
-    )
-  }
-
-  if (status.phase === "downloading") {
-    return (
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs"
-              disabled
-            >
-              <Download className="size-3.5 shrink-0 animate-bounce" />
-              {status.percent != null
-                ? `Downloading… ${Math.round(status.percent)}%`
-                : "Downloading…"}
-            </Button>
-          }
-        />
-        <TooltipContent>Downloading update</TooltipContent>
-      </Tooltip>
-    )
-  }
-
-  if (status.phase === "ready") {
-    return (
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs"
-              onClick={() => installUpdate.mutate()}
-            >
-              <RefreshCw className="size-3.5 shrink-0" />
-              Restart to install
-            </Button>
-          }
-        />
-        <TooltipContent>Restart the app to apply the update</TooltipContent>
-      </Tooltip>
-    )
-  }
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   if (status.phase === "error") {
     return (
@@ -145,7 +80,62 @@ function UpdateButton({ status }: { status: ElectronUpdateStatus }) {
     )
   }
 
-  return null
+  const { label, icon, tooltip } = (() => {
+    switch (status.phase) {
+      case "available":
+        return {
+          label: status.version
+            ? `v${status.version} available`
+            : "Update available",
+          icon: <Download className="size-3.5 shrink-0" />,
+          tooltip: "View what's new and download the update",
+        }
+      case "downloading":
+        return {
+          label:
+            status.percent != null
+              ? `Downloading… ${Math.round(status.percent)}%`
+              : "Downloading…",
+          icon: <Download className="size-3.5 shrink-0 animate-bounce" />,
+          tooltip: "Downloading update",
+        }
+      case "ready":
+        return {
+          label: "Restart to install",
+          icon: <RefreshCw className="size-3.5 shrink-0" />,
+          tooltip: "View what's new and restart to install",
+        }
+      default:
+        return null
+    }
+  })() ?? { label: null, icon: null, tooltip: null }
+
+  if (!label) return null
+
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              onClick={() => setDialogOpen(true)}
+            >
+              {icon}
+              {label}
+            </Button>
+          }
+        />
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+      <UpdateDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        status={status}
+      />
+    </>
+  )
 }
 
 export function TitleBar() {

@@ -16,6 +16,7 @@ import {
 } from "@/shared/ui/progress"
 import { Separator } from "@/shared/ui/separator"
 import {
+  ReleaseNotes,
   useCheckForUpdates,
   useDownloadUpdate,
   useElectronUpdateStatus,
@@ -75,8 +76,31 @@ export function UpdatesSection() {
             />
           </>
         )}
+
+        {isElectron && hasChangelog(status) && (
+          <>
+            <Separator />
+            <div className="flex flex-col gap-1.5">
+              <FieldTitle>What&apos;s new in v{status.version}</FieldTitle>
+              <ReleaseNotes notes={status.releaseNotes} />
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
+  )
+}
+
+function hasChangelog(
+  status: ElectronUpdateStatus | undefined
+): status is Extract<
+  ElectronUpdateStatus,
+  { phase: "available" | "downloading" | "ready" }
+> {
+  return (
+    status?.phase === "available" ||
+    status?.phase === "downloading" ||
+    status?.phase === "ready"
   )
 }
 

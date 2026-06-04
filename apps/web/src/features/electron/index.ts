@@ -30,3 +30,4 @@ export {
 } from "./mutations"
 export { ServerUnavailable } from "./server-unavailable"
 export { useAutoUpdateCheck } from "./use-auto-update-check"
+export { ReleaseNotes, UpdateDialog } from "./update-dialog"

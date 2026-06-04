@@ -38,8 +38,6 @@ import { usePrefetchThreadsMessages } from "@/features/chat/hooks"
 import {
   useElectronFullscreen,
   useElectronPlatform,
-  useElectronUpdateStatus,
-  useInstallUpdate,
 } from "@/features/electron"
 import { CommandPalette } from "@/features/command-palette"
 import { SplashScreen } from "@/shared/components/splash-screen"
@@ -175,44 +173,6 @@ function RightSidebarControls() {
           Toggle sidebar <ShortcutKbd binding={diffBinding} className="ml-1" />
         </TooltipContent>
       </Tooltip>
-    </div>
-  )
-}
-
-export function UpdateBanner() {
-  const { data: status } = useElectronUpdateStatus()
-  const installUpdate = useInstallUpdate()
-
-  if (!status || status.phase === "idle" || status.phase === "checking")
-    return null
-
-  const message = (() => {
-    switch (status.phase) {
-      case "available":
-        return `Version ${status.version} is available — open Settings → Updates to download.`
-      case "downloading":
-        return `Downloading update… ${Math.round(status.percent)}%`
-      case "ready":
-        return `Version ${status.version} is ready to install.`
-      case "error":
-        return null
-    }
-  })()
-
-  if (!message) return null
-
-  return (
-    <div className="flex shrink-0 items-center justify-between gap-4 border-b bg-primary/10 px-4 py-1.5 text-xs">
-      <span className="text-muted-foreground">{message}</span>
-      {status.phase === "ready" && (
-        <button
-          type="button"
-          onClick={() => installUpdate.mutate()}
-          className="shrink-0 rounded border px-2 py-0.5 text-xs hover:bg-muted"
-        >
-          Restart & install
-        </button>
-      )}
     </div>
   )
 }
@@ -450,7 +410,6 @@ export function WorkspaceLayout() {
             {/* Left column: TitleBar + content + terminal */}
             <div className="flex h-full min-w-0 flex-col overflow-hidden">
               <TitleBar />
-              <UpdateBanner />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="min-h-0 flex-1 overflow-hidden">
                   <MainContentArea />

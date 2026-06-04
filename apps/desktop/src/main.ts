@@ -66,8 +66,9 @@ type UpdateStatus =
       percent: number;
       bytesPerSecond: number;
       total: number;
+      releaseNotes: string | null;
     }
-  | { phase: "ready"; version: string }
+  | { phase: "ready"; version: string; releaseNotes: string | null }
   | { phase: "error"; message: string };
 
 const SERVER_READY_TIMEOUT_MS = 15_000;
@@ -83,6 +84,7 @@ let quitting = false;
 let preloadPathPromise: Promise<string> | null = null;
 let updateStatus: UpdateStatus = { phase: "idle" };
 let pendingUpdateVersion = "";
+let pendingReleaseNotes: string | null = null;
 
 type SelectFolderOptions = {
   canCreateFolder?: boolean;
@@ -109,11 +111,12 @@ function setupAutoUpdater() {
 
   autoUpdater.on("update-available", (info) => {
     pendingUpdateVersion = info.version;
+    pendingReleaseNotes =
+      typeof info.releaseNotes === "string" ? info.releaseNotes : null;
     setUpdateStatus({
       phase: "available",
       version: info.version,
-      releaseNotes:
-        typeof info.releaseNotes === "string" ? info.releaseNotes : null,
+      releaseNotes: pendingReleaseNotes,
     });
   });
 
@@ -128,11 +131,16 @@ function setupAutoUpdater() {
       percent: p.percent,
       bytesPerSecond: p.bytesPerSecond,
       total: p.total,
+      releaseNotes: pendingReleaseNotes,
     });
   });
 
   autoUpdater.on("update-downloaded", (info) => {
-    setUpdateStatus({ phase: "ready", version: info.version });
+    setUpdateStatus({
+      phase: "ready",
+      version: info.version,
+      releaseNotes: pendingReleaseNotes,
+    });
   });
 
   autoUpdater.on("error", (err) => {
