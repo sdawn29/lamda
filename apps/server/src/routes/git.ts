@@ -66,8 +66,8 @@ git.post("/git/clone", async (c) => {
   if (!body.url || !body.path)
     return c.json({ error: "url and path are required" }, 400);
   try {
-    await gitClone(body.url, body.path);
-    return c.json({ ok: true });
+    const path = await gitClone(body.url, body.path);
+    return c.json({ ok: true, path });
   } catch (err) {
     return c.json({ error: parseGitError(err, "Clone failed") }, 500);
   }

@@ -132,12 +132,16 @@ export function gitPull(sessionId: string): Promise<void> {
   return apiFetch<void>(`${base(sessionId)}/pull`, { method: "POST" })
 }
 
-export async function gitClone(url: string, path: string): Promise<void> {
-  return apiFetch<void>("/git/clone", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, path }),
-  })
+export async function gitClone(url: string, path: string): Promise<string> {
+  const { path: clonedPath } = await apiFetch<{ ok: boolean; path: string }>(
+    "/git/clone",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, path }),
+    }
+  )
+  return clonedPath
 }
 
 export async function gitGenerateCommitMessage(

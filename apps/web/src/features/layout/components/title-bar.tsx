@@ -308,26 +308,39 @@ export function TitleBar() {
   const terminalBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_TERMINAL)
   const renameBinding = useShortcutBinding(SHORTCUT_ACTIONS.RENAME_THREAD)
 
-  // Empty space in the title bar stays draggable; only interactive controls opt out.
+  // Only the breadcrumb's empty space opts into dragging; the root and the
+  // edge control clusters stay non-draggable so the floating sidebar toggles
+  // (which overlay the title bar) reliably receive their clicks in Electron.
+  const drag = { WebkitAppRegion: "drag" } as React.CSSProperties
   const noDrag = { WebkitAppRegion: "no-drag" } as React.CSSProperties
 
   return (
-    <div
-      className="sticky top-0 z-20 flex h-11 shrink-0 items-center bg-background pl-2"
-      style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
-    >
+    <div className="sticky top-0 z-20 flex h-11 shrink-0 items-center bg-background pl-2">
       {/* Breadcrumb — search + separator + context / primary */}
-      <div
-        className={cn(
-          "flex min-w-0 flex-1 items-center gap-0 px-1 transition-[padding-left] duration-200 ease-linear",
-          sidebarState === "collapsed" &&
-            (isMac && !isFullscreen ? "pl-48" : "pl-28")
-        )}
-      >
-        {urlActiveThread ? (
-          <div className="flex min-w-0 flex-1 items-center gap-1">
-            {urlActiveWorkspace && (
-              <>
+      <div className="flex min-w-0 flex-1 items-center gap-0 px-1">
+        {/* Reserves space for the floating left controls (sidebar toggle, back/forward).
+            Stays out of the drag region so their clicks aren't swallowed. */}
+        <div
+          aria-hidden
+          className={cn(
+            "h-full shrink-0 transition-[width] duration-200 ease-linear",
+            sidebarState === "collapsed"
+              ? isMac && !isFullscreen
+                ? "w-48"
+                : "w-28"
+              : "w-0"
+          )}
+        />
+        {/* Draggable area — begins after the reserved left strip, so no drag
+            region ever sits under the floating controls. */}
+        <div
+          className="flex min-w-0 flex-1 items-center gap-1"
+          style={drag}
+        >
+          {urlActiveThread && (
+            <>
+              {urlActiveWorkspace && (
+                <>
                 <span className="shrink truncate text-[11px] font-medium text-muted-foreground/70">
                   {urlActiveWorkspace.name}
                 </span>
@@ -425,8 +438,9 @@ export function TitleBar() {
               </DropdownMenu>
               <TooltipContent>Thread options</TooltipContent>
             </Tooltip>
-          </div>
-        ) : null}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Right — session actions */}
@@ -435,27 +449,22 @@ export function TitleBar() {
           "flex shrink-0 items-center gap-0.5 px-2 transition-[padding-right] duration-200 ease-linear",
           !rightSidebarOpen && "pr-9"
         )}
+        style={noDrag}
       >
         {updateStatus && updateStatus.phase !== "idle" && updateStatus.phase !== "checking" && (
-          <span className="inline-flex" style={noDrag}>
-            <UpdateButton status={updateStatus} />
-          </span>
+          <UpdateButton status={updateStatus} />
         )}
 
-        <span className="inline-flex" style={noDrag}>
-          <TasksDropdown
-            workspaceId={actionWorkspace?.id ?? ""}
-            onRunTask={runTerminalCommand}
-          />
-        </span>
+        <TasksDropdown
+          workspaceId={actionWorkspace?.id ?? ""}
+          onRunTask={runTerminalCommand}
+        />
 
-        <span className="inline-flex" style={noDrag}>
-          <OpenWithButton
-            workspaceId={actionWorkspace?.id}
-            workspacePath={actionWorkspace?.path}
-            openWithAppId={actionWorkspace?.openWithAppId}
-          />
-        </span>
+        <OpenWithButton
+          workspaceId={actionWorkspace?.id}
+          workspacePath={actionWorkspace?.path}
+          openWithAppId={actionWorkspace?.openWithAppId}
+        />
 
         <Tooltip>
           <TooltipTrigger
@@ -464,7 +473,6 @@ export function TitleBar() {
                 pressed={terminalOpen}
                 onPressedChange={() => toggleTerminal()}
                 disabled={!effectiveWorkspacePath}
-                style={noDrag}
                 className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-muted aria-pressed:text-foreground"
               >
                 <TerminalSquare className="size-4" />

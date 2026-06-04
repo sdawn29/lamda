@@ -87,8 +87,7 @@ export function useCreateWorkspace() {
 export function useCloneRepository() {
   return useMutation({
     mutationFn: async ({ url, path }: { url: string; path: string }) => {
-      await gitClone(url, path)
-      return path
+      return gitClone(url, path)
     },
   })
 }

@@ -144,14 +144,25 @@ export async function listWorkspaceFiles(cwd: string): Promise<string[]> {
   }
 }
 
-/** Clones a repository to the specified directory. Returns the clone output. */
-export async function gitClone(url: string, cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync(
+/** Derives a repository folder name from a clone URL (e.g. ".../foo.git" -> "foo"). */
+export function repoNameFromUrl(url: string): string {
+  const trimmed = url.trim().replace(/\/+$/, "").replace(/\.git$/i, "");
+  const lastSegment = trimmed.split(/[/:]/).filter(Boolean).pop();
+  return lastSegment || "repository";
+}
+
+/**
+ * Clones a repository into a subfolder named after the repository inside `dir`.
+ * Returns the absolute path of the created clone directory.
+ */
+export async function gitClone(url: string, dir: string): Promise<string> {
+  const target = join(dir, repoNameFromUrl(url));
+  await execFileAsync(
     "git",
-    ["clone", url, cwd],
-    { cwd, timeout: 60000 },
+    ["clone", url, target],
+    { cwd: dir, timeout: 60000 },
   );
-  return stdout;
+  return target;
 }
 
 export async function initGitRepo(cwd: string): Promise<void> {

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Bot, CheckCircle2, GitBranch, SquareTerminal } from "lucide-react"
+import { Bot, CheckCircle2, GitBranch, Settings, SquareTerminal } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 
 import { Button } from "@/shared/ui/button"
@@ -168,6 +168,19 @@ export function WorkspaceEmptyState() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Settings entry */}
+          <div className="flex justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate({ to: "/settings" })}
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
+            >
+              <Settings className="size-3.5" />
+              Open settings
+            </Button>
           </div>
         </div>
       </div>

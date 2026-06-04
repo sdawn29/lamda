@@ -110,9 +110,9 @@ function NavigationControls() {
               size="icon-sm"
               onClick={() => router.history.back()}
               disabled={!canGoBack}
-              className="size-6 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
+              className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
             >
-              <ChevronLeft className="size-3.5" />
+              <ChevronLeft className="size-4" />
               <span className="sr-only">Go back</span>
             </Button>
           }
@@ -129,9 +129,9 @@ function NavigationControls() {
               size="icon-sm"
               onClick={() => router.history.forward()}
               disabled={!canGoForward}
-              className="size-6 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
+              className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
             >
-              <ChevronRight className="size-3.5" />
+              <ChevronRight className="size-4" />
               <span className="sr-only">Go forward</span>
             </Button>
           }
@@ -162,7 +162,7 @@ function RightSidebarControls() {
               onClick={toggle}
               aria-pressed={isOpen}
               className={cn(
-                "size-7 text-muted-foreground/70 hover:text-foreground",
+                "size-7 text-muted-foreground hover:text-foreground",
                 isOpen && "bg-accent text-accent-foreground"
               )}
             >
@@ -269,6 +269,9 @@ export function WorkspaceLayout() {
       isDragging.current = true
       dragStartX.current = e.clientX
       dragStartWidth.current = rightSidebarWidth
+      // Suppress the open/close width animation while dragging so resize tracks
+      // the cursor 1:1 instead of easing toward each new width.
+      if (sidebarRef.current) sidebarRef.current.style.transition = "none"
 
       const onMove = (ev: MouseEvent) => {
         if (!isDragging.current) return
@@ -289,6 +292,8 @@ export function WorkspaceLayout() {
         document.removeEventListener("mouseup", onUp)
         document.body.style.cursor = ""
         document.body.style.userSelect = ""
+        // Restore the class-based width transition for subsequent open/close.
+        if (sidebarRef.current) sidebarRef.current.style.transition = ""
         // Commit final width to React state exactly once
         const delta = dragStartX.current - ev.clientX
         const finalWidth = Math.max(
@@ -415,7 +420,12 @@ export function WorkspaceLayout() {
 
   if (isOnboardRoute) {
     return (
-      <div className="h-svh">
+      <div className="relative h-svh">
+        {/* Draggable top strip so the frameless window can be moved */}
+        <div
+          className="absolute inset-x-0 top-0 z-10 h-11"
+          style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+        />
         <Outlet />
       </div>
     )
@@ -487,7 +497,7 @@ export function WorkspaceLayout() {
                   } as React.CSSProperties
                 }
                 className={cn(
-                  "h-full min-h-0 overflow-hidden",
+                  "h-full min-h-0 overflow-hidden transition-[width] duration-200 ease-linear",
                   isMobile
                     ? "hidden"
                     : diffFullscreen

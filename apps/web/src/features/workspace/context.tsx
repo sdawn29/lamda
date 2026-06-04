@@ -85,11 +85,11 @@ export function useWorkspace(): WorkspaceContextValue {
 
   const cloneRepository = useCallback(
     async (url: string, path: string): Promise<Workspace> => {
-      await cloneRepositoryMutation.mutateAsync({ url, path })
-      const folderName = path.split(/[/\\]/).pop() || path
+      const clonedPath = await cloneRepositoryMutation.mutateAsync({ url, path })
+      const folderName = clonedPath.split(/[/\\]/).pop() || clonedPath
       const { workspace } = await createWorkspaceMutation.mutateAsync({
         name: folderName,
-        path,
+        path: clonedPath,
       })
       return workspace
     },

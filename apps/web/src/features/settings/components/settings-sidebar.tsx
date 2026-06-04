@@ -90,16 +90,16 @@ function BackToThreadsButton() {
             variant="ghost"
             size="sm"
             onClick={handleClose}
-            aria-label="Back to threads"
+            aria-label="Go back"
             className="h-7 w-full justify-start gap-1.5 px-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" />
-            <span className="text-xs font-medium">Threads</span>
+            <span className="text-xs font-medium">Go back</span>
           </Button>
         }
       />
       <TooltipContent side="right">
-        Back to threads
+        Go back
         {closeBinding && (
           <ShortcutKbd binding={closeBinding} className="ml-1" />
         )}

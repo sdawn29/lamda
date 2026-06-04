@@ -174,8 +174,11 @@ export function CreateWorkspaceDialog({
 
               <div className="grid gap-2">
                 <label htmlFor="clone-folder" className="text-xs font-medium">
-                  Clone to folder
+                  Clone into folder
                 </label>
+                <p className="text-xs text-muted-foreground">
+                  A subfolder named after the repository will be created here.
+                </p>
                 <div className="flex gap-2">
                   <Input
                     id="clone-folder"
