@@ -216,6 +216,8 @@ export const RichInput = React.forwardRef<
     onArrowDown: () => void
     onEscape: () => void
     onInput: () => void
+    /** Called when ArrowUp is pressed while the input is empty (recall history). */
+    onRecallHistory: () => void
   }
 >(function RichInput(
   {
@@ -231,6 +233,7 @@ export const RichInput = React.forwardRef<
     onArrowDown,
     onEscape,
     onInput,
+    onRecallHistory,
   },
   ref
 ) {
@@ -432,6 +435,16 @@ export const RichInput = React.forwardRef<
       e.preventDefault()
       onSend()
       return
+    }
+
+    // ArrowUp on an empty input recalls the last sent message.
+    if (e.key === "ArrowUp") {
+      const div = divRef.current
+      if (div && isRichInputEmpty(div)) {
+        e.preventDefault()
+        onRecallHistory()
+        return
+      }
     }
 
     // Backspace: delete the preceding chip in one keystroke

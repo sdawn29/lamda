@@ -177,6 +177,8 @@ export const ChatTextbox = memo(
       ? controlledThinkingLevel
       : thinkingLevel
     const richInputRef = React.useRef<RichInputHandle>(null)
+    // Last message the user sent, recalled by pressing ArrowUp on an empty input.
+    const lastSentRef = React.useRef<string>("")
 
     useImperativeHandle(ref, () => ({
       getValue() {
@@ -502,6 +504,7 @@ export const ChatTextbox = memo(
         selectedModel?.provider ?? "",
         effectiveThinkingLevel
       )
+      lastSentRef.current = text
       richInputRef.current?.clear()
       setIsEmpty(true)
       setAtMention(null)
@@ -723,6 +726,12 @@ export const ChatTextbox = memo(
               onEscape={() => {
                 setAtMention(null)
                 setSlashMention(null)
+              }}
+              onRecallHistory={() => {
+                const last = lastSentRef.current
+                if (!last) return
+                richInputRef.current?.setValue(last)
+                setIsEmpty(false)
               }}
             />
           </div>
