@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.8.0](../../releases/tag/v0.8.0) — 2026-06-04
+
+### Features
+
+* **git:** enhance gitClone to return the cloned path and update related functions
+* **git:** implement per-turn file diffs and enhance commit message generation
+* **todos:** implement completed goals tracking and inline display in chat
+* **themes:** introduce code palette for syntax highlighting in Monaco editor and Markdown
+* **themes:** implement theming engine with built-in and custom themes
+* enhance error handling in chat components with expandable error messages and copy functionality
+* enhance local models configuration and validation
+* enhance Monaco diff viewer with layout coordination and add header component
+* enhance LSP integration with signature help support and improve UI components
+* implement Monaco diff viewer with lazy loading and enhanced line number highlighting
+* add Monaco code viewer with lazy loading and LSP integration
+* remove LspCodeViewer component to streamline codebase
+* refactor file and review panel components for improved key handling and state management
+* **file:** enhance file handling with range support and streaming
+* implement lazy loading for file tree with directory watchers
+* **local-models:** implement local model provider management with CRUD operations and UI integration
+* add workspace branch endpoints and integrate with git functionality
+
+### Code Refactoring
+
+* migrate MCP server management to application-wide scope
+
+### Chores
+
+* update dependencies and enhance session management
+
+### Other Changes
+
+* Updated some packages
+
 ## [0.7.1](../../releases/tag/v0.7.1) — 2026-05-28
 
 ### Features
