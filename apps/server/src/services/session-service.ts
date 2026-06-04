@@ -3,6 +3,7 @@ import {
   openManagedSession,
   createPlanModeTools,
   createTodoTool,
+  createQuestionTool,
   PLAN_DIR,
   type SdkConfig,
   type ManagedSessionHandle,
@@ -12,6 +13,12 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
+import { waitForAnswer } from "./question-registry.js";
+
+// The `question` tool is host-driven and stateless across sessions, so a
+// single instance can be shared by every session. It blocks on the question
+// registry until the user answers in the UI.
+const questionTool = createQuestionTool(waitForAnswer);
 
 async function buildSessionCustomTools(
   threadId: string,
@@ -20,13 +27,15 @@ async function buildSessionCustomTools(
 ) {
   const thread = getThread(threadId);
   const mode = thread?.mode as SdkConfig["mode"] | undefined;
+  // The question tool is available in every mode so the agent can always pause
+  // to ask the user a blocking multiple-choice question.
   const customTools = workspaceId
     ? await collectCustomTools(workspaceId, cwd, mode, threadId)
     : mode === "plan"
-      ? createPlanModeTools(cwd)
+      ? [...createPlanModeTools(cwd), questionTool]
       : mode === "ask"
-        ? []
-        : [createTodoTool(threadId)];
+        ? [questionTool]
+        : [createTodoTool(threadId), questionTool];
 
   return { customTools, mode };
 }
@@ -130,7 +139,9 @@ export async function collectCustomTools(
   threadId?: string,
 ) {
   if (mode === "plan" || mode === "ask") {
-    return mode === "plan" ? createPlanModeTools(workspacePath) : [];
+    return mode === "plan"
+      ? [...createPlanModeTools(workspacePath), questionTool]
+      : [questionTool];
   }
 
   const todoTool = threadId ? createTodoTool(threadId) : null;
@@ -149,7 +160,7 @@ export async function collectCustomTools(
         return [];
       }),
   ]);
-  return [...(todoTool ? [todoTool] : []), ...mcpTools, ...lspTools];
+  return [...(todoTool ? [todoTool] : []), questionTool, ...mcpTools, ...lspTools];
 }
 
 async function refreshSessionTools(

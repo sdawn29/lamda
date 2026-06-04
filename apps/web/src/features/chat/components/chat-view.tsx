@@ -79,6 +79,8 @@ import {
   getPendingThreadPreferences,
 } from "./pending-thread-preferences"
 import { getNextMode } from "./mode-combobox"
+import { QuestionView } from "./question-view"
+import { findActiveQuestion } from "../lib/active-question"
 
 const PLAN_DIR_PREFIX = ".agents/plans/"
 
@@ -692,6 +694,13 @@ export function ChatView({
 
   const groupedMessages = useMemo(
     () => groupChatMessages(visibleMessages),
+    [visibleMessages]
+  )
+
+  // When the agent calls the `question` tool it blocks waiting for the user.
+  // We replace the input box with a rich question picker until it's answered.
+  const activeQuestion = useMemo(
+    () => findActiveQuestion(visibleMessages),
     [visibleMessages]
   )
 
@@ -1385,26 +1394,34 @@ export function ChatView({
             </div>
 
             <div ref={textboxWrapRef} className="mx-auto w-full max-w-3xl px-6 pb-2">
-              <ChatTextbox
-                ref={chatTextboxRef}
-                onSend={handleSend}
-                onStop={handleStop}
-                isLoading={isLoading}
-                isAborting={abortSessionMutation.isPending}
-                branch={branch}
-                branches={branches}
-                onBranchSelect={handleBranchSelect}
-                onBranchError={handleGitError}
-                sessionId={sessionId}
-                workspaceId={workspaceId}
-                selectedModelId={selectedModelId}
-                onModelChange={handleModelChange}
-                selectedThinkingLevel={selectedThinkingLevel}
-                onThinkingLevelChange={setSelectedThinkingLevel}
-                mode={selectedMode}
-                onModeChange={handleModeChange}
-                sessionStats={sessionStats}
-              />
+              {activeQuestion ? (
+                <QuestionView
+                  key={activeQuestion.toolCallId}
+                  sessionId={sessionId}
+                  question={activeQuestion}
+                />
+              ) : (
+                <ChatTextbox
+                  ref={chatTextboxRef}
+                  onSend={handleSend}
+                  onStop={handleStop}
+                  isLoading={isLoading}
+                  isAborting={abortSessionMutation.isPending}
+                  branch={branch}
+                  branches={branches}
+                  onBranchSelect={handleBranchSelect}
+                  onBranchError={handleGitError}
+                  sessionId={sessionId}
+                  workspaceId={workspaceId}
+                  selectedModelId={selectedModelId}
+                  onModelChange={handleModelChange}
+                  selectedThinkingLevel={selectedThinkingLevel}
+                  onThinkingLevelChange={setSelectedThinkingLevel}
+                  mode={selectedMode}
+                  onModeChange={handleModeChange}
+                  sessionStats={sessionStats}
+                />
+              )}
             </div>
           </div>
         </div>

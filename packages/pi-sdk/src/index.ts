@@ -9,6 +9,8 @@ export { generateCommitMessage, DEFAULT_COMMIT_PROMPT } from "./commit-message.j
 export { createPlanModeTools } from "./plan-tools.js";
 export { createTodoTool, TODO_TOOL_NAME } from "./todo-tool.js";
 export type { TodoItem, TodoGoal, TodoStatus, GoalStatus, TodoResult } from "./todo-tool.js";
+export { createQuestionTool, QUESTION_TOOL_NAME } from "./question-tool.js";
+export type { Question, QuestionOption, QuestionPayload, AnswerWaiter } from "./question-tool.js";
 export {
   MODES,
   MODE_CONFIG,

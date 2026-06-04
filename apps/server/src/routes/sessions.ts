@@ -31,6 +31,7 @@ import {
   ensureSessionEventHub,
   openSessionForThread,
 } from "../services/session-service.js";
+import { submitAnswer } from "../services/question-registry.js";
 import { readSessionHistory, getModePreamble } from "@lamda/pi-sdk";
 import type { Mode, PromptOptions, SdkConfig } from "@lamda/pi-sdk";
 import { promises as fs } from "node:fs";
@@ -235,6 +236,28 @@ sessions.post("/session/:id/follow-up", async (c) => {
   });
 
   return c.json({ accepted: true }, 202);
+});
+
+/**
+ * Submit the user's answer to a pending `question` tool call. Resolves the
+ * blocked tool's `execute` so the agent turn continues with the selection.
+ */
+sessions.post("/session/:id/answer", async (c) => {
+  const id = c.req.param("id");
+  if (!store.has(id)) return c.json({ error: "Not found" }, 404);
+
+  const body = await c.req
+    .json<{ toolCallId?: string; answer?: string }>()
+    .catch((): { toolCallId?: string; answer?: string } => ({}));
+  if (!body.toolCallId || typeof body.answer !== "string") {
+    return c.json({ error: "toolCallId and answer are required" }, 400);
+  }
+
+  const accepted = submitAnswer(body.toolCallId, body.answer);
+  if (!accepted) {
+    return c.json({ error: "No pending question for that toolCallId" }, 404);
+  }
+  return c.json({ ok: true });
 });
 
 sessions.get("/session/:id/commands", (c) => {

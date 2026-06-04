@@ -1,3 +1,5 @@
+import { QUESTION_TOOL_NAME } from "./question-tool.js";
+
 export type Mode = "ask" | "plan" | "code";
 
 export const MODES: Mode[] = ["ask", "plan", "code"];
@@ -42,15 +44,15 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
     description: "Read-only Q&A. Cannot edit, write, or run shell commands.",
     preamble:
       "Ask mode is active. Answer the user's question conversationally based on the code. Do not propose changes, write plans, edit files, or run shell commands. Be concise.",
-    allowedBuiltins: ["read", "grep", "find", "ls"],
+    allowedBuiltins: ["read", "grep", "find", "ls", QUESTION_TOOL_NAME],
     allowCustomTools: false,
   },
   plan: {
     label: "Plan",
     description: "Research and propose a plan. Saves the plan to .agents/plans/.",
     preamble:
-      "Plan mode is active.\nGoal: deliver one implementation-ready plan artifact for the user's request.\n\nRules:\n1) Investigate first using read-only analysis (`read`, `grep`, `find`, `ls`, and read-only `bash`).\n2) Do not modify source files, configuration, tests, or docs.\n3) Use `plan_write` only to save the final plan file under `.agents/plans/<short-kebab-slug>.md` (2-5 word kebab-case slug).\n4) You may use `plan_read` only for files in `.agents/plans/`.\n5) If information is missing, state assumptions explicitly in the plan.\n\nPlan quality bar (must include):\n- Problem summary and current-state findings.\n- Step-by-step implementation plan ordered by execution.\n- Affected files/modules with intended changes.\n- Risks/edge cases and validation strategy.\n- Clear definition of done.\n\nOutput protocol:\n- Produce exactly one plan artifact for this request.\n- After writing the plan file successfully, stop and wait for user review.\n- Do not perform implementation in this mode.",
-    allowedBuiltins: ["read", "grep", "find", "ls", "bash", "plan_read", "plan_write"],
+      "Plan mode is active.\nGoal: deliver one implementation-ready plan artifact for the user's request.\n\nRules:\n1) Investigate first using read-only analysis (`read`, `grep`, `find`, `ls`, and read-only `bash`).\n2) Do not modify source files, configuration, tests, or docs.\n3) Use `plan_write` only to save the final plan file under `.agents/plans/<short-kebab-slug>.md` (2-5 word kebab-case slug).\n4) You may use `plan_read` only for files in `.agents/plans/`.\n5) When the request is vague, ambiguous, or could be approached several materially different ways, use the `question` tool to ask the user before writing the plan. Ask about goals, scope, constraints, or which approach to take whenever the answer would meaningfully change the plan. Batch related questions into a single `question` call. Reserve assumptions (stated explicitly in the plan) for minor gaps where any reasonable default is fine.\n\nPlan quality bar (must include):\n- Problem summary and current-state findings.\n- Step-by-step implementation plan ordered by execution.\n- Affected files/modules with intended changes.\n- Risks/edge cases and validation strategy.\n- Clear definition of done.\n\nOutput protocol:\n- Produce exactly one plan artifact for this request.\n- After writing the plan file successfully, stop and wait for user review.\n- Do not perform implementation in this mode.",
+    allowedBuiltins: ["read", "grep", "find", "ls", "bash", "plan_read", "plan_write", QUESTION_TOOL_NAME],
     allowCustomTools: false,
   },
   code: {
@@ -62,8 +64,9 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
       "2. Before starting each step, call `todo` with operation=`update` to mark it `in_progress`.\n" +
       "3. When a step is done, mark it `completed`.\n" +
       "4. Keep todos updated so the user always knows current progress.\n\n" +
-      "Simple, single-step tasks do not need todos. Use your judgement — when in doubt, use todos.",
-    allowedBuiltins: ["read", "bash", "edit", "write", "todo", "grep", "find", "ls"],
+      "Simple, single-step tasks do not need todos. Use your judgement — when in doubt, use todos.\n\n" +
+      "When the request is vague or ambiguous, or you hit a decision that is genuinely the user's to make and would change what you build (scope, approach, trade-offs, conflicting requirements), use the `question` tool to clarify before writing code. Batch related questions into a single `question` call and offer concrete options. Don't ask about choices that have an obvious sensible default — pick it, mention it, and proceed.",
+    allowedBuiltins: ["read", "bash", "edit", "write", "todo", "grep", "find", "ls", QUESTION_TOOL_NAME],
     allowCustomTools: true,
   },
 };

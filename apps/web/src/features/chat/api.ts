@@ -194,6 +194,24 @@ export function followUp(
   })
 }
 
+// ── Questions ────────────────────────────────────────────────────────────────
+
+/**
+ * Submit the user's answer to a pending `question` tool call. The server
+ * resolves the blocked tool so the agent turn resumes with the selection.
+ */
+export function submitQuestionAnswer(
+  sessionId: string,
+  toolCallId: string,
+  answer: string
+): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(`/session/${sessionId}/answer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ toolCallId, answer }),
+  })
+}
+
 // ── Messages ─────────────────────────────────────────────────────────────────
 
 export interface SessionMessagesResponse {
