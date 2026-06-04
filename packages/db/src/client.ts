@@ -88,7 +88,7 @@ function createDb() {
       is_stopped       INTEGER NOT NULL DEFAULT 0,
       is_archived      INTEGER NOT NULL DEFAULT 0,
       is_pinned        INTEGER NOT NULL DEFAULT 0,
-      mode             TEXT NOT NULL DEFAULT 'code',
+      mode             TEXT NOT NULL DEFAULT 'agent',
       last_accessed_at INTEGER,
       created_at       INTEGER NOT NULL
     );
@@ -256,8 +256,9 @@ function createDb() {
   try {
     const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
     if (!threadCols.some((col) => col.name === "mode")) {
-      sqlite.exec(`ALTER TABLE threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'code'`);
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'agent'`);
     }
+    sqlite.exec(`UPDATE threads SET mode = 'agent' WHERE mode = 'code'`);
   } catch {
     // Safe to ignore — column may already exist.
   }

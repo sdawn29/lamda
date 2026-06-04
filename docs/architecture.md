@@ -134,7 +134,7 @@ Git CLI wrapper functions:
 
 Wrapper around `@mariozechner/pi-coding-agent`:
 - Session creation and management
-- Prompt handling with mode support (`ask`, `plan`, `code`)
+- Prompt handling with mode support (`ask`, `plan`, `agent`)
 - Event streaming
 - Model selection
 - Thinking level control (`getSupportedThinkingLevels`)
@@ -278,7 +278,7 @@ Each thread operates in one of three modes, stored in the `threads.mode` column:
 
 | Mode | Description |
 |------|-------------|
-| `code` | Default — full coding agent with file read/write/edit tools |
+| `agent` | Default — full coding agent with file read/write/edit tools |
 | `ask` | Question-answering mode — read-only tools, no file edits |
 | `plan` | Planning mode — agent proposes a plan before executing |
 

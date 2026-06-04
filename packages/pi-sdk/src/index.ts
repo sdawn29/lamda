@@ -17,6 +17,7 @@ export {
   BUILTIN_TOOL_NAMES,
   PLAN_DIR,
   isMode,
+  normalizeMode,
   getModePreamble,
   computeActiveToolsForMode,
 } from "./modes.js";

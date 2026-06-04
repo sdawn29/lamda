@@ -70,7 +70,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
   const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<
     ThinkingLevel | undefined
   >(undefined)
-  const [selectedMode, setSelectedMode] = useState<Mode>("code")
+  const [selectedMode, setSelectedMode] = useState<Mode>("agent")
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
   const chatTextboxRef = useRef<ChatTextboxHandle>(null)
@@ -141,7 +141,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         // navigating — the new ChatView reads thread.mode and thread.modelId
         // from the workspaces cache to seed its textbox state.
         const persistMode =
-          selectedMode !== "code"
+          selectedMode !== "agent"
             ? updateThreadMode(thread.id, selectedMode)
             : Promise.resolve()
         const threadModelId =
@@ -157,7 +157,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
 
         // Sync the workspaces cache with the persisted picks so the route
         // mounts ChatView with the correct initial mode / modelId rather than
-        // the createThread defaults (mode "code", modelId null).
+        // the createThread defaults (mode "agent", modelId null).
         queryClient.setQueryData<WorkspaceDto[]>(workspacesQueryKey, (prev) =>
           prev?.map((ws) =>
             ws.id !== workspaceId

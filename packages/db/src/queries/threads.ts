@@ -36,7 +36,7 @@ export function updateThreadModel(id: string, modelId: string | null) {
   db.update(threads).set({ modelId }).where(eq(threads.id, id)).run()
 }
 
-export function updateThreadMode(id: string, mode: "ask" | "plan" | "code") {
+export function updateThreadMode(id: string, mode: "ask" | "plan" | "agent") {
   db.update(threads).set({ mode }).where(eq(threads.id, id)).run()
 }
 

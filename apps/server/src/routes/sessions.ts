@@ -32,8 +32,8 @@ import {
   openSessionForThread,
 } from "../services/session-service.js";
 import { submitAnswer } from "../services/question-registry.js";
-import { readSessionHistory, getModePreamble } from "@lamda/pi-sdk";
-import type { Mode, PromptOptions, SdkConfig } from "@lamda/pi-sdk";
+import { readSessionHistory, getModePreamble, normalizeMode } from "@lamda/pi-sdk";
+import type { PromptOptions, SdkConfig } from "@lamda/pi-sdk";
 import { promises as fs } from "node:fs";
 import { gitUnstage, gitRevertFile, gitRestoreFileFromRef } from "@lamda/git";
 
@@ -127,7 +127,7 @@ sessions.post("/session/:id/prompt", async (c) => {
 
   // Resolve mode-specific preamble; the SDK sees preamble + user text.
   const thread = getThread(entry.threadId);
-  const mode = thread?.mode as Mode | undefined;
+  const mode = normalizeMode(thread?.mode);
   const preamble = mode ? getModePreamble(mode) : "";
   const text = preamble ? `${preamble}\n\n${body.text}` : body.text;
 
@@ -190,7 +190,7 @@ sessions.post("/session/:id/steer", async (c) => {
   insertUserBlock(entry.threadId, body.text);
 
   const thread = getThread(entry.threadId);
-  const mode = thread?.mode as Mode | undefined;
+  const mode = normalizeMode(thread?.mode);
   const preamble = mode ? getModePreamble(mode) : "";
   const text = preamble ? `${preamble}\n\n${body.text}` : body.text;
 
@@ -224,7 +224,7 @@ sessions.post("/session/:id/follow-up", async (c) => {
   insertUserBlock(entry.threadId, body.text);
 
   const thread = getThread(entry.threadId);
-  const mode = thread?.mode as Mode | undefined;
+  const mode = normalizeMode(thread?.mode);
   const preamble = mode ? getModePreamble(mode) : "";
   const text = preamble ? `${preamble}\n\n${body.text}` : body.text;
 

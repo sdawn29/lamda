@@ -32,7 +32,7 @@ Welcome to **lamda**, a local-first desktop coding workspace for running Pi codi
 | Feature | Description |
 |---------|-------------|
 | **Chat Interface** | Real-time streaming conversations with the Pi coding agent |
-| **Thread Modes** | Code, Ask, and Plan modes control agent behaviour per thread |
+| **Thread Modes** | Agent, Ask, and Plan modes control agent behaviour per thread |
 | **Thread Forking** | Branch any conversation at any earlier message |
 | **Git Integration** | View diffs, hunk-level staging, commit, branches, stashes, and revert |
 | **Review Panel** | Side-by-side diff viewer with last-turn file change tracking |
@@ -101,7 +101,7 @@ When you launch lamda, you'll see:
 The chat interface is your primary way to interact with the Pi coding agent:
 
 - **Send messages** — Type prompts and get AI responses with real-time streaming
-- **Thread modes** — Choose `code`, `ask`, or `plan` per thread
+- **Thread modes** — Choose `agent`, `ask`, or `plan` per thread
 - **Thread forking** — Branch from any earlier message to explore alternatives
 - **Tool execution** — Watch the agent use tools (read files, edit code, run commands)
 - **Thinking visibility** — Toggle whether to show the agent's thinking process
@@ -202,7 +202,7 @@ npm install
 > **Status**: Early open-source release. Functional but evolving. Current version: **v0.4.0**
 
 - ✅ Chat with real-time streaming via WebSocket
-- ✅ Thread modes: code, ask, plan
+- ✅ Thread modes: agent, ask, plan
 - ✅ Thread forking with git state restoration
 - ✅ Git workflow (status, diff, hunk staging, commit, branches, stashes, revert)
 - ✅ Embedded terminal with multi-tab support

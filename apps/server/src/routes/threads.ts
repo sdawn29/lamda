@@ -15,7 +15,7 @@ import {
   updateThreadStopped,
   updateThreadLastAccessed,
 } from "@lamda/db";
-import { createPlanModeTools, createTodoTool, isMode, type Mode } from "@lamda/pi-sdk";
+import { createPlanModeTools, createTodoTool, normalizeMode } from "@lamda/pi-sdk";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import {
@@ -53,6 +53,7 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
         title: "New Thread",
         modelId: null,
         isStopped: false,
+        mode: "agent",
         isPinned: false,
         createdAt: Date.now(),
         sessionId,
@@ -101,12 +102,12 @@ threads.patch("/thread/:id/mode", async (c) => {
   const body = await c.req
     .json<{ mode?: string }>()
     .catch((): { mode?: string } => ({}));
-  if (!isMode(body.mode)) {
-    return c.json({ error: "mode must be 'ask', 'plan', or 'code'" }, 400);
+  const mode = normalizeMode(body.mode);
+  if (!mode) {
+    return c.json({ error: "mode must be 'ask', 'plan', or 'agent'" }, 400);
   }
   const thread = getThread(threadId);
   if (!thread) return c.json({ error: "Thread not found" }, 404);
-  const mode: Mode = body.mode;
   updateThreadMode(threadId, mode);
   const session = store.getByThreadId(threadId);
   if (session) {

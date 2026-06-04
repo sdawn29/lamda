@@ -66,7 +66,7 @@ export interface SdkConfig {
   modelRegistry?: ModelRegistry;
   /** Additional custom tools to register with the agent (e.g., MCP tools). */
   customTools?: ToolDefinition[];
-  /** Agent mode — controls base tool set ("code" = full, "plan"/"ask" = read-only). Defaults to "code". */
+  /** Agent mode — controls base tool set ("agent" = full, "plan"/"ask" = read-only). Defaults to "agent". */
   mode?: Mode;
 }
 

@@ -1,6 +1,14 @@
-import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react"
 import {
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CornerDownLeftIcon,
   SparklesIcon,
 } from "lucide-react"
@@ -72,7 +80,7 @@ function OptionRow({
         "transition-[background-color,border-color,box-shadow] duration-150 outline-none",
         "focus-visible:ring-2 focus-visible:ring-ring/40",
         selected
-          ? "border-primary/50 bg-primary/[0.06] ring-1 ring-inset ring-primary/25 dark:bg-primary/[0.08]"
+          ? "border-primary/50 bg-primary/[0.06] ring-1 ring-primary/25 ring-inset dark:bg-primary/[0.08]"
           : "border-border bg-background hover:border-primary/30 hover:bg-muted/50"
       )}
     >
@@ -127,6 +135,7 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
   const [states, setStates] = useState<QuestionState[]>(() =>
     questions.map(emptyState)
   )
+  const [currentIndex, setCurrentIndex] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const otherRef = useRef<HTMLTextAreaElement>(null)
 
@@ -149,7 +158,11 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
             }
           }
           // Single-select: choosing a concrete option clears "Other".
-          return { selected: [label], otherActive: false, otherText: s.otherText }
+          return {
+            selected: [label],
+            otherActive: false,
+            otherText: s.otherText,
+          }
         })
       )
     },
@@ -175,8 +188,16 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
   )
   const allAnswered = answeredCount === questions.length
   const multiQuestion = questions.length > 1
-  // Number-key shortcuts only make sense when there's a single question.
-  const singleQuestion = questions.length === 1
+  const activeQuestion = questions[currentIndex] ?? questions[0]
+  const activeState = states[currentIndex] ?? emptyState()
+  const activeAnswered = isAnswered(activeState)
+  const isFirstQuestion = currentIndex === 0
+  const isLastQuestion = currentIndex === questions.length - 1
+  const footerHint = multiQuestion
+    ? `${answeredCount}/${questions.length} answered`
+    : allAnswered
+      ? "Sends your answer to the agent"
+      : "Select an option to continue"
 
   const handleSubmit = useCallback(async () => {
     if (!allAnswered || isSubmitting) return
@@ -197,6 +218,15 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
     }
   }, [allAnswered, isSubmitting, sessionId, toolCallId, questions, states])
 
+  const handleNext = useCallback(() => {
+    if (!activeAnswered) return
+    setCurrentIndex((idx) => Math.min(idx + 1, questions.length - 1))
+  }, [activeAnswered, questions.length])
+
+  const handleBack = useCallback(() => {
+    setCurrentIndex((idx) => Math.max(idx - 1, 0))
+  }, [])
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
       const inText =
@@ -210,20 +240,36 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
         return
       }
 
-      // 1–9 pick an option for a single question (ignored while typing).
-      if (singleQuestion && !inText && /^[1-9]$/.test(e.key)) {
-        const q = questions[0]
+      if (multiQuestion && !inText && e.key === "Enter") {
+        e.preventDefault()
+        if (isLastQuestion) void handleSubmit()
+        else handleNext()
+        return
+      }
+
+      // 1–9 pick an option for the visible question (ignored while typing).
+      if (!inText && /^[1-9]$/.test(e.key)) {
+        const q = activeQuestion
         const idx = Number(e.key) - 1
         if (idx < q.options.length) {
           e.preventDefault()
-          toggleOption(0, q.options[idx].label, q.multiSelect)
+          toggleOption(currentIndex, q.options[idx].label, q.multiSelect)
         } else if (idx === q.options.length) {
           e.preventDefault()
-          toggleOther(0, q.multiSelect)
+          toggleOther(currentIndex, q.multiSelect)
         }
       }
     },
-    [singleQuestion, questions, handleSubmit, toggleOption, toggleOther]
+    [
+      activeQuestion,
+      currentIndex,
+      handleNext,
+      handleSubmit,
+      isLastQuestion,
+      multiQuestion,
+      toggleOption,
+      toggleOther,
+    ]
   )
 
   return (
@@ -231,7 +277,7 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
       onKeyDown={handleKeyDown}
       className={cn(
         "flex w-full flex-col overflow-hidden rounded-2xl border border-input bg-card shadow-sm",
-        "animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+        "animate-in duration-300 fade-in-0 slide-in-from-bottom-2"
       )}
     >
       {/* Header */}
@@ -241,78 +287,74 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
           {multiQuestion ? "A few questions for you" : "A quick question"}
         </span>
         {multiQuestion && (
-          <span className="shrink-0 text-[0.625rem] tabular-nums text-muted-foreground">
-            {answeredCount}/{questions.length}
+          <span className="shrink-0 text-[0.625rem] text-muted-foreground tabular-nums">
+            {currentIndex + 1}/{questions.length}
           </span>
         )}
       </div>
 
       <div className="mx-2 border-t border-border/50" />
 
-      {/* Questions */}
-      <div className="flex max-h-[min(55vh,26rem)] flex-col gap-3 overflow-y-auto px-2.5 py-2">
-        {questions.map((q, qi) => {
-          const s = states[qi]
-          const optionCount = q.options.length
-          return (
-            <div
-              key={qi}
-              className={cn(
-                "flex flex-col gap-1.5",
-                qi > 0 && "border-t border-border/40 pt-2.5"
-              )}
-            >
-              <p className="text-xs font-medium leading-snug text-foreground">
-                <Badge
-                  variant="outline"
-                  className="mr-1.5 align-[1px] text-[0.5625rem] font-medium uppercase tracking-wide text-muted-foreground"
-                >
-                  {q.header}
-                </Badge>
-                {q.question}
-                {q.multiSelect && (
-                  <span className="ml-1.5 text-[0.625rem] font-normal text-muted-foreground">
-                    (choose any)
-                  </span>
-                )}
-              </p>
+      {/* Active question */}
+      <div className="flex max-h-[min(55vh,26rem)] flex-col gap-1.5 overflow-y-auto px-2.5 py-2">
+        <p className="text-xs leading-snug font-medium text-foreground">
+          <Badge
+            variant="outline"
+            className="mr-1.5 align-[1px] text-[0.5625rem] font-medium tracking-wide text-muted-foreground uppercase"
+          >
+            {activeQuestion.header}
+          </Badge>
+          {activeQuestion.question}
+          {activeQuestion.multiSelect && (
+            <span className="ml-1.5 text-[0.625rem] font-normal text-muted-foreground">
+              (choose any)
+            </span>
+          )}
+        </p>
 
-              <div className="flex flex-col gap-1">
-                {q.options.map((opt, oi) => (
-                  <OptionRow
-                    key={opt.label}
-                    label={opt.label}
-                    description={opt.description}
-                    multi={q.multiSelect}
-                    selected={s.selected.includes(opt.label)}
-                    hintKey={singleQuestion ? String(oi + 1) : undefined}
-                    onSelect={() => toggleOption(qi, opt.label, q.multiSelect)}
-                  />
-                ))}
-                <OptionRow
-                  label={OTHER_LABEL}
-                  description="Write your own answer"
-                  multi={q.multiSelect}
-                  selected={s.otherActive}
-                  hintKey={singleQuestion ? String(optionCount + 1) : undefined}
-                  onSelect={() => toggleOther(qi, q.multiSelect)}
-                />
-                {s.otherActive && (
-                  <Textarea
-                    ref={otherRef}
-                    value={s.otherText}
-                    onChange={(e) => update(qi, { otherText: e.target.value })}
-                    placeholder="Type your answer…"
-                    className={cn(
-                      "min-h-12 resize-none text-xs",
-                      "animate-in fade-in-0 slide-in-from-top-1 duration-200"
-                    )}
-                  />
-                )}
-              </div>
-            </div>
-          )
-        })}
+        <div className="flex flex-col gap-1">
+          {activeQuestion.options.map((opt, oi) => (
+            <OptionRow
+              key={opt.label}
+              label={opt.label}
+              description={opt.description}
+              multi={activeQuestion.multiSelect}
+              selected={activeState.selected.includes(opt.label)}
+              hintKey={String(oi + 1)}
+              onSelect={() =>
+                toggleOption(
+                  currentIndex,
+                  opt.label,
+                  activeQuestion.multiSelect
+                )
+              }
+            />
+          ))}
+          <OptionRow
+            label={OTHER_LABEL}
+            description="Write your own answer"
+            multi={activeQuestion.multiSelect}
+            selected={activeState.otherActive}
+            hintKey={String(activeQuestion.options.length + 1)}
+            onSelect={() =>
+              toggleOther(currentIndex, activeQuestion.multiSelect)
+            }
+          />
+          {activeState.otherActive && (
+            <Textarea
+              ref={otherRef}
+              value={activeState.otherText}
+              onChange={(e) =>
+                update(currentIndex, { otherText: e.target.value })
+              }
+              placeholder="Type your answer..."
+              className={cn(
+                "min-h-12 resize-none text-xs",
+                "animate-in duration-200 fade-in-0 slide-in-from-top-1"
+              )}
+            />
+          )}
+        </div>
       </div>
 
       <div className="mx-2 border-t border-border/50" />
@@ -320,35 +362,57 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
       {/* Footer */}
       <div className="flex items-center justify-between gap-3 px-2.5 py-1.5">
         <span className="truncate text-[0.625rem] text-muted-foreground">
-          {allAnswered
-            ? "Sends your answer to the agent"
-            : multiQuestion
-              ? "Answer each question to continue"
-              : "Select an option to continue"}
+          {footerHint}
         </span>
-        <Button
-          size="sm"
-          onClick={handleSubmit}
-          disabled={!allAnswered || isSubmitting}
-          className="shrink-0"
-        >
-          {isSubmitting ? (
-            <LoadingSpinner size="sm" />
+        <div className="flex shrink-0 items-center gap-1.5">
+          {multiQuestion && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleBack}
+              disabled={isFirstQuestion || isSubmitting}
+              className="px-2"
+            >
+              <ChevronLeftIcon />
+              Back
+            </Button>
+          )}
+          {multiQuestion && !isLastQuestion ? (
+            <Button
+              size="sm"
+              onClick={handleNext}
+              disabled={!activeAnswered || isSubmitting}
+              className="shrink-0"
+            >
+              Next
+              <ChevronRightIcon />
+            </Button>
           ) : (
-            <CornerDownLeftIcon />
+            <Button
+              size="sm"
+              onClick={handleSubmit}
+              disabled={!allAnswered || isSubmitting}
+              className="shrink-0"
+            >
+              {isSubmitting ? (
+                <LoadingSpinner size="sm" />
+              ) : (
+                <CornerDownLeftIcon />
+              )}
+              Send
+              {!isSubmitting && (
+                <KbdGroup className="ml-0.5">
+                  <Kbd className="bg-primary-foreground/15 text-primary-foreground/90">
+                    ⌘
+                  </Kbd>
+                  <Kbd className="bg-primary-foreground/15 text-primary-foreground/90">
+                    ⏎
+                  </Kbd>
+                </KbdGroup>
+              )}
+            </Button>
           )}
-          Send
-          {!isSubmitting && (
-            <KbdGroup className="ml-0.5">
-              <Kbd className="bg-primary-foreground/15 text-primary-foreground/90">
-                ⌘
-              </Kbd>
-              <Kbd className="bg-primary-foreground/15 text-primary-foreground/90">
-                ⏎
-              </Kbd>
-            </KbdGroup>
-          )}
-        </Button>
+        </div>
       </div>
     </div>
   )

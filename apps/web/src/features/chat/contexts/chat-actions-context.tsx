@@ -11,7 +11,7 @@ export interface ChatActions {
   /** Open a file in the main-tabs viewer (focuses if already open). */
   openFile: (filePath: string, title?: string) => void
   /**
-   * Switch the thread to Code mode and seed the chat input with an
+   * Switch the thread to Agent mode and seed the chat input with an
    * "Implement the plan in <relativePath>" prompt. The user can edit or send.
    */
   implementPlan: (relativePath: string) => void

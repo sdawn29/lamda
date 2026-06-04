@@ -378,7 +378,7 @@ interface ChatViewProps {
   workspaceId: string
   threadId: string
   initialModelId: string | null
-  initialMode: "ask" | "plan" | "code"
+  initialMode: "ask" | "plan" | "agent"
   initialIsStopped: boolean
 }
 
@@ -419,7 +419,7 @@ export function ChatView({
   const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<
     ThinkingLevel | undefined
   >(initialThinkingLevel)
-  const [selectedMode, setSelectedMode] = useState<"ask" | "plan" | "code">(
+  const [selectedMode, setSelectedMode] = useState<"ask" | "plan" | "agent">(
     initialMode
   )
   const updateThreadModel = useUpdateThreadModel()
@@ -467,11 +467,11 @@ export function ChatView({
         })
       },
       implementPlan: (relativePath) => {
-        // Always switch to Code mode so the seeded prompt runs as an
-        // implementation. Idempotent if already in Code, and avoids relying on
+        // Always switch to Agent mode so the seeded prompt runs as an
+        // implementation. Idempotent if already in Agent, and avoids relying on
         // the (possibly stale) selectedMode captured in this memoized closure.
-        setSelectedMode("code")
-        updateThreadMode.mutate({ threadId, mode: "code" })
+        setSelectedMode("agent")
+        updateThreadMode.mutate({ threadId, mode: "agent" })
         const prompt = `Implement the plan in @${relativePath}`
         chatTextboxRef.current?.setValue(prompt)
         chatTextboxRef.current?.focus()
@@ -1009,7 +1009,7 @@ export function ChatView({
   )
 
   const handleModeChange = useCallback(
-    (mode: "ask" | "plan" | "code") => {
+    (mode: "ask" | "plan" | "agent") => {
       setSelectedMode(mode)
       updateThreadMode.mutate({ threadId, mode })
     },
@@ -1266,7 +1266,7 @@ export function ChatView({
                   !initialSnapshot.keys.has(firstKey)
                 const entryDelayMs = isNewGroup ? getEntryDelayMs(firstKey) : 0
                 content = (
-                  <div className="mx-auto w-full max-w-3xl px-6 pb-3">
+                  <div className="mx-auto w-full max-w-3xl px-6 pt-4 pb-8">
                     <WorkingBlock
                       messages={group.messages}
                       isActive={isGroupActive}
@@ -1393,7 +1393,10 @@ export function ChatView({
               <TodoPanel messages={visibleMessages} />
             </div>
 
-            <div ref={textboxWrapRef} className="mx-auto w-full max-w-3xl px-6 pb-2">
+            <div
+              ref={textboxWrapRef}
+              className="mx-auto w-full max-w-3xl px-6 pb-2"
+            >
               {activeQuestion ? (
                 <QuestionView
                   key={activeQuestion.toolCallId}

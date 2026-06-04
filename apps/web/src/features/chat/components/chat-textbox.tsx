@@ -125,7 +125,7 @@ export const ChatTextbox = memo(
       onModelChange,
       selectedThinkingLevel: controlledThinkingLevel,
       onThinkingLevelChange,
-      mode = "code",
+      mode = "agent",
       onModeChange,
       sessionStats,
     }: ChatTextboxProps,
@@ -296,9 +296,9 @@ export const ChatTextbox = memo(
             icon: ListTodoIcon,
           },
           {
-            mode: "code",
-            name: "code",
-            description: "Switch to Code mode",
+            mode: "agent",
+            name: "agent",
+            description: "Switch to Agent mode",
             icon: BotIcon,
           },
         ]

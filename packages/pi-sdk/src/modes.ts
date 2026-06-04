@@ -1,14 +1,19 @@
 import { QUESTION_TOOL_NAME } from "./question-tool.js";
 
-export type Mode = "ask" | "plan" | "code";
+export type Mode = "ask" | "plan" | "agent";
 
-export const MODES: Mode[] = ["ask", "plan", "code"];
+export const MODES: Mode[] = ["ask", "plan", "agent"];
 
 /** Workspace-relative directory where plan-mode artifacts are saved. */
 export const PLAN_DIR = ".agents/plans";
 
 export function isMode(value: unknown): value is Mode {
-  return value === "ask" || value === "plan" || value === "code";
+  return value === "ask" || value === "plan" || value === "agent";
+}
+
+export function normalizeMode(value: unknown): Mode | undefined {
+  if (value === "code") return "agent";
+  return isMode(value) ? value : undefined;
 }
 
 // Built-in tool names the agent ships with. Used to compute which to keep active
@@ -30,7 +35,7 @@ export const BUILTIN_TOOL_NAMES = [
 interface ModeConfig {
   label: string;
   description: string;
-  /** Prepended to user text before it reaches the SDK. Empty for "code" mode. */
+  /** Prepended to user text before it reaches the SDK. */
   preamble: string;
   /** Built-in tool names that should be active in this mode. */
   allowedBuiltins: readonly string[];
@@ -55,8 +60,8 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
     allowedBuiltins: ["read", "grep", "find", "ls", "bash", "plan_read", "plan_write", QUESTION_TOOL_NAME],
     allowCustomTools: false,
   },
-  code: {
-    label: "Code",
+  agent: {
+    label: "Agent",
     description: "Full coding agent. Can edit, write, and run shell commands.",
     preamble:
       "You are a skilled software engineer. For any task that involves more than 2–3 steps, use the `todo` tool to plan and track your work before you begin:\n\n" +

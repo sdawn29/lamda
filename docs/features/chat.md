@@ -128,7 +128,7 @@ Each thread operates in a mode that controls the agent's behaviour. Select the m
 
 | Mode | Description |
 |------|-------------|
-| **Code** | Default. Full editing permissions — the agent reads, writes, and edits files. |
+| **Agent** | Default. Full editing permissions — the agent reads, writes, and edits files. |
 | **Ask** | Read-only. The agent answers questions and explores code without making changes. |
 | **Plan** | The agent proposes a step-by-step plan and waits for approval before executing. |
 

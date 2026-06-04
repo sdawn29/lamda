@@ -27,7 +27,7 @@ export const threads = sqliteTable("threads", {
   isStopped: integer("is_stopped", { mode: "boolean" }).notNull().default(false),
   isArchived: integer("is_archived", { mode: "boolean" }).notNull().default(false),
   isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
-  mode: text("mode", { enum: ["ask", "plan", "code"] }).notNull().default("code"),
+  mode: text("mode", { enum: ["ask", "plan", "agent"] }).notNull().default("agent"),
   lastAccessedAt: integer("last_accessed_at"),
   createdAt: integer("created_at").notNull(),
   forkedFromId: text("forked_from_id"),

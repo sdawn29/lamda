@@ -7,7 +7,7 @@ export interface CreateWorkspaceBody {
   model?: string
 }
 
-export type Mode = "ask" | "plan" | "code"
+export type Mode = "ask" | "plan" | "agent"
 
 export interface ThreadDto {
   id: string

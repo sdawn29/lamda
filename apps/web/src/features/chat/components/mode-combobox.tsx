@@ -60,8 +60,8 @@ export const MODE_OPTIONS: ModeOption[] = [
     sendButton: PRIMARY_SEND_BUTTON,
   },
   {
-    value: "code",
-    label: "Code",
+    value: "agent",
+    label: "Agent",
     description: "Full coding agent",
     icon: <BotIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-emerald-600 dark:text-emerald-400",

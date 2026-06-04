@@ -4,6 +4,7 @@ import {
   createPlanModeTools,
   createTodoTool,
   createQuestionTool,
+  normalizeMode,
   PLAN_DIR,
   type SdkConfig,
   type ManagedSessionHandle,
@@ -26,7 +27,7 @@ async function buildSessionCustomTools(
   workspaceId?: string,
 ) {
   const thread = getThread(threadId);
-  const mode = thread?.mode as SdkConfig["mode"] | undefined;
+  const mode = normalizeMode(thread?.mode);
   // The question tool is available in every mode so the agent can always pause
   // to ask the user a blocking multiple-choice question.
   const customTools = workspaceId
@@ -173,7 +174,7 @@ async function refreshSessionTools(
   if (!threadId) return;
 
   const thread = getThread(threadId);
-  const mode = thread?.mode as SdkConfig["mode"] | undefined;
+  const mode = normalizeMode(thread?.mode);
   const tools = await collectCustomTools(workspaceId, workspacePath, mode, threadId);
   handle.setCustomTools(tools);
 
