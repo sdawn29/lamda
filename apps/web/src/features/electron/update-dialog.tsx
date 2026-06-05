@@ -1,5 +1,7 @@
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import rehypeRaw from "rehype-raw"
+import rehypeSanitize from "rehype-sanitize"
 import type { PluggableList } from "unified"
 import { AlertTriangle, Check, Download } from "lucide-react"
 
@@ -23,6 +25,10 @@ import { useDownloadUpdate, useInstallUpdate } from "./mutations"
 import type { ElectronUpdateStatus } from "./api"
 
 const remarkPlugins: PluggableList = [remarkGfm]
+// GitHub's release feed (the source for electron-updater's `releaseNotes`)
+// delivers the changelog as HTML, so parse the raw HTML and sanitize it before
+// rendering. Plain-markdown notes still pass through untouched.
+const rehypePlugins: PluggableList = [rehypeRaw, rehypeSanitize]
 
 const proseClass =
   "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.4] prose-headings:my-0 prose-p:leading-[1.6] prose-p:mt-0 prose-p:mb-[0.75em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.6] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
@@ -48,7 +54,9 @@ export function ReleaseNotes({
 
   return (
     <div className={cn(proseClass, className)}>
-      <Markdown remarkPlugins={remarkPlugins}>{notes}</Markdown>
+      <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins}>
+        {notes}
+      </Markdown>
     </div>
   )
 }
