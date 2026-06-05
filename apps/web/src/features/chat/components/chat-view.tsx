@@ -1227,8 +1227,7 @@ export function ChatView({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          style={{ paddingBottom: bottomBarHeight }}
-          className="flex w-full flex-1 flex-col overflow-y-auto pt-4 [overflow-anchor:none] [scrollbar-gutter:stable]"
+          className="flex w-full min-h-0 flex-1 flex-col overflow-y-auto pt-4 pb-8 [overflow-anchor:none]"
         >
           <div ref={messagesContainerRef}>
             {/* Load earlier messages button — visible when older history exists and isn't loading */}
@@ -1370,7 +1369,7 @@ export function ChatView({
 
         {showScrollButton && (
           <div
-            style={{ bottom: textboxHeight + 4 }}
+            style={{ bottom: textboxHeight + 16 }}
             className="pointer-events-none absolute inset-x-0 z-20 flex justify-center"
           >
             <Button
@@ -1384,56 +1383,56 @@ export function ChatView({
           </div>
         )}
 
-        {/* Floating bottom bar — the message list scrolls behind it. The
-            gradient fades content out as it slides under the input. The right
-            edge stops short by the 6px scrollbar gutter (see
-            [scrollbar-gutter:stable] above) so the scroll bar stays visible all
-            the way down instead of being covered when scrolled to the bottom. */}
+        {/* Gradient fade at the bottom of the message list — anchored just above
+            the textbox so messages fade into the background as they approach the
+            input. pointer-events-none so it never blocks scrolling/clicks. */}
         <div
-          ref={bottomBarRef}
-          className="absolute right-3 bottom-0 left-0 z-10"
-        >
-          <div className="pointer-events-none h-8 bg-linear-to-t from-background to-transparent" />
-          <div className="bg-background">
-            <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
+          style={{ bottom: bottomBarHeight }}
+          className="pointer-events-none absolute inset-x-0 z-10 h-8 bg-linear-to-t from-background to-transparent"
+        />
 
-            <div className="mx-auto w-full max-w-3xl px-6 pb-2 empty:hidden">
-              <TodoPanel messages={visibleMessages} />
-            </div>
+        {/* Bottom bar — sits directly below the scrolling message list in normal
+            flow, so the chat view ends just above the input instead of scrolling
+            behind it. */}
+        <div ref={bottomBarRef} className="shrink-0 bg-background">
+          <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
 
-            <div
-              ref={textboxWrapRef}
-              className="mx-auto w-full max-w-3xl px-6 pb-2"
-            >
-              {activeQuestion ? (
-                <QuestionView
-                  key={activeQuestion.toolCallId}
-                  sessionId={sessionId}
-                  question={activeQuestion}
-                />
-              ) : (
-                <ChatTextbox
-                  ref={chatTextboxRef}
-                  onSend={handleSend}
-                  onStop={handleStop}
-                  isLoading={isLoading}
-                  isAborting={abortSessionMutation.isPending}
-                  branch={branch}
-                  branches={branches}
-                  onBranchSelect={handleBranchSelect}
-                  onBranchError={handleGitError}
-                  sessionId={sessionId}
-                  workspaceId={workspaceId}
-                  selectedModelId={selectedModelId}
-                  onModelChange={handleModelChange}
-                  selectedThinkingLevel={selectedThinkingLevel}
-                  onThinkingLevelChange={setSelectedThinkingLevel}
-                  mode={selectedMode}
-                  onModeChange={handleModeChange}
-                  sessionStats={sessionStats}
-                />
-              )}
-            </div>
+          <div className="mx-auto w-full max-w-3xl px-6 pb-2 empty:hidden">
+            <TodoPanel messages={visibleMessages} />
+          </div>
+
+          <div
+            ref={textboxWrapRef}
+            className="mx-auto w-full max-w-3xl px-6 pb-2"
+          >
+            {activeQuestion ? (
+              <QuestionView
+                key={activeQuestion.toolCallId}
+                sessionId={sessionId}
+                question={activeQuestion}
+              />
+            ) : (
+              <ChatTextbox
+                ref={chatTextboxRef}
+                onSend={handleSend}
+                onStop={handleStop}
+                isLoading={isLoading}
+                isAborting={abortSessionMutation.isPending}
+                branch={branch}
+                branches={branches}
+                onBranchSelect={handleBranchSelect}
+                onBranchError={handleGitError}
+                sessionId={sessionId}
+                workspaceId={workspaceId}
+                selectedModelId={selectedModelId}
+                onModelChange={handleModelChange}
+                selectedThinkingLevel={selectedThinkingLevel}
+                onThinkingLevelChange={setSelectedThinkingLevel}
+                mode={selectedMode}
+                onModeChange={handleModeChange}
+                sessionStats={sessionStats}
+              />
+            )}
           </div>
         </div>
       </div>
