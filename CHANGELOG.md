@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.0](../../releases/tag/v0.12.0) — 2026-06-05
+
+### Features
+
+* **terminal:** implement persistent PTY sessions with reattachment and cleanup
+
 ## [0.11.0](../../releases/tag/v0.11.0) — 2026-06-05
 
 ### Features
