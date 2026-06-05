@@ -110,7 +110,7 @@ export { TerminalPanel } from "./components/terminal-panel"
 
 ## Conventions
 
-- **Tab lifecycle:** Tabs persist while open; disposed on `killAll()` or app close
+- **Tab lifecycle:** Tabs persist while open. The server PTY is persistent and keyed by tab id, so it survives client unmounts (workspace/tab switches, route changes) and is reattached with replayed scrollback instead of respawned. It is killed only on explicit `closeTab()`/`killAll()` (which call `DELETE /terminal/session/:id`) or after the server's orphan grace timeout.
 - **Single WebSocket:** One connection per panel; multiplexed for multiple tabs
 - **Auto-resize:** FitAddon called on mount, resize events, and panel size changes
 - **Terminal shell:** Server-side shell is determined by `process.env.SHELL` or `/bin/bash` fallback
@@ -129,8 +129,8 @@ export { TerminalPanel } from "./components/terminal-panel"
 - **Theme mismatch** — xterm.js terminal theme is independent from app theme; you can have dark app with light terminal (both built-in)
 - **Tab counter is module-level** — `tabCounter` is a global counter, not per-session; resets on `killAll()` or all tabs closed
 - **PTY requires native module** — `node-pty` must be rebuilt for Electron; handled by `postinstall` script in server package
-- **WebSocket reconnection** — On disconnect, old tabs show "Disconnected" state; user must create new tab to reconnect
-- **No history scrollback in server** — Server PTY doesn't maintain scrollback; client-side xterm.js handles it
+- **WebSocket reconnection** — Each connection passes a stable `terminalId` (the tab id). The server reattaches to the existing PTY and replays its scrollback, so switching away and back keeps the session intact. A "[disconnected]" line is only shown when the shell actually exits (not on a clean unmount/detach).
+- **Server keeps rolling scrollback** — The server retains a bounded rolling scrollback per session (capped, trimmed on line boundaries) purely to replay context to a reattaching client; client-side xterm.js still owns the full interactive scrollback
 
 ## Related
 

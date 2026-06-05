@@ -13,6 +13,11 @@ import "@xterm/xterm/css/xterm.css"
 const TERMINAL_OUTPUT_FLUSH_MS = 16
 const TERMINAL_IMMEDIATE_FLUSH_THRESHOLD = 8_192
 
+// Tracks tab ids whose `initialCommand` has already been dispatched, so that a
+// reattach (workspace/tab switch, route change) doesn't re-run it against the
+// persistent shell that already executed it. Module-scoped to survive remounts.
+const dispatchedInitialCommands = new Set<string>()
+
 // ─── Single terminal instance (keeps mounted when inactive for session persistence) ───
 
 interface TerminalInstanceProps {
@@ -115,7 +120,7 @@ const TerminalInstance = memo(function TerminalInstance({
     getServerUrl().then((serverUrl) => {
       if (cancelled) return
       const wsBase = serverUrl.replace(/^http/, "ws")
-      const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwd)}&workspaceId=${encodeURIComponent(workspaceId)}`
+      const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwd)}&workspaceId=${encodeURIComponent(workspaceId)}&terminalId=${encodeURIComponent(id)}`
       ws = new WebSocket(url)
       wsRef.current = ws
 
@@ -126,7 +131,8 @@ const TerminalInstance = memo(function TerminalInstance({
             JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
           )
         }
-        if (initialCommand) {
+        if (initialCommand && !dispatchedInitialCommands.has(id)) {
+          dispatchedInitialCommands.add(id)
           setTimeout(() => {
             if (ws?.readyState === WebSocket.OPEN) {
               ws.send(
@@ -148,6 +154,9 @@ const TerminalInstance = memo(function TerminalInstance({
       }
 
       ws.onclose = () => {
+        // Detach during unmount (workspace/tab switch, route change) is normal —
+        // the PTY stays alive server-side for reattach, so don't surface it.
+        if (cancelled) return
         if (pendingOutput) flushOutput()
         term.write("\r\n\x1b[31m[disconnected]\x1b[0m\r\n")
       }

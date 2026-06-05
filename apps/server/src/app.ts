@@ -13,6 +13,7 @@ import file from "./routes/file.js";
 import { mcpRouter } from "./routes/mcp.js";
 import { lspRouter } from "./routes/lsp.js";
 import { tasksRouter } from "./routes/tasks.js";
+import terminal from "./routes/terminal.js";
 
 const app = new Hono();
 
@@ -28,6 +29,7 @@ app.route("/", git);
 app.route("/", auth);
 app.route("/", localModels);
 app.route("/", file);
+app.route("/", terminal);
 app.route("/mcp", mcpRouter);
 app.route("/lsp", lspRouter);
 app.route("/tasks", tasksRouter);

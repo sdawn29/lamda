@@ -1,4 +1,16 @@
 import { create } from "zustand"
+import { apiFetch } from "@/shared/lib/client"
+
+// PTYs are persistent server-side and survive client unmounts (workspace/tab
+// switches, route changes) so the shell is never reset. They are only torn down
+// when a tab is explicitly closed, so we must tell the server to kill them here.
+function killServerTerminal(tabId: string): void {
+  apiFetch(`/terminal/session/${encodeURIComponent(tabId)}`, {
+    method: "DELETE",
+  }).catch(() => {
+    // Best-effort; an orphaned PTY is reaped by the server's grace timer.
+  })
+}
 
 export interface TerminalTab {
   id: string
@@ -127,6 +139,7 @@ export const useTerminalStore = create<TerminalStore>()((set, get) => ({
       states: updateWorkspace(s.states, workspaceId, (p) => {
         const idx = p.tabs.findIndex((t) => t.id === tabId)
         if (idx === -1) return p
+        killServerTerminal(tabId)
         const next = p.tabs.filter((t) => t.id !== tabId)
         if (next.length === 0) return { ...p, tabs: [], isOpen: false, activeTabId: null }
         const newActive =
@@ -150,6 +163,8 @@ export const useTerminalStore = create<TerminalStore>()((set, get) => ({
 
   killAll: (workspaceId) => {
     delete tabCounters[workspaceId]
+    const current = get().states[workspaceId]
+    current?.tabs.forEach((t) => killServerTerminal(t.id))
     set((s) => ({
       states: updateWorkspace(s.states, workspaceId, () => makeDefaultState()),
     }))
