@@ -753,7 +753,9 @@ export function ChatView({
     return keys
   }, [groupedMessages])
 
-  const showThinkingIndicator = isLoading && !isCompacting
+  // While a question is awaiting an answer the agent is idle, not working — hide
+  // the shimmering "thinking" phrase so it doesn't claim the agent is busy.
+  const showThinkingIndicator = isLoading && !isCompacting && !activeQuestion
 
   // Track group count + previous scrollHeight so we can restore scroll position
   // after older pages prepend (keeps the previously-first visible row in place
@@ -1383,9 +1385,15 @@ export function ChatView({
         )}
 
         {/* Floating bottom bar — the message list scrolls behind it. The
-            gradient fades content out as it slides under the input. */}
-        <div ref={bottomBarRef} className="absolute inset-x-0 bottom-0 z-10">
-          <div className="pointer-events-none h-8 bg-gradient-to-t from-background to-transparent" />
+            gradient fades content out as it slides under the input. The right
+            edge stops short by the 6px scrollbar gutter (see
+            [scrollbar-gutter:stable] above) so the scroll bar stays visible all
+            the way down instead of being covered when scrolled to the bottom. */}
+        <div
+          ref={bottomBarRef}
+          className="absolute right-3 bottom-0 left-0 z-10"
+        >
+          <div className="pointer-events-none h-8 bg-linear-to-t from-background to-transparent" />
           <div className="bg-background">
             <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
 

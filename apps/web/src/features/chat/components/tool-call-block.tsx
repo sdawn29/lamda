@@ -1,11 +1,13 @@
 import { lazy, memo, Suspense, useEffect, useRef, useState } from "react"
 import {
   AlertCircleIcon,
+  ArrowRightIcon,
   CheckIcon,
   ChevronRightIcon,
   CircleDotIcon,
   CopyIcon,
   ListTodoIcon,
+  MessageCircleQuestionIcon,
 } from "lucide-react"
 import { FileIcon } from "@/shared/ui/file-icon"
 
@@ -16,6 +18,7 @@ import { useSyntaxTheme } from "@/features/themes"
 import { RollingTimerText } from "./working-block"
 import { WriteView } from "./write-view"
 import { PlanSavedCard } from "./plan-saved-card"
+import { QUESTION_TOOL_NAME } from "../lib/active-question"
 import type { ToolMessage } from "../types"
 
 const PrismCode = lazy(() => import("./prism-code"))
@@ -126,6 +129,48 @@ function argsSummary(args: unknown, rootPath?: string): string {
   if (typeof a.pattern === "string") return a.pattern
   const first = Object.values(a)[0]
   return typeof first === "string" ? first : ""
+}
+
+// ── Question tool description ──────────────────────────────────────────────────
+
+/** Pull the human-readable question prompts out of a `question` tool's args. */
+function getQuestionPrompts(args: unknown): string[] {
+  if (typeof args !== "object" || args === null) return []
+  const list = (args as { questions?: unknown }).questions
+  if (!Array.isArray(list)) return []
+  return list
+    .map((q) =>
+      q && typeof q === "object" && typeof (q as Record<string, unknown>).question === "string"
+        ? ((q as Record<string, unknown>).question as string).trim()
+        : ""
+    )
+    .filter(Boolean)
+}
+
+/** Returned to the agent when the turn is aborted before the user answers. */
+const QUESTION_DISMISSED = "[The user dismissed the question without answering.]"
+
+/**
+ * Recover each question's chosen answer from the tool result. The result is the
+ * `formatAnswer` string the picker sends back — `"<question>\n→ <answer>"` blocks
+ * — so we slice out the text between each prompt's `→ ` marker and the next
+ * prompt. Returns one entry per prompt ("" when not found).
+ */
+function parseQuestionAnswers(prompts: string[], result: string): string[] {
+  if (!result) return prompts.map(() => "")
+  return prompts.map((prompt, i) => {
+    const marker = `${prompt}\n→ `
+    const start = result.indexOf(marker)
+    if (start === -1) return ""
+    const from = start + marker.length
+    let end = result.length
+    const next = prompts[i + 1]
+    if (next) {
+      const nextAt = result.indexOf(`${next}\n→ `, from)
+      if (nextAt !== -1) end = nextAt
+    }
+    return result.slice(from, end).trim()
+  })
 }
 
 // ── Read tool detection ────────────────────────────────────────────────────────
@@ -329,6 +374,74 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
     }
   }, [])
+
+  // Question tool: the agent paused to ask the user. Render a friendly summary
+  // instead of the raw tool name + JSON args. While pending it's a single
+  // waiting line (the picker itself replaces the input box, see QuestionView);
+  // once answered it lists each question with the answer the user chose.
+  if (msg.toolName === QUESTION_TOOL_NAME) {
+    const prompts = getQuestionPrompts(msg.args)
+    const isPending = msg.status === "running"
+    const containerProps = {
+      className: cn("w-full text-sm", isNew && "animate-chat-message-in"),
+      style:
+        isNew && entryDelayMs > 0
+          ? { animationDelay: `${entryDelayMs}ms` }
+          : undefined,
+    }
+
+    if (isPending) {
+      const summary =
+        prompts.length === 0
+          ? "Waiting for your answer…"
+          : prompts.length === 1
+            ? prompts[0]
+            : `Asked you ${prompts.length} questions`
+      return (
+        <div {...containerProps} className={cn("flex items-center gap-1.5", containerProps.className)}>
+          <MessageCircleQuestionIcon className="h-3 w-3 shrink-0 text-primary/70" />
+          <span className="min-w-0 truncate text-foreground/70">{summary}</span>
+        </div>
+      )
+    }
+
+    const dismissed = (getResultText(msg) ?? "").trim() === QUESTION_DISMISSED
+    const answers = dismissed
+      ? []
+      : parseQuestionAnswers(prompts, getResultText(msg) ?? "")
+    const headerLabel = dismissed
+      ? "Question dismissed"
+      : prompts.length > 1
+        ? `Answered ${prompts.length} questions`
+        : "Answered"
+
+    return (
+      <div {...containerProps}>
+        <div className="flex items-center gap-1.5">
+          <MessageCircleQuestionIcon className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+          <span className="font-medium text-muted-foreground/45">{headerLabel}</span>
+        </div>
+        {!dismissed && prompts.length > 0 && (
+          <div className="mt-1.5 ml-[1.125rem] flex flex-col gap-1.5">
+            {prompts.map((prompt, i) => (
+              <div key={i} className="flex flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground/70">{prompt}</span>
+                <span className="flex items-start gap-1 text-xs font-medium text-foreground/80">
+                  <ArrowRightIcon
+                    className="mt-0.5 h-3 w-3 shrink-0 text-primary/70"
+                    strokeWidth={2.5}
+                  />
+                  <span className="min-w-0 whitespace-pre-wrap">
+                    {answers[i] || "—"}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   // Todo tool: render as a tiny inline pill that names the concrete task — the
   // full list state lives in TodoPanel above the input, so we don't duplicate

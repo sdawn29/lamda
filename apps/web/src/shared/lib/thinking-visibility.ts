@@ -7,11 +7,26 @@ export function useShowThinkingSetting(): boolean {
 }
 
 export const DEFAULT_THINKING_PHRASES = [
-  "Thinking...",
-  "Sketching the plan...",
-  "Checking the details...",
-  "Pulling the pieces together...",
-  "Polishing the answer...",
+  "Thinking",
+  "Sketching the plan",
+  "Checking the details",
+  "Pulling the pieces together",
+  "Polishing the answer",
+  "Working through it",
+  "Connecting the dots",
+  "Reading the code",
+  "Tracing the logic",
+  "Weighing the options",
+  "Putting it together",
+  "Digging in",
+  "Mapping it out",
+  "Reasoning it through",
+  "Lining things up",
+  "Figuring it out",
+  "Untangling the details",
+  "Getting my bearings",
+  "Wrapping it up",
+  "Almost there",
 ]
 
 export function useThinkingPhrases(): string[] {

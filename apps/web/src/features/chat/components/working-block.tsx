@@ -4,6 +4,7 @@ import { cn } from "@/shared/lib/utils"
 import { formatDuration } from "@/shared/lib/formatters"
 import { ThinkingBlock } from "./thinking-block"
 import { ToolCallBlock } from "./tool-call-block"
+import { QUESTION_TOOL_NAME } from "../lib/active-question"
 import type { AssistantMessage, ToolMessage } from "../types"
 
 export type WorkingMessage = AssistantMessage | ToolMessage
@@ -133,6 +134,18 @@ export const WorkingBlock = memo(function WorkingBlock({
     [finalDuration, messages]
   )
 
+  // While the agent is blocked on a `question` tool it isn't actually working —
+  // it's idle waiting on the user. Suppress the ticking "Working for…" timer in
+  // that window and show a calm waiting label instead.
+  const pendingQuestion =
+    isActive &&
+    messages.some(
+      (m) =>
+        m.role === "tool" &&
+        (m as ToolMessage).toolName === QUESTION_TOOL_NAME &&
+        (m as ToolMessage).status === "running"
+    )
+
   const hasTools = messages.some((m) => m.role === "tool")
   const hasThinkingContent = messages.some(
     (m) =>
@@ -169,7 +182,11 @@ export const WorkingBlock = memo(function WorkingBlock({
           )}
         >
           {isActive ? (
-            <>Working for <RollingTimerText text={formatDuration(elapsed)} /></>
+            pendingQuestion ? (
+              "Waiting for your answer"
+            ) : (
+              <>Working for <RollingTimerText text={formatDuration(elapsed)} /></>
+            )
           ) : displayDuration > 0 ? (
             `Worked for ${formatDuration(displayDuration)}`
           ) : (
