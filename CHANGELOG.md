@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](../../releases/tag/v0.13.0) — 2026-06-05
+
+### Features
+
+* **chat-stream:** update markStopped to clear loading state on abort confirmation
+* **session-events:** add method to identify new file statuses in git feat(file-changes-card): set initial expanded state to false fix(thread-status-store): notify listeners on workspace file updates feat(monaco-diff-viewer): disable extra features for read-only diff viewer feat(monaco-code-viewer): simplify viewer settings for syntax highlighting fix(file-content-view): improve background refresh handling for file loading
+
 ## [0.12.0](../../releases/tag/v0.12.0) — 2026-06-05
 
 ### Features
