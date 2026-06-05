@@ -242,7 +242,15 @@ export function useChatStream({
     [queryClient, sessionId, lastPromptRef, pendingThinkingLevelRef]
   )
 
-  const markStopped = useCallback(() => setIsStopped(true), [])
+  // Called when the server confirms an abort. Clear isLoading immediately
+  // instead of waiting for the agent_end WebSocket event — that event may never
+  // arrive (connection dropped, agent already idle, or event missed), which
+  // would otherwise leave the Stop button stuck on screen indefinitely. If
+  // agent_end does arrive later it's idempotent (sets isLoading false again).
+  const markStopped = useCallback(() => {
+    setIsStopped(true)
+    setIsLoading(false)
+  }, [])
 
   const markSendFailed = useCallback(() => {
     setIsLoading(false)
