@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.11.0](../../releases/tag/v0.11.0) — 2026-06-05
+
+### Features
+
+* **question-tool:** enhance question handling and visibility in chat components
+
 ## [0.10.1](../../releases/tag/v0.10.1) — 2026-06-05
 
 ### Bug Fixes
