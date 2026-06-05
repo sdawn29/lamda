@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, memo } from "react"
+import { useEffect, useMemo, useState, useCallback, useRef, memo } from "react"
 import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { FileHeader } from "@/features/git/components/file-header"
@@ -169,11 +169,18 @@ export const FileContentView = memo(function FileContentView({
 
   const language = LANGUAGE_MAP[fileExtension] ?? fileExtension
 
+  const loadedPathRef = useRef<string | null>(null)
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
-    setContent(null)
+    // A background refresh (fileRefreshKey bumped for the same file) keeps the
+    // current contents on screen and swaps them in place once the re-read lands,
+    // so the viewer doesn't flash to the loading state on every disk change.
+    const isInitialLoad = loadedPathRef.current !== filePath
+    if (isInitialLoad) {
+      setLoading(true)
+      setError(null)
+      setContent(null)
+    }
 
     const loadFile = async () => {
       try {
@@ -181,7 +188,10 @@ export const FileContentView = memo(function FileContentView({
         if (!cancelled) setServerUrl(url)
 
         if (isImage) {
-          if (!cancelled) setLoading(false)
+          if (!cancelled) {
+            setLoading(false)
+            loadedPathRef.current = filePath
+          }
           return
         }
 
@@ -194,11 +204,17 @@ export const FileContentView = memo(function FileContentView({
         const text = await response.text()
         if (!cancelled) {
           setContent(text)
+          setError(null)
           setLoading(false)
+          loadedPathRef.current = filePath
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load file")
+          // On a background refresh, keep the last good contents visible rather
+          // than replacing the viewer with an error.
+          if (isInitialLoad) {
+            setError(err instanceof Error ? err.message : "Failed to load file")
+          }
           setLoading(false)
         }
       }

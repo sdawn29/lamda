@@ -447,6 +447,28 @@ export default function MonacoCodeViewer({
           padding: { top: 8, bottom: 8 },
           scrollbar: { alwaysConsumeMouseWheel: false },
           stickyScroll: { enabled: false },
+          // Strip Monaco's extra built-in features; this viewer only wants
+          // syntax highlighting plus the LSP hover/definition and comment
+          // composer wired up above.
+          contextmenu: false,
+          links: false,
+          folding: false,
+          codeLens: false,
+          lightbulb: { enabled: "off" as MonacoEditor.ShowLightbulbIconMode },
+          inlayHints: { enabled: "off" },
+          quickSuggestions: false,
+          suggestOnTriggerCharacters: false,
+          parameterHints: { enabled: false },
+          wordBasedSuggestions: "off",
+          snippetSuggestions: "none",
+          occurrencesHighlight: "off",
+          selectionHighlight: false,
+          matchBrackets: "never",
+          renderWhitespace: "none",
+          guides: { indentation: false, bracketPairs: false },
+          overviewRulerLanes: 0,
+          hideCursorInOverviewRuler: true,
+          overviewRulerBorder: false,
         }}
       />
       {composer}

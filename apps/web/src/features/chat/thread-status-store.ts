@@ -174,6 +174,15 @@ function handleGlobalMessage(e: MessageEvent): void {
           return k !== "diff" && k !== "turn-file-diff"
         },
       })
+      // A git status change means working-tree contents changed (the indexer's
+      // root watcher fires this on every edit, not just on .git writes). The
+      // `workspace_files_updated` event only fires when the *set* of file paths
+      // changes, so content-only edits to an already-indexed file would never
+      // refresh an open viewer. Notify the same listeners here so an open file
+      // re-reads its contents from disk.
+      if (data.workspaceId) {
+        for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
+      }
     }
   } catch (error) {
     console.error("[thread-status]", error)

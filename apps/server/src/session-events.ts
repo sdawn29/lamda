@@ -229,6 +229,17 @@ class SessionEventHub {
     }, 100);
   }
 
+  /**
+   * True when a git --short status code denotes a file that does not exist at
+   * HEAD: untracked (`??`) or newly added (`A`/`AM`). Modified tracked files
+   * (` M`, `MM`, `MD`, `RM`, …) return false so revert restores them instead of
+   * deleting them.
+   */
+  private isNewFileStatus(code: string): boolean {
+    const x = code[0] ?? " ";
+    return x === "?" || x === "A";
+  }
+
   private parseStatusToMap(raw: string): Map<string, string> {
     const map = new Map<string, string>();
     for (const line of raw.split("\n")) {
@@ -286,7 +297,9 @@ class SessionEventHub {
         if (this.currentTurnEmittedFiles.has(filePath)) continue;
         const preStatusCode = this.preTurnStatusMap.get(filePath) ?? "";
         if (preStatusCode !== postStatusCode) {
-          const wasCreatedByTurn = !this.preTurnStatusMap.has(filePath);
+          const wasCreatedByTurn =
+            !this.preTurnStatusMap.has(filePath) &&
+            this.isNewFileStatus(postStatusCode);
           this.currentTurnEmittedFiles.add(filePath);
           this.emit({
             type: "turn_file_changed",
@@ -393,7 +406,13 @@ class SessionEventHub {
         const preStatusCode = pre.get(filePath) ?? "";
         if (preStatusCode !== postStatusCode) {
           changedLines.push(`${postStatusCode} ${filePath}`);
-          const wasCreatedByTurn = !pre.has(filePath);
+          // A file counts as "created by this turn" only when it didn't exist
+          // at HEAD — i.e. its post-turn status is untracked (??) or added (A).
+          // A previously-committed file that the agent merely modified is absent
+          // from the pre-turn dirty status too, but it must NOT be flagged as
+          // created, otherwise revert would `fs.unlink` (delete) the whole file.
+          const wasCreatedByTurn =
+            !pre.has(filePath) && this.isNewFileStatus(postStatusCode);
           const preContent = wasCreatedByTurn
             ? null
             : (preContents.get(filePath) ?? null);

@@ -206,7 +206,7 @@ export const FileChangesCard = memo(function FileChangesCard({
   const revertToTurn = useRevertToTurn(sessionId)
   const revertFile = useGitRevertFile(sessionId)
 
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const files: ChangedFile[] = useMemo(() => {
