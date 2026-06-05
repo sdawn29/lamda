@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.1](../../releases/tag/v0.10.1) — 2026-06-05
+
+### Bug Fixes
+
+* **update-dialog:** add rehype-raw and rehype-sanitize for HTML parsing and sanitization
+
 ## [0.10.0](../../releases/tag/v0.10.0) — 2026-06-04
 
 ### Features
