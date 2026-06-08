@@ -82,6 +82,27 @@ export interface ContextUsage {
   contextWindow: number;
   /** Usage as percentage of context window, or null if tokens is unknown. */
   percent: number | null;
+  /**
+   * Composition of the current context window, derived from the most recent
+   * assistant request. Undefined until at least one assistant response exists.
+   */
+  breakdown?: ContextBreakdown;
+}
+
+export interface ContextBreakdown {
+  /** Cached prefix reused this request (system prompt, tools, stable history). */
+  cacheRead: number;
+  /** Tokens newly written to cache this request. */
+  cacheWrite: number;
+  /** Fresh, uncached input tokens. */
+  input: number;
+  /** Tokens generated in the latest response. */
+  output: number;
+  /**
+   * Estimated tokens for messages added after the last assistant response
+   * (e.g. a queued user message not yet sent to the model).
+   */
+  pending: number;
 }
 
 export interface SessionTokenStats {

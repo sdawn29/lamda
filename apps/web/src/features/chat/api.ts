@@ -370,10 +370,19 @@ export function fetchThinkingLevels(
   return apiFetch<{ levels: string[] }>(`/session/${sessionId}/thinking-levels`)
 }
 
+export interface ContextBreakdown {
+  cacheRead: number
+  cacheWrite: number
+  input: number
+  output: number
+  pending: number
+}
+
 export interface ContextUsage {
   tokens: number | null
   contextWindow: number
   percent: number | null
+  breakdown?: ContextBreakdown
 }
 
 export interface ContextUsageResponse {

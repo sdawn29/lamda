@@ -12,7 +12,7 @@ import {
 import { buildAuthStorage } from "./auth.js"
 import { sessionEventGenerator } from "./stream.js"
 import { computeActiveToolsForMode, type Mode } from "./modes.js"
-import type { HistoryBlock, ManagedSessionHandle, ManagedSessionStats, SdkConfig, SessionTokenStats } from "./types.js"
+import type { ContextBreakdown, HistoryBlock, ManagedSessionHandle, ManagedSessionStats, SdkConfig, SessionTokenStats } from "./types.js"
 
 // Duck-typed shapes for SDK message content — avoids a direct @earendil-works/pi-ai dependency
 type _ContentItem = { type: string; text?: string; thinking?: string; id?: string; name?: string; arguments?: Record<string, unknown> }
@@ -30,6 +30,42 @@ type _ToolResultMsg = {
   content: _ContentItem[]
   isError: boolean
   timestamp: number
+}
+
+type _AssistantUsage = { input: number; output: number; cacheRead: number; cacheWrite: number }
+type _UsageMsg = { role: string; stopReason?: string; usage?: _AssistantUsage }
+
+/**
+ * Derive the composition of the current context window from the most recent
+ * (non-aborted) assistant response. The reported `tokens` may exceed that
+ * response's usage when newer messages have been queued — that delta is
+ * surfaced as `pending`.
+ */
+function computeContextBreakdown(
+  messages: _UsageMsg[] | undefined,
+  tokens: number | null,
+): ContextBreakdown | undefined {
+  if (!messages || tokens == null) return undefined
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (
+      m.role === "assistant" &&
+      m.usage &&
+      m.stopReason !== "aborted" &&
+      m.stopReason !== "error"
+    ) {
+      const { input, output, cacheRead, cacheWrite } = m.usage
+      const accounted = input + output + cacheRead + cacheWrite
+      return {
+        cacheRead,
+        cacheWrite,
+        input,
+        output,
+        pending: Math.max(0, tokens - accounted),
+      }
+    }
+  }
+  return undefined
 }
 
 function buildRuntimeHandle(runtime: AgentSessionRuntime): ManagedSessionHandle {
@@ -57,9 +93,16 @@ function buildRuntimeHandle(runtime: AgentSessionRuntime): ManagedSessionHandle 
     setName: (name) => runtime.session.setSessionName(name),
     getName: () => runtime.session.sessionName,
     getContextUsage() {
-      const usage = (runtime.session as any).getContextUsage()
+      const session = runtime.session as any
+      const usage = session.getContextUsage()
       if (!usage) return undefined
-      return { tokens: usage.tokens, contextWindow: usage.contextWindow, percent: usage.percent }
+      const breakdown = computeContextBreakdown(session.messages, usage.tokens)
+      return {
+        tokens: usage.tokens,
+        contextWindow: usage.contextWindow,
+        percent: usage.percent,
+        breakdown,
+      }
     },
     async compact() { await (runtime.session as any).compact() },
     getAvailableThinkingLevels: () => (runtime.session as any).getAvailableThinkingLevels() as string[],

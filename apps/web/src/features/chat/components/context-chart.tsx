@@ -8,7 +8,7 @@ import {
   PopoverTrigger,
 } from "@/shared/ui/popover"
 import { Button } from "@/shared/ui/button"
-import type { ContextUsage, SessionStats } from "../api"
+import type { ContextBreakdown, ContextUsage, SessionStats } from "../api"
 import { compactSession } from "../api"
 import { chatKeys } from "../queries"
 import { cn } from "@/shared/lib/utils"
@@ -30,6 +30,20 @@ function formatCost(n: number): string {
   if (n >= 0.01) return `$${n.toFixed(3)}`
   return `$${(n * 1000).toFixed(1)}m`
 }
+
+// Ordered segments that make up the current context window. Each maps to a
+// field on ContextBreakdown and shares one color between bar and legend.
+const CONTEXT_SEGMENTS = [
+  { key: "cacheRead", label: "Cached", color: "bg-sky-500 dark:bg-sky-400" },
+  { key: "input", label: "Input", color: "bg-violet-500 dark:bg-violet-400" },
+  { key: "output", label: "Output", color: "bg-emerald-500 dark:bg-emerald-400" },
+  { key: "cacheWrite", label: "Cache write", color: "bg-indigo-500 dark:bg-indigo-400" },
+  { key: "pending", label: "Pending", color: "bg-amber-500 dark:bg-amber-400" },
+] as const satisfies ReadonlyArray<{
+  key: keyof ContextBreakdown
+  label: string
+  color: string
+}>
 
 export function ContextChart({
   contextUsage,
@@ -82,13 +96,21 @@ export function ContextChart({
         ? "text-yellow-500 dark:text-yellow-400"
         : "text-foreground"
 
-  const pctLabel = pct != null ? `${Math.round(pct)}%` : "?"
   const usedLabel = display.tokens != null ? formatTokens(display.tokens) : "?"
   const totalLabel = formatTokens(display.contextWindow)
 
   const tokens = sessionStats?.tokens
   const cost = sessionStats?.cost ?? null
   const hasCost = cost != null && cost > 0
+
+  // Stacked segments of the current context window (real per-request usage).
+  const breakdown = display.breakdown
+  const segments = breakdown
+    ? CONTEXT_SEGMENTS.map((s) => ({ ...s, value: breakdown[s.key] })).filter(
+        (s) => s.value > 0,
+      )
+    : []
+  const hasSegments = segments.length > 0
 
   async function handleCompact() {
     if (!sessionId || isCompacting) return
@@ -150,67 +172,100 @@ export function ContextChart({
         }
       />
 
-      <PopoverContent side="top" align="end" className="w-60 p-0 overflow-hidden">
+      <PopoverContent side="top" align="end" className="w-64 p-0 overflow-hidden">
 
-        {/* Context window usage */}
-        <div className="px-3.5 pt-3 pb-2.5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-foreground/80">Context window</span>
-            <span className={cn("text-xs font-semibold tabular-nums", pctTextColor)}>
-              {pctLabel}
+        {/* ── Context window (hero) ─────────────────────────────────────── */}
+        <div className="px-3.5 pt-3 pb-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+              Context window
             </span>
+            {display.tokens != null && (
+              <span className="text-[10px] tabular-nums text-muted-foreground/60">
+                {usedLabel} / {totalLabel}
+              </span>
+            )}
           </div>
-          {/* Progress bar */}
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn("h-full rounded-full transition-all duration-500", barColor)}
-              style={{ width: `${Math.min(fill * 100, 100)}%` }}
-            />
+
+          <div className="mt-1.5 flex items-baseline gap-1">
+            <span
+              className={cn(
+                "text-3xl font-semibold leading-none tabular-nums",
+                pctTextColor,
+              )}
+            >
+              {pct != null ? Math.round(pct) : "—"}
+            </span>
+            <span className={cn("text-base font-medium opacity-60", pctTextColor)}>
+              %
+            </span>
+            <span className="ml-1 text-[10px] text-muted-foreground/60">used</span>
           </div>
-          <div className="mt-1.5 text-[10px] text-muted-foreground/60 tabular-nums">
-            {usedLabel} of {totalLabel} tokens used
+
+          {/* Stacked usage bar */}
+          <div className="mt-3 flex h-2 w-full overflow-hidden rounded-full bg-muted">
+            {hasSegments ? (
+              segments.map((s) => (
+                <div
+                  key={s.key}
+                  className={cn("h-full transition-all duration-500", s.color)}
+                  style={{ width: `${(s.value / display.contextWindow) * 100}%` }}
+                  title={`${s.label}: ${formatTokens(s.value)}`}
+                />
+              ))
+            ) : (
+              <div
+                className={cn("h-full rounded-full transition-all duration-500", barColor)}
+                style={{ width: `${Math.min(fill * 100, 100)}%` }}
+              />
+            )}
           </div>
+
+          {/* Legend */}
+          {hasSegments && (
+            <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {segments.map((s) => (
+                <div key={s.key} className="flex items-center gap-1.5">
+                  <span className={cn("size-2 shrink-0 rounded-[3px]", s.color)} />
+                  <span className="text-[10px] text-muted-foreground">{s.label}</span>
+                  <span className="ml-auto text-[10px] font-medium tabular-nums text-foreground/80">
+                    {formatTokens(s.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Token stats */}
-        {tokens && (
-          <div className="border-t border-border/50 px-3.5 py-2.5">
-            <div className="space-y-1">
-              <StatRow label="Input" value={formatTokens(tokens.input)} />
-              <StatRow label="Output" value={formatTokens(tokens.output)} />
-              {tokens.cacheRead > 0 && (
-                <StatRow label="Cache read" value={formatTokens(tokens.cacheRead)} dimmed />
-              )}
-              {tokens.cacheWrite > 0 && (
-                <StatRow label="Cache write" value={formatTokens(tokens.cacheWrite)} dimmed />
-              )}
-            </div>
-            <div className="mt-2 flex items-center justify-between border-t border-border/40 pt-2">
-              <span className="text-[10px] font-medium text-muted-foreground">Total</span>
-              <div className="flex items-center gap-3">
-                {hasCost && (
-                  <span className="text-[10px] tabular-nums text-muted-foreground/60">
-                    {formatCost(cost)}
-                  </span>
-                )}
-                <span className="text-[10px] font-semibold tabular-nums text-foreground">
-                  {formatTokens(tokens.total)}
+        {/* ── Session totals ────────────────────────────────────────────── */}
+        {(tokens || sessionStats) && (
+          <div className="space-y-1.5 border-t border-border/50 px-3.5 py-2.5">
+            {tokens && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  Session total
                 </span>
+                <div className="flex items-center gap-2.5">
+                  {hasCost && (
+                    <span className="text-[10px] tabular-nums text-muted-foreground/60">
+                      {formatCost(cost)}
+                    </span>
+                  )}
+                  <span className="text-[11px] font-semibold tabular-nums text-foreground">
+                    {formatTokens(tokens.total)}
+                  </span>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Conversation stats */}
-        {sessionStats && (
-          <div className="border-t border-border/50 px-3.5 py-2">
-            <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground/60 tabular-nums">
-              <span>{sessionStats.userMessages} user</span>
-              <span className="opacity-40">·</span>
-              <span>{sessionStats.assistantMessages} assistant</span>
-              <span className="opacity-40">·</span>
-              <span>{sessionStats.toolCalls} tools</span>
-            </div>
+            )}
+            {sessionStats && (
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 tabular-nums">
+                <span>{sessionStats.userMessages} user</span>
+                <span className="opacity-40">·</span>
+                <span>{sessionStats.assistantMessages} assistant</span>
+                <span className="opacity-40">·</span>
+                <span>{sessionStats.toolCalls} tools</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -241,26 +296,5 @@ export function ContextChart({
 
       </PopoverContent>
     </Popover>
-  )
-}
-
-function StatRow({
-  label,
-  value,
-  dimmed = false,
-}: {
-  label: string
-  value: string
-  dimmed?: boolean
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className={cn("text-[10px]", dimmed ? "text-muted-foreground/50" : "text-muted-foreground")}>
-        {label}
-      </span>
-      <span className={cn("text-[10px] tabular-nums font-medium", dimmed ? "text-muted-foreground/50" : "text-foreground/80")}>
-        {value}
-      </span>
-    </div>
   )
 }
