@@ -25,6 +25,7 @@ import {
   deleteAgentTurnsFrom,
 } from "@lamda/db";
 import { store } from "../store.js";
+import type { StoredSession } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import {
   createSessionForThread,
@@ -32,7 +33,12 @@ import {
   openSessionForThread,
 } from "../services/session-service.js";
 import { submitAnswer } from "../services/question-registry.js";
-import { readSessionHistory, getModePreamble, normalizeMode } from "@lamda/pi-sdk";
+import {
+  readSessionHistory,
+  applyModePreamble,
+  stripModePreamble,
+  normalizeMode,
+} from "@lamda/pi-sdk";
 import type { PromptOptions, SdkConfig } from "@lamda/pi-sdk";
 import { promises as fs } from "node:fs";
 import { gitUnstage, gitRevertFile, gitRestoreFileFromRef } from "@lamda/git";
@@ -110,6 +116,29 @@ interface PromptRequestBody {
   expandPromptTemplates?: PromptOptions["expandPromptTemplates"];
 }
 
+/**
+ * Prepend the active mode's preamble to the user's text, but only when that mode
+ * isn't already the standing instruction in this live session's history — i.e. on
+ * the first turn or after a mode switch. The SDK persists each prompt (preamble
+ * included) into the conversation it replays to the model, so injecting on every
+ * turn would stack duplicate copies in context and, after a switch, leave the
+ * previous mode's stale instructions interleaved. Tracking the last-injected mode
+ * per session keeps exactly one copy in context, always reflecting the current
+ * mode. (Hard enforcement of mode is tool gating; the preamble is behavioural
+ * steering — so a single standing copy is sufficient.)
+ *
+ * The returned text is what the SDK sees; the DB always stores the clean user
+ * text without the preamble.
+ */
+function withModePreamble(entry: StoredSession, userText: string): string {
+  const mode = normalizeMode(getThread(entry.threadId)?.mode);
+  if (mode && mode !== entry.lastInjectedMode) {
+    entry.lastInjectedMode = mode;
+    return applyModePreamble(mode, userText);
+  }
+  return userText;
+}
+
 sessions.post("/session/:id/prompt", async (c) => {
   const id = c.req.param("id");
   const entry = store.get(id);
@@ -125,11 +154,8 @@ sessions.post("/session/:id/prompt", async (c) => {
   // Store user message as a block in the database (without the mode preamble)
   insertUserBlock(entry.threadId, body.text);
 
-  // Resolve mode-specific preamble; the SDK sees preamble + user text.
-  const thread = getThread(entry.threadId);
-  const mode = normalizeMode(thread?.mode);
-  const preamble = mode ? getModePreamble(mode) : "";
-  const text = preamble ? `${preamble}\n\n${body.text}` : body.text;
+  // The SDK sees the mode preamble only on the first turn / after a mode switch.
+  const text = withModePreamble(entry, body.text);
 
   // Fire and forget — events arrive via GET /session/:id/events
   const run = async () => {
@@ -189,10 +215,7 @@ sessions.post("/session/:id/steer", async (c) => {
   // Store user message as a block in the database (without the mode preamble)
   insertUserBlock(entry.threadId, body.text);
 
-  const thread = getThread(entry.threadId);
-  const mode = normalizeMode(thread?.mode);
-  const preamble = mode ? getModePreamble(mode) : "";
-  const text = preamble ? `${preamble}\n\n${body.text}` : body.text;
+  const text = withModePreamble(entry, body.text);
 
   // Fire and forget
   entry.handle.steer(text).catch((err: unknown) => {
@@ -223,10 +246,7 @@ sessions.post("/session/:id/follow-up", async (c) => {
   // Store user message as a block in the database (without the mode preamble)
   insertUserBlock(entry.threadId, body.text);
 
-  const thread = getThread(entry.threadId);
-  const mode = normalizeMode(thread?.mode);
-  const preamble = mode ? getModePreamble(mode) : "";
-  const text = preamble ? `${preamble}\n\n${body.text}` : body.text;
+  const text = withModePreamble(entry, body.text);
 
   // Fire and forget
   entry.handle.followUp(text).catch((err: unknown) => {
@@ -588,7 +608,13 @@ sessions.post("/session/:id/fork", async (c) => {
       const block = history[i];
       if (i === lastUserIdx) continue;
       if (block.role === "user") {
-        insertUserBlock(newThreadId, block.content, block.createdAt);
+        // History stores the preamble-augmented text; strip it so the forked
+        // thread shows the original user message, matching the live send path.
+        insertUserBlock(
+          newThreadId,
+          stripModePreamble(block.content),
+          block.createdAt,
+        );
       } else if (block.role === "assistant") {
         const blockId = insertAssistantStartBlock(newThreadId, block.createdAt);
         updateAssistantBlockContent(
