@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.0](../../releases/tag/v0.14.0) — 2026-06-08
+
+### Features
+
+* **checkpoint-management:** implement durable checkpoint refs for git operations and enhance thread handling
+* **session-management:** enhance session handling with mode preamble injection and stripping
+* **chat-view:** enhance bottom bar layout and spacing for improved message visibility
+
+### Other Changes
+
+* Merge pull request #6 from sdawn29/plugin-system
+
 ## [0.13.0](../../releases/tag/v0.13.0) — 2026-06-05
 
 ### Features
