@@ -31,6 +31,10 @@ export const threads = sqliteTable("threads", {
   lastAccessedAt: integer("last_accessed_at"),
   createdAt: integer("created_at").notNull(),
   forkedFromId: text("forked_from_id"),
+  // Durable checkpoint SHA capturing the working-tree state when this thread was
+  // forked, so the branch's divergence point survives independently of the
+  // parent's turn checkpoints. Null for non-forked threads.
+  baseCheckpointSha: text("base_checkpoint_sha"),
 })
 
 /**

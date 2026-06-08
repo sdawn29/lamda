@@ -321,6 +321,52 @@ function buildTurnCardsByGroup(
   return cardsByGroup
 }
 
+export interface MessageCheckpoint {
+  /** Distinct files changed by the turn(s) this message kicked off. */
+  fileCount: number
+  /** A durable git checkpoint exists, so reverting here restores the code too. */
+  hasCheckpoint: boolean
+}
+
+// Associate each user message with the checkpoint produced by the agent turn(s)
+// it started. A message "owns" every completed turn whose start falls between it
+// and the next user message — the same windowing the revert-to-message endpoint
+// uses. The result lets the transcript mark which messages are restorable points.
+function buildCheckpointByUserBlock(
+  messages: Message[],
+  turns: TurnSummary[]
+): Map<string, MessageCheckpoint> {
+  const userMessages = messages.filter(
+    (m): m is UserMessage => m.role === "user" && !!m.id
+  )
+  if (userMessages.length === 0) return new Map()
+
+  const completedTurns = turns
+    .filter((turn) => !turn.inProgress && turn.files.length > 0)
+    .sort((a, b) => a.startedAt - b.startedAt || a.id - b.id)
+
+  const result = new Map<string, MessageCheckpoint>()
+  for (let i = 0; i < userMessages.length; i++) {
+    const current = userMessages[i]
+    const createdAt = current.createdAt
+    if (createdAt == null) continue
+    const nextCreatedAt = userMessages[i + 1]?.createdAt ?? Infinity
+
+    const files = new Set<string>()
+    let hasCheckpoint = false
+    for (const turn of completedTurns) {
+      if (turn.startedAt < createdAt || turn.startedAt >= nextCreatedAt) continue
+      for (const f of turn.files) files.add(f.filePath)
+      if (turn.checkpointSha) hasCheckpoint = true
+    }
+
+    if (files.size > 0) {
+      result.set(current.id!, { fileCount: files.size, hasCheckpoint })
+    }
+  }
+  return result
+}
+
 // Map each fully-completed todo list to the group that contains the todo tool
 // message where its last goal finished, so the whole list docks inline next to
 // that turn as a single card.
@@ -707,6 +753,11 @@ export function ChatView({
   const turnCardsByGroup = useMemo(
     () => buildTurnCardsByGroup(groupedMessages, turns),
     [groupedMessages, turns]
+  )
+
+  const checkpointByUserBlock = useMemo(
+    () => buildCheckpointByUserBlock(visibleMessages, turns),
+    [visibleMessages, turns]
   )
 
   const completedTodosByGroup = useMemo(
@@ -1315,6 +1366,11 @@ export function ChatView({
                         onRevert={!isLoading ? handleRevert : undefined}
                         isReverting={
                           revertingBlockId === (message as UserMessage).id
+                        }
+                        checkpoint={
+                          message.role === "user" && message.id
+                            ? checkpointByUserBlock.get(message.id)
+                            : undefined
                         }
                       />
                     </div>

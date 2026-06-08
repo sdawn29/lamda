@@ -34,6 +34,7 @@ import {
   gitRestoreFileFromRef,
   gitDiffContents,
   gitFileAtRef,
+  gitDeleteCheckpointRef,
 } from "@lamda/git";
 import { generateCommitMessage } from "@lamda/pi-sdk";
 import {
@@ -765,7 +766,9 @@ git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
   }
 
   // Remove this turn and all subsequent turns from the DB so they disappear from the sidebar.
-  deleteAgentTurnsFrom(threadId, turnId);
+  const orphanedShas = deleteAgentTurnsFrom(threadId, turnId);
+  // Drop the now-unreferenced checkpoint refs so they don't accumulate.
+  await Promise.all(orphanedShas.map((sha) => gitDeleteCheckpointRef(cwd, sha)));
 
   return new Response(null, { status: 204 });
 });

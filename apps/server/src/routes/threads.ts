@@ -4,6 +4,7 @@ import {
   getThread,
   insertThread,
   deleteThread,
+  deleteAgentTurnsForThread,
   archiveThread,
   unarchiveThread,
   pinThread,
@@ -16,6 +17,7 @@ import {
   updateThreadLastAccessed,
 } from "@lamda/db";
 import { createPlanModeTools, createTodoTool, normalizeMode } from "@lamda/pi-sdk";
+import { gitDeleteCheckpointRef } from "@lamda/git";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import {
@@ -70,6 +72,20 @@ threads.delete("/thread/:id", async (c) => {
     await sessionEvents.dispose(session.sessionId);
     store.delete(session.sessionId);
   }
+
+  // agent_turns has no FK cascade — clean up its rows and the durable checkpoint
+  // refs they anchor before dropping the thread, so neither leaks.
+  const thread = getThread(threadId);
+  const workspace = thread ? getWorkspace(thread.workspaceId) : null;
+  const orphanedShas = deleteAgentTurnsForThread(threadId);
+  // Include this branch's fork snapshot, if any, so it doesn't outlive the thread.
+  if (thread?.baseCheckpointSha) orphanedShas.push(thread.baseCheckpointSha);
+  if (workspace?.path) {
+    await Promise.all(
+      orphanedShas.map((sha) => gitDeleteCheckpointRef(workspace.path, sha)),
+    );
+  }
+
   deleteThread(threadId);
   return new Response(null, { status: 204 });
 });

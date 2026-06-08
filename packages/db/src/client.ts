@@ -252,6 +252,16 @@ function createDb() {
     // Safe to ignore — column may already exist.
   }
 
+  // Migration: Add base_checkpoint_sha column to threads table (fork snapshot).
+  try {
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!threadCols.some((col) => col.name === "base_checkpoint_sha")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN base_checkpoint_sha TEXT`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
   // Migration: Add mode column to threads table.
   try {
     const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];

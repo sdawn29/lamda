@@ -41,7 +41,14 @@ import {
 } from "@lamda/pi-sdk";
 import type { PromptOptions, SdkConfig } from "@lamda/pi-sdk";
 import { promises as fs } from "node:fs";
-import { gitUnstage, gitRevertFile, gitRestoreFileFromRef } from "@lamda/git";
+import {
+  gitUnstage,
+  gitRevertFile,
+  gitRestoreFileFromRef,
+  gitDeleteCheckpointRef,
+  gitStashCreate,
+  gitWriteCheckpointRef,
+} from "@lamda/git";
 
 const EXCLUDED_DIRS = new Set([".git"]);
 
@@ -536,7 +543,11 @@ sessions.post("/session/:id/revert-to-message", async (c) => {
       );
     }
 
-    deleteAgentTurnsFrom(threadId, firstTurnToRevert.id);
+    const orphanedShas = deleteAgentTurnsFrom(threadId, firstTurnToRevert.id);
+    // Drop the now-unreferenced checkpoint refs so they don't accumulate.
+    await Promise.all(
+      orphanedShas.map((sha) => gitDeleteCheckpointRef(cwd, sha)),
+    );
   }
 
   // Also clear any in-progress turn state from the event hub.
@@ -587,9 +598,24 @@ sessions.post("/session/:id/fork", async (c) => {
   const parentThread = getThread(entry.threadId);
   const parentTitle = parentThread?.title ?? "Thread";
   const forkTitle = `Fork of ${parentTitle}`;
+
+  // Capture a durable snapshot of the working tree at the moment of branching so
+  // the new branch records its own divergence point, independent of the parent's
+  // turn checkpoints (which may later be reverted or pruned). Best-effort: an
+  // empty sha (clean tree / non-git / timeout) just means no snapshot to anchor.
+  let baseCheckpointSha = "";
+  try {
+    baseCheckpointSha = await gitStashCreate(entry.cwd);
+    if (baseCheckpointSha)
+      await gitWriteCheckpointRef(entry.cwd, baseCheckpointSha).catch(() => {});
+  } catch {
+    baseCheckpointSha = "";
+  }
+
   const newThreadId = insertThread(entry.workspaceId, {
     title: forkTitle,
     forkedFromId: entry.threadId,
+    baseCheckpointSha: baseCheckpointSha || undefined,
   });
   updateThreadSessionFile(newThreadId, newSessionFile);
 
