@@ -19,6 +19,8 @@ export {
   isMode,
   normalizeMode,
   getModePreamble,
+  applyModePreamble,
+  stripModePreamble,
   computeActiveToolsForMode,
 } from "./modes.js";
 export type { Mode } from "./modes.js";

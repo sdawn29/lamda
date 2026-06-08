@@ -152,18 +152,52 @@ export function getAgentTurnsFromId(threadId: string, fromTurnId: number): Agent
 }
 
 // Deletes a turn and all subsequent turns for a thread (id >= fromTurnId).
-export function deleteAgentTurnsFrom(threadId: string, fromTurnId: number): void {
-  const turnIds = db
-    .select({ id: agentTurns.id })
+// Returns the distinct, non-empty checkpoint SHAs of the deleted turns so the
+// caller can drop their now-orphaned checkpoint refs.
+export function deleteAgentTurnsFrom(threadId: string, fromTurnId: number): string[] {
+  const turns = db
+    .select({ id: agentTurns.id, checkpointSha: agentTurns.checkpointSha })
     .from(agentTurns)
     .where(and(eq(agentTurns.threadId, threadId), gte(agentTurns.id, fromTurnId)))
-    .all()
-    .map((t) => t.id);
+    .all();
 
-  if (turnIds.length === 0) return;
+  if (turns.length === 0) return [];
 
+  const turnIds = turns.map((t) => t.id);
   db.transaction(() => {
     db.delete(agentTurnFiles).where(inArray(agentTurnFiles.turnId, turnIds)).run();
     db.delete(agentTurns).where(inArray(agentTurns.id, turnIds)).run();
   });
+
+  return [...new Set(turns.map((t) => t.checkpointSha).filter(Boolean))];
+}
+
+// Deletes every turn for a thread (used when the thread itself is removed, since
+// agent_turns has no FK cascade). Returns the deleted checkpoint SHAs.
+export function deleteAgentTurnsForThread(threadId: string): string[] {
+  const turns = db
+    .select({ id: agentTurns.id, checkpointSha: agentTurns.checkpointSha })
+    .from(agentTurns)
+    .where(eq(agentTurns.threadId, threadId))
+    .all();
+
+  if (turns.length === 0) return [];
+
+  const turnIds = turns.map((t) => t.id);
+  db.transaction(() => {
+    db.delete(agentTurnFiles).where(inArray(agentTurnFiles.turnId, turnIds)).run();
+    db.delete(agentTurns).where(inArray(agentTurns.id, turnIds)).run();
+  });
+
+  return [...new Set(turns.map((t) => t.checkpointSha).filter(Boolean))];
+}
+
+// Returns the distinct, non-empty checkpoint SHAs recorded for a thread.
+export function listThreadCheckpointShas(threadId: string): string[] {
+  const rows = db
+    .select({ checkpointSha: agentTurns.checkpointSha })
+    .from(agentTurns)
+    .where(eq(agentTurns.threadId, threadId))
+    .all();
+  return [...new Set(rows.map((r) => r.checkpointSha).filter(Boolean))];
 }

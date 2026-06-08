@@ -8,6 +8,7 @@ import {
   ChevronRightIcon,
   CopyIcon,
   GitForkIcon,
+  HistoryIcon,
   SparklesIcon,
   Undo2,
   Loader2,
@@ -331,6 +332,8 @@ export interface MessageRowProps {
   onFork?: (blockId: string) => Promise<void>
   onRevert?: (blockId: string) => Promise<void>
   isReverting?: boolean
+  /** Checkpoint produced by the turn(s) this user message started, if any. */
+  checkpoint?: { fileCount: number; hasCheckpoint: boolean }
 }
 
 function AbortBlock({ message: _ }: { message: AbortMessage }) {
@@ -377,6 +380,7 @@ export const MessageRow = memo(function MessageRow({
   onFork,
   onRevert,
   isReverting = false,
+  checkpoint,
 }: MessageRowProps) {
   const [isForking, setIsForking] = useState(false)
   const [confirmRevertOpen, setConfirmRevertOpen] = useState(false)
@@ -444,6 +448,26 @@ export const MessageRow = memo(function MessageRow({
             />
           </div>
           <div className="flex items-center gap-2">
+            {checkpoint && checkpoint.fileCount > 0 && (
+              <span
+                className="flex items-center gap-1 rounded-full border border-border bg-transparent px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                title={
+                  checkpoint.hasCheckpoint
+                    ? `Checkpoint — reverting here restores ${checkpoint.fileCount} ${
+                        checkpoint.fileCount === 1 ? "file" : "files"
+                      } to this point`
+                    : `Changed ${checkpoint.fileCount} ${
+                        checkpoint.fileCount === 1 ? "file" : "files"
+                      }`
+                }
+                aria-label={`Checkpoint: ${checkpoint.fileCount} ${
+                  checkpoint.fileCount === 1 ? "file" : "files"
+                } changed`}
+              >
+                <HistoryIcon className="size-3 text-primary/60" />
+                {checkpoint.fileCount}
+              </span>
+            )}
             {canRevert && (
               <Button
                 type="button"
@@ -494,9 +518,13 @@ export const MessageRow = memo(function MessageRow({
                 Revert to before this message?
               </AlertDialogTitle>
               <AlertDialogDescription>
-                This message and all subsequent conversation and code changes
-                will be undone. The message text will be restored to your input
-                box.
+                {checkpoint?.hasCheckpoint && checkpoint.fileCount > 0
+                  ? `This message and everything after it will be undone, restoring ${
+                      checkpoint.fileCount
+                    } ${
+                      checkpoint.fileCount === 1 ? "file" : "files"
+                    } to this checkpoint. The message text will be restored to your input box.`
+                  : "This message and all subsequent conversation and code changes will be undone. The message text will be restored to your input box."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

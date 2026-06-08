@@ -665,3 +665,51 @@ export async function gitRestoreFileFromRef(cwd: string, ref: string, filePath: 
     timeout: 10000,
   });
 }
+
+// ── Durable checkpoint refs ───────────────────────────────────────────────────
+// Per-turn checkpoints are stash commit objects (from gitStashCreate). Left
+// dangling they'd be reclaimed by `git gc`; parked under `refs/stash` they'd be
+// vulnerable to `git stash clear/drop` and would pollute the user's stash list.
+// Instead we anchor each one under a private ref namespace, which keeps the
+// object durably reachable and invisible to ordinary git porcelain.
+
+const CHECKPOINT_REF_PREFIX = "refs/lamda/checkpoints/";
+
+/**
+ * Anchor a checkpoint commit object under `refs/lamda/checkpoints/<sha>` so it
+ * survives `git gc` and app restarts. No-op if sha is empty.
+ */
+export async function gitWriteCheckpointRef(cwd: string, sha: string): Promise<void> {
+  if (!sha) return;
+  await execFileAsync("git", ["update-ref", `${CHECKPOINT_REF_PREFIX}${sha}`, sha], {
+    cwd,
+    timeout: 10000,
+  });
+}
+
+/** Remove a checkpoint ref so its object becomes eligible for GC. Best-effort. */
+export async function gitDeleteCheckpointRef(cwd: string, sha: string): Promise<void> {
+  if (!sha) return;
+  await execFileAsync("git", ["update-ref", "-d", `${CHECKPOINT_REF_PREFIX}${sha}`], {
+    cwd,
+    timeout: 10000,
+  }).catch(() => {});
+}
+
+/** List the checkpoint SHAs currently anchored in this repo. */
+export async function gitListCheckpointRefs(cwd: string): Promise<string[]> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["for-each-ref", "--format=%(refname)", CHECKPOINT_REF_PREFIX],
+      { cwd, timeout: 5000 },
+    );
+    return stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((ref) => ref.slice(CHECKPOINT_REF_PREFIX.length));
+  } catch {
+    return [];
+  }
+}

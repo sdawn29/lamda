@@ -16,7 +16,7 @@ import {
 } from "@lamda/db";
 import type { ManagedSessionHandle, SessionEvent } from "@lamda/pi-sdk";
 import { PLAN_DIR } from "@lamda/pi-sdk";
-import { gitStatus, gitStashCreate, gitStashStore } from "@lamda/git";
+import { gitStatus, gitStashCreate, gitWriteCheckpointRef } from "@lamda/git";
 import {
   threadStatusBroadcaster,
   type ThreadStatus,
@@ -335,10 +335,9 @@ class SessionEventHub {
       );
       const stashPromise = gitStashCreate(this.cwd)
         .then(async (sha) => {
-          if (sha) {
-            const label = `lamda-checkpoint:${randomUUID()}`;
-            await gitStashStore(this.cwd!, sha, label).catch(() => {});
-          }
+          // Anchor the checkpoint object under a private ref so `git gc` can't
+          // reclaim it and it stays out of the user's `git stash list`.
+          if (sha) await gitWriteCheckpointRef(this.cwd!, sha).catch(() => {});
           return sha;
         })
         .catch(() => "");

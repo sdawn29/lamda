@@ -1,12 +1,21 @@
 import { randomUUID } from "node:crypto";
-import type { ManagedSessionHandle } from "@lamda/pi-sdk";
+import type { ManagedSessionHandle, Mode } from "@lamda/pi-sdk";
 
-interface StoredSession {
+export interface StoredSession {
   handle: ManagedSessionHandle;
   createdAt: number;
   cwd: string;
   threadId: string;
   workspaceId?: string;
+  /**
+   * The mode whose preamble was most recently injected into this live session's
+   * conversation history. Used to inject the mode preamble only when it changes
+   * (first turn or a mode switch) instead of on every turn — see
+   * `withModePreamble` in routes/sessions.ts. Resets to undefined when the
+   * session handle is replaced (e.g. on resume), so the preamble is re-stated
+   * once for the freshly-opened session.
+   */
+  lastInjectedMode?: Mode;
 }
 
 class SessionStore {
@@ -95,6 +104,7 @@ class SessionStore {
     if (!entry) return false;
     entry.handle.dispose();
     entry.handle = newHandle;
+    entry.lastInjectedMode = undefined;
     return true;
   }
 

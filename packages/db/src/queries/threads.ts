@@ -5,7 +5,7 @@ import { threads, workspaces } from "../schema.js"
 
 export function insertThread(
   workspaceId: string,
-  options?: { title?: string; forkedFromId?: string },
+  options?: { title?: string; forkedFromId?: string; baseCheckpointSha?: string },
 ): string {
   const id = randomUUID()
   db.insert(threads)
@@ -14,6 +14,7 @@ export function insertThread(
       workspaceId,
       title: options?.title ?? "New Thread",
       forkedFromId: options?.forkedFromId ?? null,
+      baseCheckpointSha: options?.baseCheckpointSha ?? null,
       createdAt: Date.now(),
     })
     .run()
