@@ -1,4 +1,8 @@
-import { apiFetch, getServerUrl } from "@/shared/lib/client"
+import {
+  apiFetch,
+  getResolvedServerToken,
+  getServerUrl,
+} from "@/shared/lib/client"
 
 export interface CreateWorkspaceBody {
   name: string
@@ -43,9 +47,13 @@ export async function createWorkspace(
   body: CreateWorkspaceBody
 ): Promise<{ workspace: WorkspaceDto; existing?: true }> {
   const base = await getServerUrl()
+  const token = getResolvedServerToken()
   const res = await fetch(`${base}/workspace`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(body),
   })
   if (res.status === 409) {

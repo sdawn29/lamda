@@ -6,10 +6,12 @@ import {
   ipcMain,
   nativeImage,
   powerMonitor,
+  session,
   shell,
 } from "electron";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -45,6 +47,12 @@ const SPLASH_HTML_PATH = isDev
   ? path.join(DEV_MONOREPO_ROOT, "apps", "desktop", "assets", "splash.html")
   : path.join(process.resourcesPath, "splash.html");
 const EXTERNAL_URL_PROTOCOL_RE = /^(https?:|mailto:)/i;
+
+// Per-launch shared secret. Handed to the spawned server via env and to the
+// renderer via IPC so every HTTP request and WebSocket connection can be
+// authenticated — this is what stops other local processes / websites the user
+// visits from driving the server's API. Regenerated on every app start.
+const SERVER_AUTH_TOKEN = randomBytes(32).toString("hex");
 
 app.setName(APP_NAME);
 
@@ -154,6 +162,34 @@ function setupAutoUpdater() {
   }, 10_000);
 }
 
+/**
+ * Apply a Content-Security-Policy to renderer documents in production. Limits
+ * script execution to bundled app code and restricts network access to the
+ * local server, shrinking the blast radius of any injected/XSS content. Skipped
+ * in dev because Vite's HMR relies on inline scripts and eval. `connect-src`
+ * permits any localhost port since the server uses an ephemeral one.
+ */
+function installContentSecurityPolicy() {
+  if (!app.isPackaged) return;
+  const policy = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:*",
+    "font-src 'self' data:",
+    "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*",
+  ].join("; ");
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        "Content-Security-Policy": [policy],
+      },
+    });
+  });
+}
+
 function setServerStatus(next: ServerStatus) {
   serverStatus = next;
   for (const win of BrowserWindow.getAllWindows()) {
@@ -179,6 +215,7 @@ async function spawnServer(): Promise<number> {
       env: {
         ...process.env,
         PORT: "0",
+        LAMDA_AUTH_TOKEN: SERVER_AUTH_TOKEN,
         ...(isDev
           ? {}
           : {
@@ -368,11 +405,24 @@ async function createWindow(splash?: BrowserWindow) {
     trafficLightPosition: { x: 12, y: 14 },
     webPreferences: {
       contextIsolation: true,
-      devTools: true,
+      devTools: !app.isPackaged,
       nodeIntegration: false,
       preload: preloadPath,
       spellcheck: false,
     },
+  });
+
+  // Keep the renderer pinned to the app itself. Any attempt to navigate the main
+  // frame elsewhere (e.g. an injected link) is cancelled; genuine external links
+  // are routed to the OS browser via setWindowOpenHandler below instead.
+  win.webContents.on("will-navigate", (event, url) => {
+    const allowed = isDev
+      ? url.startsWith(DEV_SERVER_URL)
+      : url.startsWith("file://");
+    if (!allowed) {
+      event.preventDefault();
+      if (EXTERNAL_URL_PROTOCOL_RE.test(url)) void shell.openExternal(url);
+    }
   });
 
   win.once("ready-to-show", () => {
@@ -416,6 +466,8 @@ app.whenReady().then(async () => {
     }
   }
 
+  installContentSecurityPolicy();
+
   const splash = await createSplashWindow();
 
   await startServerAndTrack();
@@ -444,6 +496,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle("get-server-status", () => serverStatus);
   ipcMain.handle("get-server-port", () => serverStatus.port);
+  ipcMain.handle("get-server-token", () => SERVER_AUTH_TOKEN);
   ipcMain.handle("restart-server", () => restartServer());
 
   ipcMain.handle("open-path", (_event, filePath: string) => {

@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   selectFolder: (options?: SelectFolderOptions) =>
     ipcRenderer.invoke("select-folder", options),
   getServerPort: () => ipcRenderer.invoke("get-server-port"),
+  getServerToken: (): Promise<string | null> =>
+    ipcRenderer.invoke("get-server-token"),
   getServerStatus: (): Promise<ServerStatus> =>
     ipcRenderer.invoke("get-server-status"),
   onServerStatusChange: (callback: (status: ServerStatus) => void) => {

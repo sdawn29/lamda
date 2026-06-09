@@ -7,6 +7,17 @@ import { join } from "node:path";
 const execFileAsync = promisify(execFile);
 const EMPTY_TREE_HASH = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
+/**
+ * Rejects values that git would interpret as an option flag. Even though every
+ * call uses execFile (no shell), a leading-dash argument can be parsed by git as
+ * an option (argument injection), e.g. a branch named `--upload-pack=...`.
+ */
+function assertNotOption(value: string, label: string): void {
+  if (value.startsWith("-")) {
+    throw new Error(`Invalid ${label}: must not start with '-'`);
+  }
+}
+
 function parseNumstat(stdout: string): {
   additions: number;
   deletions: number;
@@ -156,11 +167,29 @@ export function repoNameFromUrl(url: string): string {
  * Returns the absolute path of the created clone directory.
  */
 export async function gitClone(url: string, dir: string): Promise<string> {
+  assertNotOption(url.trim(), "repository URL");
   const target = join(dir, repoNameFromUrl(url));
+  // Restrict transports to ordinary remote protocols. Git's `ext::`/`fd::`
+  // transports execute arbitrary shell commands for user-initiated clones, so an
+  // attacker-supplied URL like `ext::sh -c <cmd>` would be remote code execution.
+  // `--` ends option parsing so the URL can't be read as a flag.
   await execFileAsync(
     "git",
-    ["clone", url, target],
-    { cwd: dir, timeout: 60000 },
+    [
+      "-c",
+      "protocol.ext.allow=never",
+      "-c",
+      "protocol.fd.allow=never",
+      "clone",
+      "--",
+      url,
+      target,
+    ],
+    {
+      cwd: dir,
+      timeout: 60000,
+      env: { ...process.env, GIT_ALLOW_PROTOCOL: "http:https:git:ssh:file" },
+    },
   );
   return target;
 }
@@ -193,10 +222,12 @@ export async function checkoutBranch(
   cwd: string,
   branch: string,
 ): Promise<void> {
+  assertNotOption(branch, "branch");
   await execFileAsync("git", ["checkout", branch], { cwd, timeout: 10000 });
 }
 
 export async function createBranch(cwd: string, branch: string): Promise<void> {
+  assertNotOption(branch, "branch");
   await execFileAsync("git", ["checkout", "-b", branch], {
     cwd,
     timeout: 10000,
@@ -343,16 +374,19 @@ export async function gitStashList(cwd: string): Promise<string> {
 
 /** Pops a stash: `git stash pop <ref>` */
 export async function gitStashPop(cwd: string, ref: string): Promise<void> {
+  assertNotOption(ref, "stash ref");
   await execFileAsync("git", ["stash", "pop", ref], { cwd, timeout: 10000 });
 }
 
 /** Applies a stash without removing it: `git stash apply <ref>` */
 export async function gitStashApply(cwd: string, ref: string): Promise<void> {
+  assertNotOption(ref, "stash ref");
   await execFileAsync("git", ["stash", "apply", ref], { cwd, timeout: 10000 });
 }
 
 /** Drops a stash without applying it: `git stash drop <ref>` */
 export async function gitStashDrop(cwd: string, ref: string): Promise<void> {
+  assertNotOption(ref, "stash ref");
   await execFileAsync("git", ["stash", "drop", ref], { cwd, timeout: 10000 });
 }
 
@@ -660,6 +694,7 @@ export async function gitStashStore(cwd: string, sha: string, message: string): 
  * stash^2 is the index snapshot and would miss unstaged changes for " M" files.
  */
 export async function gitRestoreFileFromRef(cwd: string, ref: string, filePath: string): Promise<void> {
+  assertNotOption(ref, "ref");
   await execFileAsync("git", ["checkout", ref, "--", filePath], {
     cwd,
     timeout: 10000,

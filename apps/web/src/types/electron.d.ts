@@ -26,6 +26,7 @@ interface ElectronAPI {
   platform: string
   selectFolder: (options?: SelectFolderOptions) => Promise<string | null>
   getServerPort: () => Promise<number | null>
+  getServerToken: () => Promise<string | null>
   getServerStatus: () => Promise<ServerStatus>
   onServerStatusChange: (callback: (status: ServerStatus) => void) => () => void
   restartServer: () => Promise<ServerStatus>

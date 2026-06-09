@@ -1,11 +1,37 @@
 import { electronServerPortQueryOptions } from "@/features/electron"
+import { getServerToken } from "@/features/electron/api"
 
 import { queryClient } from "./query-client"
 
 let resolvedServerUrl: string | null = null
+let resolvedServerToken: string | null = null
 
 export function resetServerUrl(): void {
   resolvedServerUrl = null
+  resolvedServerToken = null
+}
+
+const envToken = (): string | null =>
+  (import.meta.env.VITE_SERVER_TOKEN as string | undefined) ?? null
+
+/**
+ * The per-launch bearer token the server requires. Resolved from the Electron
+ * main process (or VITE_SERVER_TOKEN in standalone browser dev) and cached.
+ * Returns null when no token is available (e.g. a server started with auth off).
+ */
+export function getResolvedServerToken(): string | null {
+  return resolvedServerToken ?? envToken()
+}
+
+/**
+ * Appends the auth token as a `?token=` query param. Used for URLs that can't
+ * carry an Authorization header — WebSocket connections and `<img>`/media `src`.
+ */
+export function appendToken(url: string): string {
+  const token = getResolvedServerToken()
+  if (!token) return url
+  const sep = url.includes("?") ? "&" : "?"
+  return `${url}${sep}token=${encodeURIComponent(token)}`
 }
 
 export class ServerUnreachableError extends Error {
@@ -40,6 +66,10 @@ export class ApiError extends Error {
 export async function getServerUrl(): Promise<string> {
   if (resolvedServerUrl) return resolvedServerUrl
 
+  // Resolve the auth token alongside the URL so it's cached before any request
+  // (including synchronous apiUrl()/`<img>` consumers) needs it.
+  resolvedServerToken = envToken() ?? (await getServerToken())
+
   if (import.meta.env.VITE_SERVER_URL) {
     resolvedServerUrl = import.meta.env.VITE_SERVER_URL as string
     return resolvedServerUrl
@@ -63,9 +93,9 @@ export async function getServerWsUrl(): Promise<string> {
 }
 
 export function apiUrl(path: string): string {
-  if (resolvedServerUrl) return `${resolvedServerUrl}${path}`
+  if (resolvedServerUrl) return appendToken(`${resolvedServerUrl}${path}`)
   const envUrl = import.meta.env.VITE_SERVER_URL as string | undefined
-  if (envUrl) return `${envUrl}${path}`
+  if (envUrl) return appendToken(`${envUrl}${path}`)
   throw new ServerUnreachableError(
     "apiUrl called before server URL was resolved."
   )
@@ -94,9 +124,16 @@ export async function apiFetch<T>(
     init.signal.addEventListener("abort", () => clearTimeout(timeoutId), { once: true })
   }
 
+  // Attach the bearer token (resolved during getServerUrl above) without
+  // clobbering any caller-provided headers.
+  const token = getResolvedServerToken()
+  const headers = token
+    ? { ...init?.headers, Authorization: `Bearer ${token}` }
+    : init?.headers
+
   let res: Response
   try {
-    res = await fetch(`${base}${path}`, { ...init, signal })
+    res = await fetch(`${base}${path}`, { ...init, headers, signal })
   } catch (err) {
     clearTimeout(timeoutId)
     // Ignore abort errors - they are expected when canceling requests

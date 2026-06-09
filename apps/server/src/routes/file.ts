@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { stat, realpath } from "node:fs/promises";
 import { Readable } from "node:stream";
-import { extname } from "node:path";
+import { extname, isAbsolute, relative, resolve } from "node:path";
+import { listWorkspacesWithThreads } from "@lamda/db";
 
 const BINARY_MIME_TYPES: Record<string, string> = {
   ".png": "image/png",
@@ -27,6 +28,35 @@ function contentTypeFor(ext: string): string {
   return (
     BINARY_MIME_TYPES[ext] ?? TEXT_MIME_TYPES[ext] ?? "text/plain; charset=utf-8"
   );
+}
+
+/** Resolves the realpath when the file exists, else falls back to a lexical resolve. */
+async function canonicalize(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/**
+ * Confines `/file` reads to the directories of registered workspaces. Without
+ * this, the `path` query param is an arbitrary-file-read primitive (e.g.
+ * `/file?path=/Users/you/.ssh/id_rsa`). Symlinks are resolved before the
+ * containment check so they can't be used to escape a workspace root.
+ */
+async function isWithinWorkspace(target: string): Promise<boolean> {
+  const real = await canonicalize(target);
+  const roots = listWorkspacesWithThreads()
+    .map((w) => w.path)
+    .filter((p): p is string => typeof p === "string" && p.length > 0);
+
+  for (const root of roots) {
+    const realRoot = await canonicalize(root);
+    const rel = relative(realRoot, real);
+    if (rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))) return true;
+  }
+  return false;
 }
 
 /**
@@ -72,6 +102,10 @@ file.get("/file", async (c) => {
   const path = c.req.query("path");
   if (!path) {
     return c.json({ error: "path query param is required" }, 400);
+  }
+
+  if (!(await isWithinWorkspace(path))) {
+    return c.json({ error: "path is outside any open workspace" }, 403);
   }
 
   let fileStat;

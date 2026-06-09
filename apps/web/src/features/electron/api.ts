@@ -28,6 +28,10 @@ export async function getServerPort(): Promise<number | null> {
   return (await getElectronAPI()?.getServerPort()) ?? null
 }
 
+export async function getServerToken(): Promise<string | null> {
+  return (await getElectronAPI()?.getServerToken?.()) ?? null
+}
+
 export type ElectronServerStatus = ServerStatus
 
 export async function getServerStatus(): Promise<ElectronServerStatus> {

@@ -3,7 +3,7 @@
  * All session mutations go through the commands WebSocket at /ws/session/:id/commands
  */
 
-import { getServerWsUrl } from "@/shared/lib/client"
+import { appendToken, getServerWsUrl } from "@/shared/lib/client"
 
 export interface PromptOptions {
   images?: { data: string; mediaType: string }[]
@@ -219,7 +219,7 @@ export class SessionCommandsClient {
 
     const base = await getServerWsUrl()
     const url = `${base}/ws/session/${this.sessionId}/commands`
-    this.ws = new WebSocket(url)
+    this.ws = new WebSocket(appendToken(url))
 
     this.ws.onopen = () => {
       this.onConnectHandlers.forEach((h) => h())

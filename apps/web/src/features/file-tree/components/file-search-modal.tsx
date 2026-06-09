@@ -11,7 +11,7 @@ import {
 } from "@/shared/ui/command"
 import { getFileIcon } from "@/shared/ui/file-icon"
 import { useWorkspaceIndex, useWorkspaces } from "@/features/workspace/queries"
-import { getServerUrl } from "@/shared/lib/client"
+import { appendToken, getServerUrl } from "@/shared/lib/client"
 
 interface FileSearchModalProps {
   open: boolean
@@ -51,7 +51,7 @@ export function FileSearchModal({
         const base = await getServerUrl()
         const gitignorePath = `${workspacePath.replace(/\/$/, "")}/.gitignore`
         const res = await fetch(
-          `${base}/file?path=${encodeURIComponent(gitignorePath)}`
+          appendToken(`${base}/file?path=${encodeURIComponent(gitignorePath)}`)
         )
         if (!res.ok) {
           if (!cancelled) setIgnoredFolderPrefixes([])

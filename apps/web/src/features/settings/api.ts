@@ -1,4 +1,4 @@
-import { apiFetch, getServerWsUrl } from "@/shared/lib/client"
+import { apiFetch, appendToken, getServerWsUrl } from "@/shared/lib/client"
 
 // ── App settings ──────────────────────────────────────────────────────────────
 
@@ -133,7 +133,7 @@ export async function startOAuthLogin(providerId: string): Promise<string> {
 
 export async function openOAuthWebSocket(loginId: string): Promise<WebSocket> {
   const base = await getServerWsUrl()
-  return new WebSocket(`${base}/ws/auth/oauth/${loginId}/events`)
+  return new WebSocket(appendToken(`${base}/ws/auth/oauth/${loginId}/events`))
 }
 
 export async function respondToOAuthPrompt(

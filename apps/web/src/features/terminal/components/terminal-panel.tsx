@@ -6,7 +6,7 @@ import { Button } from "@/shared/ui/button"
 import { useTheme } from "@/shared/components/theme-provider"
 import { buildTerminalTheme } from "@/features/themes"
 import { useTerminal } from "../store"
-import { getServerUrl } from "@/shared/lib/client"
+import { appendToken, getServerUrl } from "@/shared/lib/client"
 import { cn } from "@/shared/lib/utils"
 import "@xterm/xterm/css/xterm.css"
 
@@ -155,7 +155,7 @@ const TerminalInstance = memo(function TerminalInstance({
       if (cancelled || !serverUrlCache) return
       const wsBase = serverUrlCache.replace(/^http/, "ws")
       const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwd)}&workspaceId=${encodeURIComponent(workspaceId)}&terminalId=${encodeURIComponent(id)}`
-      ws = new WebSocket(url)
+      ws = new WebSocket(appendToken(url))
       wsRef.current = ws
 
       ws.onopen = () => {

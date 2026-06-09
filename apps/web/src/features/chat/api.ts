@@ -1,4 +1,4 @@
-import { apiFetch, getServerWsUrl } from "@/shared/lib/client"
+import { apiFetch, appendToken, getServerWsUrl } from "@/shared/lib/client"
 import type { MessageBlock } from "./types"
 
 // ── WebSocket helpers ──────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ async function openWebSocketWithRetry(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const ws = new WebSocket(url)
+      const ws = new WebSocket(appendToken(url))
 
       // Wait for connection or failure with a timeout
       const result = await new Promise<WebSocket>((resolve, reject) => {

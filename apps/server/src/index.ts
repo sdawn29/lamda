@@ -11,6 +11,7 @@ import { handleGlobalEventsWs } from "./routes/health.js";
 import { handleOAuthEventsWs } from "./routes/auth.js";
 import { handleLspWs } from "./routes/lsp.js";
 import { handleSessionCommands } from "./websocket/session-commands.js";
+import { isAllowedOrigin, isAuthEnabled, isValidToken } from "./auth.js";
 
 const port = resolvePort();
 
@@ -48,7 +49,15 @@ bootstrapSessions()
           /^\/ws\/auth\/oauth\/[^/]+\/events$/.test(pathname) ||
           /^\/ws\/workspace\/[^/]+\/lsp$/.test(pathname);
 
-        if (isKnownWsPath) {
+        // WebSockets are not covered by CORS, so a malicious page could otherwise
+        // open ws://127.0.0.1:<port>/terminal and get a shell. Enforce the same
+        // Origin allowlist and bearer token as the HTTP layer. The token rides in
+        // the `?token=` query param because browser WebSockets can't set headers.
+        const originAllowed = isAllowedOrigin(request.headers.origin);
+        const tokenOk =
+          !isAuthEnabled() || isValidToken(url.searchParams.get("token"));
+
+        if (isKnownWsPath && originAllowed && tokenOk) {
           wss.handleUpgrade(request, socket, head, (ws) => {
             wss.emit("connection", ws, request);
           });

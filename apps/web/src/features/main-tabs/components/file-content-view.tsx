@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { FileHeader } from "@/features/git/components/file-header"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
-import { getServerUrl } from "@/shared/lib/client"
+import { appendToken, getServerUrl } from "@/shared/lib/client"
 import { cn } from "@/shared/lib/utils"
 import { LANGUAGE_MAP } from "@/shared/lib/language-map"
 import {
@@ -147,9 +147,11 @@ export const FileContentView = memo(function FileContentView({
         if (!src) return null
         const resolvedSrc = /^https?:/.test(src)
           ? src
-          : `${serverUrl}/file?path=${encodeURIComponent(
-              src.startsWith("/") ? src : resolveFilePath(filePath, src)
-            )}`
+          : appendToken(
+              `${serverUrl}/file?path=${encodeURIComponent(
+                src.startsWith("/") ? src : resolveFilePath(filePath, src)
+              )}`
+            )
         return (
           <img
             src={resolvedSrc}
@@ -196,7 +198,7 @@ export const FileContentView = memo(function FileContentView({
         }
 
         const response = await fetch(
-          `${url}/file?path=${encodeURIComponent(filePath)}`
+          appendToken(`${url}/file?path=${encodeURIComponent(filePath)}`)
         )
         if (!response.ok) {
           throw new Error(`Failed to load file: ${response.statusText}`)
@@ -318,13 +320,17 @@ export const FileContentView = memo(function FileContentView({
         >
           {isImage ? (
             <img
-              src={`${serverUrl}/file?path=${encodeURIComponent(filePath)}`}
+              src={appendToken(
+                `${serverUrl}/file?path=${encodeURIComponent(filePath)}`
+              )}
               alt={fileName}
               className="max-h-full max-w-full object-contain"
             />
           ) : isHtml && htmlPreview ? (
             <iframe
-              src={`${serverUrl}/file?path=${encodeURIComponent(filePath)}`}
+              src={appendToken(
+                `${serverUrl}/file?path=${encodeURIComponent(filePath)}`
+              )}
               title={fileName}
               className="h-full w-full border-0"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"

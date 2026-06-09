@@ -9,7 +9,7 @@
  *     it once and close when the last viewer unmounts)
  */
 
-import { getServerWsUrl } from "@/shared/lib/client"
+import { appendToken, getServerWsUrl } from "@/shared/lib/client"
 import type {
   Diagnostic,
   DocumentSymbolResult,
@@ -54,7 +54,7 @@ export class LspConnection {
       const base = await getServerWsUrl()
       const url = `${base}/ws/workspace/${encodeURIComponent(this.workspaceId)}/lsp`
       await new Promise<void>((resolve, reject) => {
-        const ws = new WebSocket(url)
+        const ws = new WebSocket(appendToken(url))
         this.ws = ws
         ws.onopen = () => resolve()
         ws.onerror = () => reject(new Error("LSP WebSocket error"))
