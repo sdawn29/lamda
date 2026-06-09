@@ -129,7 +129,7 @@ export { TerminalPanel } from "./components/terminal-panel"
 - **Theme mismatch** — xterm.js terminal theme is independent from app theme; you can have dark app with light terminal (both built-in)
 - **Tab counter is module-level** — `tabCounter` is a global counter, not per-session; resets on `killAll()` or all tabs closed
 - **PTY requires native module** — `node-pty` must be rebuilt for Electron; handled by `postinstall` script in server package
-- **WebSocket reconnection** — Each connection passes a stable `terminalId` (the tab id). The server reattaches to the existing PTY and replays its scrollback, so switching away and back keeps the session intact. A "[disconnected]" line is only shown when the shell actually exits (not on a clean unmount/detach).
+- **WebSocket reconnection** — Each connection passes a stable `terminalId` (the tab id). The server reattaches to the existing PTY and replays its scrollback, so switching away and back keeps the session intact. If the socket drops unexpectedly while the terminal is still mounted (laptop sleep/wake, server restart, network blip), the client auto-reconnects with exponential backoff (`TERMINAL_RECONNECT_BASE_MS`→`TERMINAL_RECONNECT_MAX_MS`), showing a yellow "[reconnecting…]" line. On a successful reattach it calls `term.reset()` first so the server's replayed scrollback doesn't duplicate output already on screen. A clean unmount/detach is silent.
 - **Server keeps rolling scrollback** — The server retains a bounded rolling scrollback per session (capped, trimmed on line boundaries) purely to replay context to a reattaching client; client-side xterm.js still owns the full interactive scrollback
 
 ## Related

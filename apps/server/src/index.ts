@@ -58,9 +58,37 @@ bootstrapSessions()
       },
     );
 
+    // Heartbeat: ping every client periodically and terminate any that fail to
+    // pong, so dead sockets (laptop sleep/wake, network blips) are detected and
+    // cleaned up promptly instead of lingering as half-open connections. The
+    // periodic traffic also keeps idle connections from being reaped.
+    const HEARTBEAT_INTERVAL_MS = 30_000;
+    type KeepAliveWs = WebSocket & { isAlive?: boolean };
+    const heartbeat = setInterval(() => {
+      for (const client of wss.clients as Set<KeepAliveWs>) {
+        if (client.isAlive === false) {
+          client.terminate();
+          continue;
+        }
+        client.isAlive = false;
+        try {
+          client.ping();
+        } catch {
+          // socket already closing
+        }
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+    wss.on("close", () => clearInterval(heartbeat));
+
     wss.on(
       "connection",
       (ws: WebSocket, request: import("node:http").IncomingMessage) => {
+        const keepAlive = ws as KeepAliveWs;
+        keepAlive.isAlive = true;
+        keepAlive.on("pong", () => {
+          keepAlive.isAlive = true;
+        });
+
         const url = new URL(request.url ?? "/", "http://localhost");
         const pathname = url.pathname;
 

@@ -12,6 +12,10 @@ import "@xterm/xterm/css/xterm.css"
 
 const TERMINAL_OUTPUT_FLUSH_MS = 16
 const TERMINAL_IMMEDIATE_FLUSH_THRESHOLD = 8_192
+// Auto-reconnect backoff for a dropped PTY socket. The server keeps the shell
+// alive (orphan grace), so reattaching restores the session transparently.
+const TERMINAL_RECONNECT_BASE_MS = 500
+const TERMINAL_RECONNECT_MAX_MS = 10_000
 
 // Tracks tab ids whose `initialCommand` has already been dispatched, so that a
 // reattach (workspace/tab switch, route change) doesn't re-run it against the
@@ -88,6 +92,11 @@ const TerminalInstance = memo(function TerminalInstance({
     let ws: WebSocket | null = null
     let pendingOutput = ""
     let flushTimeout: number | null = null
+    let reconnectTimeout: number | null = null
+    let reconnectAttempts = 0
+    let hasConnected = false
+    let reconnectNoticeShown = false
+    let serverUrlCache: string | null = null
 
     const flushOutput = () => {
       flushTimeout = null
@@ -104,33 +113,62 @@ const TerminalInstance = memo(function TerminalInstance({
       flushTimeout = window.setTimeout(flushOutput, delay)
     }
 
-    const resizeObserver = new ResizeObserver(() => {
-      // Skip fit when container is hidden/collapsed to 0 size
-      if (!container.offsetWidth || !container.offsetHeight) return
-      fitAddon.fit()
+    const sendResize = () => {
       const dims = fitAddon.proposeDimensions()
       if (dims && ws?.readyState === WebSocket.OPEN) {
         ws.send(
           JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
         )
       }
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      // Skip fit when container is hidden/collapsed to 0 size
+      if (!container.offsetWidth || !container.offsetHeight) return
+      fitAddon.fit()
+      sendResize()
     })
     resizeObserver.observe(container)
 
-    getServerUrl().then((serverUrl) => {
-      if (cancelled) return
-      const wsBase = serverUrl.replace(/^http/, "ws")
+    // Input handler is registered once and reads the current `ws` via closure,
+    // so it keeps working across reconnects without stacking listeners.
+    term.onData((data) => {
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "input", data }))
+      }
+    })
+
+    const scheduleReconnect = () => {
+      if (cancelled || reconnectTimeout !== null) return
+      const delay = Math.min(
+        TERMINAL_RECONNECT_BASE_MS * 2 ** reconnectAttempts,
+        TERMINAL_RECONNECT_MAX_MS
+      )
+      reconnectAttempts += 1
+      reconnectTimeout = window.setTimeout(() => {
+        reconnectTimeout = null
+        connect()
+      }, delay)
+    }
+
+    const connect = () => {
+      if (cancelled || !serverUrlCache) return
+      const wsBase = serverUrlCache.replace(/^http/, "ws")
       const url = `${wsBase}/terminal?cwd=${encodeURIComponent(cwd)}&workspaceId=${encodeURIComponent(workspaceId)}&terminalId=${encodeURIComponent(id)}`
       ws = new WebSocket(url)
       wsRef.current = ws
 
       ws.onopen = () => {
-        const dims = fitAddon.proposeDimensions()
-        if (dims) {
-          ws!.send(
-            JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows })
-          )
+        if (hasConnected) {
+          // Reattaching to a still-alive server PTY: it will replay scrollback,
+          // so clear the local view first to avoid duplicating recent output.
+          pendingOutput = ""
+          term.reset()
         }
+        hasConnected = true
+        reconnectAttempts = 0
+        reconnectNoticeShown = false
+        sendResize()
         if (initialCommand && !dispatchedInitialCommands.has(id)) {
           dispatchedInitialCommands.add(id)
           setTimeout(() => {
@@ -158,19 +196,28 @@ const TerminalInstance = memo(function TerminalInstance({
         // the PTY stays alive server-side for reattach, so don't surface it.
         if (cancelled) return
         if (pendingOutput) flushOutput()
-        term.write("\r\n\x1b[31m[disconnected]\x1b[0m\r\n")
-      }
-
-      term.onData((data) => {
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "input", data }))
+        wsRef.current = null
+        // The server keeps the PTY alive through its orphan grace window, so a
+        // dropped socket (sleep/wake, server restart, network blip) should be
+        // recovered by reattaching rather than abandoned.
+        if (!reconnectNoticeShown) {
+          term.write("\r\n\x1b[33m[reconnecting…]\x1b[0m\r\n")
+          reconnectNoticeShown = true
         }
-      })
+        scheduleReconnect()
+      }
+    }
+
+    getServerUrl().then((serverUrl) => {
+      if (cancelled) return
+      serverUrlCache = serverUrl
+      connect()
     })
 
     return () => {
       cancelled = true
       if (flushTimeout !== null) window.clearTimeout(flushTimeout)
+      if (reconnectTimeout !== null) window.clearTimeout(reconnectTimeout)
       pendingOutput = ""
       resizeObserver.disconnect()
       ws?.close()
