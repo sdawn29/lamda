@@ -1,5 +1,5 @@
 import * as React from "react"
-import { FileTextIcon, TerminalIcon, type LucideIcon } from "lucide-react"
+import { FileTextIcon, ServerCrashIcon, type LucideIcon } from "lucide-react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { getIconName, buildCatppuccinSvgElement } from "@/shared/ui/file-icon"
 import { cn } from "@/shared/lib/utils"
@@ -91,17 +91,19 @@ function buildIconifyIcon(iconName: string): SVGSVGElement {
   return buildCatppuccinSvgElement(iconName, "size-3.5 shrink-0")
 }
 
-function buildLucideIcon(Icon: LucideIcon): SVGSVGElement {
+function buildLucideIcon(Icon: LucideIcon, className?: string): SVGSVGElement {
   const template = document.createElement("template")
   template.innerHTML = renderToStaticMarkup(
-    <Icon aria-hidden size={12} strokeWidth={2} className="shrink-0" />
+    <Icon aria-hidden size={12} strokeWidth={2} className={cn("shrink-0", className)} />
   )
 
   return template.content.firstElementChild as SVGSVGElement
 }
 
 function buildSlashCommandIcon(source: SlashCommand["source"]): SVGSVGElement {
-  return buildLucideIcon(source === "skill" ? TerminalIcon : FileTextIcon)
+  return source === "skill"
+    ? buildLucideIcon(ServerCrashIcon, "text-purple-500")
+    : buildLucideIcon(FileTextIcon)
 }
 
 export function buildMentionChip(path: string): HTMLSpanElement {
@@ -119,9 +121,13 @@ export function buildMentionChip(path: string): HTMLSpanElement {
 export function buildSlashCommandChip(cmd: SlashCommand): HTMLSpanElement {
   const chip = buildChipBase()
 
+  // Skills carry a `skill:` prefix in their name — show the bare name to the
+  // user while keeping the full name in the dataset for submission.
+  const displayName = cmd.source === "skill" ? cmd.name.replace(/^skill:/, "") : cmd.name
+
   const name = document.createElement("span")
   name.className = "font-mono"
-  name.textContent = `/${cmd.name}`
+  name.textContent = `/${displayName}`
 
   chip.dataset.commandName = cmd.name
   chip.dataset.commandSource = cmd.source
@@ -130,7 +136,7 @@ export function buildSlashCommandChip(cmd: SlashCommand): HTMLSpanElement {
   }
   chip.title = [
     cmd.source === "skill" ? "Skill" : "Prompt",
-    `/${cmd.name}`,
+    `/${displayName}`,
     cmd.description,
   ]
     .filter(Boolean)

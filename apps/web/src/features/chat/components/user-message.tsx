@@ -1,4 +1,4 @@
-import { FileTextIcon, TerminalIcon } from "lucide-react"
+import { FileTextIcon, ServerCrashIcon } from "lucide-react"
 import { Icon } from "@iconify/react"
 
 import { cn } from "@/shared/lib/utils"
@@ -67,17 +67,24 @@ function FolderChip({ folderPath }: { folderPath: string }) {
 
 function SlashCommandChip({ command }: { command: SlashCommand }) {
   const isSkill = command.source === "skill"
+  // Skill commands carry a `skill:` prefix in their name — drop it for display
+  // so the chip reads `/foo` rather than `/skill:foo`.
+  const displayName = isSkill ? command.name.replace(/^skill:/, "") : command.name
 
   return (
     <MessageChip
       icon={
         isSkill ? (
-          <TerminalIcon data-icon="inline-start" aria-hidden />
+          <ServerCrashIcon
+            data-icon="inline-start"
+            className="text-purple-500"
+            aria-hidden
+          />
         ) : (
           <FileTextIcon data-icon="inline-start" aria-hidden />
         )
       }
-      label={<span className="font-mono">/{command.name}</span>}
+      label={<span className="font-mono">/{displayName}</span>}
       detailClassName="w-64 flex-col items-start gap-0 overflow-hidden p-0"
       detail={
         <>
@@ -87,12 +94,12 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
               className={cn(
                 "flex size-6 shrink-0 items-center justify-center rounded",
                 isSkill
-                  ? "bg-primary/15 text-primary"
+                  ? "bg-purple-500/15 text-purple-500"
                   : "bg-foreground/10 text-foreground/60"
               )}
             >
               {isSkill ? (
-                <TerminalIcon className="size-3.5" aria-hidden />
+                <ServerCrashIcon className="size-3.5" aria-hidden />
               ) : (
                 <FileTextIcon className="size-3.5" aria-hidden />
               )}
@@ -102,7 +109,7 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
                 {isSkill ? "Skill" : "Prompt"}
               </span>
               <span className="truncate font-mono text-[11px] font-medium text-foreground">
-                /{command.name}
+                /{displayName}
               </span>
             </div>
           </div>

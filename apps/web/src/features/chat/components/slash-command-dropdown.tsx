@@ -1,7 +1,7 @@
 import * as React from "react"
 import {
   FileTextIcon,
-  TerminalIcon,
+  ServerCrashIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -41,7 +41,11 @@ export function itemValue(item: ChatSlashItem): string {
 }
 
 export function itemName(item: ChatSlashItem): string {
-  return item.kind === "action" ? item.name : item.command.name
+  if (item.kind === "action") return item.name
+  // Skills carry a `skill:` prefix in their name — drop it for display.
+  return item.command.source === "skill"
+    ? item.command.name.replace(/^skill:/, "")
+    : item.command.name
 }
 
 export function itemDescription(item: ChatSlashItem): string | undefined {
@@ -162,10 +166,10 @@ function SlashItemIcon({ item }: { item: ChatSlashItem }) {
     )
   }
   return (
-    <TerminalIcon
+    <ServerCrashIcon
       width={12}
       height={12}
-      className="shrink-0 text-muted-foreground"
+      className="shrink-0 text-purple-500"
       aria-hidden
     />
   )

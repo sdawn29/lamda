@@ -8,6 +8,7 @@ import {
   CopyIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
+  ServerCrashIcon,
 } from "lucide-react"
 import { FileIcon } from "@/shared/ui/file-icon"
 
@@ -189,6 +190,22 @@ function isReadTool(toolName: string, args: unknown): boolean {
 }
 
 /**
+ * Detect a Read that targets a skill's `SKILL.md` and return the skill name.
+ * Skills live at `…/skills/<name>/SKILL.md` (under .agents, .claude, .pi, etc.),
+ * so we require both a `skills/` segment and a `SKILL.md` leaf, and take the
+ * directory holding it as the skill name. Returns null for ordinary reads.
+ */
+function getReadSkillName(filePath: string | null): string | null {
+  if (!filePath) return null
+  const norm = filePath.replace(/\\/g, "/")
+  if (!/(^|\/)SKILL\.md$/i.test(norm)) return null
+  if (!/(^|\/)skills\//i.test(norm)) return null
+  const parts = norm.split("/")
+  const name = parts[parts.length - 2]
+  return name || null
+}
+
+/**
  * Formats the line range a Read covers from its `offset` (1-based start line)
  * and `limit` (line count) args, e.g. "L40–89", "L40+", or null for a full read.
  */
@@ -359,6 +376,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const isRead = isReadTool(normalizedToolName, msg.args)
   const readFilePath = isRead ? getReadFilePath(msg.args) : null
   const readLineRange = isRead ? getReadLineRange(msg.args) : null
+  const skillName = isRead ? getReadSkillName(readFilePath) : null
   const isWrite =
     (normalizedToolName === "write" || normalizedToolName === "plan_write") &&
     isWriteArgs(msg.args)
@@ -567,6 +585,10 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         onClick={toggle}
         aria-expanded={expanded}
       >
+        {skillName ? (
+          <ServerCrashIcon className="h-3.5 w-3.5 shrink-0 text-purple-500" />
+        ) : null}
+
         <span className={cn(
           "shrink-0 text-sm font-medium",
           msg.status === "running"
@@ -575,10 +597,14 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               ? "text-destructive/70"
               : "text-muted-foreground/45"
         )}>
-          {msg.toolName}
+          {skillName ? "Skill" : msg.toolName}
         </span>
 
-        {filePath ? (
+        {skillName ? (
+          <span className="min-w-0 truncate text-sm font-medium text-purple-500/80">
+            {skillName}
+          </span>
+        ) : filePath ? (
           <span className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground/35">
             <FileIcon filename={filePath} className="h-3.5 w-3.5 shrink-0 opacity-50" />
             <span className="truncate">{fileBasename(filePath)}</span>
