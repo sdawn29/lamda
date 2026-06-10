@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](../../releases/tag/v0.15.0) — 2026-06-10
+
+### Features
+
+* **chat:** replace TerminalIcon with ServerCrashIcon and update slash command display names
+* **auth:** implement token-based authentication for server API and WebSocket connections
+* **terminal:** implement WebSocket heartbeat and auto-reconnect logic for improved connection stability
+* **context-usage:** add ContextBreakdown interface and integrate into ContextUsage for detailed token tracking
+
+### Code Refactoring
+
+* unify text sizing and styles across components
+
 ## [0.14.0](../../releases/tag/v0.14.0) — 2026-06-08
 
 ### Features
