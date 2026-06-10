@@ -8,7 +8,7 @@ import {
   CopyIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
-  ServerCrashIcon,
+  ZapIcon,
 } from "lucide-react"
 import { FileIcon } from "@/shared/ui/file-icon"
 
@@ -117,11 +117,11 @@ function toRelativePath(p: string, rootPath?: string): string {
   return p.startsWith(root) ? p.slice(root.length) : p
 }
 
-function fileBasename(filePath: string): string {
+export function fileBasename(filePath: string): string {
   return filePath.split("/").pop() ?? filePath
 }
 
-function argsSummary(args: unknown, rootPath?: string): string {
+export function argsSummary(args: unknown, rootPath?: string): string {
   if (typeof args !== "object" || args === null) return ""
   const a = args as Record<string, unknown>
   if (typeof a.command === "string") return a.command
@@ -203,6 +203,17 @@ function getReadSkillName(filePath: string | null): string | null {
   const parts = norm.split("/")
   const name = parts[parts.length - 2]
   return name || null
+}
+
+/**
+ * True when a tool message is a Read of a skill's `SKILL.md`. Used by the
+ * working block to keep skill loads out of "Read · N files" run groups —
+ * they render as a distinct Skill row instead.
+ */
+export function isSkillRead(msg: ToolMessage): boolean {
+  const name = msg.toolName.toLowerCase()
+  if (name !== "read" && name !== "plan_read") return false
+  return getReadSkillName(getReadFilePath(msg.args)) !== null
 }
 
 /**
@@ -581,30 +592,32 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       {/* Trigger row — text accordion style */}
       <button
         type="button"
-        className="flex w-full min-w-0 items-center gap-1.5 text-left"
+        className="group/row flex w-full min-w-0 items-center gap-1.5 text-left"
         onClick={toggle}
-        aria-expanded={expanded}
+        aria-expanded={hasBody ? expanded : undefined}
       >
         {skillName ? (
-          <ServerCrashIcon className="h-3.5 w-3.5 shrink-0 text-purple-500" />
+          <span className="flex shrink-0 items-center gap-1 rounded bg-purple-500/10 px-1.5 py-0.5 text-2xs font-medium text-purple-600 dark:text-purple-400">
+            <ZapIcon className="h-3 w-3 shrink-0" />
+            <span className="leading-none">Skill</span>
+          </span>
         ) : null}
 
         <span className={cn(
-          "shrink-0 text-sm font-medium",
+          "text-sm font-medium",
+          skillName ? "min-w-0 truncate" : "shrink-0",
           msg.status === "running"
             ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
             : msg.status === "error"
               ? "text-destructive/70"
-              : "text-muted-foreground/45"
+              : skillName
+                ? "text-foreground/70"
+                : "text-muted-foreground/45"
         )}>
-          {skillName ? "Skill" : msg.toolName}
+          {skillName ?? msg.toolName}
         </span>
 
-        {skillName ? (
-          <span className="min-w-0 truncate text-sm font-medium text-purple-500/80">
-            {skillName}
-          </span>
-        ) : filePath ? (
+        {skillName ? null : filePath ? (
           <span className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground/35">
             <FileIcon filename={filePath} className="h-3.5 w-3.5 shrink-0 opacity-50" />
             <span className="truncate">{fileBasename(filePath)}</span>
@@ -642,12 +655,16 @@ export const ToolCallBlock = memo(function ToolCallBlock({
           </span>
         )}
 
-        <ChevronRightIcon
-          className={cn(
-            "h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform duration-200",
-            expanded && "rotate-90"
-          )}
-        />
+        {hasBody && (
+          <ChevronRightIcon
+            className={cn(
+              "h-3 w-3 shrink-0 text-muted-foreground/30 transition-all duration-200",
+              expanded
+                ? "rotate-90 opacity-100"
+                : "opacity-0 group-hover/row:opacity-100"
+            )}
+          />
+        )}
       </button>
 
       {/* Collapsible content */}
@@ -658,36 +675,32 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         )}
       >
         <div className="overflow-hidden">
-          <div className="group/copy mt-2 overflow-hidden rounded-lg border border-border/40 bg-black/5 dark:bg-white/[0.03]">
-            {/* Header: summary + copy */}
-            <div className="flex items-start gap-2 border-b border-border/30 px-3 py-1.5">
-              {normalizedToolName === "bash" ? (
+          <div className="group/copy relative mt-1.5 overflow-hidden rounded-md border border-border/30 bg-black/3 dark:bg-white/2">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className={cn(
+                "absolute top-1 right-1 z-10 shrink-0 rounded p-1 text-muted-foreground/40 opacity-0 transition-opacity group-hover/copy:opacity-100 hover:bg-muted hover:text-muted-foreground",
+                copied && "text-emerald-500 opacity-100"
+              )}
+              aria-label="Copy result"
+            >
+              {copied ? (
+                <CheckIcon className="h-3 w-3" />
+              ) : (
+                <CopyIcon className="h-3 w-3" />
+              )}
+            </button>
+
+            {/* Bash: trigger row truncates the command, so repeat it in full */}
+            {normalizedToolName === "bash" && summary && (
+              <div className="flex items-start gap-2 border-b border-border/30 px-3 py-1.5 pr-8">
                 <span className="mt-px font-mono text-2xs font-bold text-foreground/60">$</span>
-              ) : (isEdit || isWrite) && filePath ? (
-                <FileIcon filename={filePath} className="mt-px h-3.5 w-3.5 shrink-0 opacity-50" />
-              ) : null}
-              <span className={cn(
-                "flex-1 font-mono text-2xs text-foreground/60",
-                normalizedToolName === "bash" ? "break-all whitespace-pre-wrap" : "truncate"
-              )}>
-                {summary || msg.toolName}
-              </span>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className={cn(
-                  "shrink-0 rounded p-1 text-muted-foreground/40 opacity-0 transition-colors group-hover/copy:opacity-100 hover:bg-muted hover:text-muted-foreground",
-                  copied && "text-emerald-500"
-                )}
-                aria-label="Copy result"
-              >
-                {copied ? (
-                  <CheckIcon className="h-3 w-3" />
-                ) : (
-                  <CopyIcon className="h-3 w-3" />
-                )}
-              </button>
-            </div>
+                <span className="flex-1 font-mono text-2xs break-all whitespace-pre-wrap text-foreground/60">
+                  {summary}
+                </span>
+              </div>
+            )}
 
             {/* Content */}
             <div className="px-3 py-2">

@@ -1,4 +1,4 @@
-import { FileTextIcon, ServerCrashIcon } from "lucide-react"
+import { FileTextIcon, ZapIcon } from "lucide-react"
 import { Icon } from "@iconify/react"
 
 import { cn } from "@/shared/lib/utils"
@@ -74,11 +74,16 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
 
   return (
     <MessageChip
+      className={
+        isSkill
+          ? "border-purple-500/30 bg-purple-500/10! text-purple-700 dark:bg-purple-500/15! dark:text-purple-300"
+          : undefined
+      }
       icon={
         isSkill ? (
-          <ServerCrashIcon
+          <ZapIcon
             data-icon="inline-start"
-            className="text-purple-500"
+            className="text-purple-600 dark:text-purple-400"
             aria-hidden
           />
         ) : (
@@ -95,12 +100,12 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
               className={cn(
                 "flex size-6 shrink-0 items-center justify-center rounded",
                 isSkill
-                  ? "bg-purple-500/15 text-purple-500"
+                  ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
                   : "bg-foreground/10 text-foreground/60"
               )}
             >
               {isSkill ? (
-                <ServerCrashIcon className="size-3.5" aria-hidden />
+                <ZapIcon className="size-3.5" aria-hidden />
               ) : (
                 <FileTextIcon className="size-3.5" aria-hidden />
               )}

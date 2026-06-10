@@ -3,11 +3,175 @@ import { ChevronRightIcon } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
 import { formatDuration } from "@/shared/lib/formatters"
 import { ThinkingBlock } from "./thinking-block"
-import { ToolCallBlock } from "./tool-call-block"
+import { ToolCallBlock, argsSummary, fileBasename, isSkillRead } from "./tool-call-block"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
 import type { AssistantMessage, ToolMessage } from "../types"
 
 export type WorkingMessage = AssistantMessage | ToolMessage
+
+const SHIMMER_TEXT_CLASS =
+  "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
+
+/**
+ * Read-only lookup tools whose consecutive calls collapse into a single
+ * "Read · 4 files" style row. Mutating tools (edit, write, bash…) always
+ * stay individually visible.
+ */
+const GROUPABLE_TOOLS = new Set([
+  "read",
+  "plan_read",
+  "grep",
+  "glob",
+  "find",
+  "search",
+  "websearch",
+  "web_search",
+  "webfetch",
+  "web_fetch",
+  "fetch",
+])
+
+function isReadTool(name: string): boolean {
+  return name === "read" || name === "plan_read"
+}
+
+function runNoun(toolName: string, count: number): string {
+  const name = toolName.toLowerCase()
+  const noun = isReadTool(name) ? "file" : name.includes("fetch") ? "page" : "search"
+  return `${count} ${noun}${count === 1 ? "" : "s"}`
+}
+
+/** A collapsed run of consecutive same-tool calls inside a working block. */
+function ToolRunGroup({
+  tools,
+  rootPath,
+}: {
+  tools: ToolMessage[]
+  rootPath?: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const toolName = tools[0].toolName
+  const running = tools.some((t) => t.status === "running")
+  const errored = tools.some((t) => t.status === "error")
+  const preview = tools
+    .map((t) => {
+      const s = argsSummary(t.args, rootPath)
+      return isReadTool(toolName.toLowerCase()) ? fileBasename(s) : s
+    })
+    .filter(Boolean)
+    .join(", ")
+
+  return (
+    <div className="w-full text-xs">
+      <button
+        type="button"
+        className="group/row flex w-full min-w-0 items-center gap-1.5 text-left"
+        onClick={() => setExpanded((prev) => !prev)}
+        aria-expanded={expanded}
+      >
+        <span
+          className={cn(
+            "shrink-0 text-sm font-medium",
+            running
+              ? SHIMMER_TEXT_CLASS
+              : errored
+                ? "text-destructive/70"
+                : "text-muted-foreground/45"
+          )}
+        >
+          {toolName}
+        </span>
+        <span className="shrink-0 text-sm tabular-nums text-muted-foreground/45">
+          {runNoun(toolName, tools.length)}
+        </span>
+        {preview && (
+          <span className="min-w-0 truncate text-sm text-muted-foreground/35">
+            {preview}
+          </span>
+        )}
+        <ChevronRightIcon
+          className={cn(
+            "h-3 w-3 shrink-0 text-muted-foreground/30 transition-all duration-200",
+            expanded
+              ? "rotate-90 opacity-100"
+              : "opacity-0 group-hover/row:opacity-100"
+          )}
+        />
+      </button>
+
+      <div
+        className={cn(
+          "grid transition-all duration-300 ease-in-out",
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        )}
+      >
+        <div className="overflow-hidden">
+          <div className="mt-1.5 ml-[3px] flex flex-col gap-1.5 border-l border-border/40 pl-3">
+            {tools.map((t) => (
+              <ToolCallBlock
+                key={t.toolCallId}
+                msg={t}
+                isNew={false}
+                rootPath={rootPath}
+                suppressPlanSavedCard
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** One renderable row in the working block body. */
+type WorkingEntry =
+  | { kind: "thinking"; key: string; thinking: string }
+  | { kind: "tool"; key: string; msg: ToolMessage }
+  | { kind: "run"; key: string; tools: ToolMessage[] }
+
+/**
+ * Flatten messages into visible rows, collapsing consecutive same-tool
+ * lookup calls into runs. Hidden thinking (showThinking off) doesn't split a
+ * run, since it renders nothing between the calls anyway.
+ */
+function buildWorkingEntries(
+  messages: WorkingMessage[],
+  showThinking: boolean
+): WorkingEntry[] {
+  const out: WorkingEntry[] = []
+  for (const m of messages) {
+    if (m.role === "assistant") {
+      const a = m as AssistantMessage
+      if (showThinking && a.thinking.trim()) {
+        out.push({ kind: "thinking", key: `thinking-${out.length}`, thinking: a.thinking })
+      }
+      continue
+    }
+    const t = m as ToolMessage
+    const groupable =
+      GROUPABLE_TOOLS.has(t.toolName.toLowerCase()) && !isSkillRead(t)
+    const last = out[out.length - 1]
+    if (
+      groupable &&
+      last?.kind === "run" &&
+      last.tools[0].toolName.toLowerCase() === t.toolName.toLowerCase()
+    ) {
+      last.tools.push(t)
+      continue
+    }
+    if (groupable) {
+      out.push({ kind: "run", key: t.toolCallId, tools: [t] })
+      continue
+    }
+    out.push({ kind: "tool", key: t.toolCallId, msg: t })
+  }
+  // Single-call runs render as a plain tool row
+  return out.map((e) =>
+    e.kind === "run" && e.tools.length === 1
+      ? { kind: "tool" as const, key: e.key, msg: e.tools[0] }
+      : e
+  )
+}
 
 export function RollingTimerText({ text }: { text: string }) {
   return (
@@ -147,6 +311,14 @@ export const WorkingBlock = memo(function WorkingBlock({
     )
 
   const hasTools = messages.some((m) => m.role === "tool")
+  const toolCount = useMemo(
+    () => messages.filter((m) => m.role === "tool").length,
+    [messages]
+  )
+  const entries = useMemo(
+    () => buildWorkingEntries(messages, showThinking),
+    [messages, showThinking]
+  )
   const hasThinkingContent = messages.some(
     (m) =>
       m.role === "assistant" && (m as AssistantMessage).thinking.trim().length > 0
@@ -194,6 +366,12 @@ export const WorkingBlock = memo(function WorkingBlock({
           )}
         </span>
 
+        {!isActive && toolCount > 0 && (
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground/40">
+            · {toolCount} {toolCount === 1 ? "step" : "steps"}
+          </span>
+        )}
+
         <ChevronRightIcon
           className={cn(
             "h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform duration-200",
@@ -210,26 +388,35 @@ export const WorkingBlock = memo(function WorkingBlock({
         )}
       >
         <div className="overflow-hidden">
-          <div className="mt-2 flex flex-col gap-2">
-            {messages.map((msg, i) => {
-              if (msg.role === "assistant") {
-                const a = msg as AssistantMessage
-                if (!showThinking || !a.thinking.trim()) return null
-                return <ThinkingBlock key={`thinking-${i}`} thinking={a.thinking} isNew={isNew} />
-              }
-              if (msg.role === "tool") {
-                const t = msg as ToolMessage
+          <div className="mt-2 ml-[3px] flex flex-col gap-1.5 border-l border-border/40 pl-4">
+            {entries.map((entry) => {
+              if (entry.kind === "thinking") {
                 return (
-                  <ToolCallBlock
-                    key={t.toolCallId}
-                    msg={t}
-                    isNew={false}
-                    rootPath={rootPath}
-                    suppressPlanSavedCard
+                  <ThinkingBlock
+                    key={entry.key}
+                    thinking={entry.thinking}
+                    isNew={isNew}
                   />
                 )
               }
-              return null
+              if (entry.kind === "run") {
+                return (
+                  <ToolRunGroup
+                    key={entry.key}
+                    tools={entry.tools}
+                    rootPath={rootPath}
+                  />
+                )
+              }
+              return (
+                <ToolCallBlock
+                  key={entry.key}
+                  msg={entry.msg}
+                  isNew={false}
+                  rootPath={rootPath}
+                  suppressPlanSavedCard
+                />
+              )
             })}
             {hasFinalThinking && finalThinking && (
               <ThinkingBlock thinking={finalThinking} isNew={isNew} />

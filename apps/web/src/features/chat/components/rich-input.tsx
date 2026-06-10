@@ -1,5 +1,5 @@
 import * as React from "react"
-import { FileTextIcon, ServerCrashIcon, type LucideIcon } from "lucide-react"
+import { FileTextIcon, ZapIcon, type LucideIcon } from "lucide-react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { getIconName, buildCatppuccinSvgElement } from "@/shared/ui/file-icon"
 import { cn } from "@/shared/lib/utils"
@@ -100,9 +100,13 @@ function buildLucideIcon(Icon: LucideIcon, className?: string): SVGSVGElement {
   return template.content.firstElementChild as SVGSVGElement
 }
 
+/** Purple tint shared by every skill chip surface (input box, sent message). */
+const SKILL_CHIP_CLASS =
+  "border-purple-500/30 bg-purple-500/10 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300"
+
 function buildSlashCommandIcon(source: SlashCommand["source"]): SVGSVGElement {
   return source === "skill"
-    ? buildLucideIcon(ServerCrashIcon, "text-purple-500")
+    ? buildLucideIcon(ZapIcon, "text-purple-600 dark:text-purple-400")
     : buildLucideIcon(FileTextIcon)
 }
 
@@ -119,7 +123,9 @@ export function buildMentionChip(path: string): HTMLSpanElement {
 }
 
 export function buildSlashCommandChip(cmd: SlashCommand): HTMLSpanElement {
-  const chip = buildChipBase()
+  const chip = buildChipBase(
+    cmd.source === "skill" ? SKILL_CHIP_CLASS : undefined
+  )
 
   // Skills carry a `skill:` prefix in their name — show the bare name to the
   // user while keeping the full name in the dataset for submission.
