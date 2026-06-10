@@ -2,16 +2,6 @@ import React, { useEffect, useRef, useState } from "react"
 import { Check, RotateCcw, Save } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
-import { Card, CardContent } from "@/shared/ui/card"
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldTitle,
-} from "@/shared/ui/field"
-import { Separator } from "@/shared/ui/separator"
 import { Switch } from "@/shared/ui/switch"
 import { Textarea } from "@/shared/ui/textarea"
 import {
@@ -22,6 +12,11 @@ import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
 
 import { useAppSettings } from "../queries"
 import { useUpdateAppSetting } from "../mutations"
+import {
+  SettingsGroup,
+  SettingsRow,
+  SettingsStack,
+} from "../components/settings-ui"
 
 export function ChatSection() {
   const showThinking = useShowThinkingSetting()
@@ -88,73 +83,60 @@ export function ChatSection() {
     phrasesValue.trim() === DEFAULT_THINKING_PHRASES.join("\n")
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 px-4 py-0">
-        <Field orientation="horizontal">
-          <FieldContent>
-            <FieldTitle>Show model thinking</FieldTitle>
-            <FieldDescription>
-              Display streamed reasoning blocks in chat when the selected model
-              emits thinking deltas.
-            </FieldDescription>
-          </FieldContent>
-          <Switch
-            checked={showThinking}
-            onCheckedChange={handleToggle}
-            aria-label="Show model thinking"
-          />
-        </Field>
+    <SettingsGroup>
+      <SettingsRow
+        title="Show model thinking"
+        description="Display streamed reasoning blocks in chat when the selected model emits thinking deltas."
+      >
+        <Switch
+          checked={showThinking}
+          onCheckedChange={handleToggle}
+          aria-label="Show model thinking"
+        />
+      </SettingsRow>
 
-        <Separator />
-
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="thinking-phrases">
-              Agent working phrases
-            </FieldLabel>
-            <FieldDescription>
-              Phrases cycled in the loading indicator while the agent is
-              working. One phrase per line.
-            </FieldDescription>
-            <Textarea
-              id="thinking-phrases"
-              value={phrasesValue}
-              onChange={(e) => {
-                setPhrasesValue(e.target.value)
-                setPhrasesSaved(false)
-              }}
-              className="mt-1.5 min-h-28 font-mono text-xs"
-              spellCheck={false}
-            />
-          </Field>
-          <div className="flex justify-end gap-2">
-            {!isDefaultPhrases && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleResetPhrases}
-                title="Reset to defaults"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset
-              </Button>
-            )}
+      <SettingsStack
+        title="Agent working phrases"
+        description="Phrases cycled in the loading indicator while the agent is working. One phrase per line."
+        htmlFor="thinking-phrases"
+      >
+        <Textarea
+          id="thinking-phrases"
+          value={phrasesValue}
+          onChange={(e) => {
+            setPhrasesValue(e.target.value)
+            setPhrasesSaved(false)
+          }}
+          className="min-h-28 font-mono text-xs"
+          spellCheck={false}
+        />
+        <div className="flex justify-end gap-2">
+          {!isDefaultPhrases && (
             <Button
+              variant="ghost"
               size="sm"
-              variant="outline"
-              onClick={handleSavePhrases}
-              disabled={phrasesSaved}
+              onClick={handleResetPhrases}
+              title="Reset to defaults"
             >
-              {phrasesSaved ? (
-                <Check data-icon="inline-start" />
-              ) : (
-                <Save data-icon="inline-start" />
-              )}
-              {phrasesSaved ? "Saved" : "Save"}
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset
             </Button>
-          </div>
-        </FieldGroup>
-      </CardContent>
-    </Card>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSavePhrases}
+            disabled={phrasesSaved}
+          >
+            {phrasesSaved ? (
+              <Check data-icon="inline-start" />
+            ) : (
+              <Save data-icon="inline-start" />
+            )}
+            {phrasesSaved ? "Saved" : "Save"}
+          </Button>
+        </div>
+      </SettingsStack>
+    </SettingsGroup>
   )
 }

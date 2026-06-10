@@ -1,17 +1,16 @@
-import { Check, AlertCircle, Info, Download, Loader2 } from "lucide-react"
+import { Check, AlertCircle, Download, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
-import { Card, CardContent } from "@/shared/ui/card"
 import { SectionLabel } from "@/shared/ui/section-label"
 import { Skeleton } from "@/shared/ui/skeleton"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/shared/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import { cn } from "@/shared/lib/utils"
-import { useInstallLspServer, useLspInstallJobs, useLspRegistry } from "../queries"
+import {
+  useInstallLspServer,
+  useLspInstallJobs,
+  useLspRegistry,
+} from "../queries"
 import type { LspInstallJob, LspRegistryEntry } from "../api"
 
 /**
@@ -25,51 +24,41 @@ export function LspSettingsCard() {
   const { data: jobs } = useLspInstallJobs()
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 px-4 py-0">
-        {isLoading ? (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-14" />
-            <Skeleton className="h-14" />
-            <Skeleton className="h-14" />
-          </div>
-        ) : isError || !languages ? (
-          <Alert variant="destructive">
-            <AlertCircle />
-            <AlertDescription>
-              Failed to load the LSP registry.
-            </AlertDescription>
-          </Alert>
-        ) : languages.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">
-            No language servers configured.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {groupByServer(languages).map((group) => (
-              <LanguageRow
-                key={group.entry.language}
-                entry={group.entry}
-                label={group.label}
-                job={jobs?.find((j) =>
-                  group.languages.includes(j.language),
-                )}
-              />
-            ))}
-          </div>
-        )}
-
-        <Alert>
-          <Info />
-          <AlertDescription>
-            Language servers are looked up on your <code>PATH</code>. Use{" "}
-            <strong>Install</strong> on a missing server, or install it
-            yourself and reopen the file to enable diagnostics, hover, and
-            go-to-definition.
-          </AlertDescription>
+    <div className="flex flex-col gap-4">
+      {isLoading ? (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-14" />
+          <Skeleton className="h-14" />
+          <Skeleton className="h-14" />
+        </div>
+      ) : isError || !languages ? (
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertDescription>Failed to load the LSP registry.</AlertDescription>
         </Alert>
-      </CardContent>
-    </Card>
+      ) : languages.length === 0 ? (
+        <p className="py-4 text-center text-sm text-muted-foreground">
+          No language servers configured.
+        </p>
+      ) : (
+        <div className="divide-y divide-border/50">
+          {groupByServer(languages).map((group) => (
+            <LanguageRow
+              key={group.entry.language}
+              entry={group.entry}
+              label={group.label}
+              job={jobs?.find((j) => group.languages.includes(j.language))}
+            />
+          ))}
+        </div>
+      )}
+
+      <p className="text-xs/relaxed text-muted-foreground">
+        Language servers are looked up on your <code>PATH</code>. Use{" "}
+        <strong>Install</strong> on a missing server, or install it yourself and
+        reopen the file to enable diagnostics, hover, and go-to-definition.
+      </p>
+    </div>
   )
 }
 
@@ -137,12 +126,10 @@ function LanguageRow({
   const installFailed = !entry.available && job?.status === "error"
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-border/40 px-3 py-2">
+    <div className="flex flex-col gap-1.5 py-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="text-sm font-medium capitalize">
-            {label}
-          </span>
+          <span className="text-sm font-medium capitalize">{label}</span>
           <div className="flex flex-wrap gap-1">
             {entry.extensions.map((ext) => (
               <Badge key={ext} variant="outline" className="font-mono text-3xs">
@@ -152,9 +139,7 @@ function LanguageRow({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {!entry.available && !installing && (
-            <InstallButton entry={entry} />
-          )}
+          {!entry.available && !installing && <InstallButton entry={entry} />}
           <StatusBadge available={entry.available} installing={installing} />
         </div>
       </div>
@@ -188,7 +173,7 @@ function LanguageRow({
               Install failed (<code>{job.commandLine}</code>).
             </span>
             {job.output.trim() && (
-              <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all font-mono text-3xs">
+              <pre className="mt-1 max-h-32 overflow-auto font-mono text-3xs break-all whitespace-pre-wrap">
                 {job.output.trim()}
               </pre>
             )}
@@ -293,12 +278,10 @@ function CommandLine({
     <div
       className={cn(
         "flex items-center gap-2 truncate",
-        !installed && "opacity-50",
+        !installed && "opacity-50"
       )}
     >
-      {isFallback && (
-        <SectionLabel>fallback</SectionLabel>
-      )}
+      {isFallback && <SectionLabel>fallback</SectionLabel>}
       <span className="truncate">
         {command}
         {args.length > 0 ? ` ${args.join(" ")}` : ""}

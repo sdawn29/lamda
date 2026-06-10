@@ -38,7 +38,7 @@ function SidebarLink({ section }: { section: SettingsSectionMeta }) {
       className={cn(
         "group relative flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm transition-colors",
         isActive
-          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+          ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
           : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
       )}
     >

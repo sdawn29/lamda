@@ -2,7 +2,6 @@ import React from "react"
 import { RotateCcw, X } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
-import { Card, CardContent } from "@/shared/ui/card"
 import { ShortcutKbd } from "@/shared/ui/kbd"
 import { useKeyboardShortcuts } from "@/shared/components/keyboard-shortcuts-provider"
 import {
@@ -103,12 +102,12 @@ export function ShortcutsSection() {
   )
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-1 p-1.5">
+    <div className="flex flex-col">
+      <div className="divide-y divide-border/50">
         {SHORTCUT_ACTION_ORDER.map((action) => (
           <div
             key={action}
-            className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2"
+            className="flex items-center justify-between gap-6 py-2"
           >
             <span className="text-sm">{SHORTCUT_LABELS[action]}</span>
             <ShortcutRecorder
@@ -118,15 +117,15 @@ export function ShortcutsSection() {
             />
           </div>
         ))}
-        {!isAllDefault && (
-          <div className="mt-0.5 flex justify-end px-1 pb-0.5">
-            <Button variant="ghost" size="sm" onClick={resetShortcuts}>
-              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-              Reset all to defaults
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+      {!isAllDefault && (
+        <div className="flex justify-end pt-3">
+          <Button variant="ghost" size="sm" onClick={resetShortcuts}>
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+            Reset all to defaults
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }

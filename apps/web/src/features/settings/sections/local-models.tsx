@@ -11,11 +11,9 @@ import {
 
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
-import { Card, CardContent } from "@/shared/ui/card"
 import { Input } from "@/shared/ui/input"
 import { Textarea } from "@/shared/ui/textarea"
 import { Switch } from "@/shared/ui/switch"
-import { Separator } from "@/shared/ui/separator"
 import {
   Accordion,
   AccordionContent,
@@ -142,17 +140,17 @@ function ConfigureProviderDialog({
   const [presetId, setPresetId] = useState(initialPreset.id)
   const [providerId, setProviderId] = useState(edit?.id ?? PRESETS[0].id)
   const [baseUrl, setBaseUrl] = useState(
-    edit?.config.baseUrl ?? PRESETS[0].baseUrl,
+    edit?.config.baseUrl ?? PRESETS[0].baseUrl
   )
   const [api, setApi] = useState<LocalProviderApi>(
-    edit?.config.api ?? PRESETS[0].api,
+    edit?.config.api ?? PRESETS[0].api
   )
   const [apiKey, setApiKey] = useState(edit?.config.apiKey ?? PRESETS[0].apiKey)
   const [modelsText, setModelsText] = useState(
-    edit ? edit.config.models.map((m) => m.id).join("\n") : "",
+    edit ? edit.config.models.map((m) => m.id).join("\n") : ""
   )
   const [reasoning, setReasoning] = useState(
-    edit ? (edit.config.models.some((m) => m.reasoning) ?? false) : false,
+    edit ? (edit.config.models.some((m) => m.reasoning) ?? false) : false
   )
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
@@ -176,7 +174,7 @@ function ConfigureProviderDialog({
         .split("\n")
         .map((line) => line.trim())
         .filter(Boolean),
-    [modelsText],
+    [modelsText]
   )
 
   function handleSave() {
@@ -233,7 +231,7 @@ function ConfigureProviderDialog({
         },
         onError: (err) =>
           setError(err instanceof Error ? err.message : String(err)),
-      },
+      }
     )
   }
 
@@ -287,7 +285,7 @@ function ConfigureProviderDialog({
                 value={providerId}
                 onChange={(e) =>
                   setProviderId(
-                    e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
+                    e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-")
                   )
                 }
                 placeholder="my-local"
@@ -483,8 +481,8 @@ function SetupGuide() {
               .
             </GuideStep>
             <GuideStep n={2}>
-              Pull a model: <Code>ollama pull qwen2.5-coder:7b</Code>. The server
-              runs at <Code>http://localhost:11434</Code>.
+              Pull a model: <Code>ollama pull qwen2.5-coder:7b</Code>. The
+              server runs at <Code>http://localhost:11434</Code>.
             </GuideStep>
             <GuideStep n={3}>
               List installed models with <Code>ollama list</Code>.
@@ -549,7 +547,7 @@ function ProviderRow({
 }) {
   const { icon } = getProviderMeta(id)
   return (
-    <div className="flex items-start justify-between gap-3 px-1 py-2.5">
+    <div className="flex items-start justify-between gap-3 py-3">
       <div className="flex min-w-0 items-start gap-2">
         <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
           {icon ?? <Server className="h-4 w-4 text-muted-foreground" />}
@@ -625,59 +623,62 @@ export function LocalModelsSection() {
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-4">
-          <div>
-            <h2 className="text-sm font-medium">Configuration steps</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Run a local model server, then register its models below. No API
-              key or internet connection required.
-            </p>
-          </div>
-          <SetupGuide />
-        </CardContent>
-      </Card>
+    <div className="flex flex-col gap-9">
+      <section className="flex flex-col gap-2">
+        <div>
+          <h2 className="text-sm font-medium tracking-tight">
+            Configuration steps
+          </h2>
+          <p className="mt-0.5 text-xs/relaxed text-muted-foreground">
+            Run a local model server, then register its models below. No API key
+            or internet connection required.
+          </p>
+        </div>
+        <SetupGuide />
+      </section>
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium">Configured providers</h2>
-            <Button size="sm" className="h-7 text-xs" onClick={openAdd}>
-              <Plus data-icon="inline-start" />
-              Add provider
-            </Button>
-          </div>
+      <section className="flex flex-col">
+        <div className="flex items-center justify-between gap-3 pb-2">
+          <h2 className="text-sm font-medium tracking-tight">
+            Configured providers
+          </h2>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={openAdd}
+          >
+            <Plus data-icon="inline-start" />
+            Add provider
+          </Button>
+        </div>
 
-          {isLoading ? (
-            <p className="text-xs text-muted-foreground">Loading…</p>
-          ) : data?.error ? (
-            <p className="flex items-start gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span className="whitespace-pre-wrap">{data.error}</span>
-            </p>
-          ) : entries.length === 0 ? (
-            <p className="py-3 text-center text-xs text-muted-foreground">
-              No local providers configured yet.
-            </p>
-          ) : (
-            <div className="flex flex-col">
-              {entries.map(([id, config], i) => (
-                <div key={id}>
-                  {i > 0 && <Separator />}
-                  <ProviderRow
-                    id={id}
-                    config={config}
-                    onEdit={() => openEdit(id, config)}
-                    onDelete={() => handleDelete(id)}
-                    isDeleting={deletingId === id}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">Loading…</p>
+        ) : data?.error ? (
+          <p className="flex items-start gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span className="whitespace-pre-wrap">{data.error}</span>
+          </p>
+        ) : entries.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border/60 px-4 py-8 text-center text-xs text-muted-foreground">
+            No local providers configured yet.
+          </p>
+        ) : (
+          <div className="divide-y divide-border/50">
+            {entries.map(([id, config]) => (
+              <ProviderRow
+                key={id}
+                id={id}
+                config={config}
+                onEdit={() => openEdit(id, config)}
+                onDelete={() => handleDelete(id)}
+                isDeleting={deletingId === id}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
       {dialogOpen && (
         <ConfigureProviderDialog

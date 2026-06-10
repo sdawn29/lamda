@@ -2,19 +2,7 @@ import { AlertTriangle, Check, Download, RefreshCw } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Button } from "@/shared/ui/button"
-import { Card, CardContent } from "@/shared/ui/card"
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldTitle,
-} from "@/shared/ui/field"
-import {
-  Progress,
-  ProgressLabel,
-  ProgressValue,
-} from "@/shared/ui/progress"
-import { Separator } from "@/shared/ui/separator"
+import { Progress, ProgressLabel, ProgressValue } from "@/shared/ui/progress"
 import {
   ReleaseNotes,
   useCheckForUpdates,
@@ -25,6 +13,12 @@ import {
 } from "@/features/electron"
 import { cn } from "@/shared/lib/utils"
 
+import {
+  SettingsGroup,
+  SettingsRow,
+  SettingsStack,
+} from "../components/settings-ui"
+
 export function UpdatesSection() {
   const { data: status } = useElectronUpdateStatus()
   const checkForUpdates = useCheckForUpdates()
@@ -33,61 +27,51 @@ export function UpdatesSection() {
   const isElectron = !!window.electronAPI
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 px-4 py-0">
-        <Field orientation="horizontal">
-          <FieldContent>
-            <FieldTitle>Current version</FieldTitle>
-            <FieldDescription>
-              {import.meta.env.DEV ? "dev build" : `v${__APP_VERSION__}`}
-            </FieldDescription>
-          </FieldContent>
-          {isElectron && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => checkForUpdates.mutate()}
-              disabled={
-                checkForUpdates.isPending ||
-                status?.phase === "checking" ||
-                status?.phase === "downloading"
-              }
-            >
-              <RefreshCw
-                className={cn(
-                  "mr-1.5 h-3.5 w-3.5",
-                  (checkForUpdates.isPending || status?.phase === "checking") &&
-                    "animate-spin"
-                )}
-              />
-              Check for updates
-            </Button>
-          )}
-        </Field>
-
-        {isElectron && status && status.phase !== "idle" && (
-          <>
-            <Separator />
-            <UpdateStatusRow
-              status={status}
-              onDownload={() => downloadUpdate.mutate()}
-              onInstall={() => installUpdate.mutate()}
-              isDownloading={downloadUpdate.isPending}
+    <SettingsGroup>
+      <SettingsRow
+        title="Current version"
+        description={import.meta.env.DEV ? "dev build" : `v${__APP_VERSION__}`}
+      >
+        {isElectron && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => checkForUpdates.mutate()}
+            disabled={
+              checkForUpdates.isPending ||
+              status?.phase === "checking" ||
+              status?.phase === "downloading"
+            }
+          >
+            <RefreshCw
+              className={cn(
+                "mr-1.5 h-3.5 w-3.5",
+                (checkForUpdates.isPending || status?.phase === "checking") &&
+                  "animate-spin"
+              )}
             />
-          </>
+            Check for updates
+          </Button>
         )}
+      </SettingsRow>
 
-        {isElectron && hasChangelog(status) && (
-          <>
-            <Separator />
-            <div className="flex flex-col gap-1.5">
-              <FieldTitle>What&apos;s new in v{status.version}</FieldTitle>
-              <ReleaseNotes notes={status.releaseNotes} />
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+      {isElectron && status && status.phase !== "idle" && (
+        <div className="py-3.5">
+          <UpdateStatusRow
+            status={status}
+            onDownload={() => downloadUpdate.mutate()}
+            onInstall={() => installUpdate.mutate()}
+            isDownloading={downloadUpdate.isPending}
+          />
+        </div>
+      )}
+
+      {isElectron && hasChangelog(status) && (
+        <SettingsStack title={`What's new in v${status.version}`}>
+          <ReleaseNotes notes={status.releaseNotes} />
+        </SettingsStack>
+      )}
+    </SettingsGroup>
   )
 }
 

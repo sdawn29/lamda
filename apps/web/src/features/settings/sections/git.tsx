@@ -2,19 +2,12 @@ import React, { useEffect, useRef, useState } from "react"
 import { Check, RotateCcw, Save } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
-import { Card, CardContent } from "@/shared/ui/card"
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/shared/ui/field"
 import { Textarea } from "@/shared/ui/textarea"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
 
 import { useAppSettings } from "../queries"
 import { useUpdateAppSetting } from "../mutations"
+import { SettingsGroup, SettingsStack } from "../components/settings-ui"
 
 const DEFAULT_COMMIT_PROMPT = `Generate a git commit message for the following staged diff. Follow the conventional commits format (e.g. "feat: ...", "fix: ...", "refactor: ..."). Use an imperative verb. Be concise — the subject line should be under 72 characters. If needed, add a blank line followed by a short body. Reply with ONLY the commit message, no extra explanation.\n\n{diff}`
 
@@ -66,39 +59,36 @@ export function GitSection() {
   const hasDiffPlaceholder = value.includes("{diff}")
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 px-4 py-0">
-        <FieldGroup>
-          <Field data-invalid={!hasDiffPlaceholder || undefined}>
-            <FieldLabel htmlFor="commit-message-prompt">
-              Prompt template
-            </FieldLabel>
-            <FieldDescription>
-              Use{" "}
-              <code className="rounded bg-muted px-1 py-0.5">{"{diff}"}</code>{" "}
-              where the staged diff should be inserted.
-            </FieldDescription>
-            <Textarea
-              id="commit-message-prompt"
-              value={value}
-              onChange={(e) => {
-                setValue(e.target.value)
-                setSaved(false)
-              }}
-              rows={6}
-              className="min-h-32 resize-y font-mono text-xs"
-              spellCheck={false}
-              aria-invalid={!hasDiffPlaceholder || undefined}
-            />
-            {!hasDiffPlaceholder && (
-              <FieldError>
-                Prompt must contain{" "}
-                <code className="rounded bg-muted px-1 py-0.5">{"{diff}"}</code>{" "}
-                — it will be replaced with the staged diff.
-              </FieldError>
-            )}
-          </Field>
-        </FieldGroup>
+    <SettingsGroup>
+      <SettingsStack
+        title="Prompt template"
+        description={
+          <>
+            Use <code className="rounded bg-muted px-1 py-0.5">{"{diff}"}</code>{" "}
+            where the staged diff should be inserted.
+          </>
+        }
+        htmlFor="commit-message-prompt"
+      >
+        <Textarea
+          id="commit-message-prompt"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value)
+            setSaved(false)
+          }}
+          rows={6}
+          className="min-h-32 resize-y font-mono text-xs"
+          spellCheck={false}
+          aria-invalid={!hasDiffPlaceholder || undefined}
+        />
+        {!hasDiffPlaceholder && (
+          <p className="text-xs/relaxed text-destructive" role="alert">
+            Prompt must contain{" "}
+            <code className="rounded bg-muted px-1 py-0.5">{"{diff}"}</code> —
+            it will be replaced with the staged diff.
+          </p>
+        )}
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
@@ -129,7 +119,7 @@ export function GitSection() {
             )}
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </SettingsStack>
+    </SettingsGroup>
   )
 }
