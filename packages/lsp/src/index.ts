@@ -20,6 +20,8 @@ export { buildLspTools } from "./converter.js";
 export type { LspToolHelpers } from "./converter.js";
 export type {
   LspServerConfig,
+  LspServerCommand,
+  LspInstallSpec,
   DiagnosticsUpdate,
   Diagnostic,
   Hover,

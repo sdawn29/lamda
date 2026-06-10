@@ -121,10 +121,17 @@ const TurnItem = memo(function TurnItem({
 
   return (
     <div className="mx-2 mt-1.5 overflow-hidden rounded-lg border border-border/50">
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => onToggle(turn.id)}
-        className="flex h-7 w-full items-center gap-1.5 bg-muted/30 px-2.5 transition-colors hover:bg-muted/50"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            onToggle(turn.id)
+          }
+        }}
+        className="flex h-7 w-full cursor-pointer items-center gap-1.5 bg-muted/30 px-2.5 transition-colors hover:bg-muted/50"
       >
         <ChevronRight
           className={cn(
@@ -179,7 +186,7 @@ const TurnItem = memo(function TurnItem({
             </TooltipContent>
           </Tooltip>
         )}
-      </button>
+      </div>
 
       {isExpanded && files.length > 0 && (
         <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">

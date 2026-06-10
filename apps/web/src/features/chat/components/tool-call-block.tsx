@@ -6,8 +6,15 @@ import {
   ChevronRightIcon,
   CircleDotIcon,
   CopyIcon,
+  FilePenLineIcon,
+  FilePlus2Icon,
+  FileTextIcon,
+  GlobeIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
+  SearchIcon,
+  SquareTerminalIcon,
+  WrenchIcon,
   ZapIcon,
 } from "lucide-react"
 import { FileIcon } from "@/shared/ui/file-icon"
@@ -119,6 +126,35 @@ function toRelativePath(p: string, rootPath?: string): string {
 
 export function fileBasename(filePath: string): string {
   return filePath.split("/").pop() ?? filePath
+}
+
+/** Small leading glyph that identifies the tool kind at a glance. */
+export function ToolGlyph({
+  toolName,
+  className,
+}: {
+  toolName: string
+  className?: string
+}) {
+  const name = toolName.toLowerCase()
+  const Icon =
+    name === "bash" || name.includes("terminal") || name.includes("command")
+      ? SquareTerminalIcon
+      : name.includes("edit")
+        ? FilePenLineIcon
+        : name === "write" || name === "plan_write"
+          ? FilePlus2Icon
+          : name === "read" || name === "plan_read"
+            ? FileTextIcon
+            : name.includes("fetch") || name.includes("web")
+              ? GlobeIcon
+              : name.includes("grep") ||
+                  name.includes("glob") ||
+                  name.includes("search") ||
+                  name === "find"
+                ? SearchIcon
+                : WrenchIcon
+  return <Icon className={className} />
 }
 
 export function argsSummary(args: unknown, rootPath?: string): string {
@@ -344,7 +380,7 @@ function ReadView({
   const language = detectLanguage(filePath) ?? "text"
 
   return (
-    <div className="max-h-64 overflow-auto rounded border border-border/30 text-xs text-muted-foreground/60">
+    <div className="max-h-64 overflow-auto rounded-md text-xs text-muted-foreground/60">
       <Suspense
         fallback={
           <pre className="overflow-auto px-3 py-2 text-xs text-muted-foreground/60">
@@ -393,6 +429,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     isWriteArgs(msg.args)
   const writeArgs = isWrite ? (msg.args as WriteArgs) : null
   const filePath = (isEdit || isWrite) ? getReadFilePath(msg.args) : null
+  // Reads get the same file-icon + basename row treatment as edits/writes
+  const displayFilePath = filePath ?? (skillName ? null : readFilePath)
 
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -597,11 +635,23 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         aria-expanded={hasBody ? expanded : undefined}
       >
         {skillName ? (
-          <span className="flex shrink-0 items-center gap-1 rounded bg-purple-500/10 px-1.5 py-0.5 text-2xs font-medium text-purple-600 dark:text-purple-400">
+          <span className="flex shrink-0 items-center gap-1 rounded-md bg-purple-500/10 px-1.5 py-0.5 text-2xs font-medium text-purple-600 dark:text-purple-400">
             <ZapIcon className="h-3 w-3 shrink-0" />
             <span className="leading-none">Skill</span>
           </span>
-        ) : null}
+        ) : (
+          <ToolGlyph
+            toolName={msg.toolName}
+            className={cn(
+              "h-3.5 w-3.5 shrink-0",
+              msg.status === "running"
+                ? "animate-pulse text-foreground/50"
+                : msg.status === "error"
+                  ? "text-destructive/60"
+                  : "text-muted-foreground/35"
+            )}
+          />
+        )}
 
         <span className={cn(
           "text-sm font-medium",
@@ -617,13 +667,20 @@ export const ToolCallBlock = memo(function ToolCallBlock({
           {skillName ?? msg.toolName}
         </span>
 
-        {skillName ? null : filePath ? (
+        {skillName ? null : displayFilePath ? (
           <span className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground/35">
-            <FileIcon filename={filePath} className="h-3.5 w-3.5 shrink-0 opacity-50" />
-            <span className="truncate">{fileBasename(filePath)}</span>
+            <FileIcon filename={displayFilePath} className="h-3.5 w-3.5 shrink-0 opacity-50" />
+            <span className="truncate">{fileBasename(displayFilePath)}</span>
           </span>
         ) : summary ? (
-          <span className="min-w-0 truncate text-sm text-muted-foreground/35">{summary}</span>
+          <span
+            className={cn(
+              "min-w-0 truncate text-muted-foreground/35",
+              normalizedToolName === "bash" ? "font-mono text-xs" : "text-sm"
+            )}
+          >
+            {summary}
+          </span>
         ) : null}
 
         {readLineRange && (
@@ -675,13 +732,13 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         )}
       >
         <div className="overflow-hidden">
-          <div className="group/copy relative mt-1.5 overflow-hidden rounded-md border border-border/30 bg-black/3 dark:bg-white/2">
+          <div className="group/copy relative mt-2 overflow-hidden rounded-lg border border-border/40 bg-muted/20 shadow-xs">
             <button
               type="button"
               onClick={handleCopy}
               className={cn(
-                "absolute top-1 right-1 z-10 shrink-0 rounded p-1 text-muted-foreground/40 opacity-0 transition-opacity group-hover/copy:opacity-100 hover:bg-muted hover:text-muted-foreground",
-                copied && "text-emerald-500 opacity-100"
+                "absolute top-1.5 right-1.5 z-10 shrink-0 rounded-md border border-border/50 bg-background/80 p-1 text-muted-foreground/50 opacity-0 shadow-xs backdrop-blur-sm transition-all group-hover/copy:opacity-100 hover:text-foreground",
+                copied && "border-emerald-500/40 text-emerald-500 opacity-100"
               )}
               aria-label="Copy result"
             >
@@ -694,9 +751,9 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
             {/* Bash: trigger row truncates the command, so repeat it in full */}
             {normalizedToolName === "bash" && summary && (
-              <div className="flex items-start gap-2 border-b border-border/30 px-3 py-1.5 pr-8">
-                <span className="mt-px font-mono text-2xs font-bold text-foreground/60">$</span>
-                <span className="flex-1 font-mono text-2xs break-all whitespace-pre-wrap text-foreground/60">
+              <div className="flex items-start gap-2 border-b border-border/40 bg-muted/30 px-3 py-2 pr-9">
+                <span className="mt-px font-mono text-2xs font-bold text-primary/60 select-none">$</span>
+                <span className="flex-1 font-mono text-2xs break-all whitespace-pre-wrap text-foreground/70">
                   {summary}
                 </span>
               </div>
@@ -768,8 +825,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
               {/* Error state */}
               {msg.status === "error" && (
-                <div className="flex items-start gap-2 rounded border border-destructive/30 bg-destructive/10 px-3 py-2">
-                  <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/80" />
+                <div className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2">
+                  <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/70" />
                   <pre className="flex-1 overflow-auto text-xs break-all whitespace-pre-wrap text-destructive/80">
                     {resultText ?? "Tool execution failed"}
                   </pre>

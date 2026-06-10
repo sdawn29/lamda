@@ -64,8 +64,25 @@ export default function MonacoDiffViewer({
   // onMount and keep the disposer in a ref. A mode change remounts the editor
   // (keyed below) and re-fires onMount, which disposes the prior registration.
   const disposeLayoutRef = useRef<(() => void) | null>(null)
+  const disposeModelsRef = useRef<(() => void) | null>(null)
   const handleMount: DiffOnMount = useCallback((editor) => {
     editorRef.current = editor
+    // We own model disposal (keepCurrent*Model below): the library disposes
+    // models before resetting the diff widget, which trips Monaco's
+    // "TextModel got disposed before DiffEditorWidget model got reset"
+    // assertion. Detach the models from the widget before releasing them,
+    // unless the editor is already gone (then they're detached already).
+    disposeModelsRef.current?.()
+    const models = editor.getModel()
+    let editorDisposed = false
+    editor.onDidDispose(() => {
+      editorDisposed = true
+    })
+    disposeModelsRef.current = () => {
+      if (!editorDisposed) editor.setModel(null)
+      models?.original.dispose()
+      models?.modified.dispose()
+    }
     const el = containerRef.current
     if (!el) return
     disposeLayoutRef.current?.()
@@ -76,6 +93,8 @@ export default function MonacoDiffViewer({
     () => () => {
       disposeLayoutRef.current?.()
       disposeLayoutRef.current = null
+      disposeModelsRef.current?.()
+      disposeModelsRef.current = null
     },
     []
   )
@@ -138,6 +157,8 @@ export default function MonacoDiffViewer({
         original={original}
         modified={modified}
         theme={themeNameFor(resolvedTheme === "dark")}
+        keepCurrentOriginalModel
+        keepCurrentModifiedModel
         beforeMount={beforeMount}
         onMount={handleMount}
         options={options}

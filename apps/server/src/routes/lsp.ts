@@ -21,6 +21,11 @@ import type { WebSocket } from "ws";
 import { Hono } from "hono";
 import { listLanguageRegistry, isCommandOnPath } from "@lamda/lsp";
 import {
+  getInstallJobs,
+  resolveInstallCandidate,
+  startInstall,
+} from "../services/lsp-installer.js";
+import {
   openDocument,
   closeDocument,
   requestForFile,
@@ -170,6 +175,9 @@ lspRouter.get("/registry", async (c) => {
       );
       const available =
         primaryInstalled || fallbacks.some((fb) => fb.installed);
+      const installCandidate = available
+        ? null
+        : await resolveInstallCandidate(entry.language);
       return {
         language: entry.language,
         extensions: entry.extensions,
@@ -178,8 +186,39 @@ lspRouter.get("/registry", async (c) => {
         installed: primaryInstalled,
         fallbacks,
         available,
+        installable: installCandidate !== null,
+        installCommand: installCandidate
+          ? `${installCandidate.spec.command} ${installCandidate.spec.args.join(" ")}`
+          : null,
+        // Tool the user would need for the *first* recipe, shown when nothing
+        // is installable so the UI can say "requires npm".
+        requiredTool: entry.install?.tool ?? entry.fallbacks.find((fb) => fb.install)?.install?.tool ?? null,
       };
     }),
   );
   return c.json({ languages: resolved });
+});
+
+/**
+ * POST /lsp/install { language }
+ *
+ * Kicks off the registry's install recipe for that language. Returns 202 with
+ * the job; the client polls GET /lsp/install for progress.
+ */
+lspRouter.post("/install", async (c) => {
+  const body = await c.req.json<{ language?: string }>().catch(() => null);
+  const language = body?.language;
+  if (!language || typeof language !== "string") {
+    return c.json({ error: "Missing 'language'." }, 400);
+  }
+  const result = await startInstall(language);
+  if ("error" in result) {
+    return c.json({ error: result.error }, 409);
+  }
+  return c.json({ job: result.job }, 202);
+});
+
+/** GET /lsp/install — all install jobs (running and finished). */
+lspRouter.get("/install", (c) => {
+  return c.json({ jobs: getInstallJobs() });
 });

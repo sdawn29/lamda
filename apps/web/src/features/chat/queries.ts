@@ -78,16 +78,15 @@ export function updateLastPageMessages(
 /** Flatten all pages into a single chronological message list.
  *
  * Tool messages are deduplicated by toolCallId, keeping the LAST occurrence.
- * This guards against the multi-page edge case where `upsertToolMessage` (which
- * only operates on the last page) misses a same-ID entry in an older page and
- * inserts a second copy, causing React key collisions in WorkingBlock.
+ * Duplicates show up two ways: the multi-page edge case where
+ * `upsertToolMessage` (which only operates on the last page) misses a same-ID
+ * entry in an older page and inserts a second copy, and threads whose
+ * persisted blocks already contain duplicate tool rows. Both cause React key
+ * collisions in WorkingBlock, so dedup runs even for a single page.
  */
 export function getMessagesFromInfinite(data: MessagesInfiniteData | undefined): Message[] {
   if (!data) return []
   const flat = data.pages.flatMap((p) => p.messages)
-
-  // Fast path: no pages or a single page (the common case during streaming).
-  if (data.pages.length <= 1) return flat
 
   // Build a map of toolCallId → last index so we can filter out earlier dupes.
   const toolLastIndex = new Map<string, number>()

@@ -742,6 +742,10 @@ class SessionEventHub {
         args: msg.args,
       });
 
+      // A duplicate start for a call we're already tracking would persist a
+      // second block with the same toolCallId (duplicate React keys client-side)
+      if (this.currentToolBlocks.has(msg.toolCallId)) return;
+
       // Create tool block in DB
       const blockId = insertToolBlock(
         this.threadId,

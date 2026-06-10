@@ -3,7 +3,13 @@ import { ChevronRightIcon } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
 import { formatDuration } from "@/shared/lib/formatters"
 import { ThinkingBlock } from "./thinking-block"
-import { ToolCallBlock, argsSummary, fileBasename, isSkillRead } from "./tool-call-block"
+import {
+  ToolCallBlock,
+  ToolGlyph,
+  argsSummary,
+  fileBasename,
+  isSkillRead,
+} from "./tool-call-block"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
 import type { AssistantMessage, ToolMessage } from "../types"
 
@@ -69,6 +75,17 @@ function ToolRunGroup({
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
+        <ToolGlyph
+          toolName={toolName}
+          className={cn(
+            "h-3.5 w-3.5 shrink-0",
+            running
+              ? "animate-pulse text-foreground/50"
+              : errored
+                ? "text-destructive/60"
+                : "text-muted-foreground/35"
+          )}
+        />
         <span
           className={cn(
             "shrink-0 text-sm font-medium",
@@ -81,7 +98,7 @@ function ToolRunGroup({
         >
           {toolName}
         </span>
-        <span className="shrink-0 text-sm tabular-nums text-muted-foreground/45">
+        <span className="shrink-0 rounded-full bg-muted/60 px-1.5 py-px text-2xs tabular-nums text-muted-foreground/55">
           {runNoun(toolName, tools.length)}
         </span>
         {preview && (
@@ -347,6 +364,12 @@ export const WorkingBlock = memo(function WorkingBlock({
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
+        {isActive && !pendingQuestion && (
+          <span className="relative flex h-1.5 w-1.5 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/50" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary/80" />
+          </span>
+        )}
         <span
           className={cn(
             "text-sm font-medium",

@@ -28,7 +28,7 @@ export function MessageChip({
       <Badge
         variant="outline"
         className={cn(
-          "mx-0.5 bg-muted! align-middle text-foreground/80 select-text text-xs!",
+          "mx-0.5 rounded-md border-transparent bg-foreground/5! px-1.5 align-middle text-xs! text-foreground/80 transition-colors select-text hover:bg-foreground/10!",
           className
         )}
       >

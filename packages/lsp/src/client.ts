@@ -278,7 +278,11 @@ export class LspClient {
     if (this.disposed) return;
     this.disposed = true;
     try {
-      await this.connection.sendRequest("shutdown");
+      // A wedged server never answers `shutdown`; don't let it hang teardown.
+      await Promise.race([
+        this.connection.sendRequest("shutdown"),
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+      ]);
       this.connection.sendNotification("exit");
     } catch (err) {
       console.warn(`[lsp:${this.languageId}] shutdown error (ignoring):`, err);

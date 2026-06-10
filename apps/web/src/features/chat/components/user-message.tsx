@@ -76,7 +76,7 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
     <MessageChip
       className={
         isSkill
-          ? "border-purple-500/30 bg-purple-500/10! text-purple-700 dark:bg-purple-500/15! dark:text-purple-300"
+          ? "bg-purple-500/10! text-purple-700 hover:bg-purple-500/15! dark:bg-purple-500/15! dark:text-purple-300 dark:hover:bg-purple-500/20!"
           : undefined
       }
       icon={

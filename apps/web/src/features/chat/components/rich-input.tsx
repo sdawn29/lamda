@@ -78,7 +78,7 @@ function hasFileExtension(p: string): boolean {
 }
 
 const CHIP_CLASS =
-  "mx-0.5 inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-border bg-input/20 px-2 py-0.5 align-middle text-sm font-medium whitespace-nowrap text-foreground/80 select-none dark:bg-input/30 [&>svg]:pointer-events-none [&>svg]:size-3.5!"
+  "mx-0.5 inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-md bg-foreground/5 px-1.5 py-0.5 align-middle text-xs font-medium whitespace-nowrap text-foreground/80 select-none [&>svg]:pointer-events-none [&>svg]:size-3.5!"
 
 function buildChipBase(className?: string): HTMLSpanElement {
   const chip = document.createElement("span")
@@ -102,7 +102,7 @@ function buildLucideIcon(Icon: LucideIcon, className?: string): SVGSVGElement {
 
 /** Purple tint shared by every skill chip surface (input box, sent message). */
 const SKILL_CHIP_CLASS =
-  "border-purple-500/30 bg-purple-500/10 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300"
+  "bg-purple-500/10 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300"
 
 function buildSlashCommandIcon(source: SlashCommand["source"]): SVGSVGElement {
   return source === "skill"
@@ -154,9 +154,7 @@ export function buildSlashCommandChip(cmd: SlashCommand): HTMLSpanElement {
 
 function buildFileContextChip(context: FileCommentContext): HTMLSpanElement {
   const basename = context.path.split("/").pop() ?? context.path
-  const chip = buildChipBase(
-    "rounded-full border-border bg-input/20 text-foreground/80 dark:bg-input/30"
-  )
+  const chip = buildChipBase()
   chip.dataset.contextPath = context.path
   chip.dataset.contextLine = String(context.line)
   chip.dataset.contextComment = context.comment

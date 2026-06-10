@@ -39,6 +39,7 @@ export class LspConnection {
   private openCounts = new Map<string, number>()
   private openContents = new Map<string, string>()
   private connectPromise: Promise<void> | null = null
+  private hasConnectedBefore = false
   private disposed = false
 
   constructor(workspaceId: string) {
@@ -56,7 +57,18 @@ export class LspConnection {
       await new Promise<void>((resolve, reject) => {
         const ws = new WebSocket(appendToken(url))
         this.ws = ws
-        ws.onopen = () => resolve()
+        ws.onopen = () => {
+          // On reconnect, re-open documents that viewers still hold so
+          // diagnostics resume (the server lost its open-document state).
+          // Fire-and-forget with id 0 — responses to unknown ids are ignored.
+          if (this.hasConnectedBefore) {
+            for (const [filePath, content] of this.openContents) {
+              ws.send(JSON.stringify({ kind: "open", id: 0, filePath, content }))
+            }
+          }
+          this.hasConnectedBefore = true
+          resolve()
+        }
         ws.onerror = () => reject(new Error("LSP WebSocket error"))
         ws.onclose = () => {
           this.ws = null
