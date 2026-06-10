@@ -41,7 +41,10 @@ export function isValidToken(provided: string | null | undefined): boolean {
 export function isAllowedOrigin(origin: string | null | undefined): boolean {
   // No/'null' Origin: same-origin requests, the packaged file:// renderer, and
   // non-browser clients. The token still gates access in these cases.
-  if (!origin || origin === "null") return true;
+  // Chromium serializes a file:// page's origin as "null" for fetch/XHR but
+  // sends the literal "file://" on WebSocket upgrades — allow both, otherwise
+  // the packaged renderer's event streams are destroyed at upgrade.
+  if (!origin || origin === "null" || origin === "file://") return true;
   try {
     const { hostname } = new URL(origin);
     return hostname === "localhost" || hostname === "127.0.0.1";

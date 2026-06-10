@@ -74,15 +74,25 @@ export function SlashCommandDropdown({
   )
   const listRef = React.useRef<HTMLDivElement>(null)
 
-  // cmdk's value-driven highlight applies `data-selected="true"` to the active
-  // item — scroll it into view ourselves since cmdk only auto-scrolls on its
-  // own keyboard nav (which we don't use).
+  // Scroll the highlighted item into view ourselves: cmdk only auto-scrolls on
+  // its own keyboard nav (which we don't use). Look the item up by data-value,
+  // not data-selected — cmdk applies data-selected in a nested re-render that
+  // commits *after* this effect runs, so querying it here would find the
+  // previously selected item and the scroll would lag one step behind.
   React.useEffect(() => {
     if (!selectedValue) return
     const el = listRef.current?.querySelector<HTMLElement>(
-      '[data-selected="true"]'
+      `[data-value=${CSS.escape(selectedValue)}]`
     )
-    el?.scrollIntoView({ block: "nearest" })
+    if (!el) return
+    // When landing on the first item of a group, bring its heading into view
+    // too so the group label isn't clipped at the top of the list.
+    if (el.parentElement?.firstElementChild === el) {
+      el.closest('[cmdk-group=""]')
+        ?.querySelector('[cmdk-group-heading=""]')
+        ?.scrollIntoView({ block: "nearest" })
+    }
+    el.scrollIntoView({ block: "nearest" })
   }, [selectedValue])
 
   if (!open) return null
