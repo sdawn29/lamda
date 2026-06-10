@@ -202,7 +202,7 @@ export function DiffLineContent({
         "w-max shrink-0 whitespace-pre",
         paddingClass,
         isSkipped &&
-          "font-mono text-[10px] italic text-muted-foreground/40"
+          "font-mono text-3xs italic text-muted-foreground/40"
       )}
     >
       {isSkipped ? (
@@ -214,9 +214,7 @@ export function DiffLineContent({
               key={i}
               className={cn(
                 "rounded-sm",
-                isAdded
-                  ? "bg-emerald-500/30 dark:bg-emerald-400/25"
-                  : "bg-rose-500/30 dark:bg-rose-400/25"
+                isAdded ? "bg-diff-add/30" : "bg-diff-remove/30"
               )}
             >
               {part.text}

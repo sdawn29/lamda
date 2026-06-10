@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react"
 
 import { cn } from "@/shared/lib/utils"
 import { getIconName } from "@/shared/ui/file-icon"
+import { SectionLabel } from "@/shared/ui/section-label"
 import type { SlashCommand } from "../api"
 import { MessageChip } from "./message-chip"
 import {
@@ -34,9 +35,9 @@ function FileChip({ filePath }: { filePath: string }) {
       label={basename}
       detail={
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+          <SectionLabel>
             File
-          </span>
+          </SectionLabel>
           <span className="font-mono text-xs break-all">{filePath}</span>
         </div>
       }
@@ -55,9 +56,9 @@ function FolderChip({ folderPath }: { folderPath: string }) {
       label={basename}
       detail={
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+          <SectionLabel>
             Folder
-          </span>
+          </SectionLabel>
           <span className="font-mono text-xs break-all">{normalized}</span>
         </div>
       }
@@ -105,10 +106,10 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
               )}
             </div>
             <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="text-[9px] font-semibold tracking-[0.14em] text-foreground/45 uppercase">
+              <SectionLabel>
                 {isSkill ? "Skill" : "Prompt"}
-              </span>
-              <span className="truncate font-mono text-[11px] font-medium text-foreground">
+              </SectionLabel>
+              <span className="truncate font-mono text-2xs font-medium text-foreground">
                 /{displayName}
               </span>
             </div>
@@ -116,11 +117,11 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
           {/* Description */}
           <div className="px-3 py-2.5">
             {command.description ? (
-              <p className="text-[11px] leading-relaxed text-foreground/70">
+              <p className="text-2xs leading-relaxed text-foreground/70">
                 {command.description}
               </p>
             ) : (
-              <p className="text-[11px] text-foreground/40 italic">
+              <p className="text-2xs text-foreground/40 italic">
                 No description available
               </p>
             )}
@@ -154,20 +155,20 @@ function FileContextChip({ context }: { context: FileCommentContext }) {
               aria-hidden
             />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-mono text-[11px] font-medium">
+              <p className="truncate font-mono text-2xs font-medium">
                 {context.path}
               </p>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-3xs text-muted-foreground">
                 Line {context.line} context
               </p>
             </div>
           </div>
           {context.code && (
-            <pre className="max-h-20 w-full overflow-auto border-b border-foreground/10 bg-muted/40 px-3 py-2 font-mono text-[10px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+            <pre className="max-h-20 w-full overflow-auto border-b border-foreground/10 bg-muted/40 px-3 py-2 font-mono text-3xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
               {context.code}
             </pre>
           )}
-          <p className="px-3 py-2.5 text-[11px] leading-relaxed text-foreground/80">
+          <p className="px-3 py-2.5 text-2xs leading-relaxed text-foreground/80">
             {context.comment}
           </p>
         </>

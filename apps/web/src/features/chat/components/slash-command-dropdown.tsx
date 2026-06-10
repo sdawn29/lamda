@@ -126,7 +126,7 @@ export function SlashCommandDropdown({
                           /{itemName(item)}
                         </span>
                         {itemDescription(item) && (
-                          <span className="truncate text-[10px] text-muted-foreground">
+                          <span className="truncate text-3xs text-muted-foreground">
                             {itemDescription(item)}
                           </span>
                         )}

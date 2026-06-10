@@ -311,7 +311,7 @@ export function CommitInputSection({
                   variant="ghost"
                   size="xs"
                   onClick={openSettings}
-                  className="gap-1 text-[11px] text-muted-foreground"
+                  className="gap-1 text-2xs text-muted-foreground"
                 >
                   <Settings2 />
                   Configure
@@ -329,7 +329,7 @@ export function CommitInputSection({
                   size="xs"
                   onClick={handleGenerate}
                   disabled={generating || staged.length === 0}
-                  className="gap-1.5 text-[11px] text-muted-foreground"
+                  className="gap-1.5 text-2xs text-muted-foreground"
                 >
                   {generating ? (
                     <Loader2 className="size-3 animate-spin" />
@@ -356,7 +356,7 @@ export function CommitInputSection({
       )}
 
       <div className="mt-2 flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-2xs text-muted-foreground">
           {staged.length > 0
             ? `${staged.length} file${staged.length === 1 ? "" : "s"} staged`
             : (ahead ?? 0) > 0

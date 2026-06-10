@@ -2,6 +2,7 @@ import { Check, AlertCircle, Info } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Badge } from "@/shared/ui/badge"
 import { Card, CardContent } from "@/shared/ui/card"
+import { SectionLabel } from "@/shared/ui/section-label"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { cn } from "@/shared/lib/utils"
 import { useLspRegistry } from "../queries"
@@ -81,7 +82,7 @@ function LanguageRow({ entry }: { entry: LspRegistryEntry }) {
           </span>
           <div className="flex flex-wrap gap-1">
             {entry.extensions.map((ext) => (
-              <Badge key={ext} variant="outline" className="font-mono text-[10px]">
+              <Badge key={ext} variant="outline" className="font-mono text-3xs">
                 .{ext}
               </Badge>
             ))}
@@ -149,9 +150,7 @@ function CommandLine({
       )}
     >
       {isFallback && (
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
-          fallback
-        </span>
+        <SectionLabel>fallback</SectionLabel>
       )}
       <span className="truncate">
         {command}

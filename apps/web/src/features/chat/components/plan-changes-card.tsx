@@ -3,6 +3,7 @@ import { EyeIcon, ListTodoIcon, PlayIcon } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
 import { FileIcon } from "@/shared/ui/file-icon"
+import { SectionLabel } from "@/shared/ui/section-label"
 import { useChatActions } from "../contexts/chat-actions-context"
 import type { TurnSummary } from "@/features/git/api"
 
@@ -44,9 +45,9 @@ export const PlanChangesCard = memo(function PlanChangesCard({
             <ListTodoIcon className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400">
+            <SectionLabel className="block text-amber-700 dark:text-amber-400">
               {planFiles.length === 1 ? "Plan ready" : `${planFiles.length} plans ready`}
-            </p>
+            </SectionLabel>
             <ul className="mt-1.5 flex flex-col gap-1">
               {planFiles.map((rel) => {
                 const fileName = rel.split("/").pop() ?? rel

@@ -108,7 +108,7 @@ const ChangedFileItem = memo(function ChangedFileItem({
           />
           <span className="min-w-0 flex-1 overflow-hidden">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate font-mono text-[11px] font-medium leading-4 text-foreground/80">
+              <span className="truncate font-mono text-2xs font-medium leading-4 text-foreground/80">
                 {fileName}
               </span>
               {counts != null && (counts.added > 0 || counts.removed > 0) && (
@@ -116,7 +116,7 @@ const ChangedFileItem = memo(function ChangedFileItem({
               )}
             </span>
             {dirPath && (
-              <span className="block truncate font-mono text-[10px] leading-3 text-muted-foreground/45">
+              <span className="block truncate font-mono text-3xs leading-3 text-muted-foreground/45">
                 {dirPath}
               </span>
             )}
@@ -268,7 +268,7 @@ export const FileChangesCard = memo(function FileChangesCard({
                 <span className="block text-xs font-medium leading-4 text-foreground/85">
                   Files changed
                 </span>
-                <span className="flex min-w-0 items-center gap-1.5 text-[10px] leading-3 text-muted-foreground/60">
+                <span className="flex min-w-0 items-center gap-1.5 text-3xs leading-3 text-muted-foreground/60">
                   <span>{files.length} this turn</span>
                   {fileSummary.newFiles > 0 && (
                     <>
@@ -292,7 +292,7 @@ export const FileChangesCard = memo(function FileChangesCard({
                 size="sm"
                 variant="outline"
                 onClick={() => openRightSidebar()}
-                className="h-7 gap-1.5 rounded-md px-2.5 text-[11px] text-muted-foreground hover:text-foreground"
+                className="h-7 gap-1.5 rounded-md px-2.5 text-2xs text-muted-foreground hover:text-foreground"
               >
                 <GitCompare className="h-3 w-3" />
                 Diff
@@ -302,7 +302,7 @@ export const FileChangesCard = memo(function FileChangesCard({
                 variant="outline"
                 onClick={() => setConfirmOpen(true)}
                 disabled={revertToTurn.isPending}
-                className="h-7 gap-1.5 rounded-md px-2.5 text-[11px] text-muted-foreground disabled:opacity-50"
+                className="h-7 gap-1.5 rounded-md px-2.5 text-2xs text-muted-foreground disabled:opacity-50"
               >
                 {revertToTurn.isPending ? (
                   <Loader2 className="h-3 w-3 animate-spin" />

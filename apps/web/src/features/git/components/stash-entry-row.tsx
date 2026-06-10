@@ -61,7 +61,7 @@ export const StashEntryRow = memo(function StashEntryRow({
 
   return (
     <div className="group flex items-center gap-2.5 border-b border-border/20 px-3 py-2 last:border-0 hover:bg-muted/30">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-muted text-3xs font-semibold text-muted-foreground">
         {entry.index}
       </span>
 
@@ -70,7 +70,7 @@ export const StashEntryRow = memo(function StashEntryRow({
         {entry.branch && (
           <div className="mt-0.5 flex items-center gap-1">
             <GitBranch className="h-2.5 w-2.5 shrink-0 text-muted-foreground/40" />
-            <span className="truncate font-mono text-[10px] text-muted-foreground/50">
+            <span className="truncate font-mono text-3xs text-muted-foreground/50">
               {entry.branch}
             </span>
           </div>

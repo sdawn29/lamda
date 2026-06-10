@@ -89,7 +89,7 @@ export const PlanSavedCard = memo(function PlanSavedCard({
           <div className="min-w-0 flex-1">
             <span
               className={cn(
-                "text-[10px] font-semibold uppercase tracking-[0.08em]",
+                "text-3xs font-semibold uppercase tracking-wider",
                 isRunning
                   ? "animate-thinking-shimmer bg-linear-to-r from-amber-600/40 via-amber-700 to-amber-600/40 bg-size-[200%_100%] bg-clip-text text-transparent dark:from-amber-300/40 dark:via-amber-200 dark:to-amber-300/40"
                   : isError
@@ -105,7 +105,7 @@ export const PlanSavedCard = memo(function PlanSavedCard({
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="mt-1 inline-flex max-w-full items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+              className="mt-1 inline-flex max-w-full items-center gap-1 text-2xs text-muted-foreground transition-colors hover:text-foreground"
               aria-expanded={expanded}
             >
               <FileIcon filename={fileName} className="size-3 shrink-0 opacity-70" />

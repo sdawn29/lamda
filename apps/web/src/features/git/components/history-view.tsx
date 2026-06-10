@@ -63,7 +63,7 @@ function CommitRow({
           <p className="truncate text-xs font-medium leading-snug text-foreground/85 group-hover:text-foreground">
             {entry.subject || "(no message)"}
           </p>
-          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground/45">
+          <div className="mt-0.5 flex items-center gap-1 text-2xs text-muted-foreground/45">
             <span className="rounded bg-muted/60 px-1 font-mono text-muted-foreground/60">
               {entry.shortSha}
             </span>
@@ -96,7 +96,7 @@ function CommitRow({
                 ))}
               </div>
             ) : (
-              <p className="px-3 py-2 text-[11px] text-muted-foreground/50">
+              <p className="px-3 py-2 text-2xs text-muted-foreground/50">
                 No files changed
               </p>
             )}
@@ -135,7 +135,7 @@ export const HistoryView = memo(function HistoryView({
         </div>
         <div className="space-y-1">
           <p className="text-xs font-medium text-muted-foreground/60">No commits yet</p>
-          <p className="text-[10px] text-muted-foreground/40">
+          <p className="text-3xs text-muted-foreground/40">
             Commits will appear here once you start committing
           </p>
         </div>

@@ -24,7 +24,7 @@ export const FilesSection = memo(function FilesSection({
   return (
     <SectionCard label={label} count={files.length}>
       {files.length === 0 && emptyText && (
-        <p className="px-3 py-2 text-[11px] text-muted-foreground/50">{emptyText}</p>
+        <p className="px-3 py-2 text-2xs text-muted-foreground/50">{emptyText}</p>
       )}
       <div className="divide-y divide-border/25">
         {files.map((file) => (

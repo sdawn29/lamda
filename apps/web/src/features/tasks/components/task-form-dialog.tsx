@@ -133,7 +133,7 @@ export function TaskFormDialog({ open, onOpenChange, task, onSave }: TaskFormDia
             Cancel
           </Button>
           <div className="flex items-center gap-2.5">
-            <span className="text-[10px] text-muted-foreground/40 select-none">⌘↵</span>
+            <span className="text-3xs text-muted-foreground/40 select-none">⌘↵</span>
             <Button size="sm" onClick={handleSave}>
               {task ? "Update" : "Create"}
             </Button>

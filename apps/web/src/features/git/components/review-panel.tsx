@@ -23,6 +23,7 @@ import {
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
+import { SectionLabel } from "@/shared/ui/section-label"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import {
   DropdownMenu,
@@ -131,12 +132,10 @@ const TurnItem = memo(function TurnItem({
             isExpanded && "rotate-90"
           )}
         />
-        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
-          Turn {turnNumber}
-        </span>
+        <SectionLabel>Turn {turnNumber}</SectionLabel>
         {turn.checkpointSha && (
           <span
-            className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground/60"
+            className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground/60"
             title={`Checkpoint: ${turn.checkpointSha}`}
           >
             checkpoint
@@ -145,12 +144,12 @@ const TurnItem = memo(function TurnItem({
         {files.length > 0 && (
           <Badge
             variant="secondary"
-            className="h-4 min-w-4 rounded-full px-1 text-[10px] tabular-nums"
+            className="h-4 min-w-4 rounded-full px-1 text-3xs tabular-nums"
           >
             {files.length}
           </Badge>
         )}
-        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">
+        <span className="ml-auto shrink-0 text-3xs text-muted-foreground/40">
           {formatTurnTime(turn.inProgress ? turn.startedAt : turn.endedAt)}
         </span>
         {!turn.inProgress && (
@@ -201,7 +200,7 @@ const TurnItem = memo(function TurnItem({
 
       {isExpanded && files.length === 0 && (
         <div className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
-          <p className="px-3 py-1.5 text-[11px] text-muted-foreground/40">
+          <p className="px-3 py-1.5 text-2xs text-muted-foreground/40">
             No file changes recorded
           </p>
         </div>
@@ -275,7 +274,7 @@ const TurnHistoryView = memo(function TurnHistoryView({
           <p className="text-xs font-medium text-muted-foreground/60">
             No turns yet
           </p>
-          <p className="text-[10px] leading-relaxed text-muted-foreground/40">
+          <p className="text-3xs leading-relaxed text-muted-foreground/40">
             Each agent turn creates a checkpoint you can revert to
           </p>
         </div>
@@ -425,7 +424,7 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
             <>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuLabel className="px-2 py-1 text-[10px] font-medium tracking-wider text-muted-foreground/60 uppercase">
+                <DropdownMenuLabel className="px-2 py-1 text-3xs font-semibold tracking-wider text-muted-foreground uppercase">
                   Sort by
                 </DropdownMenuLabel>
                 {SORT_OPTIONS.map((opt) => (
@@ -574,7 +573,7 @@ const SourceControlContent = memo(function SourceControlContent({
                     <p className="text-xs font-medium text-muted-foreground/60">
                       Not a git repository
                     </p>
-                    <p className="text-[10px] leading-relaxed text-muted-foreground/40">
+                    <p className="text-3xs leading-relaxed text-muted-foreground/40">
                       This folder is not tracked by git
                     </p>
                   </div>
@@ -622,7 +621,7 @@ const SourceControlContent = memo(function SourceControlContent({
                           <p className="text-xs font-medium text-muted-foreground/60">
                             No changes
                           </p>
-                          <p className="text-[10px] text-muted-foreground/40">
+                          <p className="text-3xs text-muted-foreground/40">
                             Your working tree is clean
                           </p>
                         </div>
@@ -824,11 +823,11 @@ export const ReviewPanel = memo(function ReviewPanel({
             {visibleDiffStat &&
               (visibleDiffStat.additions > 0 ||
                 visibleDiffStat.deletions > 0) && (
-                <span className="flex animate-in items-center gap-1 font-mono text-[11px] leading-none duration-200 fade-in-0 zoom-in-90">
-                  <span className="text-emerald-500">
+                <span className="flex animate-in items-center gap-1 font-mono text-2xs leading-none duration-200 fade-in-0 zoom-in-90">
+                  <span className="text-diff-add">
                     +{visibleDiffStat.additions}
                   </span>
-                  <span className="text-rose-500">
+                  <span className="text-diff-remove">
                     -{visibleDiffStat.deletions}
                   </span>
                 </span>

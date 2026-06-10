@@ -59,7 +59,7 @@ function StepRow({
           <CheckCircle2 className="size-5 text-primary" strokeWidth={2} />
         ) : (
           <div className="flex size-5 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/25">
-            <span className="text-[10px] font-semibold text-primary">
+            <span className="text-3xs font-semibold text-primary">
               {number}
             </span>
           </div>
@@ -74,7 +74,7 @@ function StepRow({
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
       {done ? (
-        <span className="shrink-0 self-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+        <span className="shrink-0 self-center rounded-full bg-primary/10 px-2 py-0.5 text-2xs font-medium text-primary">
           Done
         </span>
       ) : (
@@ -159,10 +159,10 @@ export function WorkspaceEmptyState() {
                   <Icon className="size-3.5 text-primary/80" />
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[11px] leading-tight font-semibold">
+                  <p className="text-2xs leading-tight font-semibold">
                     {label}
                   </p>
-                  <p className="text-[10px] leading-snug text-muted-foreground">
+                  <p className="text-3xs leading-snug text-muted-foreground">
                     {description}
                   </p>
                 </div>

@@ -109,13 +109,13 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
               <span className="flex items-baseline gap-2">
                 <span className="text-xs font-medium text-foreground">{error.title}</span>
                 {error.retryCount != null && (
-                  <span className="text-[10px] text-muted-foreground/60">
+                  <span className="text-3xs text-muted-foreground/60">
                     attempt {error.retryCount}
                   </span>
                 )}
               </span>
               {error.message && !expanded && (
-                <span className="text-[11px] leading-relaxed text-muted-foreground/80 line-clamp-1">
+                <span className="text-2xs leading-relaxed text-muted-foreground/80 line-clamp-1">
                   {error.message}
                 </span>
               )}
@@ -164,7 +164,7 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
         >
           <div className="overflow-hidden">
             <div className="group/copy relative border-t border-destructive/15 bg-destructive/[0.04]">
-              <pre className="max-h-64 overflow-auto px-3 py-2 pr-9 text-[11px] leading-relaxed break-all whitespace-pre-wrap text-foreground/80">
+              <pre className="max-h-64 overflow-auto px-3 py-2 pr-9 text-2xs leading-relaxed break-all whitespace-pre-wrap text-foreground/80">
                 {error.message}
               </pre>
               <button

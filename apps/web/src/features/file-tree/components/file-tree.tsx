@@ -317,7 +317,7 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
           </Button>
         </div>
         {!showSkeleton && (
-          <div className="flex h-4 items-center justify-between px-0.5 text-[10px] leading-none text-sidebar-foreground/45">
+          <div className="flex h-4 items-center justify-between px-0.5 text-3xs leading-none text-sidebar-foreground/45">
             <span>
               {isFiltering
                 ? `${searchRows.length} matches`
@@ -332,11 +332,11 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
         {showSkeleton ? (
           <FileTreeSkeleton />
         ) : isEmpty ? (
-          <div className="p-2 text-[10px] text-sidebar-foreground/50">
+          <div className="p-2 text-3xs text-sidebar-foreground/50">
             No files indexed
           </div>
         ) : isFiltering && searchRows.length === 0 ? (
-          <div className="p-2 text-[10px] text-sidebar-foreground/50">
+          <div className="p-2 text-3xs text-sidebar-foreground/50">
             No matching files
           </div>
         ) : (

@@ -71,16 +71,18 @@ const SideBySideCell = memo(function SideBySideCell({
     <div
       className={cn(
         "flex min-w-full leading-5",
-        isAdded && "bg-emerald-500/8",
-        isRemoved && "bg-rose-500/8"
+        isAdded && "bg-diff-add/8",
+        isRemoved && "bg-diff-remove/8"
       )}
     >
       {/* Gutter */}
       <div
         className={cn(
           "sticky left-0 z-10 flex shrink-0 select-none",
-          isAdded && "bg-emerald-50 dark:bg-emerald-950",
-          isRemoved && "bg-rose-50 dark:bg-rose-950",
+          isAdded &&
+            "bg-[color-mix(in_srgb,var(--diff-add)_12%,var(--background))]",
+          isRemoved &&
+            "bg-[color-mix(in_srgb,var(--diff-remove)_12%,var(--background))]",
           isNeutral && "bg-background"
         )}
       >
@@ -88,17 +90,17 @@ const SideBySideCell = memo(function SideBySideCell({
         <span
           className={cn(
             "w-0.5 shrink-0",
-            isAdded && "bg-emerald-500/50",
-            isRemoved && "bg-rose-500/50"
+            isAdded && "bg-diff-add/50",
+            isRemoved && "bg-diff-remove/50"
           )}
         />
 
         {/* Line number */}
         <span
           className={cn(
-            "w-7 shrink-0 border-r pr-1.5 text-right font-mono text-[10px] leading-5",
-            isAdded && "border-emerald-500/20 text-emerald-400/70",
-            isRemoved && "border-rose-500/20 text-rose-400/70",
+            "w-7 shrink-0 border-r pr-1.5 text-right font-mono text-3xs leading-5",
+            isAdded && "border-diff-add/20 text-diff-add/80",
+            isRemoved && "border-diff-remove/20 text-diff-remove/80",
             isNeutral && "border-border/40 text-muted-foreground/30"
           )}
         >
@@ -108,9 +110,9 @@ const SideBySideCell = memo(function SideBySideCell({
         {/* Sign */}
         <span
           className={cn(
-            "w-4 shrink-0 text-center font-mono text-[11px] leading-5",
-            isAdded && "text-emerald-500",
-            isRemoved && "text-rose-500",
+            "w-4 shrink-0 text-center font-mono text-2xs leading-5",
+            isAdded && "text-diff-add",
+            isRemoved && "text-diff-remove",
             isNeutral && "text-muted-foreground/20"
           )}
         >

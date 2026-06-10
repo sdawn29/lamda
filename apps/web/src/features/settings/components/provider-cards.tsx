@@ -624,7 +624,7 @@ function ConfigureKeyDialog({
           <DialogTitle>Configure {provider.label}</DialogTitle>
           <DialogDescription>
             Enter your API key for {provider.label}. It will be saved to{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            <code className="rounded bg-muted px-1 py-0.5 text-2xs">
               ~/.pi/agent/auth.json
             </code>
             .

@@ -46,11 +46,11 @@ export function OutlinePanel({ symbols, onJumpToLine }: OutlinePanelProps) {
   if (!symbols || symbols.length === 0) return null
 
   return (
-    <div className="border-b bg-muted/10 text-xs">
+    <div className="border-b border-border/50 bg-muted/30 text-xs">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-muted-foreground hover:bg-muted/30"
+        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-muted-foreground hover:bg-muted/40"
       >
         {open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
         <ListTree className="size-3.5" />

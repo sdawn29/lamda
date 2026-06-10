@@ -22,6 +22,15 @@
   --font-heading: var(--font-sans);
   --font-sans: "Geist Variable", sans-serif;
   --font-mono: "JetBrains Mono Variable", monospace;
+  /* ── Micro type scale ──────────────────────────────────────────────────
+     Extends Tailwind's xs/sm ladder downward so the dense UI chrome (chat
+     metadata, git rows, badges, section eyebrows) draws from named tiers
+     instead of ad-hoc text-[10px]/[11px] values. Keep the ladder short:
+       text-sm  14px · text-xs 12px · text-2xs 11px · text-3xs 10px       */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-3xs: 0.625rem;
+  --text-3xs--line-height: 0.875rem;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,6 +48,8 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-diff-add: var(--diff-add);
+  --color-diff-remove: var(--diff-remove);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -106,6 +117,13 @@
 
   /* ── Destructive (jellybeans error red) ── */
   --destructive: #902020;
+
+  /* ── Diff add/remove: clean, saturated green/red for code diffs. Kept
+       separate from --chart-2 / --destructive (which stay olive/brick for
+       syntax + charts) and constant across themes so diffs always read as
+       unambiguous green/red. ── */
+  --diff-add: #1a7f37;
+  --diff-remove: #cf222e;
 
   /* ── Border: separator that reads against both bg and card. Sits just
        below the card/secondary level so card edges are legible and panel
@@ -197,6 +215,10 @@
 
   /* ── Destructive (jellybeans error red) ── */
   --destructive: #cc3333;
+
+  /* ── Diff add/remove: brighter for dark surfaces (GitHub-style). ── */
+  --diff-add: #3fb950;
+  --diff-remove: #f85149;
 
   /* ── Borders: subtle separators · Input: border of form fields ── */
   --border: #1e1e1e;
@@ -370,8 +392,8 @@
   .lamda-monaco-diff-viewer {
     /* Base hues, deepened with a touch of black so row tints and chips read
        darker / richer rather than washed out. */
-    --lamda-diff-added: color-mix(in srgb, var(--chart-2) 72%, black);
-    --lamda-diff-removed: color-mix(in srgb, var(--destructive) 72%, black);
+    --lamda-diff-added: color-mix(in srgb, var(--diff-add) 80%, black);
+    --lamda-diff-removed: color-mix(in srgb, var(--diff-remove) 80%, black);
     --lamda-diff-gutter-bg: color-mix(in srgb, var(--card) 60%, var(--background));
     --lamda-diff-line-alpha: 18%;
     --lamda-diff-char-alpha: 38%;

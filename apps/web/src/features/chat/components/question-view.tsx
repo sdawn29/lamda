@@ -300,7 +300,7 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
         <p className="text-xs leading-snug font-medium text-foreground">
           <Badge
             variant="outline"
-            className="mr-1.5 align-[1px] text-[0.5625rem] font-medium tracking-wide text-muted-foreground uppercase"
+            className="mr-1.5 align-[1px] text-3xs font-semibold tracking-wider text-muted-foreground uppercase"
           >
             {activeQuestion.header}
           </Badge>

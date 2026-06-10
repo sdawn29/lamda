@@ -496,7 +496,7 @@ export function AppSidebar() {
           </SidebarMenuSub>
         ) : (
           <div className="animate-in mx-2 my-1 rounded-md px-2 py-1.5 text-center duration-150 fade-in-0 slide-in-from-top-1">
-            <span className="text-[11px] text-muted-foreground/60">
+            <span className="text-2xs text-muted-foreground/60">
               No threads
             </span>
           </div>
@@ -572,7 +572,7 @@ export function AppSidebar() {
         )}
 
         <SidebarGroup className="group/workspaces flex min-h-0 flex-1 flex-col">
-          <SidebarGroupLabel className="text-[10px]">WORKSPACES</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-3xs">WORKSPACES</SidebarGroupLabel>
           <Tooltip>
             <TooltipTrigger
               render={

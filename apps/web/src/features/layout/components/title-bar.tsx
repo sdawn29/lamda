@@ -331,10 +331,10 @@ export function TitleBar() {
             <>
               {urlActiveWorkspace && (
                 <>
-                <span className="shrink truncate text-[11px] font-medium text-muted-foreground/70">
+                <span className="shrink truncate text-2xs font-medium text-muted-foreground/70">
                   {urlActiveWorkspace.name}
                 </span>
-                <span className="mx-0.5 shrink-0 text-[11px] text-muted-foreground/40 select-none">
+                <span className="mx-0.5 shrink-0 text-2xs text-muted-foreground/40 select-none">
                   /
                 </span>
               </>

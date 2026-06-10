@@ -157,7 +157,7 @@ function buildFileContextChip(context: FileCommentContext): HTMLSpanElement {
   if (context.code) chip.dataset.contextCode = context.code
   chip.title = `${context.path}:${context.line}\n${context.comment}`
   const line = document.createElement("span")
-  line.className = "font-mono text-[10px] uppercase tracking-wide opacity-70"
+  line.className = "font-mono text-3xs uppercase tracking-wide opacity-70"
   line.textContent = `L${context.line}`
   chip.append(
     buildIconifyIcon(getIconName(basename)),

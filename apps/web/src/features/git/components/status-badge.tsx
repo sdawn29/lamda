@@ -67,7 +67,7 @@ export const StatusBadge = memo(function StatusBadge({
   return (
     <Badge
       className={cn(
-        "h-4 min-w-4 rounded-sm px-0.5 font-mono text-[10px] leading-none font-semibold",
+        "h-4 min-w-4 rounded-sm px-0.5 font-mono text-3xs leading-none font-semibold",
         meta.bg,
         meta.text
       )}

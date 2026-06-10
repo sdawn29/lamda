@@ -86,7 +86,7 @@ export function FileMentionDropdown({
                       {entry.path.split("/").pop() ?? entry.path}
                     </span>
                     {entry.path.includes("/") && (
-                      <span className="truncate font-mono text-[10px] text-muted-foreground">
+                      <span className="truncate font-mono text-3xs text-muted-foreground">
                         {entry.path.slice(0, entry.path.lastIndexOf("/"))}
                       </span>
                     )}

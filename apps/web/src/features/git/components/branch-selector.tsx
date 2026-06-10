@@ -95,12 +95,12 @@ export function BranchSelector({
                 {branch ?? (hasRepository ? "no branch" : "no repository")}
               </span>
               {aheadBehind && (aheadBehind.ahead ?? 0) > 0 && (
-                <span className="text-[10px] font-medium text-green-600 dark:text-green-400">
+                <span className="text-3xs font-medium text-green-600 dark:text-green-400">
                   ↑{aheadBehind.ahead}
                 </span>
               )}
               {aheadBehind && (aheadBehind.behind ?? 0) > 0 && (
-                <span className="text-[10px] font-medium text-amber-500">
+                <span className="text-3xs font-medium text-amber-500">
                   ↓{aheadBehind.behind}
                 </span>
               )}

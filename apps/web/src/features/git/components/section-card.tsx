@@ -1,6 +1,7 @@
 import { memo, useState, type ReactNode } from "react"
 import { ChevronRight, Loader2 } from "lucide-react"
 import { Badge } from "@/shared/ui/badge"
+import { SectionLabel } from "@/shared/ui/section-label"
 import { cn } from "@/shared/lib/utils"
 
 interface SectionCardProps {
@@ -29,7 +30,7 @@ export const SectionCard = memo(function SectionCard({
     >
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className="flex h-8 w-full items-center gap-2 border-b border-border/35 bg-muted/25 px-2.5 text-left transition-colors hover:bg-muted/40"
+        className="flex h-8 w-full items-center gap-2 border-b border-border/50 bg-muted/30 px-2.5 text-left transition-colors hover:bg-muted/40"
       >
         <ChevronRight
           className={cn(
@@ -37,16 +38,14 @@ export const SectionCard = memo(function SectionCard({
             !collapsed && "rotate-90"
           )}
         />
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
-          {label}
-        </span>
+        <SectionLabel>{label}</SectionLabel>
         {isLoading && (
           <Loader2 className="size-3 animate-spin text-muted-foreground/40" />
         )}
         {!isLoading && count != null && count > 0 && (
           <Badge
             variant="secondary"
-            className="h-4 min-w-4 rounded-sm px-1 text-[10px] tabular-nums"
+            className="h-4 min-w-4 rounded-sm px-1 text-3xs tabular-nums"
           >
             {count}
           </Badge>

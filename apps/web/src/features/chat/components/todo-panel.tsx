@@ -248,7 +248,7 @@ function GoalSection({
         >
           {goal.description}
         </span>
-        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/35">
+        <span className="shrink-0 text-2xs tabular-nums text-muted-foreground/35">
           {completedCount}/{total}
         </span>
       </div>

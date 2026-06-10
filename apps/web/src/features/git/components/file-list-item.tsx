@@ -159,11 +159,11 @@ export const FileListItem = memo(function FileListItem({
             aria-hidden
           />
           <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
-            <span className="shrink-0 font-mono text-[11px] font-medium text-foreground/80">
+            <span className="shrink-0 font-mono text-2xs font-medium text-foreground/80">
               {fileName}
             </span>
             {dirPath && (
-              <span className="truncate font-mono text-[10px] text-muted-foreground/35">
+              <span className="truncate font-mono text-3xs text-muted-foreground/35">
                 {dirPath}
               </span>
             )}
@@ -278,7 +278,7 @@ export const FileRow = memo(function FileRow({
           {fileName}
         </span>
         {dirPath && (
-          <span className="truncate font-mono text-[10px] text-muted-foreground/35">
+          <span className="truncate font-mono text-3xs text-muted-foreground/35">
             {dirPath}
           </span>
         )}

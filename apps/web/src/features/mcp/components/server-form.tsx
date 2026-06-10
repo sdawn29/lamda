@@ -18,6 +18,7 @@ import {
 
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Button } from "@/shared/ui/button"
+import { SectionLabel } from "@/shared/ui/section-label"
 import { Input } from "@/shared/ui/input"
 import { Separator } from "@/shared/ui/separator"
 import { Switch } from "@/shared/ui/switch"
@@ -60,7 +61,7 @@ function EnvVarRow({ envVar, index, onChange, onRemove }: EnvVarRowProps) {
 
   return (
     <div className="group flex items-center gap-2 rounded-md border bg-muted/30 px-2 py-1.5">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-medium text-muted-foreground">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-muted text-3xs font-medium text-muted-foreground">
         {index + 1}
       </span>
       <Input
@@ -286,9 +287,7 @@ function ServerFormFields({
         {/* Command preview — shown when command is filled */}
         {formState.command && (
           <div className="rounded-md bg-muted/50 px-3 py-2.5">
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Preview
-            </p>
+            <SectionLabel className="mb-1 block">Preview</SectionLabel>
             <code className="break-all font-mono text-xs">
               {formState.command}
               {formState.args && ` ${formState.args}`}
@@ -325,7 +324,7 @@ function ServerFormFields({
             <Settings2 className="h-3.5 w-3.5" />
             Advanced Options
             {formState.envVars.length > 0 && (
-              <span className="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary">
+              <span className="rounded-full bg-primary/10 px-1.5 py-px text-3xs font-semibold text-primary">
                 {formState.envVars.length}
               </span>
             )}
@@ -643,7 +642,7 @@ export function ServerListItem({
             {statusLabel && (
               <span
                 className={cn(
-                  "shrink-0 text-[11px] leading-none",
+                  "shrink-0 text-2xs leading-none",
                   status?.error ? "text-destructive" : "text-muted-foreground",
                   status === undefined && "animate-pulse"
                 )}
@@ -652,12 +651,12 @@ export function ServerListItem({
               </span>
             )}
           </div>
-          <code className="mt-1 block truncate font-mono text-[11px] text-muted-foreground/60">
+          <code className="mt-1 block truncate font-mono text-2xs text-muted-foreground/60">
             {server.command}
             {server.args?.length ? ` ${server.args.join(" ")}` : ""}
           </code>
           {checked && status?.error && (
-            <p className="mt-1 truncate text-[11px] text-destructive">{status.error}</p>
+            <p className="mt-1 truncate text-2xs text-destructive">{status.error}</p>
           )}
         </div>
 
@@ -668,7 +667,7 @@ export function ServerListItem({
             size="sm"
             onClick={() => setShowTools(!showTools)}
             className={cn(
-              "h-6 shrink-0 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground",
+              "h-6 shrink-0 gap-1 px-1.5 text-2xs text-muted-foreground hover:text-foreground",
               showTools && "text-foreground"
             )}
           >
@@ -714,11 +713,11 @@ export function ServerListItem({
         <div className="space-y-2 border-t border-border/40 px-3 py-2.5">
           {tools.map((tool) => (
             <div key={tool.name}>
-              <code className="font-mono text-[11px] font-medium text-foreground/80">
+              <code className="font-mono text-2xs font-medium text-foreground/80">
                 {tool.name}
               </code>
               {tool.description && (
-                <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
                   {tool.description}
                 </p>
               )}

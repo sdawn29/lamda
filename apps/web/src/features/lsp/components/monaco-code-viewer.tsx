@@ -390,7 +390,7 @@ export default function MonacoCodeViewer({
                   className="min-h-20 text-xs"
                   autoFocus
                 />
-                <FieldDescription className="text-[10px]">
+                <FieldDescription className="text-3xs">
                   Saved into chat as file context.
                 </FieldDescription>
               </Field>

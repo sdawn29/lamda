@@ -36,8 +36,8 @@ export function TabsEmptyState() {
               <Icon className="size-3.5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-medium text-foreground/80">{SHORTCUT_LABELS[action]}</p>
-              <p className="truncate text-[10px] text-muted-foreground">{description}</p>
+              <p className="text-2xs font-medium text-foreground/80">{SHORTCUT_LABELS[action]}</p>
+              <p className="truncate text-3xs text-muted-foreground">{description}</p>
             </div>
             <ShortcutKbd binding={shortcuts[action]} />
           </div>

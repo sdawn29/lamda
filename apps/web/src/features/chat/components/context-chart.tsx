@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from "@/shared/ui/popover"
 import { Button } from "@/shared/ui/button"
+import { SectionLabel } from "@/shared/ui/section-label"
 import type { ContextBreakdown, ContextUsage, SessionStats } from "../api"
 import { compactSession } from "../api"
 import { chatKeys } from "../queries"
@@ -164,7 +165,7 @@ export function ContextChart({
               />
             </svg>
             {pct != null && (
-              <span className="max-w-0 overflow-hidden text-[10px] leading-none text-muted-foreground tabular-nums transition-all duration-200 ease-out group-hover:max-w-[4ch] group-hover:pl-1">
+              <span className="max-w-0 overflow-hidden text-3xs leading-none text-muted-foreground tabular-nums transition-all duration-200 ease-out group-hover:max-w-[4ch] group-hover:pl-1">
                 {Math.round(pct)}%
               </span>
             )}
@@ -177,11 +178,11 @@ export function ContextChart({
         {/* ── Context window (hero) ─────────────────────────────────────── */}
         <div className="px-3.5 pt-3 pb-3">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+            <SectionLabel>
               Context window
-            </span>
+            </SectionLabel>
             {display.tokens != null && (
-              <span className="text-[10px] tabular-nums text-muted-foreground/60">
+              <span className="text-3xs tabular-nums text-muted-foreground/60">
                 {usedLabel} / {totalLabel}
               </span>
             )}
@@ -199,7 +200,7 @@ export function ContextChart({
             <span className={cn("text-base font-medium opacity-60", pctTextColor)}>
               %
             </span>
-            <span className="ml-1 text-[10px] text-muted-foreground/60">used</span>
+            <span className="ml-1 text-3xs text-muted-foreground/60">used</span>
           </div>
 
           {/* Stacked usage bar */}
@@ -227,8 +228,8 @@ export function ContextChart({
               {segments.map((s) => (
                 <div key={s.key} className="flex items-center gap-1.5">
                   <span className={cn("size-2 shrink-0 rounded-[3px]", s.color)} />
-                  <span className="text-[10px] text-muted-foreground">{s.label}</span>
-                  <span className="ml-auto text-[10px] font-medium tabular-nums text-foreground/80">
+                  <span className="text-3xs text-muted-foreground">{s.label}</span>
+                  <span className="ml-auto text-3xs font-medium tabular-nums text-foreground/80">
                     {formatTokens(s.value)}
                   </span>
                 </div>
@@ -242,23 +243,23 @@ export function ContextChart({
           <div className="space-y-1.5 border-t border-border/50 px-3.5 py-2.5">
             {tokens && (
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                <SectionLabel>
                   Session total
-                </span>
+                </SectionLabel>
                 <div className="flex items-center gap-2.5">
                   {hasCost && (
-                    <span className="text-[10px] tabular-nums text-muted-foreground/60">
+                    <span className="text-3xs tabular-nums text-muted-foreground/60">
                       {formatCost(cost)}
                     </span>
                   )}
-                  <span className="text-[11px] font-semibold tabular-nums text-foreground">
+                  <span className="text-2xs font-semibold tabular-nums text-foreground">
                     {formatTokens(tokens.total)}
                   </span>
                 </div>
               </div>
             )}
             {sessionStats && (
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 tabular-nums">
+              <div className="flex items-center gap-2 text-3xs text-muted-foreground/60 tabular-nums">
                 <span>{sessionStats.userMessages} user</span>
                 <span className="opacity-40">·</span>
                 <span>{sessionStats.assistantMessages} assistant</span>
@@ -277,7 +278,7 @@ export function ContextChart({
               variant="ghost"
               onClick={handleCompact}
               disabled={isCompacting}
-              className="w-full h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+              className="w-full h-7 gap-1.5 text-2xs text-muted-foreground hover:text-foreground"
             >
               {isCompacting ? (
                 <>

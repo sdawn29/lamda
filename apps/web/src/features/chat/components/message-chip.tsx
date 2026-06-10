@@ -35,7 +35,7 @@ export function MessageChip({
         {icon}
         <span className="max-w-36 truncate">{label}</span>
         {meta && (
-          <span className="font-mono text-[10px] text-muted-foreground">
+          <span className="font-mono text-3xs text-muted-foreground">
             {meta}
           </span>
         )}

@@ -662,12 +662,12 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             {/* Header: summary + copy */}
             <div className="flex items-start gap-2 border-b border-border/30 px-3 py-1.5">
               {normalizedToolName === "bash" ? (
-                <span className="mt-px font-mono text-[11px] font-bold text-foreground/60">$</span>
+                <span className="mt-px font-mono text-2xs font-bold text-foreground/60">$</span>
               ) : (isEdit || isWrite) && filePath ? (
                 <FileIcon filename={filePath} className="mt-px h-3.5 w-3.5 shrink-0 opacity-50" />
               ) : null}
               <span className={cn(
-                "flex-1 font-mono text-[11px] text-foreground/60",
+                "flex-1 font-mono text-2xs text-foreground/60",
                 normalizedToolName === "bash" ? "break-all whitespace-pre-wrap" : "truncate"
               )}>
                 {summary || msg.toolName}

@@ -32,7 +32,7 @@ export const DiffHeader = memo(function DiffHeader({
   const dirPath = parts.length > 1 ? parts.slice(0, -1).join("/") + "/" : null
 
   return (
-    <div className="flex h-8 items-center gap-2 border-b border-border/60 bg-muted/30 pr-1 pl-2.5">
+    <div className="flex h-8 items-center gap-2 border-b border-border/50 bg-muted/30 pr-1 pl-2.5">
       {fileName && (
         <Icon
           icon={`catppuccin:${getIconName(fileName)}`}
@@ -42,12 +42,12 @@ export const DiffHeader = memo(function DiffHeader({
       )}
       <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
         {fileName && (
-          <span className="shrink-0 truncate font-mono text-[11px] font-medium text-foreground/85">
+          <span className="shrink-0 truncate font-mono text-2xs font-medium text-foreground/85">
             {fileName}
           </span>
         )}
         {dirPath && (
-          <span className="truncate font-mono text-[10px] text-muted-foreground/40">
+          <span className="truncate font-mono text-3xs text-muted-foreground/40">
             {dirPath}
           </span>
         )}

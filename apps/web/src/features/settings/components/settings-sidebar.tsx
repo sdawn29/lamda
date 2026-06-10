@@ -5,6 +5,7 @@ import { Link, useMatchRoute, useRouter } from "@tanstack/react-router"
 
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
+import { SectionLabel } from "@/shared/ui/section-label"
 import { Input } from "@/shared/ui/input"
 import { ShortcutKbd } from "@/shared/ui/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
@@ -35,7 +36,7 @@ function SidebarLink({ section }: { section: SettingsSectionMeta }) {
       params={{ section: section.slug }}
       preload="intent"
       className={cn(
-        "group relative flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+        "group relative flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm transition-colors",
         isActive
           ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
           : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
@@ -184,9 +185,9 @@ export function SettingsSidebar() {
             if (!items?.length) return null
             return (
               <div key={group.id} className="mt-3 first:mt-1">
-                <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/55">
+                <SectionLabel className="mb-1 block px-2">
                   {group.label}
-                </p>
+                </SectionLabel>
                 <div className="flex flex-col gap-0.5">
                   {items.map((section) => (
                     <SidebarLink key={section.slug} section={section} />
@@ -207,16 +208,16 @@ export function SettingsSidebar() {
           >
             Λ
           </span>
-          <span className="text-[11px] font-medium text-muted-foreground">
+          <span className="text-2xs font-medium text-muted-foreground">
             Lamda
           </span>
         </div>
         {import.meta.env.DEV ? (
-          <Badge variant="outline" className="font-mono text-[10px]">
+          <Badge variant="outline" className="font-mono text-3xs">
             dev
           </Badge>
         ) : (
-          <Badge variant="outline" className="font-mono text-[10px]">
+          <Badge variant="outline" className="font-mono text-3xs">
             v{__APP_VERSION__}
           </Badge>
         )}

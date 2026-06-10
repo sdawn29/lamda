@@ -246,7 +246,7 @@ function ConfigureProviderDialog({
           </DialogTitle>
           <DialogDescription>
             Saved to{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            <code className="rounded bg-muted px-1 py-0.5 text-2xs">
               ~/.pi/agent/models.json
             </code>
             . Models appear in the model picker immediately.
@@ -356,7 +356,7 @@ function ConfigureProviderDialog({
             />
             <FieldDescription>
               One model id per line — exactly as the server reports it (e.g.{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+              <code className="rounded bg-muted px-1 py-0.5 text-2xs">
                 ollama list
               </code>
               ).
@@ -443,7 +443,7 @@ function ConfigureProviderDialog({
 function GuideStep({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <li className="flex gap-2">
-      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-3xs font-medium text-muted-foreground">
         {n}
       </span>
       <span className="min-w-0">{children}</span>
@@ -453,7 +453,7 @@ function GuideStep({ n, children }: { n: number; children: React.ReactNode }) {
 
 function Code({ children }: { children: string }) {
   return (
-    <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+    <code className="rounded bg-muted px-1 py-0.5 font-mono text-2xs">
       {children}
     </code>
   )
@@ -559,10 +559,10 @@ function ProviderRow({
             <p className="truncate text-sm font-medium">{id}</p>
             <Badge variant="secondary">{config.models.length} models</Badge>
           </div>
-          <p className="truncate font-mono text-[11px] text-muted-foreground">
+          <p className="truncate font-mono text-2xs text-muted-foreground">
             {config.baseUrl}
           </p>
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+          <p className="mt-0.5 truncate text-2xs text-muted-foreground">
             {config.models.map((m) => m.id).join(", ")}
           </p>
         </div>

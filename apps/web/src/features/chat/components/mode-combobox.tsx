@@ -140,7 +140,7 @@ export function ModeCombobox({
                   </span>
                   <div className="flex flex-col">
                     <span className="text-xs font-medium">{mode.label}</span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-2xs text-muted-foreground">
                       {mode.description}
                     </span>
                   </div>
