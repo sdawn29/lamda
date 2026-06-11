@@ -15,7 +15,17 @@ function TooltipProvider({
   )
 }
 
-function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
+function Tooltip({
+  delay,
+  ...props
+}: TooltipPrimitive.Root.Props & { delay?: number }) {
+  if (delay !== undefined) {
+    return (
+      <TooltipProvider delay={delay}>
+        <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+      </TooltipProvider>
+    )
+  }
   return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
 }
 
