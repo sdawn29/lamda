@@ -1,4 +1,4 @@
-import { gte, sql, type SQL } from "drizzle-orm";
+import { and, gte, lte, sql, type SQL } from "drizzle-orm";
 import { db } from "../client.js";
 import { aiUsage, workspaces } from "../schema.js";
 
@@ -71,13 +71,19 @@ const totalsColumns = {
   cost: sql<number>`coalesce(sum(${aiUsage.cost}), 0)`,
 };
 
-function sinceFilter(sinceMs?: number): SQL | undefined {
-  return sinceMs && sinceMs > 0 ? gte(aiUsage.createdAt, sinceMs) : undefined;
+function rangeFilter(sinceMs?: number, untilMs?: number): SQL | undefined {
+  const filters: SQL[] = [];
+  if (sinceMs && sinceMs > 0) filters.push(gte(aiUsage.createdAt, sinceMs));
+  if (untilMs && untilMs > 0) filters.push(lte(aiUsage.createdAt, untilMs));
+  return filters.length > 0 ? and(...filters) : undefined;
 }
 
-/** Aggregated usage stats, optionally limited to rows recorded at/after sinceMs. */
-export function getAiUsageStats(sinceMs?: number): AiUsageStats {
-  const where = sinceFilter(sinceMs);
+/** Aggregated usage stats, optionally limited to rows recorded within [sinceMs, untilMs]. */
+export function getAiUsageStats(
+  sinceMs?: number,
+  untilMs?: number,
+): AiUsageStats {
+  const where = rangeFilter(sinceMs, untilMs);
 
   const totals = db
     .select(totalsColumns)

@@ -1,10 +1,11 @@
-import { useQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import {
   fetchProviders,
   fetchOAuthProviders,
   fetchAppSettings,
   fetchLocalProviders,
   fetchAiUsage,
+  type AiUsageRange,
 } from "./api"
 
 const settingsRootKey = ["settings"] as const
@@ -15,7 +16,8 @@ export const settingsKeys = {
   providers: [...settingsRootKey, "providers"] as const,
   oauthProviders: [...settingsRootKey, "oauth-providers"] as const,
   localProviders: [...settingsRootKey, "local-providers"] as const,
-  aiUsage: (days: number) => [...settingsRootKey, "ai-usage", days] as const,
+  aiUsage: (range: AiUsageRange) =>
+    [...settingsRootKey, "ai-usage", range] as const,
 }
 
 export const appSettingsQueryKey = settingsKeys.app
@@ -48,12 +50,15 @@ export function useOAuthProviders() {
   })
 }
 
-export function useAiUsage(days: number) {
+export function useAiUsage(range: AiUsageRange) {
   return useQuery({
-    queryKey: settingsKeys.aiUsage(days),
-    queryFn: ({ signal }) => fetchAiUsage(days, signal),
+    queryKey: settingsKeys.aiUsage(range),
+    queryFn: ({ signal }) => fetchAiUsage(range, signal),
     staleTime: 15 * 1000,
     refetchInterval: 60 * 1000,
+    // Keep showing the previous range's data while the new one loads, so
+    // switching ranges never flashes a loading state.
+    placeholderData: keepPreviousData,
   })
 }
 

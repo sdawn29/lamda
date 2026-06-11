@@ -1,17 +1,48 @@
 import { useMemo, useState } from "react"
 import {
+  eachDayOfInterval,
+  format,
+  startOfDay,
+  startOfMonth,
+  subDays,
+} from "date-fns"
+import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  CalendarRange,
   ChartColumn,
+  ChartPie,
   CircleDollarSign,
   DatabaseZap,
   FolderGit2,
   MessagesSquare,
 } from "lucide-react"
+import type { DateRange } from "react-day-picker"
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ComposedChart,
+  Label,
+  Line,
+  Pie,
+  PieChart,
+  XAxis,
+  YAxis,
+} from "recharts"
 
 import { Badge } from "@/shared/ui/badge"
-import { Skeleton } from "@/shared/ui/skeleton"
-import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs"
+import { Button } from "@/shared/ui/button"
+import { Calendar } from "@/shared/ui/calendar"
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/shared/ui/chart"
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import { cn } from "@/shared/lib/utils"
 
@@ -19,6 +50,7 @@ import type {
   AiUsageByModel,
   AiUsageByWorkspace,
   AiUsageDaily,
+  AiUsageRange,
   AiUsageTotals,
 } from "../api"
 import { useAiUsage } from "../queries"
@@ -42,10 +74,20 @@ function formatCost(n: number): string {
   return `$${n.toFixed(2)}`
 }
 
-function formatDay(day: string): string {
-  const date = new Date(`${day}T00:00:00`)
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+/** Parse a local-time YYYY-MM-DD day key into a Date. */
+function parseDay(day: string): Date {
+  return new Date(`${day}T00:00:00`)
 }
+
+function formatDayShort(day: string): string {
+  return format(parseDay(day), "MMM d")
+}
+
+function formatDayFull(day: string): string {
+  return format(parseDay(day), "EEE, MMM d, yyyy")
+}
+
+const dayKey = (date: Date) => format(date, "yyyy-MM-dd")
 
 // ── Token-type metadata ───────────────────────────────────────────────────────
 
@@ -81,36 +123,150 @@ const TOKEN_TYPES = [
   description: string
 }[]
 
-const RANGES = [
-  { days: 7, label: "7 days" },
-  { days: 30, label: "30 days" },
-  { days: 0, label: "All time" },
-] as const
+// ── Date range selection ──────────────────────────────────────────────────────
+
+/** Active filter: a preset label for display, or null when hand-picked. */
+interface RangeSelection {
+  label: string | null
+  range: AiUsageRange
+}
+
+const RANGE_PRESETS: { label: string; range: () => AiUsageRange }[] = [
+  { label: "Last 7 days", range: () => ({ days: 7 }) },
+  { label: "Last 30 days", range: () => ({ days: 30 }) },
+  { label: "Last 90 days", range: () => ({ days: 90 }) },
+  {
+    label: "This month",
+    range: () => {
+      const now = new Date()
+      return { from: dayKey(startOfMonth(now)), to: dayKey(now) }
+    },
+  },
+  { label: "All time", range: () => ({ days: 0 }) },
+]
+
+function selectionTitle(selection: RangeSelection): string {
+  if (selection.label) return selection.label
+  if ("from" in selection.range) {
+    const from = parseDay(selection.range.from)
+    const to = parseDay(selection.range.to)
+    const sameYear = from.getFullYear() === to.getFullYear()
+    return `${format(from, sameYear ? "MMM d" : "MMM d, yyyy")} – ${format(to, "MMM d, yyyy")}`
+  }
+  return "Custom range"
+}
+
+function DateRangePicker({
+  selection,
+  onChange,
+}: {
+  selection: RangeSelection
+  onChange: (selection: RangeSelection) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<DateRange | undefined>()
+
+  const selected: DateRange | undefined =
+    draft ??
+    ("from" in selection.range
+      ? {
+          from: parseDay(selection.range.from),
+          to: parseDay(selection.range.to),
+        }
+      : undefined)
+
+  // Two-click selection: the first click anchors the range, the second click
+  // commits it (clicking the anchor again commits a single-day range). The
+  // library's own range math is ignored — its first click already returns a
+  // complete from===to range, which would commit immediately. The popover
+  // stays open so the result can be inspected and the range refined.
+  const handleSelect = (_range: DateRange | undefined, day: Date) => {
+    if (!draft?.from) {
+      setDraft({ from: day, to: undefined })
+      return
+    }
+    const [from, to] = day < draft.from ? [day, draft.from] : [draft.from, day]
+    onChange({ label: null, range: { from: dayKey(from), to: dayKey(to) } })
+    setDraft(undefined)
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (!next) setDraft(undefined)
+      }}
+    >
+      <PopoverTrigger
+        render={
+          <Button variant="outline">
+            <CalendarRange data-icon="inline-start" />
+            {selectionTitle(selection)}
+          </Button>
+        }
+      />
+      <PopoverContent align="start" className="w-auto gap-0 p-0">
+        <div className="flex">
+          <div className="flex flex-col gap-0.5 border-r border-border/50 p-2">
+            {RANGE_PRESETS.map((preset) => (
+              <Button
+                key={preset.label}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "justify-start font-normal",
+                  selection.label === preset.label &&
+                    "bg-muted font-medium text-foreground"
+                )}
+                onClick={() => {
+                  onChange({ label: preset.label, range: preset.range() })
+                  setOpen(false)
+                  setDraft(undefined)
+                }}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
+          <Calendar
+            mode="range"
+            numberOfMonths={2}
+            selected={selected}
+            onSelect={handleSelect}
+            defaultMonth={
+              selected?.from ?? startOfMonth(subDays(new Date(), 31))
+            }
+            disabled={{ after: new Date() }}
+            autoFocus
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 // ── Section ───────────────────────────────────────────────────────────────────
 
 export function UsageSection() {
-  const [days, setDays] = useState<number>(30)
-  const { data, isPending, isError } = useAiUsage(days)
+  const [selection, setSelection] = useState<RangeSelection>({
+    label: "Last 30 days",
+    range: { days: 30 },
+  })
+  const { data, isPending, isError } = useAiUsage(selection.range)
+
+  const daily = useMemo(
+    () => fillDaily(data?.daily ?? [], selection.range),
+    [data?.daily, selection.range]
+  )
 
   return (
     <>
-      <Tabs
-        value={String(days)}
-        onValueChange={(value) => setDays(Number(value))}
-      >
-        <TabsList>
-          {RANGES.map((range) => (
-            <TabsTrigger key={range.days} value={String(range.days)}>
-              {range.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="flex items-center justify-between gap-2">
+        <DateRangePicker selection={selection} onChange={setSelection} />
+      </div>
 
-      {isPending ? (
-        <UsageSkeleton />
-      ) : isError ? (
+      {isPending ? null : isError ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
           Failed to load usage data. Is the server running?
         </p>
@@ -118,7 +274,7 @@ export function UsageSection() {
         <EmptyState />
       ) : (
         <>
-          <OverviewCards totals={data.totals} />
+          <OverviewCards totals={data.totals} daily={data.daily} />
           <SettingsGroup
             title="Token types"
             description="How the consumed tokens break down by kind."
@@ -126,15 +282,22 @@ export function UsageSection() {
             <TokenTypeBreakdown totals={data.totals} />
           </SettingsGroup>
           <SettingsGroup
-            title="Daily activity"
-            description="Total tokens consumed per day."
+            title="Daily tokens"
+            description="Tokens consumed per day, stacked by token type."
           >
-            <DailyChart daily={data.daily} days={days} />
+            <DailyTokensChart daily={daily} />
+          </SettingsGroup>
+          <SettingsGroup
+            title="Daily cost"
+            description="Estimated spend per day, with the running total for the period."
+          >
+            <DailyCostChart daily={daily} />
           </SettingsGroup>
           <SettingsGroup
             title="Models"
-            description="Every model used in the selected period."
+            description="Where the spend goes, and every model used in the selected period."
           >
+            <ModelCostChart models={data.byModel} totals={data.totals} />
             <ModelTable models={data.byModel} />
           </SettingsGroup>
           <SettingsGroup
@@ -157,32 +320,72 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center gap-2 py-16 text-center">
       <ChartColumn className="size-8 text-muted-foreground/50" />
-      <p className="text-sm font-medium">No usage recorded yet</p>
+      <p className="text-sm font-medium">No usage recorded</p>
       <p className="max-w-sm text-xs text-muted-foreground">
-        Token usage is recorded every time the agent responds. Start a
-        conversation in any workspace and the dashboard will fill in.
+        No token usage was recorded in the selected period. Usage is recorded
+        every time the agent responds — start a conversation in any workspace or
+        widen the date range.
       </p>
     </div>
   )
 }
 
-function UsageSkeleton() {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-20 rounded-lg" />
-        ))}
-      </div>
-      <Skeleton className="h-32 rounded-lg" />
-      <Skeleton className="h-48 rounded-lg" />
-    </div>
-  )
+// ── Daily series ──────────────────────────────────────────────────────────────
+
+/** Longest gap-filled daily window rendered, to keep all-time charts legible. */
+const MAX_CHART_DAYS = 180
+
+const emptyDay = (day: string): AiUsageDaily => ({
+  day,
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+  totalTokens: 0,
+  cost: 0,
+})
+
+/** Expand sparse daily rows into a contiguous series over the active range. */
+function fillDaily(daily: AiUsageDaily[], range: AiUsageRange): AiUsageDaily[] {
+  const today = startOfDay(new Date())
+  let start: Date
+  let end: Date
+  if ("from" in range) {
+    start = parseDay(range.from)
+    end = parseDay(range.to)
+  } else if (range.days > 0) {
+    start = subDays(today, range.days - 1)
+    end = today
+  } else {
+    if (daily.length === 0) return []
+    start = parseDay(daily[0].day)
+    end = today
+  }
+  const minStart = subDays(end, MAX_CHART_DAYS - 1)
+  if (start < minStart) start = minStart
+  if (end < start) return []
+
+  const byDay = new Map(daily.map((d) => [d.day, d]))
+  return eachDayOfInterval({ start, end }).map((date) => {
+    const key = dayKey(date)
+    return byDay.get(key) ?? emptyDay(key)
+  })
 }
 
 // ── Overview cards ────────────────────────────────────────────────────────────
 
-function OverviewCards({ totals }: { totals: AiUsageTotals }) {
+function OverviewCards({
+  totals,
+  daily,
+}: {
+  totals: AiUsageTotals
+  daily: AiUsageDaily[]
+}) {
+  const promptTokens = totals.inputTokens + totals.cacheReadTokens
+  const cacheHitRate =
+    promptTokens > 0 ? (totals.cacheReadTokens / promptTokens) * 100 : 0
+  const activeDays = daily.filter((d) => d.totalTokens > 0).length
+
   const cards = [
     {
       label: "Total tokens",
@@ -208,10 +411,27 @@ function OverviewCards({ totals }: { totals: AiUsageTotals }) {
       detail: `${fullFormat.format(totals.outputTokens)} generated`,
       icon: ArrowDownToLine,
     },
+    {
+      label: "Cost per request",
+      value: formatCost(
+        totals.requests > 0 ? totals.cost / totals.requests : 0
+      ),
+      detail:
+        activeDays > 0
+          ? `${formatCost(totals.cost / activeDays)} per active day`
+          : "No active days",
+      icon: ChartPie,
+    },
+    {
+      label: "Cache hit rate",
+      value: `${cacheHitRate.toFixed(1)}%`,
+      detail: "Prompt tokens served from cache",
+      icon: DatabaseZap,
+    },
   ]
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {cards.map((card) => (
         <div
           key={card.label}
@@ -258,7 +478,7 @@ function TokenTypeBreakdown({ totals }: { totals: AiUsageTotals }) {
                   {((totals[t.key] / sum) * 100).toFixed(1)}%)
                 </TooltipContent>
               </Tooltip>
-            ) : null,
+            ) : null
           )}
       </div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
@@ -281,77 +501,284 @@ function TokenTypeBreakdown({ totals }: { totals: AiUsageTotals }) {
   )
 }
 
-// ── Daily chart ───────────────────────────────────────────────────────────────
+// ── Daily tokens chart ────────────────────────────────────────────────────────
 
-function DailyChart({ daily, days }: { daily: AiUsageDaily[]; days: number }) {
-  const bars = useMemo(() => {
-    const byDay = new Map(daily.map((d) => [d.day, d]))
-    // Fixed ranges show every calendar day (including gaps); all-time shows
-    // only recorded days, capped to the most recent 60.
-    if (days === 0) return daily.slice(-60)
-    const result: AiUsageDaily[] = []
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
-      result.push(
-        byDay.get(key) ?? {
-          day: key,
-          inputTokens: 0,
-          outputTokens: 0,
-          cacheReadTokens: 0,
-          cacheWriteTokens: 0,
-          totalTokens: 0,
-          cost: 0,
-        },
-      )
-    }
-    return result
-  }, [daily, days])
+const tokensChartConfig = {
+  inputTokens: { label: "Input", color: "var(--chart-1)" },
+  outputTokens: { label: "Output", color: "var(--chart-2)" },
+  cacheReadTokens: { label: "Cache read", color: "var(--chart-3)" },
+  cacheWriteTokens: { label: "Cache write", color: "var(--chart-4)" },
+} satisfies ChartConfig
 
-  const max = Math.max(...bars.map((b) => b.totalTokens), 1)
+function DailyTokensChart({ daily }: { daily: AiUsageDaily[] }) {
+  if (daily.length === 0) return <ChartEmpty />
 
   return (
     <div className="py-3.5">
-      <div className="flex h-28 items-end gap-px">
-        {bars.map((bar) => (
-          <Tooltip key={bar.day}>
-            <TooltipTrigger
-              render={
-                <div className="group flex h-full flex-1 items-end px-px">
-                  <div
-                    className={cn(
-                      "w-full rounded-t-sm transition-colors",
-                      bar.totalTokens > 0
-                        ? "bg-chart-1 group-hover:bg-chart-1/80"
-                        : "bg-muted",
-                    )}
-                    style={{
-                      height:
-                        bar.totalTokens > 0
-                          ? `${Math.max((bar.totalTokens / max) * 100, 2)}%`
-                          : "2px",
-                    }}
-                  />
-                </div>
-              }
+      <ChartContainer
+        config={tokensChartConfig}
+        className="aspect-auto h-52 w-full"
+      >
+        <BarChart data={daily} margin={{ left: 0, right: 0, top: 4 }}>
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="day"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={6}
+            minTickGap={28}
+            tickFormatter={formatDayShort}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            width={44}
+            tickFormatter={(value: number) => compactFormat.format(value)}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                labelFormatter={(_, payload) =>
+                  formatDayFull(String(payload?.[0]?.payload?.day ?? ""))
+                }
+              />
+            }
+          />
+          <ChartLegend content={<ChartLegendContent />} />
+          <Bar
+            dataKey="inputTokens"
+            stackId="tokens"
+            fill="var(--color-inputTokens)"
+          />
+          <Bar
+            dataKey="outputTokens"
+            stackId="tokens"
+            fill="var(--color-outputTokens)"
+          />
+          <Bar
+            dataKey="cacheReadTokens"
+            stackId="tokens"
+            fill="var(--color-cacheReadTokens)"
+          />
+          <Bar
+            dataKey="cacheWriteTokens"
+            stackId="tokens"
+            fill="var(--color-cacheWriteTokens)"
+          />
+        </BarChart>
+      </ChartContainer>
+    </div>
+  )
+}
+
+// ── Daily cost chart ──────────────────────────────────────────────────────────
+
+const costChartConfig = {
+  cost: { label: "Daily cost", color: "var(--chart-2)" },
+  cumulativeCost: { label: "Running total", color: "var(--chart-5)" },
+} satisfies ChartConfig
+
+function DailyCostChart({ daily }: { daily: AiUsageDaily[] }) {
+  const data = useMemo(() => {
+    const result: { day: string; cost: number; cumulativeCost: number }[] = []
+    for (const d of daily) {
+      const previous =
+        result.length > 0 ? result[result.length - 1].cumulativeCost : 0
+      result.push({
+        day: d.day,
+        cost: d.cost,
+        cumulativeCost: previous + d.cost,
+      })
+    }
+    return result
+  }, [daily])
+
+  if (data.length === 0) return <ChartEmpty />
+
+  return (
+    <div className="py-3.5">
+      <ChartContainer
+        config={costChartConfig}
+        className="aspect-auto h-52 w-full"
+      >
+        <ComposedChart data={data} margin={{ left: 0, right: 0, top: 4 }}>
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="day"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={6}
+            minTickGap={28}
+            tickFormatter={formatDayShort}
+          />
+          <YAxis
+            yAxisId="daily"
+            tickLine={false}
+            axisLine={false}
+            width={48}
+            tickFormatter={(value: number) => formatCost(value)}
+          />
+          <YAxis
+            yAxisId="cumulative"
+            orientation="right"
+            tickLine={false}
+            axisLine={false}
+            width={48}
+            tickFormatter={(value: number) => formatCost(value)}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                labelFormatter={(_, payload) =>
+                  formatDayFull(String(payload?.[0]?.payload?.day ?? ""))
+                }
+                formatter={(value, name) => (
+                  <div className="flex w-full items-center justify-between gap-4">
+                    <span className="text-muted-foreground">
+                      {costChartConfig[name as keyof typeof costChartConfig]
+                        ?.label ?? name}
+                    </span>
+                    <span className="font-mono font-medium tabular-nums">
+                      {formatCost(Number(value))}
+                    </span>
+                  </div>
+                )}
+              />
+            }
+          />
+          <ChartLegend content={<ChartLegendContent />} />
+          <Bar yAxisId="daily" dataKey="cost" fill="var(--color-cost)" />
+          <Line
+            yAxisId="cumulative"
+            type="monotone"
+            dataKey="cumulativeCost"
+            stroke="var(--color-cumulativeCost)"
+            strokeWidth={1.5}
+            dot={false}
+          />
+        </ComposedChart>
+      </ChartContainer>
+    </div>
+  )
+}
+
+function ChartEmpty() {
+  return (
+    <p className="py-8 text-center text-xs text-muted-foreground">
+      Nothing recorded in this period.
+    </p>
+  )
+}
+
+// ── Cost by model chart ───────────────────────────────────────────────────────
+
+const MODEL_SLICE_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]
+
+function ModelCostChart({
+  models,
+  totals,
+}: {
+  models: AiUsageByModel[]
+  totals: AiUsageTotals
+}) {
+  const { data, config } = useMemo(() => {
+    const withCost = models.filter((m) => m.cost > 0)
+    const top = withCost.slice(0, MODEL_SLICE_COLORS.length - 1)
+    const rest = withCost.slice(MODEL_SLICE_COLORS.length - 1)
+    const slices = top.map((m, i) => ({
+      key: `model${i}`,
+      name: m.model || "Unknown model",
+      cost: m.cost,
+      fill: MODEL_SLICE_COLORS[i],
+    }))
+    if (rest.length > 0) {
+      slices.push({
+        key: "modelOther",
+        name: `Other (${rest.length})`,
+        cost: rest.reduce((acc, m) => acc + m.cost, 0),
+        fill: MODEL_SLICE_COLORS[MODEL_SLICE_COLORS.length - 1],
+      })
+    }
+    const config = Object.fromEntries(
+      slices.map((s) => [s.key, { label: s.name, color: s.fill }])
+    ) satisfies ChartConfig
+    return { data: slices, config }
+  }, [models])
+
+  if (data.length === 0) return null
+
+  return (
+    <div className="py-3.5">
+      <ChartContainer config={config} className="mx-auto aspect-auto h-56">
+        <PieChart>
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                nameKey="key"
+                hideLabel
+                formatter={(value, _name, item) => (
+                  <div className="flex w-full items-center justify-between gap-4">
+                    <span className="text-muted-foreground">
+                      {item?.payload?.name}
+                    </span>
+                    <span className="font-mono font-medium tabular-nums">
+                      {formatCost(Number(value))}
+                    </span>
+                  </div>
+                )}
+              />
+            }
+          />
+          <Pie
+            data={data}
+            dataKey="cost"
+            nameKey="key"
+            innerRadius={55}
+            strokeWidth={4}
+          >
+            <Label
+              content={({ viewBox }) => {
+                if (!viewBox || !("cx" in viewBox) || !("cy" in viewBox)) {
+                  return null
+                }
+                return (
+                  <text
+                    x={viewBox.cx}
+                    y={viewBox.cy}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                  >
+                    <tspan
+                      x={viewBox.cx}
+                      y={viewBox.cy}
+                      className="fill-foreground text-base font-semibold tabular-nums"
+                    >
+                      {formatCost(totals.cost)}
+                    </tspan>
+                    <tspan
+                      x={viewBox.cx}
+                      y={(viewBox.cy ?? 0) + 16}
+                      className="fill-muted-foreground text-[10px]"
+                    >
+                      total cost
+                    </tspan>
+                  </text>
+                )
+              }}
             />
-            <TooltipContent>
-              <div className="flex flex-col gap-0.5">
-                <span className="font-medium">{formatDay(bar.day)}</span>
-                <span>{fullFormat.format(bar.totalTokens)} tokens</span>
-                <span>{formatCost(bar.cost)}</span>
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        ))}
-      </div>
-      <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground">
-        <span>{bars.length > 0 ? formatDay(bars[0].day) : ""}</span>
-        <span>
-          {bars.length > 1 ? formatDay(bars[bars.length - 1].day) : ""}
-        </span>
-      </div>
+          </Pie>
+          <ChartLegend
+            content={<ChartLegendContent nameKey="key" />}
+            className="flex-wrap gap-x-4 gap-y-1 *:justify-center"
+          />
+        </PieChart>
+      </ChartContainer>
     </div>
   )
 }
@@ -364,13 +791,13 @@ function ModelTable({ models }: { models: AiUsageByModel[] }) {
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-border/50 text-left text-muted-foreground">
-            <th className="pb-2 pr-3 font-medium">Model</th>
-            <th className="pb-2 pr-3 text-right font-medium">Requests</th>
-            <th className="pb-2 pr-3 text-right font-medium">Input</th>
-            <th className="pb-2 pr-3 text-right font-medium">Output</th>
-            <th className="pb-2 pr-3 text-right font-medium">Cache read</th>
-            <th className="pb-2 pr-3 text-right font-medium">Cache write</th>
-            <th className="pb-2 pr-3 text-right font-medium">Total</th>
+            <th className="pr-3 pb-2 font-medium">Model</th>
+            <th className="pr-3 pb-2 text-right font-medium">Requests</th>
+            <th className="pr-3 pb-2 text-right font-medium">Input</th>
+            <th className="pr-3 pb-2 text-right font-medium">Output</th>
+            <th className="pr-3 pb-2 text-right font-medium">Cache read</th>
+            <th className="pr-3 pb-2 text-right font-medium">Cache write</th>
+            <th className="pr-3 pb-2 text-right font-medium">Total</th>
             <th className="pb-2 text-right font-medium">Cost</th>
           </tr>
         </thead>
@@ -483,7 +910,7 @@ function WorkspaceCard({ workspace }: { workspace: AiUsageByWorkspace }) {
                     </Badge>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-3 tabular-nums text-muted-foreground">
+                <div className="flex shrink-0 items-center gap-3 text-muted-foreground tabular-nums">
                   <span>{fullFormat.format(m.requests)} req</span>
                   <span>{formatTokens(m.totalTokens)} tokens</span>
                   <span>{formatCost(m.cost)}</span>

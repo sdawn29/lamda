@@ -7,7 +7,10 @@ export async function fetchAppSettings(): Promise<Record<string, string>> {
   return res.settings
 }
 
-export async function updateAppSetting(key: string, value: string): Promise<void> {
+export async function updateAppSetting(
+  key: string,
+  value: string
+): Promise<void> {
   await apiFetch(`/settings/${encodeURIComponent(key)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -19,8 +22,12 @@ export async function updateAppSetting(key: string, value: string): Promise<void
 
 export type ProviderKeys = Record<string, string>
 
-export async function fetchProviders(signal?: AbortSignal): Promise<ProviderKeys> {
-  const res = await apiFetch<{ providers: ProviderKeys }>("/providers", { signal })
+export async function fetchProviders(
+  signal?: AbortSignal
+): Promise<ProviderKeys> {
+  const res = await apiFetch<{ providers: ProviderKeys }>("/providers", {
+    signal,
+  })
   return res.providers
 }
 
@@ -63,17 +70,17 @@ export interface LocalProviderConfig {
 export type LocalProviders = Record<string, LocalProviderConfig>
 
 export async function fetchLocalProviders(
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<{ providers: LocalProviders; error?: string }> {
   return apiFetch<{ providers: LocalProviders; error?: string }>(
     "/local-providers",
-    { signal },
+    { signal }
   )
 }
 
 export async function saveLocalProvider(
   id: string,
-  config: LocalProviderConfig,
+  config: LocalProviderConfig
 ): Promise<{ error?: string; warning?: string }> {
   return apiFetch<{ ok: boolean; error?: string; warning?: string }>(
     `/local-providers/${encodeURIComponent(id)}`,
@@ -81,7 +88,7 @@ export async function saveLocalProvider(
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(config),
-    },
+    }
   )
 }
 
@@ -133,12 +140,21 @@ export interface AiUsageStats {
   daily: AiUsageDaily[]
 }
 
-/** Aggregated AI usage; `days` limits to the last N days, 0 means all-time. */
+/** Filter for usage queries: a rolling `days` window (0 = all-time) or an
+ * inclusive `from`/`to` date range in local-time YYYY-MM-DD. */
+export type AiUsageRange = { days: number } | { from: string; to: string }
+
+/** Aggregated AI usage for the given range. */
 export async function fetchAiUsage(
-  days: number,
-  signal?: AbortSignal,
+  range: AiUsageRange,
+  signal?: AbortSignal
 ): Promise<AiUsageStats> {
-  return apiFetch<AiUsageStats>(`/usage?days=${days}`, { signal })
+  const params = new URLSearchParams(
+    "days" in range
+      ? { days: String(range.days) }
+      : { from: range.from, to: range.to }
+  )
+  return apiFetch<AiUsageStats>(`/usage?${params}`, { signal })
 }
 
 // ── OAuth ─────────────────────────────────────────────────────────────────────
@@ -169,15 +185,23 @@ export type OAuthWsEvent =
   | { type: "done" }
   | { type: "error"; message: string }
 
-export async function fetchOAuthProviders(signal?: AbortSignal): Promise<OAuthProvider[]> {
-  const res = await apiFetch<{ providers: OAuthProvider[] }>("/auth/oauth/providers", { signal })
+export async function fetchOAuthProviders(
+  signal?: AbortSignal
+): Promise<OAuthProvider[]> {
+  const res = await apiFetch<{ providers: OAuthProvider[] }>(
+    "/auth/oauth/providers",
+    { signal }
+  )
   return res.providers
 }
 
 export async function startOAuthLogin(providerId: string): Promise<string> {
-  const res = await apiFetch<{ loginId: string }>(`/auth/oauth/${providerId}/login`, {
-    method: "POST",
-  })
+  const res = await apiFetch<{ loginId: string }>(
+    `/auth/oauth/${providerId}/login`,
+    {
+      method: "POST",
+    }
+  )
   return res.loginId
 }
 
@@ -189,7 +213,7 @@ export async function openOAuthWebSocket(loginId: string): Promise<WebSocket> {
 export async function respondToOAuthPrompt(
   loginId: string,
   promptId: string,
-  value: string,
+  value: string
 ): Promise<void> {
   await apiFetch(`/auth/oauth/${loginId}/respond`, {
     method: "POST",
