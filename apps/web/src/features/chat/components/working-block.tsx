@@ -1,15 +1,16 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronRightIcon } from "lucide-react"
+import {
+  ChevronRightIcon,
+  FilePenLineIcon,
+  GlobeIcon,
+  SearchIcon,
+  SquareTerminalIcon,
+  type LucideIcon,
+} from "lucide-react"
 import { cn } from "@/shared/lib/utils"
 import { formatDuration } from "@/shared/lib/formatters"
 import { ThinkingBlock } from "./thinking-block"
-import {
-  ToolCallBlock,
-  ToolGlyph,
-  argsSummary,
-  fileBasename,
-  isSkillRead,
-} from "./tool-call-block"
+import { ToolCallBlock, argsSummary, isSkillRead } from "./tool-call-block"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
 import type { AssistantMessage, ToolMessage } from "../types"
 
@@ -19,35 +20,96 @@ const SHIMMER_TEXT_CLASS =
   "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
 
 /**
- * Read-only lookup tools whose consecutive calls collapse into a single
- * "Read · 4 files" style row. Mutating tools (edit, write, bash…) always
- * stay individually visible.
+ * Tool-group categories. Consecutive calls to tools in the same category
+ * collapse into a single verbose row, e.g. "Exploring · read 4 files, ran
+ * 2 searches, ran 1 command". Tools not mapped here (todo, question,
+ * plan_write…) always stay individually visible.
  */
-const GROUPABLE_TOOLS = new Set([
-  "read",
-  "plan_read",
-  "grep",
-  "glob",
-  "find",
-  "search",
-  "websearch",
-  "web_search",
-  "webfetch",
-  "web_fetch",
-  "fetch",
-])
+type ToolGroupId = "exploring" | "terminal" | "web" | "editing"
+
+const TOOL_GROUP_IDS: Record<string, ToolGroupId> = {
+  read: "exploring",
+  plan_read: "exploring",
+  grep: "exploring",
+  glob: "exploring",
+  find: "exploring",
+  ls: "exploring",
+  search: "exploring",
+  // bash gets its own group — it can mutate state, so it shouldn't read as exploring
+  bash: "terminal",
+  websearch: "web",
+  web_search: "web",
+  webfetch: "web",
+  web_fetch: "web",
+  fetch: "web",
+  edit: "editing",
+  // plan_write intentionally excluded — its PlanSavedCard CTA must stay visible
+  write: "editing",
+}
+
+const TOOL_GROUP_META: Record<
+  ToolGroupId,
+  { activeLabel: string; doneLabel: string; icon: LucideIcon }
+> = {
+  exploring: { activeLabel: "Exploring", doneLabel: "Explored", icon: SearchIcon },
+  terminal: {
+    activeLabel: "Running commands",
+    doneLabel: "Ran commands",
+    icon: SquareTerminalIcon,
+  },
+  web: {
+    activeLabel: "Searching the web",
+    doneLabel: "Searched the web",
+    icon: GlobeIcon,
+  },
+  editing: { activeLabel: "Editing", doneLabel: "Edited", icon: FilePenLineIcon },
+}
+
+function toolGroupId(t: ToolMessage): ToolGroupId | null {
+  if (isSkillRead(t)) return null
+  return TOOL_GROUP_IDS[t.toolName.toLowerCase()] ?? null
+}
 
 function isReadTool(name: string): boolean {
   return name === "read" || name === "plan_read"
 }
 
-function runNoun(toolName: string, count: number): string {
-  const name = toolName.toLowerCase()
-  const noun = isReadTool(name) ? "file" : name.includes("fetch") ? "page" : "search"
-  return `${count} ${noun}${count === 1 ? "" : "s"}`
+/** Verbose action phrase per tool kind, keyed off the call count. */
+const ACTION_PHRASES: Record<string, (n: number) => string> = {
+  read: (n) => `read ${n} file${n === 1 ? "" : "s"}`,
+  command: (n) => `ran ${n} command${n === 1 ? "" : "s"}`,
+  list: (n) => `listed ${n} director${n === 1 ? "y" : "ies"}`,
+  search: (n) => `ran ${n} search${n === 1 ? "" : "es"}`,
+  websearch: (n) => `searched ${n} quer${n === 1 ? "y" : "ies"}`,
+  fetch: (n) => `fetched ${n} page${n === 1 ? "" : "s"}`,
+  edit: (n) => `edited ${n} file${n === 1 ? "" : "s"}`,
+  write: (n) => `wrote ${n} file${n === 1 ? "" : "s"}`,
 }
 
-/** A collapsed run of consecutive same-tool calls inside a working block. */
+function actionKind(name: string): string {
+  if (isReadTool(name)) return "read"
+  if (name === "bash") return "command"
+  if (name === "ls") return "list"
+  if (name === "edit") return "edit"
+  if (name === "write") return "write"
+  if (name === "websearch" || name === "web_search") return "websearch"
+  if (name.includes("fetch")) return "fetch"
+  return "search"
+}
+
+/** "read 4 files, ran 2 searches, ran 1 command" for a collapsed run. */
+function describeRun(tools: ToolMessage[]): string {
+  const counts = new Map<string, number>()
+  for (const t of tools) {
+    const kind = actionKind(t.toolName.toLowerCase())
+    counts.set(kind, (counts.get(kind) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([kind, n]) => ACTION_PHRASES[kind](n))
+    .join(", ")
+}
+
+/** A collapsed run of consecutive same-category tool calls inside a working block. */
 function ToolRunGroup({
   tools,
   rootPath,
@@ -56,16 +118,20 @@ function ToolRunGroup({
   rootPath?: string
 }) {
   const [expanded, setExpanded] = useState(false)
-  const toolName = tools[0].toolName
+  const groupId = toolGroupId(tools[0]) ?? "exploring"
+  const meta = TOOL_GROUP_META[groupId]
+  const GroupIcon = meta.icon
   const running = tools.some((t) => t.status === "running")
   const errored = tools.some((t) => t.status === "error")
-  const preview = tools
-    .map((t) => {
-      const s = argsSummary(t.args, rootPath)
-      return isReadTool(toolName.toLowerCase()) ? fileBasename(s) : s
-    })
-    .filter(Boolean)
-    .join(", ")
+  // Terminal runs would only repeat the label ("ran 3 commands"), so show the
+  // commands themselves instead of the action breakdown
+  const description =
+    groupId === "terminal"
+      ? tools
+          .map((t) => argsSummary(t.args, rootPath))
+          .filter(Boolean)
+          .join(" · ")
+      : describeRun(tools)
 
   return (
     <div className="w-full text-xs">
@@ -75,8 +141,7 @@ function ToolRunGroup({
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
-        <ToolGlyph
-          toolName={toolName}
+        <GroupIcon
           className={cn(
             "h-3.5 w-3.5 shrink-0",
             running
@@ -96,14 +161,14 @@ function ToolRunGroup({
                 : "text-muted-foreground/45"
           )}
         >
-          {toolName}
+          {running ? meta.activeLabel : meta.doneLabel}
         </span>
         <span className="shrink-0 rounded-full bg-muted/60 px-1.5 py-px text-2xs tabular-nums text-muted-foreground/55">
-          {runNoun(toolName, tools.length)}
+          {tools.length} tool{tools.length === 1 ? "" : "s"}
         </span>
-        {preview && (
+        {description && (
           <span className="min-w-0 truncate text-sm text-muted-foreground/35">
-            {preview}
+            {description}
           </span>
         )}
         <ChevronRightIcon
@@ -147,9 +212,10 @@ type WorkingEntry =
   | { kind: "run"; key: string; tools: ToolMessage[] }
 
 /**
- * Flatten messages into visible rows, collapsing consecutive same-tool
- * lookup calls into runs. Hidden thinking (showThinking off) doesn't split a
- * run, since it renders nothing between the calls anyway.
+ * Flatten messages into visible rows, collapsing consecutive calls of
+ * same-category tools (exploring, web, editing) into verbose runs. Hidden
+ * thinking (showThinking off) doesn't split a run, since it renders nothing
+ * between the calls anyway.
  */
 function buildWorkingEntries(
   messages: WorkingMessage[],
@@ -165,18 +231,17 @@ function buildWorkingEntries(
       continue
     }
     const t = m as ToolMessage
-    const groupable =
-      GROUPABLE_TOOLS.has(t.toolName.toLowerCase()) && !isSkillRead(t)
+    const groupId = toolGroupId(t)
     const last = out[out.length - 1]
     if (
-      groupable &&
+      groupId !== null &&
       last?.kind === "run" &&
-      last.tools[0].toolName.toLowerCase() === t.toolName.toLowerCase()
+      toolGroupId(last.tools[0]) === groupId
     ) {
       last.tools.push(t)
       continue
     }
-    if (groupable) {
+    if (groupId !== null) {
       out.push({ kind: "run", key: t.toolCallId, tools: [t] })
       continue
     }
@@ -391,7 +456,7 @@ export const WorkingBlock = memo(function WorkingBlock({
 
         {!isActive && toolCount > 0 && (
           <span className="shrink-0 text-xs tabular-nums text-muted-foreground/40">
-            · {toolCount} {toolCount === 1 ? "step" : "steps"}
+            · {toolCount} {toolCount === 1 ? "tool" : "tools"}
           </span>
         )}
 
