@@ -389,6 +389,13 @@ export const RichInput = React.forwardRef<
       onSlashMentionChange(null)
       return
     }
+    // Only treat "/" as a command trigger at the start of a token — a slash
+    // preceded by non-whitespace is part of a path (e.g. "@src/components").
+    const charBefore = beforeCaret[lastSlash - 1]
+    if (charBefore !== undefined && !/[\s\u200B]/.test(charBefore)) {
+      onSlashMentionChange(null)
+      return
+    }
     onSlashMentionChange({
       filter: between,
       textNode: startContainer as Text,
