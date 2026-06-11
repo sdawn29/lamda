@@ -119,6 +119,19 @@ const TurnItem = memo(function TurnItem({
     [turn.files]
   )
 
+  const { data: diffStat } = useTurnDiffStat(
+    sessionId,
+    turn.id,
+    isExpanded && files.length > 0
+  )
+  const fileCounts = useMemo(() => {
+    const map = new Map<string, { added: number; removed: number }>()
+    for (const f of diffStat?.files ?? []) {
+      map.set(f.filePath, { added: f.additions, removed: f.deletions })
+    }
+    return map
+  }, [diffStat])
+
   return (
     <div className="mx-2 mt-1.5 overflow-hidden rounded-lg border border-border/50">
       <div
@@ -198,6 +211,7 @@ const TurnItem = memo(function TurnItem({
                 sessionId={sessionId}
                 mode={mode}
                 turnId={turn.id}
+                counts={fileCounts.get(file.filePath)}
                 showActions={false}
               />
             ))}
@@ -657,6 +671,7 @@ const SourceControlContent = memo(function SourceControlContent({
                       mode={mode}
                       onStageToggle={handleStageToggle}
                       onRevert={handleRevert}
+                      className="mb-2"
                     />
                   )}
                 </>

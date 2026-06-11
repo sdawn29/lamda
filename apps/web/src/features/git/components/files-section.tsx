@@ -12,6 +12,7 @@ export const FilesSection = memo(function FilesSection({
   onStageToggle,
   onRevert,
   emptyText,
+  className,
 }: {
   label: string
   files: ChangedFile[]
@@ -20,9 +21,10 @@ export const FilesSection = memo(function FilesSection({
   onStageToggle: (file: ChangedFile) => Promise<void>
   onRevert: (file: ChangedFile) => Promise<void>
   emptyText?: string
+  className?: string
 }) {
   return (
-    <SectionCard label={label} count={files.length}>
+    <SectionCard label={label} count={files.length} className={className}>
       {files.length === 0 && emptyText && (
         <p className="px-3 py-2 text-2xs text-muted-foreground/50">{emptyText}</p>
       )}

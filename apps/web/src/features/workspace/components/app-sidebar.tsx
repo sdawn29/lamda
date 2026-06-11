@@ -50,6 +50,8 @@ import {
 import { useOpenPath, useOpenWorkspaceWithApp } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
 import { apiUrl } from "@/shared/lib/client"
+import { cn } from "@/shared/lib/utils"
+import { useTheme } from "@/shared/components/theme-provider"
 import { useWorkspace, useCreateWorkspaceAction } from "../context"
 import { useThreadStatus } from "@/features/chat"
 import type { Thread } from "../context"
@@ -88,6 +90,63 @@ function useNow() {
   return now
 }
 
+// Average luminance (0..1) of each icon's opaque pixels, keyed by src, so
+// re-renders and re-mounts don't re-fetch and re-sample. null = unknown
+// (load/CORS failure) — treated as "leave the icon as-is".
+const iconLuminanceCache = new Map<string, number | null>()
+
+function useIconLuminance(src: string | null): number | null {
+  const [luminance, setLuminance] = useState<number | null>(() =>
+    src ? (iconLuminanceCache.get(src) ?? null) : null
+  )
+  useEffect(() => {
+    if (!src) return
+    if (iconLuminanceCache.has(src)) {
+      setLuminance(iconLuminanceCache.get(src) ?? null)
+      return
+    }
+    let cancelled = false
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      if (cancelled) return
+      let result: number | null = null
+      try {
+        const size = 16
+        const canvas = document.createElement("canvas")
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext("2d")
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, size, size)
+          const { data } = ctx.getImageData(0, 0, size, size)
+          let sum = 0
+          let count = 0
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] < 32) continue
+            sum +=
+              0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]
+            count++
+          }
+          if (count > 0) result = sum / count / 255
+        }
+      } catch {
+        // Tainted canvas (icon served without CORS) — luminance stays unknown.
+      }
+      iconLuminanceCache.set(src, result)
+      setLuminance(result)
+    }
+    img.onerror = () => {
+      if (!cancelled) iconLuminanceCache.set(src, null)
+    }
+    img.src = src
+    return () => {
+      cancelled = true
+    }
+  }, [src])
+  return luminance
+}
+
 function WorkspaceIcon({
   workspaceId,
   icon,
@@ -97,19 +156,31 @@ function WorkspaceIcon({
   icon: string | null
   isCollapsed: boolean
 }) {
+  const { resolvedTheme } = useTheme()
   const FallbackIcon = isCollapsed ? Folder : FolderOpen
-  if (!icon) return <FallbackIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
-  let src: string
-  try {
-    src = apiUrl(`/workspace/${workspaceId}/icon`)
-  } catch {
-    return <FallbackIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
+  let src: string | null = null
+  if (icon) {
+    try {
+      src = apiUrl(`/workspace/${workspaceId}/icon`)
+    } catch {
+      src = null
+    }
   }
+  const luminance = useIconLuminance(src)
+  if (!src) return <FallbackIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
+  // Icons whose brightness is close to the sidebar background (black logo on a
+  // dark theme, white logo on a light theme) get a contrasting backdrop chip.
+  const needsBackdrop =
+    luminance !== null &&
+    (resolvedTheme === "dark" ? luminance < 0.25 : luminance > 0.75)
   return (
     <img
       src={src}
       alt=""
-      className="size-3.5 shrink-0 rounded-[2px] object-contain"
+      className={cn(
+        "size-3.5 shrink-0 rounded-[2px] object-contain",
+        needsBackdrop && (resolvedTheme === "dark" ? "bg-white/90 p-px" : "bg-zinc-800/90 p-px")
+      )}
       onError={(e) => {
         // Fallback: hide the broken image — the parent text label is still visible.
         ;(e.currentTarget as HTMLImageElement).style.display = "none"

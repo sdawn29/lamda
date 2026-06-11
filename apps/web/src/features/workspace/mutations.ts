@@ -12,6 +12,7 @@ import {
   pinWorkspace as apiPinWorkspace,
   unpinWorkspace as apiUnpinWorkspace,
   createThread as apiCreateThread,
+  type CreateThreadOptions,
   deleteThread as apiDeleteThread,
   archiveThread as apiArchiveThread,
   unarchiveThread as apiUnarchiveThread,
@@ -116,8 +117,14 @@ export function useDeleteWorkspace() {
 export function useCreateThread() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (workspaceId: string) => apiCreateThread(workspaceId),
-    onSuccess: ({ thread }, workspaceId) => {
+    mutationFn: ({
+      workspaceId,
+      options,
+    }: {
+      workspaceId: string
+      options?: CreateThreadOptions
+    }) => apiCreateThread(workspaceId, options),
+    onSuccess: ({ thread }, { workspaceId }) => {
       setWorkspacesData(queryClient, (current) =>
         current.map((workspace) =>
           workspace.id !== workspaceId

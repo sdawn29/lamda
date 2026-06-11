@@ -435,14 +435,15 @@ export async function gitPull(cwd: string): Promise<void> {
 }
 
 /**
- * Returns structured git log output. Each line is pipe-delimited:
- * fullSha|shortSha|authorName|authorDate(ISO)|subject
+ * Returns structured git log output. Records are separated by \x1e and
+ * fields by \x1f: fullSha, shortSha, authorName, authorDate(ISO), subject, body.
+ * Control-character separators keep multi-line bodies parseable.
  */
 export async function gitLog(cwd: string, maxCount = 50): Promise<string> {
   try {
     const { stdout } = await execFileAsync(
       "git",
-      ["log", "--pretty=format:%H|%h|%an|%ai|%s", `-${maxCount}`],
+      ["log", "--pretty=format:%H%x1f%h%x1f%an%x1f%ai%x1f%s%x1f%b%x1e", `-${maxCount}`],
       { cwd, timeout: 10000 },
     );
     return stdout;

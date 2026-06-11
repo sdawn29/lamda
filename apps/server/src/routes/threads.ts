@@ -29,14 +29,31 @@ const threads = new Hono();
 
 threads.post("/workspace/:workspaceId/thread", async (c) => {
   const workspaceId = c.req.param("workspaceId");
+  type CreateThreadBody = {
+    provider?: string;
+    model?: string;
+    title?: string;
+    mode?: string;
+    modelId?: string | null;
+  };
   const body = await c.req
-    .json<{ provider?: string; model?: string }>()
-    .catch((): { provider?: string; model?: string } => ({}));
+    .json<CreateThreadBody>()
+    .catch((): CreateThreadBody => ({}));
 
   const ws = getWorkspace(workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
 
-  const threadId = insertThread(workspaceId);
+  if (body.mode !== undefined && !normalizeMode(body.mode)) {
+    return c.json({ error: "mode must be 'ask', 'plan', or 'agent'" }, 400);
+  }
+
+  const title = body.title?.trim() || "New Thread";
+  const mode = normalizeMode(body.mode) ?? "agent";
+  const modelId = body.modelId ?? null;
+
+  // Insert with the requested mode before creating the session — the session
+  // builds its custom tools from the thread's persisted mode.
+  const threadId = insertThread(workspaceId, { title, mode, modelId });
   const sessionId = await createSessionForThread(
     threadId,
     ws.path,
@@ -52,10 +69,10 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
       thread: {
         id: threadId,
         workspaceId,
-        title: "New Thread",
-        modelId: null,
+        title,
+        modelId,
         isStopped: false,
-        mode: "agent",
+        mode,
         isPinned: false,
         createdAt: Date.now(),
         sessionId,

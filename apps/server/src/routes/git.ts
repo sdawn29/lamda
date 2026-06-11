@@ -263,20 +263,51 @@ git.get("/session/:id/git/ahead-behind", async (c) => {
   return c.json(result ?? { ahead: null, behind: null });
 });
 
+async function readLogEntries(cwd: string, limitParam: string | undefined) {
+  const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 200) : 50;
+  const raw = await gitLog(cwd, limit);
+  return raw
+    .split("\x1e")
+    .map((record) => record.trim())
+    .filter(Boolean)
+    .map((record) => {
+      const [sha, shortSha, author, date, subject, body] = record.split("\x1f");
+      return { sha, shortSha, author, date, subject, body: (body ?? "").trim() };
+    });
+}
+
 git.get("/session/:id/git/log", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ entries: [] });
-  const limitParam = c.req.query("limit");
-  const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 200) : 50;
-  const raw = await gitLog(cwd, limit);
-  const entries = raw
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      const [sha, shortSha, author, date, ...subjectParts] = line.split("|");
-      return { sha, shortSha, author, date, subject: subjectParts.join("|") };
-    });
-  return c.json({ entries });
+  return c.json({ entries: await readLogEntries(cwd, c.req.query("limit")) });
+});
+
+// Workspace-level read-only history — lets the UI show commits when the
+// workspace has no live session yet (e.g. the new-thread page).
+git.get("/workspace/:id/git/log", async (c) => {
+  const ws = getWorkspace(c.req.param("id"));
+  if (!ws) return c.json({ entries: [] });
+  return c.json({
+    entries: await readLogEntries(ws.path, c.req.query("limit")),
+  });
+});
+
+git.get("/workspace/:id/git/show-files", async (c) => {
+  const ws = getWorkspace(c.req.param("id"));
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  const sha = c.req.query("sha");
+  if (!sha) return c.json({ error: "sha query param is required" }, 400);
+  return c.json({ files: await gitShowFiles(ws.path, sha) });
+});
+
+git.get("/workspace/:id/git/show-file-diff", async (c) => {
+  const ws = getWorkspace(c.req.param("id"));
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  const sha = c.req.query("sha");
+  const file = c.req.query("file");
+  if (!sha) return c.json({ error: "sha query param is required" }, 400);
+  if (!file) return c.json({ error: "file query param is required" }, 400);
+  return c.json({ diff: await gitShowFileDiff(ws.path, sha, file) });
 });
 
 git.get("/session/:id/git/show", async (c) => {
@@ -614,22 +645,26 @@ git.get("/session/:id/git/turns/:turnId/diff-stat", async (c) => {
   const perFile = await Promise.all(
     files.slice(0, 100).map(async (f) => {
       const pair = await resolveTurnFileContents(id, threadId, cwd, turnIdParam, f.filePath);
-      if (!pair) return { additions: 0, deletions: 0 };
-      return countDiffLines(
-        await gitDiffContents(pair.preText, pair.postText, f.filePath),
-      );
+      if (!pair) return { filePath: f.filePath, additions: 0, deletions: 0 };
+      return {
+        filePath: f.filePath,
+        ...countDiffLines(
+          await gitDiffContents(pair.preText, pair.postText, f.filePath),
+        ),
+      };
     }),
   );
 
-  return c.json(
-    perFile.reduce(
+  return c.json({
+    ...perFile.reduce(
       (acc, next) => ({
         additions: acc.additions + next.additions,
         deletions: acc.deletions + next.deletions,
       }),
       { additions: 0, deletions: 0 },
     ),
-  );
+    files: perFile,
+  });
 });
 
 // Revert the working tree to the state before a given turn.

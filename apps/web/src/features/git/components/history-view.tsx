@@ -1,7 +1,13 @@
 import { memo, useState } from "react"
 import { GitCommit, Loader2 } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
-import { useGitLog, useGitShowFiles } from "../queries"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
+import {
+  useGitLog,
+  useGitShowFiles,
+  useWorkspaceGitLog,
+  useWorkspaceGitShowFiles,
+} from "../queries"
 import type { CommitFile, LogEntry } from "../api"
 import { type ChangedFile } from "./status-badge"
 import { FileListItem } from "./file-list-item"
@@ -34,12 +40,25 @@ function commitFileToChangedFile(f: CommitFile): ChangedFile {
 function CommitRow({
   entry,
   sessionId,
+  workspaceId,
 }: {
   entry: LogEntry
   sessionId: string
+  workspaceId?: string
 }) {
   const [expanded, setExpanded] = useState(false)
-  const { data: files, isLoading } = useGitShowFiles(sessionId, entry.sha, expanded)
+  const { data: sessionFiles, isLoading: sessionLoading } = useGitShowFiles(
+    sessionId,
+    entry.sha,
+    expanded && !!sessionId
+  )
+  const { data: wsFiles, isLoading: wsLoading } = useWorkspaceGitShowFiles(
+    sessionId ? null : (workspaceId ?? null),
+    entry.sha,
+    expanded
+  )
+  const files = sessionId ? sessionFiles : wsFiles
+  const isLoading = sessionId ? sessionLoading : wsLoading
 
   return (
     <div className="relative mb-0.5 flex items-start gap-0.5">
@@ -55,24 +74,42 @@ function CommitRow({
 
       {/* Content */}
       <div className="min-w-0 flex-1 pb-2">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="group w-full rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <p className="truncate text-xs font-medium leading-snug text-foreground/85 group-hover:text-foreground">
-            {entry.subject || "(no message)"}
-          </p>
-          <div className="mt-0.5 flex items-center gap-1 text-2xs text-muted-foreground/45">
-            <span className="rounded bg-muted/60 px-1 font-mono text-muted-foreground/60">
-              {entry.shortSha}
-            </span>
-            <span>·</span>
-            <span>{entry.author}</span>
-            <span>·</span>
-            <span>{formatRelativeDate(entry.date)}</span>
-          </div>
-        </button>
+        <Tooltip delay={500}>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="group w-full rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <p className="truncate text-xs font-medium leading-snug text-foreground/85 group-hover:text-foreground">
+                  {entry.subject || "(no message)"}
+                </p>
+                <div className="mt-0.5 flex items-center gap-1 text-2xs text-muted-foreground/45">
+                  <span className="rounded bg-muted/60 px-1 font-mono text-muted-foreground/60">
+                    {entry.shortSha}
+                  </span>
+                  <span>·</span>
+                  <span>{entry.author}</span>
+                  <span>·</span>
+                  <span>{formatRelativeDate(entry.date)}</span>
+                </div>
+              </button>
+            }
+          />
+          <TooltipContent side="left" className="max-w-sm items-start">
+            <div className="min-w-0 space-y-1">
+              <p className="font-medium break-words">
+                {entry.subject || "(no message)"}
+              </p>
+              {entry.body && (
+                <p className="whitespace-pre-wrap break-words text-muted-foreground">
+                  {entry.body}
+                </p>
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
 
         {expanded && (
           <div className="animate-in fade-in-0 mt-1.5 overflow-hidden rounded-md border border-border/40 duration-150">
@@ -88,6 +125,7 @@ function CommitRow({
                     key={f.path}
                     file={commitFileToChangedFile(f)}
                     sessionId={sessionId}
+                    workspaceId={workspaceId}
                     sha={entry.sha}
                     counts={{ added: f.added, removed: f.removed }}
                     mode="inline"
@@ -108,13 +146,23 @@ function CommitRow({
 }
 
 interface HistoryViewProps {
+  /** Session whose workspace history to show. May be empty when `workspaceId` is set. */
   sessionId: string
+  /** Workspace-level fallback used when no session exists (e.g. the new-thread page). */
+  workspaceId?: string
 }
 
 export const HistoryView = memo(function HistoryView({
   sessionId,
+  workspaceId,
 }: HistoryViewProps) {
-  const { data: entries = [], isLoading } = useGitLog(sessionId)
+  const { data: sessionEntries = [], isLoading: sessionLoading } =
+    useGitLog(sessionId)
+  const { data: wsEntries = [], isLoading: wsLoading } = useWorkspaceGitLog(
+    sessionId ? null : (workspaceId ?? null)
+  )
+  const entries = sessionId ? sessionEntries : wsEntries
+  const isLoading = sessionId ? sessionLoading : wsLoading
 
   if (isLoading) {
     return (
@@ -147,7 +195,12 @@ export const HistoryView = memo(function HistoryView({
     <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
       <div className="relative">
         {entries.map((entry) => (
-          <CommitRow key={entry.sha} entry={entry} sessionId={sessionId} />
+          <CommitRow
+            key={entry.sha}
+            entry={entry}
+            sessionId={sessionId}
+            workspaceId={workspaceId}
+          />
         ))}
       </div>
     </div>

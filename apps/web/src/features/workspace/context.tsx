@@ -17,7 +17,11 @@ import {
   useUnpinWorkspace as useUnpinWorkspaceMutation,
   useUpdateThreadTitle,
 } from "./mutations"
-import { type ThreadDto, type WorkspaceDto } from "./api"
+import {
+  type CreateThreadOptions,
+  type ThreadDto,
+  type WorkspaceDto,
+} from "./api"
 
 export type Workspace = WorkspaceDto
 export type Thread = ThreadDto
@@ -28,7 +32,10 @@ interface WorkspaceContextValue {
   createWorkspace: (name: string, path: string) => Promise<Workspace>
   cloneRepository: (url: string, path: string) => Promise<Workspace>
   deleteWorkspace: (workspace: Workspace) => Promise<void>
-  createThread: (workspaceId: string) => Promise<Thread>
+  createThread: (
+    workspaceId: string,
+    options?: CreateThreadOptions
+  ) => Promise<Thread>
   deleteThread: (workspaceId: string, threadId: string) => Promise<void>
   archiveThread: (workspaceId: string, threadId: string) => Promise<void>
   pinThread: (workspaceId: string, threadId: string) => Promise<void>
@@ -104,8 +111,14 @@ export function useWorkspace(): WorkspaceContextValue {
   )
 
   const createThread = useCallback(
-    async (workspaceId: string): Promise<Thread> => {
-      const { thread } = await createThreadMutation.mutateAsync(workspaceId)
+    async (
+      workspaceId: string,
+      options?: CreateThreadOptions
+    ): Promise<Thread> => {
+      const { thread } = await createThreadMutation.mutateAsync({
+        workspaceId,
+        options,
+      })
       return thread
     },
     [createThreadMutation]

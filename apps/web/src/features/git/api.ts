@@ -165,6 +165,7 @@ export interface LogEntry {
   author: string
   date: string
   subject: string
+  body: string
 }
 
 export async function gitLog(sessionId: string, limit = 50): Promise<LogEntry[]> {
@@ -264,13 +265,23 @@ export async function getTurnFileDiff(
   return diff
 }
 
+export interface TurnFileDiffStat {
+  filePath: string
+  additions: number
+  deletions: number
+}
+
+export interface TurnDiffStat {
+  additions: number
+  deletions: number
+  files: TurnFileDiffStat[]
+}
+
 export async function getTurnDiffStat(
   sessionId: string,
   turnId: number
-): Promise<{ additions: number; deletions: number }> {
-  return apiFetch<{ additions: number; deletions: number }>(
-    `${base(sessionId)}/turns/${turnId}/diff-stat`
-  )
+): Promise<TurnDiffStat> {
+  return apiFetch<TurnDiffStat>(`${base(sessionId)}/turns/${turnId}/diff-stat`)
 }
 
 export function revertToTurn(sessionId: string, turnId: number): Promise<void> {
@@ -287,6 +298,40 @@ export function listWorkspaceBranches(
   workspaceId: string
 ): Promise<{ branches: string[] }> {
   return apiFetch<{ branches: string[] }>(`/workspace/${workspaceId}/branches`)
+}
+
+// ── Workspace-level history (no session required) ─────────────────────────────
+
+export async function workspaceGitLog(
+  workspaceId: string,
+  limit = 50
+): Promise<LogEntry[]> {
+  const { entries } = await apiFetch<{ entries: LogEntry[] }>(
+    `/workspace/${workspaceId}/git/log?limit=${limit}`
+  )
+  return entries
+}
+
+export async function workspaceGitShowFiles(
+  workspaceId: string,
+  sha: string
+): Promise<CommitFile[]> {
+  const { files } = await apiFetch<{ files: CommitFile[] }>(
+    `/workspace/${workspaceId}/git/show-files?sha=${encodeURIComponent(sha)}`
+  )
+  return files
+}
+
+export async function workspaceGitShowFileDiff(
+  workspaceId: string,
+  sha: string,
+  filePath: string
+): Promise<string> {
+  const params = new URLSearchParams({ sha, file: filePath })
+  const { diff } = await apiFetch<{ diff: string }>(
+    `/workspace/${workspaceId}/git/show-file-diff?${params}`
+  )
+  return diff
 }
 
 

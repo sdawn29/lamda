@@ -7,7 +7,12 @@ import { IconButtonWithTooltip } from "@/shared/ui/icon-button-with-tooltip"
 import { DiffView, type DiffMode } from "./diff-view"
 import { StatusBadge, type ChangedFile } from "./status-badge"
 import { DiffStat, parseDiffCounts } from "./diff-stat"
-import { useGitFileDiff, useGitShowFileDiff, useTurnFileDiff } from "../queries"
+import {
+  useGitFileDiff,
+  useGitShowFileDiff,
+  useTurnFileDiff,
+  useWorkspaceGitShowFileDiff,
+} from "../queries"
 import { cn } from "@/shared/lib/utils"
 
 interface FileListItemProps {
@@ -34,6 +39,11 @@ interface FileListItemProps {
   /** When set, fetches diff from the given commit SHA instead of the working tree */
   sha?: string
   /**
+   * Commit-mode fallback when no session exists: fetches the commit diff via
+   * the workspace-level endpoint. Only used when `sessionId` is empty.
+   */
+  workspaceId?: string
+  /**
    * When set, fetches the diff scoped to a single agent turn (only what that
    * turn changed in this file) instead of the cumulative working-tree diff.
    * `sessionId` must be the agent session id that owns the turn.
@@ -56,6 +66,7 @@ export const FileListItem = memo(function FileListItem({
   disabled = false,
   className,
   sha,
+  workspaceId,
   turnId,
   counts: preloadedCounts,
 }: FileListItemProps) {
@@ -82,8 +93,15 @@ export const FileListItem = memo(function FileListItem({
     sessionId,
     sha ?? "",
     file.filePath,
-    isCommitMode && isExpanded
+    isCommitMode && isExpanded && !!sessionId
   )
+  const { data: wsCommitDiff, isLoading: wsCommitDiffLoading } =
+    useWorkspaceGitShowFileDiff(
+      sessionId ? null : (workspaceId ?? null),
+      sha ?? "",
+      file.filePath,
+      isCommitMode && isExpanded
+    )
   const { data: turnDiff, isLoading: turnDiffLoading } = useTurnFileDiff(
     sessionId,
     turnId,
@@ -91,9 +109,13 @@ export const FileListItem = memo(function FileListItem({
     isTurnMode && isExpanded
   )
 
-  const diff = isCommitMode ? commitDiff : isTurnMode ? turnDiff : workDiff
+  const diff = isCommitMode
+    ? (sessionId ? commitDiff : wsCommitDiff)
+    : isTurnMode
+      ? turnDiff
+      : workDiff
   const diffLoading = isCommitMode
-    ? commitDiffLoading
+    ? (sessionId ? commitDiffLoading : wsCommitDiffLoading)
     : isTurnMode
       ? turnDiffLoading
       : workDiffLoading

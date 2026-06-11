@@ -1,5 +1,6 @@
 export { useReviewPanel } from "./store"
 export { ReviewPanel } from "./components/review-panel"
+export { HistoryView } from "./components/history-view"
 export { CommitInputSection } from "./components/commit-dialog"
 export { BranchSelector } from "./components/branch-selector"
 export { DiffView, detectLanguage } from "./components/diff-view"

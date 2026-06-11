@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFileDiff, getTurnDiffStat, getWorkspaceBranch, listWorkspaceBranches } from "./api"
+import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFileDiff, getTurnDiffStat, getWorkspaceBranch, listWorkspaceBranches, workspaceGitLog, workspaceGitShowFiles, workspaceGitShowFileDiff, type TurnDiffStat } from "./api"
 import { getBranch, listBranches } from "@/features/chat/api"
 
 const gitRootKey = ["git"] as const
@@ -102,8 +102,8 @@ export function useTurnDiffStat(
       turnId !== undefined
         ? gitKeys.turnDiffStat(sessionId, turnId)
         : ([...gitSessionKey(sessionId), "turn-diff-stat-none"] as const),
-    queryFn: async (): Promise<{ additions: number; deletions: number }> => {
-      if (turnId === undefined) return { additions: 0, deletions: 0 }
+    queryFn: async (): Promise<TurnDiffStat> => {
+      if (turnId === undefined) return { additions: 0, deletions: 0, files: [] }
       return getTurnDiffStat(sessionId, turnId)
     },
     enabled: enabled && !!sessionId && turnId !== undefined,
@@ -223,6 +223,54 @@ export function useGitShowFileDiff(sessionId: string, sha: string, filePath: str
     queryKey: gitKeys.showFileDiff(sessionId, sha, filePath),
     queryFn: () => gitShowFileDiff(sessionId, sha, filePath),
     enabled: enabled && !!sessionId && !!sha && !!filePath,
+    gcTime: 5 * 60_000,
+    staleTime: Infinity,
+  })
+}
+
+// ── Workspace-level history (no session required) ─────────────────────────────
+
+const gitWorkspaceKey = (workspaceId: string) =>
+  [...gitRootKey, "workspace", workspaceId] as const
+
+export function useWorkspaceGitLog(workspaceId: string | null) {
+  return useQuery({
+    queryKey: [...gitWorkspaceKey(workspaceId ?? ""), "log"] as const,
+    queryFn: () => workspaceGitLog(workspaceId!),
+    enabled: !!workspaceId,
+    staleTime: 10_000,
+  })
+}
+
+export function useWorkspaceGitShowFiles(
+  workspaceId: string | null,
+  sha: string,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...gitWorkspaceKey(workspaceId ?? ""), "show-files", sha] as const,
+    queryFn: () => workspaceGitShowFiles(workspaceId!, sha),
+    enabled: enabled && !!workspaceId && !!sha,
+    gcTime: 5 * 60_000,
+    staleTime: Infinity,
+  })
+}
+
+export function useWorkspaceGitShowFileDiff(
+  workspaceId: string | null,
+  sha: string,
+  filePath: string,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [
+      ...gitWorkspaceKey(workspaceId ?? ""),
+      "show-file-diff",
+      sha,
+      filePath,
+    ] as const,
+    queryFn: () => workspaceGitShowFileDiff(workspaceId!, sha, filePath),
+    enabled: enabled && !!workspaceId && !!sha && !!filePath,
     gcTime: 5 * 60_000,
     staleTime: Infinity,
   })

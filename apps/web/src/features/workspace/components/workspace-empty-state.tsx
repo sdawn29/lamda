@@ -3,6 +3,7 @@ import { Bot, CheckCircle2, GitBranch, Settings, SquareTerminal } from "lucide-r
 import { useNavigate } from "@tanstack/react-router"
 
 import { Button } from "@/shared/ui/button"
+import { LambdaMark } from "@/shared/components/lambda-mark"
 import { useProviders, useOAuthProviders } from "@/features/settings/queries"
 import { CreateWorkspaceDialog } from "./create-workspace-dialog"
 import { useCreateWorkspaceAction } from "../context"
@@ -104,14 +105,7 @@ export function WorkspaceEmptyState() {
         <div className="w-full max-w-md animate-in space-y-7 duration-300 fade-in-0 zoom-in-95">
           {/* Brand header */}
           <div className="flex flex-col items-center gap-3 text-center">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-[#1c1c1e] shadow-md ring-1 ring-white/5">
-              <span
-                className="text-3xl leading-none font-black"
-                style={{ color: "#d4a017" }}
-              >
-                Λ
-              </span>
-            </div>
+            <LambdaMark />
             <div className="space-y-1">
               <h1 className="text-xl font-semibold tracking-tight">
                 Welcome to Lamda

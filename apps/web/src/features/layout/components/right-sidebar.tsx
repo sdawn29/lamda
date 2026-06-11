@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react"
-import { FileDiff, FolderTree, Maximize2, Minimize2, X } from "lucide-react"
+import { FileDiff, FolderTree, History, Maximize2, Minimize2, X } from "lucide-react"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
 import { Button } from "@/shared/ui/button"
@@ -25,6 +25,10 @@ const ReviewPanel = lazy(() =>
 
 const FileTree = lazy(() =>
   import("@/features/file-tree").then((m) => ({ default: m.FileTree }))
+)
+
+const HistoryView = lazy(() =>
+  import("@/features/git").then((m) => ({ default: m.HistoryView }))
 )
 
 interface RightSidebarProps {
@@ -182,6 +186,18 @@ export function RightSidebarContent({
                   isEmbedded
                 />
               </Suspense>
+            ) : workspaceId ? (
+              // No live session — fall back to workspace-level commit history
+              // so the panel is still useful on the new-thread page.
+              <div className="flex h-full flex-col">
+                <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border/40 px-3 text-xs font-medium text-sidebar-foreground/70">
+                  <History className="size-3.5" />
+                  Commit history
+                </div>
+                <Suspense fallback={<div className="h-full bg-sidebar" />}>
+                  <HistoryView sessionId="" workspaceId={workspaceId} />
+                </Suspense>
+              </div>
             ) : (
               <div className="flex h-full items-center justify-center text-xs text-sidebar-foreground/40">
                 No active session

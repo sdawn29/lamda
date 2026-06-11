@@ -101,13 +101,20 @@ export function unpinWorkspace(workspaceId: string): Promise<void> {
   return apiFetch<void>(`/workspace/${workspaceId}/unpin`, { method: "PATCH" })
 }
 
+export interface CreateThreadOptions {
+  title?: string
+  mode?: Mode
+  modelId?: string | null
+}
+
 export function createThread(
-  workspaceId: string
+  workspaceId: string,
+  options: CreateThreadOptions = {}
 ): Promise<{ thread: ThreadDto }> {
   return apiFetch<{ thread: ThreadDto }>(`/workspace/${workspaceId}/thread`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify(options),
   })
 }
 
