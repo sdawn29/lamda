@@ -1,59 +1,54 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 // Reveal cadence — base interval when caught up. Adaptive: if the reveal
 // falls more than CATCHUP_THRESHOLD words behind the actual content, the
-// interval shrinks so the cursor catches up without losing the typewriter
-// feel. Once the gap closes, it returns to baseline.
+// interval shrinks and multiple words are revealed per tick so the cursor
+// catches up without losing the typewriter feel. Once the gap closes, it
+// returns to baseline.
 const BASE_INTERVAL_MS = 35
 const FAST_INTERVAL_MS = 12
 const CATCHUP_THRESHOLD = 12
+// Upper bound on words revealed per tick. Each tick re-renders the markdown
+// tree, so a deep backlog is drained by widening the step (bounded number of
+// renders) instead of queueing thousands of single-word timeouts — a long
+// turn used to need tens of seconds to finish revealing after agent_end.
+const MAX_WORDS_PER_TICK = 8
 
-interface RevealData {
-  /** Slice of content up to the n-th word boundary (or full content if n >= total). */
-  sliced: string
-  /** Word count of the full content. */
+let reducedMotionQuery: MediaQueryList | null | undefined
+function prefersReducedMotion(): boolean {
+  if (reducedMotionQuery === undefined) {
+    reducedMotionQuery =
+      typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : null
+  }
+  return reducedMotionQuery?.matches ?? false
+}
+
+interface WordScan {
+  /** Char index of the whitespace that ended each completed word. */
+  boundaries: number[]
+  /** Word count, including a trailing word with no whitespace after it. */
   total: number
 }
 
-function wordRevealData(content: string, n: number): RevealData {
-  if (n <= 0) return { sliced: "", total: countWords(content) }
-
-  let count = 0
-  let inWord = false
-  let slicedAt = -1
-  for (let i = 0; i < content.length; i++) {
-    const ch = content[i]
-    const isSpace = ch === " " || ch === "\n" || ch === "\t" || ch === "\r"
-    if (!isSpace && !inWord) {
-      inWord = true
-    } else if (isSpace && inWord) {
-      inWord = false
-      count++
-      if (slicedAt < 0 && count >= n) slicedAt = i
-    }
-  }
-  if (inWord) count++
-  return {
-    sliced: slicedAt >= 0 ? content.slice(0, slicedAt) : content,
-    total: count,
-  }
+function isSpace(ch: string): boolean {
+  return ch === " " || ch === "\n" || ch === "\t" || ch === "\r"
 }
 
-function countWords(content: string): number {
-  let count = 0
+function scanWords(content: string): WordScan {
+  const boundaries: number[] = []
   let inWord = false
   for (let i = 0; i < content.length; i++) {
-    const ch = content[i]
-    const isSpace = ch === " " || ch === "\n" || ch === "\t" || ch === "\r"
-    if (!isSpace && !inWord) {
+    const space = isSpace(content[i])
+    if (!space && !inWord) {
       inWord = true
-    } else if (isSpace && inWord) {
+    } else if (space && inWord) {
       inWord = false
-      count++
+      boundaries.push(i)
     }
   }
-  if (inWord) count++
-  return count
+  return { boundaries, total: boundaries.length + (inWord ? 1 : 0) }
 }
 
 /**
@@ -65,9 +60,11 @@ function countWords(content: string): number {
  *   flips back to false mid-reveal (e.g. the agent_end event lands while
  *   words are still being revealed), the reveal keeps running so the user
  *   sees a continuous typewriter rather than a content snap.
- * - The interval adapts to backlog: if there are many more words queued
- *   than revealed, words come faster so the reveal catches up to the
- *   actual content; otherwise it stays at the baseline cadence.
+ * - The cadence adapts to backlog: if there are many more words queued than
+ *   revealed, words come faster and in small batches so the reveal catches
+ *   up to the actual content; otherwise it stays at the baseline cadence.
+ * - Respects prefers-reduced-motion by skipping the reveal entirely,
+ *   matching the CSS entry animations which are also disabled there.
  */
 export function useWordReveal(content: string, isNew: boolean): string {
   const [revealedWords, setRevealedWords] = useState(0)
@@ -77,17 +74,34 @@ export function useWordReveal(content: string, isNew: boolean): string {
   const [started, setStarted] = useState(isNew)
   if (isNew && !started) setStarted(true)
 
-  const { sliced, total } = wordRevealData(content, revealedWords)
+  const animate = started && !prefersReducedMotion()
+
+  // Word boundaries are scanned once per content change, not on every reveal
+  // tick — per tick only an O(1) boundary lookup + slice remains. (The old
+  // implementation re-scanned the full string on each tick: O(words × length)
+  // over a long reply, enough to visibly stutter the typewriter.)
+  const scan = useMemo(
+    () => (animate ? scanWords(content) : null),
+    [animate, content]
+  )
+  const total = scan?.total ?? 0
 
   useEffect(() => {
-    if (!started || revealedWords >= total) return
+    if (!animate || revealedWords >= total) return
     const backlog = total - revealedWords
-    const interval = backlog > CATCHUP_THRESHOLD ? FAST_INTERVAL_MS : BASE_INTERVAL_MS
-    const id = setTimeout(() => setRevealedWords((c) => c + 1), interval)
+    const catchingUp = backlog > CATCHUP_THRESHOLD
+    const interval = catchingUp ? FAST_INTERVAL_MS : BASE_INTERVAL_MS
+    const step = catchingUp
+      ? Math.min(MAX_WORDS_PER_TICK, Math.ceil(backlog / CATCHUP_THRESHOLD))
+      : 1
+    const id = setTimeout(() => setRevealedWords((c) => c + step), interval)
     return () => clearTimeout(id)
-  }, [revealedWords, total, started])
+  }, [revealedWords, total, animate])
 
-  // Historical messages (never started) or fully revealed → show all text.
-  if (!started || revealedWords >= total) return content
-  return sliced
+  // Historical messages (never started), reduced motion, or fully revealed →
+  // show all text.
+  if (!scan || revealedWords >= total) return content
+  if (revealedWords <= 0) return ""
+  if (revealedWords > scan.boundaries.length) return content
+  return content.slice(0, scan.boundaries[revealedWords - 1])
 }

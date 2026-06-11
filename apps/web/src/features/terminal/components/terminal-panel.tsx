@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, memo } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
+import { WebLinksAddon } from "@xterm/addon-web-links"
 import { Plus, Trash2, X, TerminalSquare } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { useTheme } from "@/shared/components/theme-provider"
@@ -78,6 +79,13 @@ const TerminalInstance = memo(function TerminalInstance({
 
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
+    // Detects plain-text URLs in output (e.g. dev server addresses) and makes
+    // them clickable; OSC 8 hyperlinks are handled by `linkHandler` above.
+    term.loadAddon(
+      new WebLinksAddon((_event, uri) => {
+        window.open(uri, "_blank", "noopener,noreferrer")
+      })
+    )
     term.open(container)
     fitAddon.fit()
 

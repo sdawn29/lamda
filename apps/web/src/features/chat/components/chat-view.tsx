@@ -647,9 +647,19 @@ export function ChatView({
     const wasLoading = prevIsLoadingRef.current
     prevIsLoadingRef.current = isLoading
     if (isLoading || visibleMessages.length === 0) return
-    setInitialSnapshot({
-      sessionId,
-      keys: new Set(visibleMessages.map((m, i) => getMessageKey(m, i))),
+    // Bail out (returning the same reference skips the re-render) when every
+    // key is already in the snapshot — idle cache updates land here often.
+    setInitialSnapshot((prev) => {
+      const keys = visibleMessages.map((m, i) => getMessageKey(m, i))
+      if (
+        prev !== null &&
+        prev.sessionId === sessionId &&
+        prev.keys.size === keys.length &&
+        keys.every((k) => prev.keys.has(k))
+      ) {
+        return prev
+      }
+      return { sessionId, keys: new Set(keys) }
     })
     if (wasLoading) {
       appearanceOrderRef.current = new Map()

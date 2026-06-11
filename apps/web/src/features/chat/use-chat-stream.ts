@@ -143,17 +143,26 @@ export function useChatStream({
   }, [setThreadStatus, threadId])
 
   const handleToolExecutionEnd = useCallback((toolName: string) => {
+    const modifiesFiles = isFileModifyingTool(toolName)
     // Skip per-file diffs (key[3] === "diff") — N active observers all refetching
     // on every tool execution end creates a request burst. Diffs are lazily
     // refreshed when the user expands a file or the statusCode changes.
+    // Also skip git status when it's force-refetched below — invalidating it
+    // here too would cancel that in-flight request and fetch twice.
     void queryClient.invalidateQueries({
       queryKey: gitKeys.session(sessionId),
-      predicate: (query) => (query.queryKey as unknown[])[3] !== "diff",
+      predicate: (query) => {
+        const part = (query.queryKey as unknown[])[3]
+        if (part === "diff") return false
+        if (modifiesFiles && part === "status") return false
+        return true
+      },
     })
-    void queryClient.invalidateQueries({ queryKey: ["file-tree"] })
-    if (isFileModifyingTool(toolName)) {
+    if (modifiesFiles) {
       void queryClient.refetchQueries({ queryKey: gitStatusKey(sessionId) })
       void queryClient.refetchQueries({ queryKey: ["file-tree"] })
+    } else {
+      void queryClient.invalidateQueries({ queryKey: ["file-tree"] })
     }
   }, [queryClient, sessionId])
 

@@ -331,6 +331,10 @@ export function useSessionStream({
   // Unified event queue — every WebSocket event lands here in arrival order.
   const eventQueueRef = useRef<QueuedEvent[]>([])
   const rafRef = useRef<number | null>(null)
+  // Timeout-based flush used while the document is hidden (rAF doesn't fire
+  // there, which would let events — including agent_end — queue indefinitely
+  // in a backgrounded window).
+  const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Tool start-time tracking for accurate duration on tool_end.
   const pendingToolStartRef = useRef<Map<string, number>>(new Map())
@@ -363,6 +367,10 @@ export function useSessionStream({
 
   const processQueue = useCallback(() => {
     rafRef.current = null
+    if (flushTimeoutRef.current !== null) {
+      clearTimeout(flushTimeoutRef.current)
+      flushTimeoutRef.current = null
+    }
     const events = eventQueueRef.current.splice(0)
     if (events.length === 0) return
 
@@ -533,8 +541,12 @@ export function useSessionStream({
   }, [queryClient, sessionId])
 
   // Schedule a processQueue on the next animation frame (deduplicated).
+  // Hidden documents get a timeout instead — rAF is suspended there.
   const scheduleFlush = useCallback(() => {
-    if (rafRef.current === null) {
+    if (rafRef.current !== null || flushTimeoutRef.current !== null) return
+    if (document.hidden) {
+      flushTimeoutRef.current = setTimeout(processQueue, 32)
+    } else {
       rafRef.current = requestAnimationFrame(processQueue)
     }
   }, [processQueue])
@@ -548,6 +560,11 @@ export function useSessionStream({
   const flushNow = useCallback(() => {
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+    if (flushTimeoutRef.current !== null) {
+      clearTimeout(flushTimeoutRef.current)
+      flushTimeoutRef.current = null
     }
     flushSync(processQueue)
   }, [processQueue])
@@ -810,6 +827,10 @@ export function useSessionStream({
       agentRunningRef.current = false
       sessionDoneFlags.delete(sessionId)
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      if (flushTimeoutRef.current !== null) {
+        clearTimeout(flushTimeoutRef.current)
+        flushTimeoutRef.current = null
+      }
       if (reconnectTimer !== null) clearTimeout(reconnectTimer)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       eventQueueRef.current = []
