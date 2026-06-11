@@ -140,8 +140,8 @@
   --chart-4: #9f4e32;
   --chart-5: #a06820;
 
-  /* ── Radius ── */
-  --radius: 0.5rem;
+  /* ── Radius (macOS-like 10px controls) ── */
+  --radius: 0.625rem;
 
   /* ── Sidebar: distinct panel, slightly darker than content area ── */
   --sidebar: #ededea;

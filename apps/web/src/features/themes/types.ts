@@ -84,7 +84,7 @@ export interface ColorTheme {
   description?: string
   /** Short grouping tag (e.g. palette family or author). */
   group?: string
-  /** Base corner radius, e.g. `0.5rem`. Defaults to `0.5rem` when omitted. */
+  /** Base corner radius, e.g. `0.625rem`. Defaults to `0.625rem` when omitted. */
   radius?: string
   light: ThemePalette
   dark: ThemePalette
@@ -103,7 +103,7 @@ export interface ColorTheme {
 
 /** Resolve a theme's radius, falling back to the app default. */
 export function themeRadius(theme: ColorTheme): string {
-  return theme.radius ?? "0.5rem"
+  return theme.radius ?? "0.625rem"
 }
 
 /**
