@@ -1,5 +1,6 @@
 import type { ComponentType } from "react"
 import {
+  ChartColumn,
   Code2,
   Database,
   DollarSign,
@@ -128,6 +129,28 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
       "custom provider",
       "base url",
       "self-hosted",
+    ],
+  },
+  {
+    slug: "usage",
+    label: "AI Usage",
+    title: "AI Usage",
+    description:
+      "Track tokens, cost, and model activity across all your workspaces.",
+    icon: ChartColumn,
+    group: "providers",
+    keywords: [
+      "usage",
+      "tokens",
+      "cost",
+      "spend",
+      "model",
+      "input",
+      "output",
+      "cache",
+      "statistics",
+      "dashboard",
+      "workspace",
     ],
   },
   {

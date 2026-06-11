@@ -17,6 +17,7 @@ import { McpSection } from "@/features/settings/sections/mcp"
 import { RetrySection } from "@/features/settings/sections/retry"
 import { UpdatesSection } from "@/features/settings/sections/updates"
 import { DataSection } from "@/features/settings/sections/data"
+import { UsageSection } from "@/features/settings/sections/usage"
 
 const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
   appearance: AppearanceSection,
@@ -24,6 +25,7 @@ const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
   subscriptions: SubscriptionsSection,
   "api-keys": ApiKeysSection,
   "local-models": LocalModelsSection,
+  usage: UsageSection,
   git: GitSection,
   shortcuts: ShortcutsSection,
   lsp: LspSection,

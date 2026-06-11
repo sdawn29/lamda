@@ -64,16 +64,16 @@ export function ModelCombobox({
             size="sm"
             disabled={disabled}
             aria-expanded={open}
-            className="w-auto"
+            className="max-w-44"
           >
             {selectedMeta?.icon}
-            <span className="whitespace-nowrap">{selected?.name ?? "Select model"}</span>
+            <span className="truncate">{selected?.name ?? "Select model"}</span>
             <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
           </Button>
         }
       />
       <PopoverContent
-        className="w-auto min-w-40 p-0"
+        className="w-64 p-0"
         side="top"
         align="start"
         sideOffset={6}
@@ -91,14 +91,13 @@ export function ModelCombobox({
                       key={`${provider}::${m.id}`}
                       value={`${provider}::${m.id}`}
                       data-checked={m.id === selected?.id && provider === selected?.provider}
-                      className="whitespace-nowrap"
                       onSelect={() => {
                         onSelect(`${provider}::${m.id}`)
                         setOpen(false)
                       }}
                     >
                       {meta.icon}
-                      {m.name}
+                      <span className="truncate">{m.name}</span>
                     </CommandItem>
                   ))}
                 </CommandGroup>

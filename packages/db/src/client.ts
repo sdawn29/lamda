@@ -180,6 +180,21 @@ function createDb() {
       checkpoint_sha  TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      thread_id          TEXT NOT NULL,
+      workspace_id       TEXT NOT NULL DEFAULT '',
+      provider           TEXT NOT NULL DEFAULT '',
+      model              TEXT NOT NULL DEFAULT '',
+      input_tokens       INTEGER NOT NULL DEFAULT 0,
+      output_tokens      INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens  INTEGER NOT NULL DEFAULT 0,
+      cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+      total_tokens       INTEGER NOT NULL DEFAULT 0,
+      cost               REAL NOT NULL DEFAULT 0,
+      created_at         INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS agent_turn_files (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       turn_id             INTEGER NOT NULL REFERENCES agent_turns(id) ON DELETE CASCADE,
@@ -196,6 +211,8 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS workspace_files_workspace_idx ON workspace_files(workspace_id);
     CREATE INDEX IF NOT EXISTS workspace_tasks_workspace_idx ON workspace_tasks(workspace_id);
     CREATE INDEX IF NOT EXISTS agent_turns_thread_idx ON agent_turns(thread_id);
+    CREATE INDEX IF NOT EXISTS ai_usage_workspace_idx ON ai_usage(workspace_id);
+    CREATE INDEX IF NOT EXISTS ai_usage_created_idx ON ai_usage(created_at);
     CREATE INDEX IF NOT EXISTS agent_turn_files_turn_idx ON agent_turn_files(turn_id);
     CREATE INDEX IF NOT EXISTS thread_todo_goals_thread_idx ON thread_todo_goals(thread_id, sort_order, created_at);
     CREATE INDEX IF NOT EXISTS thread_todos_thread_idx ON thread_todos(thread_id, sort_order, created_at);

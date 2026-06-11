@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core"
+import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core"
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
@@ -141,6 +141,28 @@ export const threadTodos = sqliteTable("thread_todos", {
     .notNull()
     .default("pending"),
   sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+})
+
+// ── AI Usage ──────────────────────────────────────────────────────────────────
+
+/**
+ * One row per completed LLM response. thread_id/workspace_id are intentionally
+ * not foreign keys so usage history survives thread/workspace deletion —
+ * readers join workspaces/threads with a LEFT JOIN for display names.
+ */
+export const aiUsage = sqliteTable("ai_usage", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  threadId: text("thread_id").notNull(),
+  workspaceId: text("workspace_id").notNull().default(""),
+  provider: text("provider").notNull().default(""),
+  model: text("model").notNull().default(""),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+  cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+  totalTokens: integer("total_tokens").notNull().default(0),
+  cost: real("cost").notNull().default(0),
   createdAt: integer("created_at").notNull(),
 })
 

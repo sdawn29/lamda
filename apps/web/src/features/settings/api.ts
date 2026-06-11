@@ -91,6 +91,56 @@ export async function deleteLocalProvider(id: string): Promise<void> {
   })
 }
 
+// ── AI usage ──────────────────────────────────────────────────────────────────
+
+export interface AiUsageTotals {
+  requests: number
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  totalTokens: number
+  cost: number
+}
+
+export interface AiUsageByModel extends AiUsageTotals {
+  provider: string
+  model: string
+}
+
+export interface AiUsageByWorkspace extends AiUsageTotals {
+  workspaceId: string
+  workspaceName: string | null
+  threads: number
+  models: AiUsageByModel[]
+}
+
+export interface AiUsageDaily {
+  /** Local-time day in YYYY-MM-DD format. */
+  day: string
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  totalTokens: number
+  cost: number
+}
+
+export interface AiUsageStats {
+  totals: AiUsageTotals
+  byModel: AiUsageByModel[]
+  byWorkspace: AiUsageByWorkspace[]
+  daily: AiUsageDaily[]
+}
+
+/** Aggregated AI usage; `days` limits to the last N days, 0 means all-time. */
+export async function fetchAiUsage(
+  days: number,
+  signal?: AbortSignal,
+): Promise<AiUsageStats> {
+  return apiFetch<AiUsageStats>(`/usage?days=${days}`, { signal })
+}
+
 // ── OAuth ─────────────────────────────────────────────────────────────────────
 
 export interface OAuthProvider {

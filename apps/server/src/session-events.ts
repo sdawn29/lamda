@@ -13,6 +13,8 @@ import {
   listRunningToolBlocks,
   insertAgentTurn,
   insertCompactionBlock,
+  insertAiUsage,
+  getThread,
 } from "@lamda/db";
 import type { ManagedSessionHandle, SessionEvent } from "@lamda/pi-sdk";
 import { PLAN_DIR } from "@lamda/pi-sdk";
@@ -150,6 +152,7 @@ class SessionEventHub {
   private deltaBlockId: string | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private onIdle: (() => void) | null = null;
+  private cachedWorkspaceId: string | null = null;
 
   constructor(
     private readonly sessionId: string,
@@ -725,6 +728,52 @@ class SessionEventHub {
       }
       if (assistantEvent.partial?.provider && !this.turnContext.provider) {
         this.turnContext.provider = assistantEvent.partial.provider;
+      }
+      return;
+    }
+
+    // message_end - record token usage for the completed LLM response
+    if (event.type === "message_end") {
+      const msg = event as {
+        message?: {
+          role?: string;
+          model?: string;
+          provider?: string;
+          usage?: {
+            input: number;
+            output: number;
+            cacheRead: number;
+            cacheWrite: number;
+            totalTokens?: number;
+            cost?: { total?: number };
+          };
+        };
+      };
+      const m = msg.message;
+      if (m?.role !== "assistant" || !m.usage) return;
+      const { input, output, cacheRead, cacheWrite } = m.usage;
+      // Aborted/errored responses report whatever was actually consumed; a
+      // zero-usage row carries no information, so skip those.
+      if (input + output + cacheRead + cacheWrite <= 0) return;
+      try {
+        if (this.cachedWorkspaceId === null) {
+          this.cachedWorkspaceId = getThread(this.threadId)?.workspaceId ?? "";
+        }
+        insertAiUsage({
+          threadId: this.threadId,
+          workspaceId: this.cachedWorkspaceId,
+          provider: m.provider ?? "",
+          model: m.model ?? "",
+          inputTokens: input,
+          outputTokens: output,
+          cacheReadTokens: cacheRead,
+          cacheWriteTokens: cacheWrite,
+          totalTokens:
+            m.usage.totalTokens ?? input + output + cacheRead + cacheWrite,
+          cost: m.usage.cost?.total ?? 0,
+        });
+      } catch {
+        // Usage accounting must never break event processing.
       }
       return;
     }
