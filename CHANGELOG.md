@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.16.0](../../releases/tag/v0.16.0) — 2026-06-11
+
+### Features
+
+* add support for Latte theme by remapping Macchiato colors in light mode
+* add macOS theme and update corner radius for built-in themes
+* enhance git functionality with workspace-level history and diff stats
+* add WebLinksAddon to terminal for clickable URLs and update dependencies
+* enhance LSP installation process and UI integration
+* **chat:** replace ServerCrashIcon with ZapIcon and update styles for skill chips
+* **auth:** allow 'file://' origin in isAllowedOrigin function for WebSocket upgrades
+
+### Other Changes
+
+* Refactor settings UI components and improve layout
+
 ## [0.15.0](../../releases/tag/v0.15.0) — 2026-06-10
 
 ### Features
