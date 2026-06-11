@@ -4,6 +4,60 @@ import catppuccinData from "@iconify-json/catppuccin/icons.json"
 
 addCollection(catppuccinData as Parameters<typeof addCollection>[0])
 
+/**
+ * The catppuccin icon set hardcodes Macchiato (dark-flavor) pastels into its
+ * SVG bodies, so on light backgrounds the lighter strokes (text, surface
+ * colors…) are nearly invisible. There is no Latte variant of the collection,
+ * but every Macchiato color has an official Latte counterpart — so in light
+ * mode we remap them with CSS attribute selectors, which beat SVG presentation
+ * attributes at any specificity. Keyed off `:root:not(.dark)` so the remap
+ * also holds before the theme engine first applies a mode class.
+ */
+const MACCHIATO_TO_LATTE: Record<string, string> = {
+  "#f4dbd6": "#dc8a78", // rosewater
+  "#f0c6c6": "#dd7878", // flamingo
+  "#f5bde6": "#ea76cb", // pink
+  "#c6a0f6": "#8839ef", // mauve
+  "#ed8796": "#d20f39", // red
+  "#ee99a0": "#e64553", // maroon
+  "#f5a97f": "#fe640b", // peach
+  "#eed49f": "#df8e1d", // yellow
+  "#a6da95": "#40a02b", // green
+  "#8bd5ca": "#179299", // teal
+  "#91d7e3": "#04a5e5", // sky
+  "#7dc4e4": "#209fb5", // sapphire
+  "#8aadf4": "#1e66f5", // blue
+  "#b7bdf8": "#7287fd", // lavender
+  "#cad3f5": "#4c4f69", // text
+  "#b8c0e0": "#5c5f77", // subtext1
+  "#a5adcb": "#6c6f85", // subtext0
+  "#939ab7": "#7c7f93", // overlay2
+  "#8087a2": "#8c8fa1", // overlay1
+  "#6e738d": "#9ca0b0", // overlay0
+  "#5b6078": "#acb0be", // surface2
+  "#494d64": "#bcc0cc", // surface1
+  "#363a4f": "#ccd0da", // surface0
+  "#24273a": "#eff1f5", // base
+  "#1e2030": "#e6e9ef", // mantle
+  "#181926": "#dce0e8", // crust
+}
+
+const LATTE_STYLE_ID = "catppuccin-icons-latte"
+
+if (typeof document !== "undefined" && !document.getElementById(LATTE_STYLE_ID)) {
+  const css = Object.entries(MACCHIATO_TO_LATTE)
+    .map(
+      ([from, to]) =>
+        `:root:not(.dark) [stroke="${from}"] { stroke: ${to}; }\n` +
+        `:root:not(.dark) [fill="${from}"] { fill: ${to}; }`
+    )
+    .join("\n")
+  const el = document.createElement("style")
+  el.id = LATTE_STYLE_ID
+  el.textContent = css
+  document.head.appendChild(el)
+}
+
 export function getIconName(filename: string): string {
   const lower = filename.toLowerCase()
   const parts = lower.split(".")
