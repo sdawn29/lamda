@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.17.0](../../releases/tag/v0.17.0) — 2026-06-11
+
+### Features
+
+* implement AI usage tracking and reporting features
+* categorize tools into groups for improved display in WorkingBlock component
+* enhance slash command handling in RichInput component
+* add delay prop to Tooltip for customizable tooltip display timing
+
 ## [0.16.0](../../releases/tag/v0.16.0) — 2026-06-11
 
 ### Features
