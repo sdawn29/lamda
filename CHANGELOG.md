@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.18.0](../../releases/tag/v0.18.0) — 2026-06-12
+
+### Features
+
+* enhance font management with Google Fonts integration, add font selection UI, and update styling for code blocks
+* update styling in chat components, enhance session management, and add lamda-specific system context
+* enhance tool run group description and improve category breakdown in WorkingBlock component
+* improve styling and layout in chat components, enhance reconnect logic in session stream, and add new color theme
+* enhance AI usage stats query with date range filtering
+
 ## [0.17.0](../../releases/tag/v0.17.0) — 2026-06-11
 
 ### Features
