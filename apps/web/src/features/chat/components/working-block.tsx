@@ -109,6 +109,59 @@ function describeRun(tools: ToolMessage[]): string {
     .join(", ")
 }
 
+/**
+ * Build the collapsed description for a tool run group, appending file/query
+ * names for file-based and web groups so the summary is immediately legible.
+ */
+function buildGroupDescription(
+  tools: ToolMessage[],
+  groupId: ToolGroupId,
+  rootPath?: string
+): string {
+  if (groupId === "terminal") {
+    return tools
+      .map((t) => argsSummary(t.args, rootPath))
+      .filter(Boolean)
+      .join(" · ")
+  }
+
+  const runDesc = describeRun(tools)
+
+  const names = [
+    ...new Set(
+      tools
+        .map((t) => {
+          const s = argsSummary(t.args, rootPath)
+          if (!s) return null
+          if (groupId === "web") {
+            const q = s.length > 26 ? `${s.slice(0, 26)}…` : s
+            return `"${q}"`
+          }
+          return s.split("/").pop() ?? s
+        })
+        .filter((n): n is string => n !== null && n.length > 0)
+    ),
+  ]
+
+  if (names.length === 0) return runDesc
+  const shown = names.slice(0, 3).join(", ")
+  const extra = names.length > 3 ? ` +${names.length - 3}` : ""
+  return `${runDesc} · ${shown}${extra}`
+}
+
+/** Category + count breakdown for the working block collapsed header. */
+function getCategoryBreakdown(
+  messages: WorkingMessage[]
+): { groupId: ToolGroupId; count: number }[] {
+  const counts = new Map<ToolGroupId, number>()
+  for (const m of messages) {
+    if (m.role !== "tool") continue
+    const gid = toolGroupId(m as ToolMessage)
+    if (gid) counts.set(gid, (counts.get(gid) ?? 0) + 1)
+  }
+  return [...counts.entries()].map(([groupId, count]) => ({ groupId, count }))
+}
+
 /** A collapsed run of consecutive same-category tool calls inside a working block. */
 function ToolRunGroup({
   tools,
@@ -123,15 +176,8 @@ function ToolRunGroup({
   const GroupIcon = meta.icon
   const running = tools.some((t) => t.status === "running")
   const errored = tools.some((t) => t.status === "error")
-  // Terminal runs would only repeat the label ("ran 3 commands"), so show the
-  // commands themselves instead of the action breakdown
-  const description =
-    groupId === "terminal"
-      ? tools
-          .map((t) => argsSummary(t.args, rootPath))
-          .filter(Boolean)
-          .join(" · ")
-      : describeRun(tools)
+  const errorCount = tools.filter((t) => t.status === "error").length
+  const description = buildGroupDescription(tools, groupId, rootPath)
 
   return (
     <div className="w-full text-xs">
@@ -148,7 +194,7 @@ function ToolRunGroup({
               ? "animate-pulse text-foreground/50"
               : errored
                 ? "text-destructive/60"
-                : "text-muted-foreground/35"
+                : "text-muted-foreground/40"
           )}
         />
         <span
@@ -158,17 +204,31 @@ function ToolRunGroup({
               ? SHIMMER_TEXT_CLASS
               : errored
                 ? "text-destructive/70"
-                : "text-muted-foreground/45"
+                : "text-muted-foreground/55"
           )}
         >
           {running ? meta.activeLabel : meta.doneLabel}
         </span>
-        <span className="shrink-0 rounded-full bg-muted/60 px-1.5 py-px text-2xs tabular-nums text-muted-foreground/55">
-          {tools.length} tool{tools.length === 1 ? "" : "s"}
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-1.5 py-px text-2xs tabular-nums",
+            running
+              ? "bg-primary/10 text-primary/60"
+              : errored
+                ? "bg-destructive/10 text-destructive/60"
+                : "bg-muted/60 text-muted-foreground/60"
+          )}
+        >
+          {tools.length}
         </span>
         {description && (
-          <span className="min-w-0 truncate text-sm text-muted-foreground/35">
+          <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground/40">
             {description}
+          </span>
+        )}
+        {!running && errorCount > 0 && (
+          <span className="shrink-0 text-2xs tabular-nums text-destructive/50">
+            {errorCount} err
           </span>
         )}
         <ChevronRightIcon
@@ -188,7 +248,7 @@ function ToolRunGroup({
         )}
       >
         <div className="overflow-hidden">
-          <div className="mt-1.5 ml-[3px] flex flex-col gap-1.5 border-l border-border/40 pl-3">
+          <div className="mt-1.5 ml-[3px] flex flex-col gap-1.5 border-l border-border/50 pl-3">
             {tools.map((t) => (
               <ToolCallBlock
                 key={t.toolCallId}
@@ -397,6 +457,10 @@ export const WorkingBlock = memo(function WorkingBlock({
     () => messages.filter((m) => m.role === "tool").length,
     [messages]
   )
+  const categoryBreakdown = useMemo(
+    () => (!isActive ? getCategoryBreakdown(messages) : []),
+    [isActive, messages]
+  )
   const entries = useMemo(
     () => buildWorkingEntries(messages, showThinking),
     [messages, showThinking]
@@ -425,7 +489,7 @@ export const WorkingBlock = memo(function WorkingBlock({
       {/* Trigger row — looks like inline text, no card chrome */}
       <button
         type="button"
-        className="flex items-center gap-1.5 text-left"
+        className="flex w-full min-w-0 items-center gap-1.5 text-left"
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
@@ -437,8 +501,8 @@ export const WorkingBlock = memo(function WorkingBlock({
         )}
         <span
           className={cn(
-            "text-sm font-medium",
-            isActive ? "text-foreground/60" : "text-muted-foreground"
+            "shrink-0 text-sm font-medium",
+            isActive ? "text-foreground/65" : "text-muted-foreground/70"
           )}
         >
           {isActive ? (
@@ -455,14 +519,34 @@ export const WorkingBlock = memo(function WorkingBlock({
         </span>
 
         {!isActive && toolCount > 0 && (
-          <span className="shrink-0 text-xs tabular-nums text-muted-foreground/40">
-            · {toolCount} {toolCount === 1 ? "tool" : "tools"}
+          <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground/40">
+            <span className="shrink-0 text-xs tabular-nums">
+              · {toolCount} {toolCount === 1 ? "tool" : "tools"}
+            </span>
+            {categoryBreakdown.length > 0 && (
+              <span className="flex shrink-0 items-center gap-1">
+                {categoryBreakdown.map(({ groupId, count }) => {
+                  const meta = TOOL_GROUP_META[groupId]
+                  const CatIcon = meta.icon
+                  return (
+                    <span
+                      key={groupId}
+                      className="flex items-center gap-0.5 text-muted-foreground/35"
+                      title={`${meta.doneLabel}: ${count}`}
+                    >
+                      <CatIcon className="h-2.5 w-2.5" />
+                      <span className="text-2xs tabular-nums">{count}</span>
+                    </span>
+                  )
+                })}
+              </span>
+            )}
           </span>
         )}
 
         <ChevronRightIcon
           className={cn(
-            "h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform duration-200",
+            "ml-auto h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform duration-200",
             expanded && "rotate-90"
           )}
         />
@@ -476,7 +560,7 @@ export const WorkingBlock = memo(function WorkingBlock({
         )}
       >
         <div className="overflow-hidden">
-          <div className="mt-2 ml-[3px] flex flex-col gap-1.5 border-l border-border/40 pl-4">
+          <div className="mt-2 ml-[3px] flex flex-col gap-2 border-l border-border/50 pl-4">
             {entries.map((entry) => {
               if (entry.kind === "thinking") {
                 return (

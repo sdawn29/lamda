@@ -20,6 +20,7 @@ import {
 import { FileIcon } from "@/shared/ui/file-icon"
 
 import { cn } from "@/shared/lib/utils"
+import { formatDuration } from "@/shared/lib/formatters"
 import { LivePre } from "./live-pre"
 import { DiffView, detectLanguage, parseDiffCounts } from "@/features/git"
 import { useSyntaxTheme } from "@/features/themes"
@@ -648,7 +649,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                 ? "animate-pulse text-foreground/50"
                 : msg.status === "error"
                   ? "text-destructive/60"
-                  : "text-muted-foreground/35"
+                  : "text-muted-foreground/40"
             )}
           />
         )}
@@ -662,20 +663,20 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               ? "text-destructive/70"
               : skillName
                 ? "text-foreground/70"
-                : "text-muted-foreground/45"
+                : "text-muted-foreground/55"
         )}>
           {skillName ?? msg.toolName}
         </span>
 
         {skillName ? null : displayFilePath ? (
-          <span className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground/35">
-            <FileIcon filename={displayFilePath} className="h-3.5 w-3.5 shrink-0 opacity-50" />
+          <span className="flex min-w-0 flex-1 items-center gap-1 text-sm text-muted-foreground/40">
+            <FileIcon filename={displayFilePath} className="h-3.5 w-3.5 shrink-0 opacity-60" />
             <span className="truncate">{fileBasename(displayFilePath)}</span>
           </span>
         ) : summary ? (
           <span
             className={cn(
-              "min-w-0 truncate text-muted-foreground/35",
+              "min-w-0 flex-1 truncate text-muted-foreground/40",
               normalizedToolName === "bash" ? "font-mono text-xs" : "text-sm"
             )}
           >
@@ -684,7 +685,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         ) : null}
 
         {readLineRange && (
-          <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground/35">
+          <span className="shrink-0 rounded bg-muted/50 px-1 py-px font-mono text-2xs tabular-nums text-muted-foreground/50">
             {readLineRange}
           </span>
         )}
@@ -712,6 +713,12 @@ export const ToolCallBlock = memo(function ToolCallBlock({
           </span>
         )}
 
+        {msg.status === "done" && msg.duration != null && msg.duration > 0 && (
+          <span className="shrink-0 tabular-nums text-2xs text-muted-foreground/30">
+            {formatDuration(msg.duration)}
+          </span>
+        )}
+
         {hasBody && (
           <ChevronRightIcon
             className={cn(
@@ -732,7 +739,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         )}
       >
         <div className="overflow-hidden">
-          <div className="group/copy relative mt-2 overflow-hidden rounded-lg border border-border/40 bg-muted/20 shadow-xs">
+          <div className="group/copy relative mt-2 overflow-hidden rounded-lg border border-border/50 bg-muted/20 shadow-xs">
             <button
               type="button"
               onClick={handleCopy}
@@ -751,11 +758,18 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
             {/* Bash: trigger row truncates the command, so repeat it in full */}
             {normalizedToolName === "bash" && summary && (
-              <div className="flex items-start gap-2 border-b border-border/40 bg-muted/30 px-3 py-2 pr-9">
-                <span className="mt-px font-mono text-2xs font-bold text-primary/60 select-none">$</span>
-                <span className="flex-1 font-mono text-2xs break-all whitespace-pre-wrap text-foreground/70">
-                  {summary}
-                </span>
+              <div className="flex items-start justify-between gap-2 border-b border-border/40 bg-muted/30 px-3 py-2 pr-9">
+                <div className="flex min-w-0 flex-1 items-start gap-2">
+                  <span className="mt-px font-mono text-2xs font-bold text-primary/60 select-none">$</span>
+                  <span className="flex-1 font-mono text-2xs break-all whitespace-pre-wrap text-foreground/70">
+                    {summary}
+                  </span>
+                </div>
+                {msg.status === "done" && resultText && (
+                  <span className="shrink-0 self-center tabular-nums text-2xs text-muted-foreground/40">
+                    {resultText.split("\n").length} lines
+                  </span>
+                )}
               </div>
             )}
 
