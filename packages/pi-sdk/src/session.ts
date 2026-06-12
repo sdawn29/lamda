@@ -12,6 +12,7 @@ import {
 import { buildAuthStorage } from "./auth.js"
 import { sessionEventGenerator } from "./stream.js"
 import { computeActiveToolsForMode, type Mode } from "./modes.js"
+import { LAMDA_SYSTEM_CONTEXT } from "./system-prompt.js"
 import type { ContextBreakdown, HistoryBlock, ManagedSessionHandle, ManagedSessionStats, SdkConfig, SessionTokenStats } from "./types.js"
 
 // Duck-typed shapes for SDK message content — avoids a direct @earendil-works/pi-ai dependency
@@ -163,6 +164,9 @@ function buildRuntimeFactory(
       agentDir,
       authStorage,
       modelRegistry,
+      resourceLoaderOptions: {
+        appendSystemPromptOverride: (base) => [...base, LAMDA_SYSTEM_CONTEXT],
+      },
     })
     return {
       ...(await createAgentSessionFromServices({

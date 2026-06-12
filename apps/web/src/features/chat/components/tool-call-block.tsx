@@ -20,7 +20,6 @@ import {
 import { FileIcon } from "@/shared/ui/file-icon"
 
 import { cn } from "@/shared/lib/utils"
-import { formatDuration } from "@/shared/lib/formatters"
 import { LivePre } from "./live-pre"
 import { DiffView, detectLanguage, parseDiffCounts } from "@/features/git"
 import { useSyntaxTheme } from "@/features/themes"
@@ -631,7 +630,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       {/* Trigger row — text accordion style */}
       <button
         type="button"
-        className="group/row flex w-full min-w-0 items-center gap-1.5 text-left"
+        className="group/row flex w-fit max-w-full min-w-0 items-center gap-1.5 text-left"
         onClick={toggle}
         aria-expanded={hasBody ? expanded : undefined}
       >
@@ -644,7 +643,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
           <ToolGlyph
             toolName={msg.toolName}
             className={cn(
-              "h-3.5 w-3.5 shrink-0",
+              "h-3 w-3 shrink-0",
               msg.status === "running"
                 ? "animate-pulse text-foreground/50"
                 : msg.status === "error"
@@ -670,7 +669,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
         {skillName ? null : displayFilePath ? (
           <span className="flex min-w-0 flex-1 items-center gap-1 text-sm text-muted-foreground/40">
-            <FileIcon filename={displayFilePath} className="h-3.5 w-3.5 shrink-0 opacity-60" />
+            <FileIcon filename={displayFilePath} className="h-3 w-3 shrink-0 opacity-60" />
             <span className="truncate">{fileBasename(displayFilePath)}</span>
           </span>
         ) : summary ? (
@@ -710,12 +709,6 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             <span className="text-green-600 dark:text-green-400">
               +<RollingTimerText text={String(writeLineCount)} />
             </span>
-          </span>
-        )}
-
-        {msg.status === "done" && msg.duration != null && msg.duration > 0 && (
-          <span className="shrink-0 tabular-nums text-2xs text-muted-foreground/30">
-            {formatDuration(msg.duration)}
           </span>
         )}
 

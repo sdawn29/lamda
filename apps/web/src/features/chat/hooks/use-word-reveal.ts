@@ -67,7 +67,10 @@ function scanWords(content: string): WordScan {
  *   matching the CSS entry animations which are also disabled there.
  */
 export function useWordReveal(content: string, isNew: boolean): string {
-  const [revealedWords, setRevealedWords] = useState(0)
+  // Start at 1 for new messages so the first word is visible immediately;
+  // starting at 0 causes a 35 ms blank while the entry animation is already
+  // fading in, which is noticeable even at a low opacity.
+  const [revealedWords, setRevealedWords] = useState(() => (isNew ? 1 : 0))
   // Latches on the first render where isNew is true and stays on; the reveal
   // continues to completion even if isNew flips back to false mid-stream
   // (which happens when agent_end lands while words are still arriving).
@@ -101,7 +104,6 @@ export function useWordReveal(content: string, isNew: boolean): string {
   // Historical messages (never started), reduced motion, or fully revealed →
   // show all text.
   if (!scan || revealedWords >= total) return content
-  if (revealedWords <= 0) return ""
   if (revealedWords > scan.boundaries.length) return content
   return content.slice(0, scan.boundaries[revealedWords - 1])
 }

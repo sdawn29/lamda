@@ -183,13 +183,13 @@ function ToolRunGroup({
     <div className="w-full text-xs">
       <button
         type="button"
-        className="group/row flex w-full min-w-0 items-center gap-1.5 text-left"
+        className="group/row flex w-fit max-w-full min-w-0 items-center gap-1.5 text-left"
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
         <GroupIcon
           className={cn(
-            "h-3.5 w-3.5 shrink-0",
+            "h-3 w-3 shrink-0",
             running
               ? "animate-pulse text-foreground/50"
               : errored
@@ -489,7 +489,7 @@ export const WorkingBlock = memo(function WorkingBlock({
       {/* Trigger row — looks like inline text, no card chrome */}
       <button
         type="button"
-        className="flex w-full min-w-0 items-center gap-1.5 text-left"
+        className="flex w-fit max-w-full min-w-0 items-center gap-1.5 text-left"
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
@@ -546,7 +546,7 @@ export const WorkingBlock = memo(function WorkingBlock({
 
         <ChevronRightIcon
           className={cn(
-            "ml-auto h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform duration-200",
+            "h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform duration-200",
             expanded && "rotate-90"
           )}
         />
