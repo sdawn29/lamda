@@ -7,6 +7,21 @@ import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provi
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 
 import { applyColorTheme } from "./apply-theme"
+import { applyFonts } from "./apply-fonts"
+import {
+  DEFAULT_UI_FONT_ID,
+  DEFAULT_CHAT_FONT_ID,
+  DEFAULT_MONO_FONT_ID,
+  DEFAULT_CODE_FONT_ID,
+  SANS_FONTS,
+  MONO_FONTS,
+  resolveAnyFontValue,
+} from "./font-options"
+import {
+  isGoogleFontId,
+  googleFontFamilyFromId,
+  loadGoogleFont,
+} from "./google-fonts-loader"
 import { BUILT_IN_THEMES, DEFAULT_THEME_ID, getThemeById } from "./registry"
 import {
   CUSTOM_THEME_ID,
@@ -75,6 +90,15 @@ type ThemeProviderState = {
     key: CodeTokenKey,
     value: string
   ) => void
+  /** Active font setting IDs. */
+  uiFontId: string
+  chatFontId: string
+  monoFontId: string
+  codeFontId: string
+  setUiFont: (id: string) => void
+  setChatFont: (id: string) => void
+  setMonoFont: (id: string) => void
+  setCodeFont: (id: string) => void
 }
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)"
@@ -210,6 +234,28 @@ export function ThemeProvider({
     [updateSetting, settings, activeColorTheme, setCustomData]
   )
 
+  const uiFontId = settings?.[APP_SETTINGS_KEYS.UI_FONT] ?? DEFAULT_UI_FONT_ID
+  const chatFontId = settings?.[APP_SETTINGS_KEYS.CHAT_FONT] ?? DEFAULT_CHAT_FONT_ID
+  const monoFontId = settings?.[APP_SETTINGS_KEYS.MONO_FONT] ?? DEFAULT_MONO_FONT_ID
+  const codeFontId = settings?.[APP_SETTINGS_KEYS.CODE_FONT] ?? DEFAULT_CODE_FONT_ID
+
+  const setUiFont = React.useCallback(
+    (id: string) => updateSetting.mutate({ key: APP_SETTINGS_KEYS.UI_FONT, value: id }),
+    [updateSetting]
+  )
+  const setChatFont = React.useCallback(
+    (id: string) => updateSetting.mutate({ key: APP_SETTINGS_KEYS.CHAT_FONT, value: id }),
+    [updateSetting]
+  )
+  const setMonoFont = React.useCallback(
+    (id: string) => updateSetting.mutate({ key: APP_SETTINGS_KEYS.MONO_FONT, value: id }),
+    [updateSetting]
+  )
+  const setCodeFont = React.useCallback(
+    (id: string) => updateSetting.mutate({ key: APP_SETTINGS_KEYS.CODE_FONT, value: id }),
+    [updateSetting]
+  )
+
   const applyMode = React.useCallback(
     (nextResolvedTheme: ResolvedMode) => {
       const root = document.documentElement
@@ -240,6 +286,18 @@ export function ThemeProvider({
     applyColorTheme(activeColorTheme)
     restoreTransitions?.()
   }, [activeColorTheme, disableTransitionOnChange])
+
+  React.useEffect(() => {
+    for (const id of [uiFontId, chatFontId, monoFontId, codeFontId]) {
+      if (isGoogleFontId(id)) loadGoogleFont(googleFontFamilyFromId(id))
+    }
+    applyFonts(
+      resolveAnyFontValue(uiFontId, SANS_FONTS),
+      resolveAnyFontValue(chatFontId, SANS_FONTS),
+      resolveAnyFontValue(monoFontId, MONO_FONTS),
+      resolveAnyFontValue(codeFontId, MONO_FONTS)
+    )
+  }, [uiFontId, chatFontId, monoFontId, codeFontId])
 
   React.useEffect(() => {
     const mediaQuery = window.matchMedia(COLOR_SCHEME_QUERY)
@@ -281,6 +339,14 @@ export function ThemeProvider({
       setCustomData,
       updateCustomToken,
       updateCustomCodeToken,
+      uiFontId,
+      chatFontId,
+      monoFontId,
+      codeFontId,
+      setUiFont,
+      setChatFont,
+      setMonoFont,
+      setCodeFont,
     }),
     [
       theme,
@@ -295,6 +361,14 @@ export function ThemeProvider({
       setCustomData,
       updateCustomToken,
       updateCustomCodeToken,
+      uiFontId,
+      chatFontId,
+      monoFontId,
+      codeFontId,
+      setUiFont,
+      setChatFont,
+      setMonoFont,
+      setCodeFont,
     ]
   )
 

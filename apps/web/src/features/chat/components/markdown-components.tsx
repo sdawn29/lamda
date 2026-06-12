@@ -56,7 +56,7 @@ function CodeBlock({
         <CopyButton code={code} />
         <Suspense
           fallback={
-            <pre className="overflow-x-auto bg-transparent px-4 py-3 font-mono text-sm leading-4 text-foreground">
+            <pre className="overflow-x-auto bg-transparent px-4 py-3 font-code text-sm leading-4 text-foreground">
               <code className="text-foreground">{code}</code>
             </pre>
           }
@@ -77,7 +77,7 @@ function CodeBlock({
   return (
     <div className="group/codeblock relative my-4 overflow-hidden rounded-lg border border-border">
       <CopyButton code={code} />
-      <pre className="overflow-x-auto bg-transparent px-4 py-3 font-mono text-sm leading-4 text-foreground">
+      <pre className="overflow-x-auto bg-transparent px-4 py-3 font-code text-sm leading-4 text-foreground">
         <code className="text-foreground">{code}</code>
       </pre>
     </div>

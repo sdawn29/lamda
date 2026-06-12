@@ -1,4 +1,16 @@
 export { ThemeProvider, useTheme } from "./theme-engine"
+export {
+  SANS_FONTS,
+  MONO_FONTS,
+  DEFAULT_UI_FONT_ID,
+  DEFAULT_CHAT_FONT_ID,
+  DEFAULT_MONO_FONT_ID,
+  DEFAULT_CODE_FONT_ID,
+  getFontById,
+  resolveFontLabel,
+  type FontOption,
+} from "./font-options"
+export { GoogleFontsBrowser } from "./components/google-fonts-browser"
 export { useSyntaxTheme } from "./use-syntax-theme"
 export {
   BUILT_IN_THEMES,

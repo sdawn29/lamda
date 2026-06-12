@@ -10,7 +10,13 @@ import {
   SelectValue,
 } from "@/shared/ui/select"
 import { useTheme } from "@/shared/components/theme-provider"
-import { ThemePicker, ThemeEditor } from "@/features/themes"
+import {
+  ThemePicker,
+  ThemeEditor,
+  SANS_FONTS,
+  MONO_FONTS,
+  GoogleFontsBrowser,
+} from "@/features/themes"
 import { useKeyboardShortcuts } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { ShortcutKbd } from "@/shared/ui/kbd"
@@ -30,7 +36,19 @@ const THEMES: { value: Theme; label: string; icon: React.ElementType }[] = [
 ]
 
 export function AppearanceSection() {
-  const { theme, setTheme, isCustomActive } = useTheme()
+  const {
+    theme,
+    setTheme,
+    isCustomActive,
+    uiFontId,
+    chatFontId,
+    monoFontId,
+    codeFontId,
+    setUiFont,
+    setChatFont,
+    setMonoFont,
+    setCodeFont,
+  } = useTheme()
   const { shortcuts } = useKeyboardShortcuts()
   const activeTheme = THEMES.find(({ value }) => value === theme) ?? THEMES[0]
   const ActiveThemeIcon = activeTheme.icon
@@ -93,6 +111,54 @@ export function AppearanceSection() {
           <ThemeEditor />
         </SettingsStack>
       )}
+
+      <SettingsRow
+        title="App UI font"
+        description="Font used for the application interface."
+      >
+        <GoogleFontsBrowser
+          value={uiFontId}
+          onChange={setUiFont}
+          bundledOptions={SANS_FONTS}
+          defaultCategory="sans-serif"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        title="Chat font"
+        description="Font used for chat message content."
+      >
+        <GoogleFontsBrowser
+          value={chatFontId}
+          onChange={setChatFont}
+          bundledOptions={SANS_FONTS}
+          defaultCategory="sans-serif"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        title="Monospace font"
+        description="Font used for the terminal and inline code."
+      >
+        <GoogleFontsBrowser
+          value={monoFontId}
+          onChange={setMonoFont}
+          bundledOptions={MONO_FONTS}
+          defaultCategory="monospace"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        title="Code font"
+        description="Font used for code blocks."
+      >
+        <GoogleFontsBrowser
+          value={codeFontId}
+          onChange={setCodeFont}
+          bundledOptions={MONO_FONTS}
+          defaultCategory="monospace"
+        />
+      </SettingsRow>
     </SettingsGroup>
   )
 }

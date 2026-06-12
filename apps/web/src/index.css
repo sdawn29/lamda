@@ -4,6 +4,8 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/jetbrains-mono";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/outfit";
+@import "@fontsource-variable/google-sans-flex";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -19,9 +21,11 @@
 }
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: "Geist Variable", sans-serif;
-  --font-mono: "JetBrains Mono Variable", monospace;
+  --font-heading: var(--app-font-sans);
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+  --font-chat: var(--app-font-chat);
+  --font-code: var(--app-font-code);
   /* ── Micro type scale ──────────────────────────────────────────────────
      Extends Tailwind's xs/sm ladder downward so the dense UI chrome (chat
      metadata, git rows, badges, section eyebrows) draws from named tiers
@@ -84,6 +88,14 @@
 
    Each level is ~1.5–2 stops darker than the one above it.
    ════════════════════════════════════════════════════════════════════ */
+
+/* ── Font family defaults (overridden at runtime by applyFonts) ────── */
+:root {
+  --app-font-sans: "Geist Variable", sans-serif;
+  --app-font-mono: "JetBrains Mono Variable", monospace;
+  --app-font-chat: var(--app-font-sans);
+  --app-font-code: var(--app-font-mono);
+}
 
 /* ── Jellybeans Light ─────────────────────────────────────────────── */
 :root {

@@ -53,7 +53,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     description: "Choose how the application looks and feels.",
     icon: Palette,
     group: "interface",
-    keywords: ["theme", "dark", "light", "system", "color", "mode"],
+    keywords: ["theme", "dark", "light", "system", "color", "mode", "font", "typeface", "monospace", "chat", "code"],
   },
   {
     slug: "chat",

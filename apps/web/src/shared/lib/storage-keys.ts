@@ -8,6 +8,10 @@ export const APP_SETTINGS_KEYS = {
   COLOR_THEME: "color_theme",
   CUSTOM_THEME: "custom_theme",
   KEYBOARD_SHORTCUTS: "keyboard_shortcuts",
+  UI_FONT: "ui_font",
+  CHAT_FONT: "chat_font",
+  MONO_FONT: "mono_font",
+  CODE_FONT: "code_font",
 } as const
 
 export type AppSettingKey = (typeof APP_SETTINGS_KEYS)[keyof typeof APP_SETTINGS_KEYS]

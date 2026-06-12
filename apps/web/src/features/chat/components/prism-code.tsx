@@ -269,7 +269,7 @@ function PrismCode({
   const codeTagProps = useMemo(
     () => ({
       style: {
-        fontFamily: "var(--font-mono, ui-monospace, monospace)",
+        fontFamily: "var(--app-font-code, ui-monospace, monospace)",
         fontWeight: "normal",
         fontSize,
       },
