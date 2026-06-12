@@ -513,14 +513,22 @@ export function ChatView({
         })
       },
       implementPlan: (relativePath) => {
-        // Always switch to Agent mode so the seeded prompt runs as an
-        // implementation. Idempotent if already in Agent, and avoids relying on
-        // the (possibly stale) selectedMode captured in this memoized closure.
+        // Switch to Agent mode first, then fill the chatbox only after the
+        // server confirms the mode change. This avoids a race where the user
+        // could submit before updateThreadMode completes, causing the agent to
+        // run in plan mode (no edit/write tools) and leaving FileChangesCard blank.
         setSelectedMode("agent")
-        updateThreadMode.mutate({ threadId, mode: "agent" })
         const prompt = `Implement the plan in @${relativePath}`
-        chatTextboxRef.current?.setValue(prompt)
-        chatTextboxRef.current?.focus()
+        updateThreadMode.mutateAsync({ threadId, mode: "agent" })
+          .then(() => {
+            chatTextboxRef.current?.setValue(prompt)
+            chatTextboxRef.current?.focus()
+          })
+          .catch(() => {
+            // Server update failed but local state is already agent — fill anyway.
+            chatTextboxRef.current?.setValue(prompt)
+            chatTextboxRef.current?.focus()
+          })
       },
       addFileCommentContext: (context) => {
         const current = chatTextboxRef.current?.getValue() ?? ""

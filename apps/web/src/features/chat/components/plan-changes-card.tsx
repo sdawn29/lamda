@@ -1,5 +1,5 @@
 import { memo, useMemo } from "react"
-import { EyeIcon, ListTodoIcon, PlayIcon } from "lucide-react"
+import { BotIcon, EyeIcon, ListTodoIcon } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
 import { FileIcon } from "@/shared/ui/file-icon"
@@ -94,7 +94,7 @@ export const PlanChangesCard = memo(function PlanChangesCard({
                 actions.implementPlan(first)
               }}
             >
-              <PlayIcon className="size-3.5" />
+              <BotIcon className="size-3.5" />
               Implement plan
             </Button>
           </div>

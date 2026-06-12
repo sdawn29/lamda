@@ -12,7 +12,8 @@ export interface ChatActions {
   openFile: (filePath: string, title?: string) => void
   /**
    * Switch the thread to Agent mode and seed the chat input with an
-   * "Implement the plan in <relativePath>" prompt. The user can edit or send.
+   * "Implement the plan in <relativePath>" prompt. The mode update is awaited
+   * before filling the input to avoid a race with the message send.
    */
   implementPlan: (relativePath: string) => void
   /** Add a file-line comment token to the current chat textbox. */

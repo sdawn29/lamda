@@ -1,9 +1,9 @@
 import { memo, useState } from "react"
 import {
+  BotIcon,
   ChevronRightIcon,
   EyeIcon,
   ListTodoIcon,
-  PlayIcon,
 } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
@@ -139,7 +139,7 @@ export const PlanSavedCard = memo(function PlanSavedCard({
               className="h-7 gap-1.5 bg-amber-600 text-white hover:bg-amber-600/90 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
               onClick={() => actions.implementPlan(relativePath)}
             >
-              <PlayIcon className="size-3.5" />
+              <BotIcon className="size-3.5" />
               Implement plan
             </Button>
           </div>
