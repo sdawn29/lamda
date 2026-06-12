@@ -123,6 +123,8 @@ export interface SessionEventHandlers {
   }) => void;
   onServerError: (event: SessionServerErrorEvent) => void;
   onTransportError?: (event: Event) => void;
+  /** Called with the numeric event id from each server message, for lastEventId tracking. */
+  onEventId?: (id: string) => void;
 }
 
 export interface SessionServerErrorEvent {
@@ -135,7 +137,10 @@ export function subscribeToSessionEvents(
 ) {
   const handleMessage = (event: MessageEvent) => {
     try {
-      const data = JSON.parse(event.data as string) as { type: string } & Record<string, unknown>
+      const data = JSON.parse(event.data as string) as { type: string; id?: number } & Record<string, unknown>
+      if (data.id !== undefined) {
+        handlers.onEventId?.(String(data.id))
+      }
       switch (data.type) {
         case "message_start":
           handlers.onMessageStart(data as SessionMessageStartEvent)

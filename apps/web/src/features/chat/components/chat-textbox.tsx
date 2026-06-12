@@ -650,7 +650,7 @@ export const ChatTextbox = memo(
             onSelect={handleSelectFile}
           />
 
-          <div className="px-2 pt-2 pb-1">
+          <div className="p-4">
             <RichInput
               ref={richInputRef}
               placeholder={placeholder}
@@ -736,10 +736,8 @@ export const ChatTextbox = memo(
             />
           </div>
 
-          <div className="mx-2 border-t border-border/50" />
-
-          <div className="flex items-center justify-between px-1.5 py-1.5">
-            <div className="flex items-center gap-0.5">
+          <div className="flex items-center justify-between rounded-b-2xl border-t border-border/40 bg-muted/40 px-4 py-2.5">
+            <div className="flex items-center gap-1">
               {onModeChange && (
                 <ModeCombobox selected={mode} onSelect={onModeChange} />
               )}
@@ -762,7 +760,7 @@ export const ChatTextbox = memo(
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 pr-0.5">
+            <div className="flex items-center gap-2">
               <ContextChart
                 contextUsage={contextUsage}
                 sessionId={sessionId}

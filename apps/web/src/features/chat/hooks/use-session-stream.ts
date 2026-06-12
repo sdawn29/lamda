@@ -351,6 +351,10 @@ export function useSessionStream({
   // happen after agent_end (e.g. server graceful shutdown between turns).
   const agentRunningRef = useRef(false)
 
+  // Last event id received from the server. Used to resume the stream from the
+  // correct position when reconnecting after a transient network drop.
+  const lastEventIdRef = useRef<string | undefined>(undefined)
+
   // Always-current callbacks — stored in a ref so the queue processor (which
   // is stable across renders) always calls the latest versions.
   const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved })
@@ -589,16 +593,28 @@ export function useSessionStream({
     let ws: WebSocket | null = null
     let unsubscribe: (() => void) | undefined
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    // Counts consecutive reconnect attempts while the agent is running.
+    // Reset to 0 whenever a server event is successfully received.
+    let reconnectAttempts = 0
+    const MAX_RECONNECT_ATTEMPTS = 3
 
-    async function connect() {
-      const socket = await openSessionWebSocket(sessionId)
+    async function connect(lastEventId?: string) {
+      const socket = await openSessionWebSocket(sessionId, lastEventId)
       if (doneFlag.current) {
         socket?.close()
         return
       }
       if (!socket) {
-        doneFlag.current = true
-        callbacksRef.current.onIsLoadingChange?.(false)
+        // Reconnect attempt failed to open the socket at all.
+        if (agentRunningRef.current) {
+          reconnectAttempts = 0
+          agentRunningRef.current = false
+          doneFlag.current = true
+          enqueueNow({ kind: "transport_error", lastPrompt: lastPromptRef.current })
+        } else {
+          doneFlag.current = true
+          callbacksRef.current.onIsLoadingChange?.(false)
+        }
         return
       }
 
@@ -778,6 +794,13 @@ export function useSessionStream({
             })
           },
 
+          onEventId: (id: string) => {
+            lastEventIdRef.current = id
+            // Reset the counter whenever a server event is received — consecutive
+            // failures is what we care about, not lifetime reconnects.
+            reconnectAttempts = 0
+          },
+
           onTransportError: () => {
             if (doneFlag.current) return
             if (!agentRunningRef.current) {
@@ -793,12 +816,29 @@ export function useSessionStream({
               }, 2000)
               return
             }
-            agentRunningRef.current = false
-            doneFlag.current = true
-            enqueueNow({
-              kind: "transport_error",
-              lastPrompt: lastPromptRef.current,
-            })
+            // Agent is running — attempt transparent reconnect using lastEventId
+            // so the stream resumes from where it dropped. Only surface the error
+            // to the user after MAX_RECONNECT_ATTEMPTS consecutive failures.
+            ws?.close()
+            ws = null
+            unsubscribe?.()
+            unsubscribe = undefined
+            if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+              reconnectAttempts = 0
+              agentRunningRef.current = false
+              doneFlag.current = true
+              enqueueNow({
+                kind: "transport_error",
+                lastPrompt: lastPromptRef.current,
+              })
+              return
+            }
+            const delay = Math.min(500 * Math.pow(2, reconnectAttempts), 8000)
+            reconnectAttempts++
+            reconnectTimer = setTimeout(() => {
+              reconnectTimer = null
+              if (!doneFlag.current) connect(lastEventIdRef.current).catch(console.debug)
+            }, delay)
           },
         })
     }
