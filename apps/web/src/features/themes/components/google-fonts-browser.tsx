@@ -19,14 +19,14 @@ import {
   type GoogleFontCategory,
 } from "../google-fonts-data"
 import { loadGoogleFont } from "../google-fonts-loader"
-import { SANS_FONTS, MONO_FONTS, resolveFontLabel, type FontOption } from "../font-options"
+import { resolveFontLabel, type FontOption } from "../font-options"
 
 // ── Lazy font loader via IntersectionObserver ────────────────────────────────
 
 const fontLoadedSet = new Set<string>()
 
 function useLazyFont(family: string | null) {
-  const ref = React.useRef<HTMLDivElement | null>(null)
+  const ref = React.useRef<HTMLButtonElement | null>(null)
   const [loaded, setLoaded] = React.useState(() =>
     family ? fontLoadedSet.has(family) : true
   )
