@@ -18,6 +18,7 @@ Human-facing documentation directory containing user guides, API references, arc
 | File | Purpose |
 |------|---------|
 | `index.md` | Documentation home page |
+| `quick-start.md` | 5-minute setup walkthrough |
 | `getting-started.md` | Initial setup and first-run guide |
 | `architecture.md` | System architecture overview |
 | `api.md` | REST API reference |
@@ -25,6 +26,7 @@ Human-facing documentation directory containing user guides, API references, arc
 | `settings.md` | Settings reference |
 | `cli.md` | Command-line interface |
 | `contributing.md` | Developer contribution guidelines |
+| `features/*.md` | User guides: workspaces, chat, git, terminal, tasks, settings, themes, MCP |
 
 ## Relationship to AGENTS.md
 

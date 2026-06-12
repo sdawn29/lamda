@@ -13,8 +13,8 @@ Thank you for your interest in contributing to lamda!
 ### Setup
 
 ```sh
-git clone <repository-url>
-cd lamda
+git clone https://github.com/sdawn29/lambda.git
+cd lambda
 npm install
 ```
 
@@ -103,12 +103,13 @@ Manual verification is expected. When adding features:
 
 ## Release Process
 
-Releases are automated via `release-please`:
+Releases are cut locally with `scripts/release.mjs`, which analyzes conventional commits since the last tag:
 
-1. Push commits with conventional format (`feat:`, `fix:`, etc.)
-2. `release-please` creates/updates a release PR
-3. Merge PR to trigger GitHub Release
-4. Artifacts uploaded automatically
+1. Push commits with conventional format (`feat:`, `fix:`, etc.) to `main`
+2. Run `npm run release:dry-run` to preview the version bump and changelog
+3. Run `npm run release` — bumps the version, updates `CHANGELOG.md`, syncs all workspace package versions, commits, tags, and pushes
+
+Pass `--patch`, `--minor`, or `--major` to force a specific bump instead of auto-detecting from commits.
 
 ## Code Style
 
@@ -119,6 +120,6 @@ Releases are automated via `release-please`:
 
 ## Getting Help
 
-- [docs/](docs/) — Full documentation
-- [AGENTS.md](AGENTS.md) — AI agent context
-- [GitHub Issues](https://github.com/snehasishdawn/lamda/issues) — Bug reports and questions
+- [docs/index.md](index.md) — Full documentation
+- [AGENTS.md](../AGENTS.md) — AI agent context
+- [GitHub Issues](https://github.com/sdawn29/lambda/issues) — Bug reports and questions

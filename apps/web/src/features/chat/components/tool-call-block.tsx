@@ -525,7 +525,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       todoArgs.status === "completed"
     return (
       <div
-        className={cn("flex items-center gap-1.5 text-sm", isNew && "animate-chat-message-in")}
+        className={cn("flex items-center gap-1.5 text-xs", isNew && "animate-chat-message-in")}
         style={isNew && entryDelayMs > 0 ? { animationDelay: `${entryDelayMs}ms` } : undefined}
       >
         {msg.status === "error" ? (
@@ -630,7 +630,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       {/* Trigger row — text accordion style */}
       <button
         type="button"
-        className="group/row flex w-fit max-w-full min-w-0 items-center gap-1.5 text-left"
+        className="group/row -mx-1.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-muted/40"
         onClick={toggle}
         aria-expanded={hasBody ? expanded : undefined}
       >
@@ -654,7 +654,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         )}
 
         <span className={cn(
-          "text-sm font-medium",
+          "text-xs font-medium",
           skillName ? "min-w-0 truncate" : "shrink-0",
           msg.status === "running"
             ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
@@ -668,7 +668,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         </span>
 
         {skillName ? null : displayFilePath ? (
-          <span className="flex min-w-0 flex-1 items-center gap-1 text-sm text-muted-foreground/40">
+          <span className="flex min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground/40">
             <FileIcon filename={displayFilePath} className="h-3 w-3 shrink-0 opacity-60" />
             <span className="truncate">{fileBasename(displayFilePath)}</span>
           </span>
@@ -676,7 +676,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
           <span
             className={cn(
               "min-w-0 flex-1 truncate text-muted-foreground/40",
-              normalizedToolName === "bash" ? "font-mono text-xs" : "text-sm"
+              normalizedToolName === "bash" ? "font-mono text-2xs" : "text-xs"
             )}
           >
             {summary}
@@ -684,13 +684,13 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         ) : null}
 
         {readLineRange && (
-          <span className="shrink-0 rounded bg-muted/50 px-1 py-px font-mono text-2xs tabular-nums text-muted-foreground/50">
+          <span className="shrink-0 font-mono text-2xs tabular-nums text-muted-foreground/40">
             {readLineRange}
           </span>
         )}
 
         {editCounts && (editCounts.added > 0 || editCounts.removed > 0) && (
-          <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-xs tabular-nums">
+          <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-2xs tabular-nums">
             {editCounts.added > 0 && (
               <span className="text-green-600 dark:text-green-400">
                 +<RollingTimerText text={String(editCounts.added)} />
@@ -705,7 +705,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         )}
 
         {writeLineCount !== null && writeLineCount > 0 && (
-          <span className="flex shrink-0 items-baseline font-mono text-xs tabular-nums">
+          <span className="flex shrink-0 items-baseline font-mono text-2xs tabular-nums">
             <span className="text-green-600 dark:text-green-400">
               +<RollingTimerText text={String(writeLineCount)} />
             </span>
@@ -732,7 +732,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         )}
       >
         <div className="overflow-hidden">
-          <div className="group/copy relative mt-2 overflow-hidden rounded-lg border border-border/50 bg-muted/20 shadow-xs">
+          <div className="group/copy relative mt-1.5 overflow-hidden rounded-lg border border-border/50 bg-muted/20 shadow-xs">
             <button
               type="button"
               onClick={handleCopy}

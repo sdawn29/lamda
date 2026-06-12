@@ -693,6 +693,17 @@ GET /session/:id/git/diff?file=src/index.ts&status=M
 
 ---
 
+### Get Commit History
+
+```http
+GET /session/:id/git/log
+GET /workspace/:id/git/log
+```
+
+Returns recent commits. The workspace-level endpoint is read-only and lets the UI show history without an active session.
+
+---
+
 ### Commit
 
 ```http
@@ -891,18 +902,69 @@ Connect via WebSocket to `/terminal`:
 GET /settings
 ```
 
+**Response**:
+```json
+{
+  "settings": { "theme": "catppuccin", "...": "..." }
+}
+```
+
 ---
 
-### Save Settings
+### Save Setting
 
 ```http
-POST /settings
+PUT /settings/:key
 Content-Type: application/json
 
 {
-  "theme": "dark",
-  "thinkingVisibility": "show"
+  "value": "catppuccin"
 }
+```
+
+---
+
+## Usage
+
+### Get AI Usage Stats
+
+```http
+GET /usage
+GET /usage?days=30
+GET /usage?from=2026-06-01&to=2026-06-12
+```
+
+Aggregated AI token and cost usage. Filters are mutually exclusive (`from`/`to` win over `days`):
+
+| Query Param | Description |
+|-------------|-------------|
+| `from` / `to` | Inclusive `YYYY-MM-DD` date range (local time); either bound may be omitted |
+| `days` | Last N days; omit or pass `0` for all-time |
+
+---
+
+## Local Models
+
+### List Local Providers
+
+```http
+GET /local-providers
+```
+
+---
+
+### Create or Update Local Provider
+
+```http
+PUT /local-providers/:id
+```
+
+---
+
+### Delete Local Provider
+
+```http
+DELETE /local-providers/:id
 ```
 
 ---

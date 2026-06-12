@@ -136,6 +136,18 @@ The mode is stored per thread and can be changed at any time between turns.
 
 ---
 
+## Agent Questions
+
+When the agent needs your input mid-turn (for example, choosing between two approaches), it can ask a multiple-choice question directly in the chat. Pick an option to let the agent continue, or answer with free text. Unanswered questions are highlighted so they don't get lost in the conversation.
+
+---
+
+## Todos
+
+The agent tracks its goals for a task as a todo list. Completed goals are shown inline in the chat as it works, so you can follow progress on multi-step changes at a glance.
+
+---
+
 ## Forking a Thread
 
 Fork lets you branch the conversation at any earlier user message and explore an alternative approach without losing the original history.
@@ -222,6 +234,7 @@ Manually trigger compaction:
 |----------|--------|
 | `Cmd/Ctrl + Enter` | Send message |
 | `Shift + Enter` | New line in input |
+| `↑` (empty input) | Recall last sent message |
 | `Cmd/Ctrl + K` | Open command palette |
 | `Cmd/Ctrl + Shift + S` | Search messages |
 | `Escape` | Cancel current operation |

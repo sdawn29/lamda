@@ -103,6 +103,16 @@ The `key` field supports three formats:
   { "type": "api_key", "key": "!security find-generic-password -ws 'anthropic'" }
   ```
 
+## Local Model Providers
+
+In addition to cloud providers, you can register local inference providers (e.g., an OpenAI-compatible server running on your machine):
+
+1. Go to **Settings** → **Providers** → **Local Models**
+2. Add a provider with its base URL and available models
+3. Local models appear in the model selector alongside cloud models
+
+Local providers are managed via the `/local-providers` API (see the [API Reference](api.md#local-models)). For slow local inference, consider raising `retry.provider.timeoutMs` — see [Settings](settings.md).
+
 ## Model Selection
 
 Models are available based on your configured providers and API keys. The model selector in the chat interface shows only models compatible with your authentication setup.

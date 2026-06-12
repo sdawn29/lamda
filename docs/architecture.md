@@ -69,6 +69,8 @@ React 19 + Vite application with feature modules:
 | Command Palette | `src/features/command-palette/` | Keyboard-driven command and file search |
 | File Tree | `src/features/file-tree/` | Workspace file browser |
 | MCP | `src/features/mcp/` | MCP server management UI |
+| Themes | `src/features/themes/` | Theming engine: built-in/custom themes, fonts, syntax palettes |
+| Onboarding | `src/features/onboarding/` | First-run onboarding flow |
 | Electron | `src/features/electron/` | Desktop IPC wrapper |
 
 **Shared components:**
@@ -93,14 +95,25 @@ Hono API server that:
 - `routes/lsp.ts` — LSP WebSocket bridge
 - `routes/mcp.ts` — MCP server management
 - `routes/tasks.ts` — Workspace task CRUD
-- `routes/file.ts` — File read endpoint
+- `routes/file.ts` — File read endpoint (range support, streaming)
 - `routes/auth.ts` — API key management
+- `routes/settings.ts` — Settings key/value store
+- `routes/terminal.ts` — Terminal WebSocket endpoint
+- `routes/usage.ts` — AI token/cost usage stats
+- `routes/local-models.ts` — Local model provider CRUD
+- `routes/health.ts` — Health check
 
 **Services:**
 - `services/session-service.ts` — Session management
-- `services/terminal-service.ts` — PTY management
+- `services/terminal-service.ts` — PTY management (persistent sessions with reattachment)
 - `services/language-service.ts` — LSP client lifecycle
+- `services/lsp-installer.ts` — Language server installation
 - `services/auth-service.ts` — API key management
+- `services/mcp-service.ts` — MCP server connection lifecycle
+- `services/models-config-service.ts` — Local model provider configuration
+- `services/question-registry.ts` — Pending agent questions (question tool)
+- `services/file-tree-service.ts` — Lazy file tree with directory watchers
+- `services/workspace-indexer.ts` — Workspace file indexing for search
 
 ## Packages
 
@@ -116,9 +129,10 @@ Drizzle ORM + SQLite persistence layer (file: `~/.lamda-code/db-v2.sqlite`):
 | `settings` | User preferences (key/value store) |
 | `workspace_files` | Indexed file tree per workspace (for search) |
 | `workspace_tasks` | User-defined shell command shortcuts per workspace |
-| `mcp_servers` | MCP server configurations per workspace |
+| `mcp_servers` | MCP server configurations (application-wide) |
 | `agent_turns` | Records of each agent turn with git checkpoint SHA |
 | `agent_turn_files` | Files touched in each turn (for revert-to-turn) |
+| `ai_usage` | Per-turn token and cost records for usage stats |
 
 ### `@lamda/git` (`packages/git/`)
 
@@ -238,9 +252,13 @@ Sessions are ephemeral — stored in memory and lost on server restart.
 
 - **Server state**: TanStack Query for API data (messages, git status, etc.)
 - **UI state**: Zustand stores (theme, sidebar, terminal tabs, main tabs, tasks)
-- **Persistence**: Zustand `persist` middleware with localStorage for UI state
+- **Persistence**: durable UI state and preferences are stored in the server's SQLite `settings` table (key/value store), not localStorage
 
 ## Communication Protocols
+
+### Authentication
+
+The server API and WebSocket upgrades are protected by token-based authentication. The desktop shell passes the token to the web UI at startup; WebSocket upgrade requests are also origin-checked (`file://` is allowed for the packaged desktop app).
 
 ### WebSocket (Session Streaming)
 

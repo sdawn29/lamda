@@ -12,8 +12,8 @@ Get up and running with lamda in 5 minutes.
 ## Step 1: Install
 
 ```bash
-git clone <repository-url>
-cd lamda
+git clone https://github.com/sdawn29/lambda.git
+cd lambda
 npm install
 ```
 
@@ -203,5 +203,5 @@ curl http://localhost:3001/health
 
 ## Getting Help
 
-- [GitHub Issues](https://github.com/snehasishdawn/lamda/issues) — Report bugs
+- [GitHub Issues](https://github.com/sdawn29/lambda/issues) — Report bugs
 - [docs/index.md](index.md) — Full documentation

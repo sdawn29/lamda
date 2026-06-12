@@ -16,6 +16,7 @@ Welcome to **lamda**, a local-first desktop coding workspace for running Pi codi
 | Terminal | [Terminal Guide](features/terminal.md) | Embedded shell access |
 | Tasks | [Tasks Guide](features/tasks.md) | Workspace shell command shortcuts |
 | Settings | [Settings Guide](features/settings.md) | Configuration and preferences |
+| Themes | [Themes Guide](features/themes.md) | Color themes and fonts |
 | MCP | [MCP Guide](features/mcp.md) | Model Context Protocol servers |
 | **Reference** | | |
 | API | [API Reference](api.md) | Server REST API endpoints |
@@ -41,8 +42,11 @@ Welcome to **lamda**, a local-first desktop coding workspace for running Pi codi
 | **Command Palette** | Keyboard-driven command and file search (`Cmd/Ctrl + K`) |
 | **Workspaces** | Organize multiple repositories with multiple conversation threads |
 | **Workspace Tasks** | One-click shell command shortcuts per workspace |
-| **LSP Integration** | Live diagnostics (errors and warnings) in the file viewer |
+| **LSP Integration** | Live diagnostics in the file viewer, with one-click language server installs |
 | **MCP Support** | Connect to Model Context Protocol servers for extended capabilities |
+| **Themes & Fonts** | Built-in color themes (Catppuccin, Nord, Tokyo Night, …), custom themes, and Google Fonts |
+| **Usage Tracking** | AI token and cost stats with date-range filtering |
+| **Local Models** | Manage local inference providers alongside cloud APIs |
 | **Local-First** | All data stored locally in SQLite (`~/.lamda-code/db-v2.sqlite`) |
 | **Multiple Providers** | Support for Anthropic, OpenAI, DeepSeek, Google Gemini, and more |
 
@@ -153,7 +157,7 @@ Configure your preferences:
 - **Provider configuration** — Add API keys for AI providers
 - **Model selection** — Choose which model to use
 - **Thinking level** — Control how much reasoning the agent does
-- **Theme** — Dark/light mode
+- **Appearance** — Color themes, fonts, and corner radius (see the [Themes Guide](features/themes.md))
 - **Retry configuration** — Adjust error handling behavior
 
 ### [MCP Servers](features/mcp.md)
@@ -199,21 +203,24 @@ npm install
 
 ## 📊 Project Status
 
-> **Status**: Early open-source release. Functional but evolving. Current version: **v0.4.0**
+> **Status**: Early open-source release. Functional but evolving. Current version: **v0.18.0**
 
 - ✅ Chat with real-time streaming via WebSocket
 - ✅ Thread modes: agent, ask, plan
 - ✅ Thread forking with git state restoration
-- ✅ Git workflow (status, diff, hunk staging, commit, branches, stashes, revert)
-- ✅ Embedded terminal with multi-tab support
+- ✅ Git workflow (status, diff, hunk staging, commit, branches, stashes, revert, workspace-level history)
+- ✅ Embedded terminal with persistent multi-tab sessions and auto-reconnect
 - ✅ Workspace/thread management with pinning and archiving
 - ✅ Workspace tasks (custom shell command shortcuts)
-- ✅ File tabs and file tree browser
+- ✅ File tabs, file tree browser, and Monaco code/diff viewers
 - ✅ Command palette (`Cmd/Ctrl + K`)
-- ✅ LSP diagnostics in the file viewer
+- ✅ LSP diagnostics with one-click language server installation
 - ✅ MCP server integration
+- ✅ Theming engine with built-in and custom themes, Google Fonts support
+- ✅ AI usage tracking (tokens and cost, with date-range filtering)
+- ✅ Local model provider management
+- ✅ Token-based authentication for the server API and WebSockets
 - ✅ Multiple AI providers (20+)
-- ✅ State management via Zustand
 - ⚠️ No automated test suite yet
 - ⚠️ macOS `arm64` packaging only (for now)
 
@@ -221,5 +228,5 @@ npm install
 
 ## 🆘 Getting Help
 
-- [GitHub Issues](https://github.com/snehasishdawn/lamda/issues) — Report bugs and request features
+- [GitHub Issues](https://github.com/sdawn29/lambda/issues) — Report bugs and request features
 - [AGENTS.md](../AGENTS.md) — Context for AI coding agents working on this codebase

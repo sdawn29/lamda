@@ -11,8 +11,8 @@
 
 ```sh
 # Clone the repository
-git clone <repository-url>
-cd lamda
+git clone https://github.com/sdawn29/lambda.git
+cd lambda
 
 # Install dependencies
 npm install

@@ -224,6 +224,10 @@ stash@{1}: WIP on feature: def456 Add dark mode
 2. Confirm in the dialog
 3. Stash is permanently deleted
 
+## Commit History
+
+The git panel shows the workspace's recent commit history, including when no chat session is active.
+
 ## Diff Statistics
 
 The header shows aggregate changes:

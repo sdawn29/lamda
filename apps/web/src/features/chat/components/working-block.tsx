@@ -149,48 +149,47 @@ function buildGroupDescription(
   return `${runDesc} · ${shown}${extra}`
 }
 
-/** Category + count breakdown for the working block collapsed header. */
-function getCategoryBreakdown(
-  messages: WorkingMessage[]
-): { groupId: ToolGroupId; count: number }[] {
-  const counts = new Map<ToolGroupId, number>()
-  for (const m of messages) {
-    if (m.role !== "tool") continue
-    const gid = toolGroupId(m as ToolMessage)
-    if (gid) counts.set(gid, (counts.get(gid) ?? 0) + 1)
-  }
-  return [...counts.entries()].map(([groupId, count]) => ({ groupId, count }))
-}
-
 /** A collapsed run of consecutive same-category tool calls inside a working block. */
 function ToolRunGroup({
   tools,
   rootPath,
+  live = false,
 }: {
   tools: ToolMessage[]
   rootPath?: string
+  /**
+   * Keeps the group in its loading state even when no call is in flight.
+   * Set for the trailing group of an active working block so the shimmer
+   * persists between calls, until the next entry / message block arrives.
+   */
+  live?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const groupId = toolGroupId(tools[0]) ?? "exploring"
   const meta = TOOL_GROUP_META[groupId]
   const GroupIcon = meta.icon
-  const running = tools.some((t) => t.status === "running")
-  const errored = tools.some((t) => t.status === "error")
+  const isLive = live || tools.some((t) => t.status === "running")
+  const errored = !isLive && tools.some((t) => t.status === "error")
   const errorCount = tools.filter((t) => t.status === "error").length
-  const description = buildGroupDescription(tools, groupId, rootPath)
+
+  // While live, surface what the group is doing right now; once settled,
+  // collapse to the full run summary ("read 4 files · a.ts, b.ts +2").
+  const description = isLive
+    ? argsSummary(tools[tools.length - 1].args, rootPath)
+    : buildGroupDescription(tools, groupId, rootPath)
 
   return (
     <div className="w-full text-xs">
       <button
         type="button"
-        className="group/row flex w-fit max-w-full min-w-0 items-center gap-1.5 text-left"
+        className="group/row -mx-1.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-muted/40"
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
         <GroupIcon
           className={cn(
             "h-3 w-3 shrink-0",
-            running
+            isLive
               ? "animate-pulse text-foreground/50"
               : errored
                 ? "text-destructive/60"
@@ -199,34 +198,27 @@ function ToolRunGroup({
         />
         <span
           className={cn(
-            "shrink-0 text-sm font-medium",
-            running
+            "shrink-0 text-xs font-medium",
+            isLive
               ? SHIMMER_TEXT_CLASS
               : errored
                 ? "text-destructive/70"
                 : "text-muted-foreground/55"
           )}
         >
-          {running ? meta.activeLabel : meta.doneLabel}
-        </span>
-        <span
-          className={cn(
-            "shrink-0 rounded-full px-1.5 py-px text-2xs tabular-nums",
-            running
-              ? "bg-primary/10 text-primary/60"
-              : errored
-                ? "bg-destructive/10 text-destructive/60"
-                : "bg-muted/60 text-muted-foreground/60"
-          )}
-        >
-          {tools.length}
+          {isLive ? meta.activeLabel : meta.doneLabel}
         </span>
         {description && (
-          <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground/40">
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate text-muted-foreground/40",
+              groupId === "terminal" ? "font-mono text-2xs" : "text-xs"
+            )}
+          >
             {description}
           </span>
         )}
-        {!running && errorCount > 0 && (
+        {!isLive && errorCount > 0 && (
           <span className="shrink-0 text-2xs tabular-nums text-destructive/50">
             {errorCount} err
           </span>
@@ -248,7 +240,7 @@ function ToolRunGroup({
         )}
       >
         <div className="overflow-hidden">
-          <div className="mt-1.5 ml-[3px] flex flex-col gap-1.5 border-l border-border/50 pl-3">
+          <div className="mt-1 ml-[5px] flex flex-col gap-1 border-l border-border/40 pl-3">
             {tools.map((t) => (
               <ToolCallBlock
                 key={t.toolCallId}
@@ -279,7 +271,8 @@ type WorkingEntry =
  */
 function buildWorkingEntries(
   messages: WorkingMessage[],
-  showThinking: boolean
+  showThinking: boolean,
+  keepTrailingGroup: boolean
 ): WorkingEntry[] {
   const out: WorkingEntry[] = []
   for (const m of messages) {
@@ -307,9 +300,13 @@ function buildWorkingEntries(
     }
     out.push({ kind: "tool", key: t.toolCallId, msg: t })
   }
-  // Single-call runs render as a plain tool row
-  return out.map((e) =>
-    e.kind === "run" && e.tools.length === 1
+  // Single-call runs render as a plain tool row — except a trailing run while
+  // the block is active, which stays grouped so it can carry the live state
+  // until the next entry arrives.
+  return out.map((e, i) =>
+    e.kind === "run" &&
+    e.tools.length === 1 &&
+    !(keepTrailingGroup && i === out.length - 1)
       ? { kind: "tool" as const, key: e.key, msg: e.tools[0] }
       : e
   )
@@ -457,13 +454,9 @@ export const WorkingBlock = memo(function WorkingBlock({
     () => messages.filter((m) => m.role === "tool").length,
     [messages]
   )
-  const categoryBreakdown = useMemo(
-    () => (!isActive ? getCategoryBreakdown(messages) : []),
-    [isActive, messages]
-  )
   const entries = useMemo(
-    () => buildWorkingEntries(messages, showThinking),
-    [messages, showThinking]
+    () => buildWorkingEntries(messages, showThinking, isActive),
+    [messages, showThinking, isActive]
   )
   const hasThinkingContent = messages.some(
     (m) =>
@@ -489,7 +482,7 @@ export const WorkingBlock = memo(function WorkingBlock({
       {/* Trigger row — looks like inline text, no card chrome */}
       <button
         type="button"
-        className="flex w-fit max-w-full min-w-0 items-center gap-1.5 text-left"
+        className="group/row -mx-1.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-muted/40"
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
@@ -501,8 +494,8 @@ export const WorkingBlock = memo(function WorkingBlock({
         )}
         <span
           className={cn(
-            "shrink-0 text-sm font-medium",
-            isActive ? "text-foreground/65" : "text-muted-foreground/70"
+            "shrink-0 text-xs font-medium",
+            isActive ? "text-foreground/65" : "text-muted-foreground/60"
           )}
         >
           {isActive ? (
@@ -519,28 +512,8 @@ export const WorkingBlock = memo(function WorkingBlock({
         </span>
 
         {!isActive && toolCount > 0 && (
-          <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground/40">
-            <span className="shrink-0 text-xs tabular-nums">
-              · {toolCount} {toolCount === 1 ? "tool" : "tools"}
-            </span>
-            {categoryBreakdown.length > 0 && (
-              <span className="flex shrink-0 items-center gap-1">
-                {categoryBreakdown.map(({ groupId, count }) => {
-                  const meta = TOOL_GROUP_META[groupId]
-                  const CatIcon = meta.icon
-                  return (
-                    <span
-                      key={groupId}
-                      className="flex items-center gap-0.5 text-muted-foreground/35"
-                      title={`${meta.doneLabel}: ${count}`}
-                    >
-                      <CatIcon className="h-2.5 w-2.5" />
-                      <span className="text-2xs tabular-nums">{count}</span>
-                    </span>
-                  )
-                })}
-              </span>
-            )}
+          <span className="shrink-0 text-2xs tabular-nums text-muted-foreground/40">
+            · {toolCount} {toolCount === 1 ? "tool" : "tools"}
           </span>
         )}
 
@@ -560,8 +533,8 @@ export const WorkingBlock = memo(function WorkingBlock({
         )}
       >
         <div className="overflow-hidden">
-          <div className="mt-2 ml-[3px] flex flex-col gap-2 border-l border-border/50 pl-4">
-            {entries.map((entry) => {
+          <div className="mt-1.5 ml-[5px] flex flex-col gap-1 border-l border-border/40 pl-3.5">
+            {entries.map((entry, idx) => {
               if (entry.kind === "thinking") {
                 return (
                   <ThinkingBlock
@@ -577,6 +550,12 @@ export const WorkingBlock = memo(function WorkingBlock({
                     key={entry.key}
                     tools={entry.tools}
                     rootPath={rootPath}
+                    live={
+                      isActive &&
+                      !pendingQuestion &&
+                      !hasFinalThinking &&
+                      idx === entries.length - 1
+                    }
                   />
                 )
               }

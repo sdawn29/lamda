@@ -141,6 +141,10 @@ Drag the panel borders to resize:
 - Horizontal resize changes terminal width
 - Vertical resize changes terminal height
 
+## Persistent Sessions
+
+Terminal sessions are persistent: the PTY lives on the server and survives page reloads and brief disconnects. When you reopen the terminal panel or reload the app, existing tabs reattach to their running sessions with scrollback intact. Idle sessions are cleaned up by the server after their tab is closed.
+
 ## Connection Status
 
 ### Connected
@@ -152,7 +156,11 @@ Drag the panel borders to resize:
 
 - Red indicator on tab
 - "Disconnected" message
-- Create a new tab to reconnect
+- The client sends WebSocket heartbeats and reconnects automatically; the tab reattaches to its running session once the server is reachable again
+
+## Clickable Links
+
+URLs in terminal output are detected automatically — `Cmd/Ctrl + Click` a link to open it in your browser.
 
 ## Shell Selection
 

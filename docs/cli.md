@@ -104,17 +104,12 @@ PORT=3002 npm run dev -w @lamda/server
 
 ## Release Management
 
-### Sync Version
-
 ```sh
-npm run release:sync-version
+npm run release            # Auto-detect bump type from conventional commits
+npm run release:dry-run    # Preview without making changes
+node scripts/release.mjs --patch   # Force patch bump
+node scripts/release.mjs --minor   # Force minor bump
+node scripts/release.mjs --major   # Force major bump
 ```
 
-Syncs version across all `package.json` files from root.
-
-### Release Flow
-
-1. Push conventional commits to `main`
-2. `release-please` creates/updates release PR
-3. Merge PR to trigger GitHub Release
-4. Artifacts uploaded to GitHub Releases
+The release script analyzes conventional commits since the last tag, bumps the version, updates `CHANGELOG.md`, syncs all workspace `package.json` versions, then commits, tags, and pushes to origin.

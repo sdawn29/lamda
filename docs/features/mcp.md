@@ -230,19 +230,9 @@ Agent uses: read_file
   └─ Returns: File contents
 ```
 
-## Per-Workspace Configuration
+## Configuration Scope
 
-### Workspace-Specific Servers
-
-MCP servers can be configured per workspace:
-
-1. Open a workspace
-2. Click **MCP** in the title bar
-3. Configure servers for this workspace only
-
-### Default Configuration
-
-When no workspace is specified, servers are available globally across all workspaces.
+MCP servers are configured application-wide: a server added once is available in every workspace. Each server can be enabled or disabled individually without removing its configuration.
 
 ## Troubleshooting
 

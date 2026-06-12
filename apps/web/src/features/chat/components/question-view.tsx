@@ -1,28 +1,27 @@
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   CheckIcon,
   ChevronLeftIcon,
-  ChevronRightIcon,
   CornerDownLeftIcon,
-  SparklesIcon,
+  XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/shared/lib/utils"
-import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Textarea } from "@/shared/ui/textarea"
-import { Kbd, KbdGroup } from "@/shared/ui/kbd"
+import { Kbd } from "@/shared/ui/kbd"
 import { LoadingSpinner } from "@/shared/ui/loading-spinner"
 import { submitQuestionAnswer } from "../api"
 import type { ActiveQuestion, Question } from "../lib/active-question"
 
 const OTHER_LABEL = "Other"
+
+/** Sent in place of an answer when the user closes the question UI. */
+const DISMISS_ANSWER =
+  "[User dismissed the question without answering. Continue without their input.]"
+
+/** Letter shortcuts shown on options — a, b, c, … pressed to toggle them. */
+const OPTION_KEYS = "abcdefghijklmnopqrstuvwxyz"
 
 interface QuestionState {
   selected: string[]
@@ -76,20 +75,20 @@ function OptionRow({
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        "group/opt relative flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left",
-        "transition-[background-color,border-color,box-shadow] duration-150 outline-none",
+        "group/opt flex w-full items-start gap-2 rounded-lg px-2 py-1 text-left",
+        "transition-colors duration-150 outline-none",
         "focus-visible:ring-2 focus-visible:ring-ring/40",
         selected
-          ? "border-primary/50 bg-primary/[0.06] ring-1 ring-primary/25 ring-inset dark:bg-primary/[0.08]"
-          : "border-border bg-background hover:border-primary/30 hover:bg-muted/50"
+          ? "bg-primary/[0.07] dark:bg-primary/[0.1]"
+          : "hover:bg-muted/60"
       )}
     >
       <span
         className={cn(
-          "flex size-4 shrink-0 items-center justify-center border transition-all duration-150",
-          multi ? "rounded-[5px]" : "rounded-full",
+          "mt-0.5 flex size-3.5 shrink-0 items-center justify-center border transition-all duration-150",
+          multi ? "rounded-[4px]" : "rounded-full",
           selected
-            ? "scale-100 border-primary bg-primary text-primary-foreground"
+            ? "border-primary bg-primary text-primary-foreground"
             : "border-muted-foreground/35 bg-transparent group-hover/opt:border-primary/50"
         )}
       >
@@ -102,20 +101,20 @@ function OptionRow({
         />
       </span>
 
-      <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1.5">
-        <span className="text-xs font-medium text-foreground">{label}</span>
+      <span className="min-w-0 flex-1 text-xs leading-snug">
+        <span className="font-medium text-foreground">{label}</span>
         {description && (
-          <span className="text-[0.6875rem] leading-snug text-muted-foreground">
-            {description}
-          </span>
+          <span className="text-muted-foreground"> — {description}</span>
         )}
       </span>
 
       {hintKey && (
         <Kbd
           className={cn(
-            "transition-opacity",
-            selected ? "opacity-0" : "opacity-60 group-hover/opt:opacity-100"
+            "mt-px shrink-0 transition-opacity",
+            selected
+              ? "bg-primary/15 text-primary opacity-100"
+              : "opacity-60 group-hover/opt:opacity-100"
           )}
         >
           {hintKey}
@@ -136,7 +135,11 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
     questions.map(emptyState)
   )
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  // Which resolution is in flight — sending the answers or dismissing the tool.
+  const [pendingAction, setPendingAction] = useState<"send" | "dismiss" | null>(
+    null
+  )
+  const isSubmitting = pendingAction !== null
   const otherRef = useRef<HTMLTextAreaElement>(null)
 
   const update = useCallback((qi: number, next: Partial<QuestionState>) => {
@@ -193,15 +196,10 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
   const activeAnswered = isAnswered(activeState)
   const isFirstQuestion = currentIndex === 0
   const isLastQuestion = currentIndex === questions.length - 1
-  const footerHint = multiQuestion
-    ? `${answeredCount}/${questions.length} answered`
-    : allAnswered
-      ? "Sends your answer to the agent"
-      : "Select an option to continue"
 
   const handleSubmit = useCallback(async () => {
     if (!allAnswered || isSubmitting) return
-    setIsSubmitting(true)
+    setPendingAction("send")
     try {
       await submitQuestionAnswer(
         sessionId,
@@ -211,27 +209,53 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
       // Leave the submitting state on — the view unmounts once the tool resolves
       // and the running question clears from the stream.
     } catch (err) {
-      setIsSubmitting(false)
+      setPendingAction(null)
       toast.error("Couldn't send your answer", {
         description: err instanceof Error ? err.message : "Please try again.",
       })
     }
   }, [allAnswered, isSubmitting, sessionId, toolCallId, questions, states])
 
+  const handleDismiss = useCallback(async () => {
+    if (isSubmitting) return
+    setPendingAction("dismiss")
+    try {
+      await submitQuestionAnswer(sessionId, toolCallId, DISMISS_ANSWER)
+      // View unmounts once the tool resolves, same as a regular answer.
+    } catch (err) {
+      setPendingAction(null)
+      toast.error("Couldn't dismiss the question", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      })
+    }
+  }, [isSubmitting, sessionId, toolCallId])
+
+  const goTo = useCallback(
+    (idx: number) => {
+      setCurrentIndex(Math.min(Math.max(idx, 0), questions.length - 1))
+    },
+    [questions.length]
+  )
+
   const handleNext = useCallback(() => {
     if (!activeAnswered) return
-    setCurrentIndex((idx) => Math.min(idx + 1, questions.length - 1))
-  }, [activeAnswered, questions.length])
+    goTo(currentIndex + 1)
+  }, [activeAnswered, currentIndex, goTo])
 
   const handleBack = useCallback(() => {
-    setCurrentIndex((idx) => Math.max(idx - 1, 0))
-  }, [])
+    goTo(currentIndex - 1)
+  }, [currentIndex, goTo])
 
   const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLDivElement>) => {
+    (e: globalThis.KeyboardEvent) => {
+      if (e.isComposing) return
       const inText =
         e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLInputElement
+        e.target instanceof HTMLInputElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      // The listener is window-level — leave unrelated text fields (e.g. a
+      // search box elsewhere in the app) completely alone.
+      if (inText && e.target !== otherRef.current) return
 
       // ⌘/Ctrl+Enter submits from anywhere, including the free-text field.
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -240,18 +264,48 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
         return
       }
 
-      if (multiQuestion && !inText && e.key === "Enter") {
+      // Plain Enter advances (or sends on the last question). Works inside the
+      // free-text field too; Shift+Enter still inserts a newline there.
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault()
         if (isLastQuestion) void handleSubmit()
         else handleNext()
         return
       }
 
-      // 1–9 pick an option for the visible question (ignored while typing).
-      if (!inText && /^[1-9]$/.test(e.key)) {
+      if (inText) return
+
+      // Esc closes the question and lets the agent continue unanswered.
+      // Ignored while typing in the free-text field to protect drafts.
+      if (e.key === "Escape") {
+        e.preventDefault()
+        void handleDismiss()
+        return
+      }
+
+      // ←/→ move between questions without touching the buttons.
+      if (multiQuestion && e.key === "ArrowLeft") {
+        e.preventDefault()
+        handleBack()
+        return
+      }
+      if (multiQuestion && e.key === "ArrowRight") {
+        e.preventDefault()
+        handleNext()
+        return
+      }
+
+      // a, b, c, … toggle the matching option for the visible question
+      // (ignored while typing and when a modifier is held, e.g. ⌘A).
+      if (
+        /^[a-z]$/i.test(e.key) &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey
+      ) {
         const q = activeQuestion
-        const idx = Number(e.key) - 1
-        if (idx < q.options.length) {
+        const idx = OPTION_KEYS.indexOf(e.key.toLowerCase())
+        if (idx >= 0 && idx < q.options.length) {
           e.preventDefault()
           toggleOption(currentIndex, q.options[idx].label, q.multiSelect)
         } else if (idx === q.options.length) {
@@ -263,6 +317,8 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
     [
       activeQuestion,
       currentIndex,
+      handleBack,
+      handleDismiss,
       handleNext,
       handleSubmit,
       isLastQuestion,
@@ -272,47 +328,92 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
     ]
   )
 
+  // Window-level listener: the shortcuts work as soon as the question appears,
+  // without requiring focus to be inside the card first.
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [handleKeyDown])
+
+  const footerHint = multiQuestion
+    ? `${answeredCount}/${questions.length} answered`
+    : allAnswered
+      ? "⏎ to send"
+      : `a–${OPTION_KEYS[Math.min(activeQuestion.options.length, OPTION_KEYS.length - 1)]} to select`
+
   return (
     <div
-      onKeyDown={handleKeyDown}
       className={cn(
-        "flex w-full flex-col overflow-hidden rounded-2xl border border-input bg-card shadow-sm",
+        "flex w-full flex-col rounded-2xl border border-input bg-card shadow-sm",
         "animate-in duration-300 fade-in-0 slide-in-from-bottom-2"
       )}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 px-2.5 py-1.5">
-        <SparklesIcon className="size-3 shrink-0 text-primary" />
-        <span className="min-w-0 flex-1 truncate text-[0.6875rem] font-medium text-foreground">
-          {multiQuestion ? "A few questions for you" : "A quick question"}
-        </span>
-        {multiQuestion && (
-          <span className="shrink-0 text-[0.625rem] text-muted-foreground tabular-nums">
-            {currentIndex + 1}/{questions.length}
-          </span>
+      {/* Active question — keyed so each step fades in. */}
+      <div
+        key={currentIndex}
+        className={cn(
+          "flex max-h-[min(50vh,22rem)] flex-col gap-1.5 overflow-y-auto pt-2.5",
+          "animate-in duration-150 fade-in-0"
         )}
-      </div>
-
-      <div className="mx-2 border-t border-border/50" />
-
-      {/* Active question */}
-      <div className="flex max-h-[min(55vh,26rem)] flex-col gap-1.5 overflow-y-auto px-2.5 py-2">
-        <p className="text-xs leading-snug font-medium text-foreground">
-          <Badge
-            variant="outline"
-            className="mr-1.5 align-[1px] text-3xs font-semibold tracking-wider text-muted-foreground uppercase"
-          >
-            {activeQuestion.header}
-          </Badge>
-          {activeQuestion.question}
-          {activeQuestion.multiSelect && (
-            <span className="ml-1.5 text-[0.625rem] font-normal text-muted-foreground">
-              (choose any)
+      >
+        <div className="flex items-baseline justify-between gap-3 px-3">
+          <p className="min-w-0 text-xs leading-snug font-medium text-foreground">
+            <span className="mr-1.5 text-3xs font-semibold tracking-wider text-muted-foreground uppercase">
+              {activeQuestion.header}
             </span>
-          )}
-        </p>
+            {activeQuestion.question}
+            {activeQuestion.multiSelect && (
+              <span className="ml-1.5 text-3xs font-normal text-muted-foreground">
+                choose any
+              </span>
+            )}
+          </p>
+          <div className="flex shrink-0 translate-y-[-1px] items-center gap-1.5">
+            {multiQuestion && (
+              /* Step dots — clickable to jump between questions. */
+              <div className="flex items-center gap-1">
+                {questions.map((q, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-label={`Go to question ${i + 1}: ${q.header}`}
+                    aria-current={i === currentIndex ? "step" : undefined}
+                    onClick={() => goTo(i)}
+                    className="group/step flex h-4 items-center outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  >
+                    <span
+                      className={cn(
+                        "h-1 rounded-full transition-all duration-200",
+                        i === currentIndex
+                          ? "w-3.5 bg-primary"
+                          : isAnswered(states[i])
+                            ? "w-1.5 bg-primary/40 group-hover/step:bg-primary/60"
+                            : "w-1.5 bg-muted-foreground/25 group-hover/step:bg-muted-foreground/40"
+                      )}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleDismiss}
+              disabled={isSubmitting}
+              aria-label="Dismiss without answering"
+              title="Dismiss without answering (Esc)"
+              className={cn(
+                "flex size-4 items-center justify-center rounded-sm text-muted-foreground/60",
+                "transition-colors outline-none hover:text-foreground",
+                "focus-visible:ring-2 focus-visible:ring-ring/40",
+                "disabled:pointer-events-none disabled:opacity-50"
+              )}
+            >
+              <XIcon className="size-3.5" />
+            </button>
+          </div>
+        </div>
 
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col px-1 pb-1">
           {activeQuestion.options.map((opt, oi) => (
             <OptionRow
               key={opt.label}
@@ -320,7 +421,7 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
               description={opt.description}
               multi={activeQuestion.multiSelect}
               selected={activeState.selected.includes(opt.label)}
-              hintKey={String(oi + 1)}
+              hintKey={OPTION_KEYS[oi]}
               onSelect={() =>
                 toggleOption(
                   currentIndex,
@@ -332,10 +433,10 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
           ))}
           <OptionRow
             label={OTHER_LABEL}
-            description="Write your own answer"
+            description="write your own"
             multi={activeQuestion.multiSelect}
             selected={activeState.otherActive}
-            hintKey={String(activeQuestion.options.length + 1)}
+            hintKey={OPTION_KEYS[activeQuestion.options.length]}
             onSelect={() =>
               toggleOther(currentIndex, activeQuestion.multiSelect)
             }
@@ -347,34 +448,32 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
               onChange={(e) =>
                 update(currentIndex, { otherText: e.target.value })
               }
-              placeholder="Type your answer..."
+              placeholder="Type your answer…"
               className={cn(
-                "min-h-12 resize-none text-xs",
-                "animate-in duration-200 fade-in-0 slide-in-from-top-1"
+                "mx-2 mt-1 min-h-12 w-auto resize-none rounded-lg text-xs",
+                "animate-in duration-150 fade-in-0"
               )}
             />
           )}
         </div>
       </div>
 
-      <div className="mx-2 border-t border-border/50" />
-
       {/* Footer */}
-      <div className="flex items-center justify-between gap-3 px-2.5 py-1.5">
-        <span className="truncate text-[0.625rem] text-muted-foreground">
+      <div className="flex items-center justify-between gap-3 px-3 pb-2">
+        <span className="truncate text-3xs text-muted-foreground">
           {footerHint}
         </span>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1">
           {multiQuestion && (
             <Button
               size="sm"
               variant="ghost"
               onClick={handleBack}
               disabled={isFirstQuestion || isSubmitting}
-              className="px-2"
+              aria-label="Back"
+              className="size-7 p-0"
             >
               <ChevronLeftIcon />
-              Back
             </Button>
           )}
           {multiQuestion && !isLastQuestion ? (
@@ -382,34 +481,23 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
               size="sm"
               onClick={handleNext}
               disabled={!activeAnswered || isSubmitting}
-              className="shrink-0"
+              className="h-7 px-2.5 text-xs"
             >
               Next
-              <ChevronRightIcon />
             </Button>
           ) : (
             <Button
               size="sm"
               onClick={handleSubmit}
               disabled={!allAnswered || isSubmitting}
-              className="shrink-0"
+              className="h-7 px-2.5 text-xs"
             >
-              {isSubmitting ? (
+              {pendingAction === "send" ? (
                 <LoadingSpinner size="sm" />
               ) : (
-                <CornerDownLeftIcon />
+                <CornerDownLeftIcon className="size-3" />
               )}
               Send
-              {!isSubmitting && (
-                <KbdGroup className="ml-0.5">
-                  <Kbd className="bg-primary-foreground/15 text-primary-foreground/90">
-                    ⌘
-                  </Kbd>
-                  <Kbd className="bg-primary-foreground/15 text-primary-foreground/90">
-                    ⏎
-                  </Kbd>
-                </KbdGroup>
-              )}
             </Button>
           )}
         </div>

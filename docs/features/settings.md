@@ -288,21 +288,19 @@ Project settings in `.pi/settings.json` override global settings:
 
 ## Appearance
 
+Appearance has two independent axes: **mode** (Light / Dark / System) and **color theme** (which palette fills the design tokens).
+
 ### Themes
 
-| Theme | Description |
-|-------|-------------|
-| **Dark** | Dark background (default) |
-| **Light** | Light background |
-| **System** | Follow system preference |
+Built-in color themes include Jellybeans (default), Graphite, macOS, Nord, Rosé Pine, Solarized, Catppuccin, Cursor Anysphere, and Tokyo Night. You can also create a fully custom theme with the per-token theme editor.
 
-### Font Size
+The active theme also drives code-block syntax highlighting and the terminal color scheme.
 
-Adjust UI text size:
-- **Small** — Compact UI
-- **Medium** — Default
-- **Large** — Larger text
-- **Extra Large** — Accessibility
+See the [Themes Guide](themes.md) for details.
+
+### Fonts
+
+Choose the UI (sans) and code (mono) fonts in **Settings** → **Appearance**. Bundled options include Geist, Outfit, and JetBrains Mono, or browse and apply any font from Google Fonts.
 
 ## Data Management
 

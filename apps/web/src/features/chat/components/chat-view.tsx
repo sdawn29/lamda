@@ -547,6 +547,7 @@ export function ChatView({
     visibleMessages,
     hasConversationHistory,
     isLoading,
+    isLoadingMessages,
     isCompacting,
     compactionReason,
     pendingError,
@@ -868,12 +869,24 @@ export function ChatView({
   // Otherwise, scroll to bottom (new thread behavior).
   // useLayoutEffect runs before the browser paints, so scroll position is
   // applied atomically with the DOM update — no one-frame flash of wrong position.
+  //
+  // The restore is deferred until the thread's messages have rendered: the
+  // paginated fetch is async, and applying a saved scrollTop against a
+  // still-empty container clamps it to 0 — stranding the view at the oldest
+  // message once content arrives (the auto-scroll effect below only recovers
+  // when pinned). Guarded by a ref so it runs exactly once per session.
+  const scrollRestoredSessionRef = useRef<string | null>(null)
   useLayoutEffect(() => {
-    programmaticScrollRef.current = false
-    pinnedRef.current = true
-
+    if (scrollRestoredSessionRef.current === sessionId) return
     const el = scrollContainerRef.current
     if (!el) return
+    // Wait for the initial (most-recent) page to land. A genuinely empty
+    // thread settles with isLoadingMessages false and proceeds.
+    if (groupedMessages.length === 0 && isLoadingMessages) return
+    scrollRestoredSessionRef.current = sessionId
+
+    programmaticScrollRef.current = false
+    pinnedRef.current = true
 
     // Check if this thread has been visited before
     // First check query cache, then localStorage
@@ -912,7 +925,14 @@ export function ChatView({
     // here since pinnedRef drives the auto-scroll effect, not showScrollButton).
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     setShowScrollButton(distanceFromBottom >= 80)
-  }, [threadId, sessionId, queryClient, syncEngine])
+  }, [
+    threadId,
+    sessionId,
+    queryClient,
+    syncEngine,
+    groupedMessages.length,
+    isLoadingMessages,
+  ])
 
   useLayoutEffect(() => {
     if (!pinnedRef.current || groupedMessages.length === 0) return
