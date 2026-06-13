@@ -166,6 +166,31 @@ export const aiUsage = sqliteTable("ai_usage", {
   createdAt: integer("created_at").notNull(),
 })
 
+// ── Agent Memories ────────────────────────────────────────────────────────────
+
+/**
+ * Durable facts the agent has learned. `user` scope applies to every workspace;
+ * `workspace` scope is tied to one workspace and cascades away with it.
+ */
+export const agentMemories = sqliteTable("agent_memories", {
+  id: text("id").primaryKey(),
+  scope: text("scope", { enum: ["user", "workspace"] }).notNull(),
+  workspaceId: text("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  category: text("category"),
+  source: text("source", { enum: ["agent", "healing", "user"] })
+    .notNull()
+    .default("agent"),
+  // Pinned memories form the always-on "core" injected into every session,
+  // regardless of relevance to the current prompt.
+  pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  lastUsedAt: integer("last_used_at"),
+  useCount: integer("use_count").notNull().default(0),
+})
+
 // ── MCP Servers ───────────────────────────────────────────────────────────────
 
 export const workspaceTasks = sqliteTable("workspace_tasks", {

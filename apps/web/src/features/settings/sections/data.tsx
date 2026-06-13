@@ -37,7 +37,7 @@ export function DataSection() {
       <SettingsGroup>
         <SettingsRow
           title="Data folder"
-          description={<span className="font-mono">~/.lambda-code</span>}
+          description={<span className="font-mono">~/.lamda</span>}
         >
           <Button
             variant="outline"

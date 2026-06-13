@@ -7,7 +7,12 @@ import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
 
 import { useAppSettings } from "../queries"
 import { useUpdateAppSetting } from "../mutations"
-import { SettingsGroup, SettingsStack } from "../components/settings-ui"
+import {
+  SettingsGroup,
+  SettingsRow,
+  SettingsStack,
+} from "../components/settings-ui"
+import { ModelSetting } from "../components/model-setting"
 
 const DEFAULT_COMMIT_PROMPT = `Generate a git commit message for the following staged diff. Follow the conventional commits format (e.g. "feat: ...", "fix: ...", "refactor: ..."). Use an imperative verb. Be concise — the subject line should be under 72 characters. If needed, add a blank line followed by a short body. Reply with ONLY the commit message, no extra explanation.\n\n{diff}`
 
@@ -60,6 +65,12 @@ export function GitSection() {
 
   return (
     <SettingsGroup>
+      <SettingsRow
+        title="Model"
+        description="Model used to generate commit messages. Defaults to your active chat model."
+      >
+        <ModelSetting settingKey={APP_SETTINGS_KEYS.COMMIT_MESSAGE_MODEL} />
+      </SettingsRow>
       <SettingsStack
         title="Prompt template"
         description={

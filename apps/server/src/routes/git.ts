@@ -43,10 +43,12 @@ import {
   getAgentTurnsFromId,
   deleteAgentTurnsFrom,
   getWorkspace,
+  getAllSettings,
 } from "@lamda/db";
 import { store } from "../store.js";
 import { gitCwd } from "../services/session-service.js";
 import { sessionEvents } from "../session-events.js";
+import { parseModelKey } from "./settings.js";
 
 const git = new Hono();
 
@@ -208,9 +210,18 @@ git.post("/session/:id/git/generate-commit-message", async (c) => {
       { error: "No staged changes to generate a message for" },
       400,
     );
+  // Model is configured in Settings → Git; an empty/absent value uses the
+  // default model.
+  const { provider, model } = parseModelKey(
+    getAllSettings()["commit_message_model"],
+  );
   try {
     return c.json({
-      message: await generateCommitMessage(diff, { cwd }, body.promptTemplate),
+      message: await generateCommitMessage(
+        diff,
+        { cwd, provider, model },
+        body.promptTemplate,
+      ),
     });
   } catch (err) {
     return c.json(

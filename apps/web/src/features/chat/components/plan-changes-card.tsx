@@ -7,7 +7,7 @@ import { SectionLabel } from "@/shared/ui/section-label"
 import { useChatActions } from "../contexts/chat-actions-context"
 import type { TurnSummary } from "@/features/git/api"
 
-const PLAN_DIR_PREFIX = ".agents/plans/"
+const PLAN_DIR_PREFIX = ".lamda/plans/"
 
 interface PlanChangesCardProps {
   /** Absolute path to the workspace root, used to compute file paths to open. */

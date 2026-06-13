@@ -18,6 +18,46 @@ export async function updateAppSetting(
   })
 }
 
+// ── Agent memories ──────────────────────────────────────────────────────────────
+
+export type MemoryScope = "user" | "workspace"
+export type MemorySource = "agent" | "healing" | "user"
+
+export interface MemoryItem {
+  id: string
+  scope: MemoryScope
+  workspaceId: string | null
+  title: string
+  content: string
+  category: string | null
+  source: MemorySource
+  pinned: boolean
+  createdAt: number
+  updatedAt: number
+  lastUsedAt: number | null
+  useCount: number
+}
+
+export async function fetchMemories(signal?: AbortSignal): Promise<MemoryItem[]> {
+  const res = await apiFetch<{ memories: MemoryItem[] }>("/memories", { signal })
+  return res.memories
+}
+
+export async function updateMemoryApi(
+  id: string,
+  fields: { title?: string; content?: string; category?: string | null; pinned?: boolean }
+): Promise<void> {
+  await apiFetch(`/memories/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  })
+}
+
+export async function deleteMemoryApi(id: string): Promise<void> {
+  await apiFetch(`/memories/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
+
 // ── Provider API keys ─────────────────────────────────────────────────────────
 
 export type ProviderKeys = Record<string, string>

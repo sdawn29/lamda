@@ -16,6 +16,21 @@ export interface StoredSession {
    * once for the freshly-opened session.
    */
   lastInjectedMode?: Mode;
+  /**
+   * Memories already injected into this live session's history, mapped to the
+   * `updatedAt` they had when injected (see `withMemoryPreamble` in
+   * services/prompt-injection.ts). Lets each prompt inject only memories not yet
+   * seen this session — or ones edited since — so retrieved context stays lean
+   * and never stacks duplicates. Reset when the handle is replaced so the set is
+   * re-stated once for the freshly-opened session.
+   */
+  injectedMemories?: Map<string, number>;
+  /**
+   * The fully-injected text of the last prompt sent to the agent. Used by
+   * session-level self-healing to re-send an interrupted prompt after rebuilding
+   * a crashed handle.
+   */
+  lastPromptText?: string;
 }
 
 class SessionStore {
@@ -105,6 +120,7 @@ class SessionStore {
     entry.handle.dispose();
     entry.handle = newHandle;
     entry.lastInjectedMode = undefined;
+    entry.injectedMemories = undefined;
     return true;
   }
 

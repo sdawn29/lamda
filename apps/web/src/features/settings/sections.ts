@@ -1,5 +1,6 @@
 import type { ComponentType } from "react"
 import {
+  Brain,
   ChartColumn,
   Code2,
   Database,
@@ -71,6 +72,11 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
       "model",
       "visible",
       "hidden",
+      "title",
+      "thread title",
+      "title prompt",
+      "title model",
+      "generation",
     ],
   },
   {
@@ -161,7 +167,28 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
       "Customize the AI prompt used to generate commit messages from staged diffs.",
     icon: GitBranch,
     group: "customization",
-    keywords: ["commit", "message", "diff", "prompt", "ai", "git", "staged"],
+    keywords: ["commit", "message", "diff", "prompt", "ai", "git", "staged", "model"],
+  },
+  {
+    slug: "memory",
+    label: "Memory",
+    title: "Memory & Self-Healing",
+    description:
+      "Manage what the agent remembers across sessions and how it recovers from errors.",
+    icon: Brain,
+    group: "customization",
+    keywords: [
+      "memory",
+      "remember",
+      "learn",
+      "lessons",
+      "forget",
+      "self-healing",
+      "healing",
+      "recover",
+      "retry",
+      "auto-fix",
+    ],
   },
   {
     slug: "shortcuts",

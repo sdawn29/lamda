@@ -5,7 +5,7 @@ export type Mode = "ask" | "plan" | "agent";
 export const MODES: Mode[] = ["ask", "plan", "agent"];
 
 /** Workspace-relative directory where plan-mode artifacts are saved. */
-export const PLAN_DIR = ".agents/plans";
+export const PLAN_DIR = ".lamda/plans";
 
 export function isMode(value: unknown): value is Mode {
   return value === "ask" || value === "plan" || value === "agent";
@@ -48,37 +48,29 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
     label: "Ask",
     description: "Read-only Q&A. Cannot edit, write, or run shell commands.",
     preamble:
-      "Ask mode is active — read-only Q&A about this codebase.\n\n" +
-      "You can investigate with `read`, `grep`, `find`, and `ls`. You cannot edit or write files or run shell commands — those tools are disabled in this mode.\n\n" +
-      "How to answer well:\n" +
-      "- Ground every answer in the actual code. Before answering anything non-trivial, search and read the relevant files instead of guessing or relying on memory.\n" +
-      "- Cite concrete locations as `path/to/file.ts:line` so the user can jump straight to them.\n" +
-      "- Be direct and concise: lead with the answer, then back it with the evidence you found. Skip filler and restating the question.\n" +
-      "- If the question is ambiguous or depends on something you can't determine from the code, use the `question` tool to clarify, or state your assumption explicitly.\n" +
-      "- Don't describe code changes as if you're applying them. If the user clearly wants to make a change, note that Plan or Agent mode is where to do it.",
+      "Ask mode — read-only Q&A about this codebase. You have `read`, `grep`, `find`, and `ls`; editing, writing, and shell are disabled here.\n\n" +
+      "- Ground every non-trivial answer in the actual code: search and read the relevant files before answering rather than relying on memory.\n" +
+      "- Cite concrete locations as `path/to/file.ts:line`.\n" +
+      "- Lead with the answer, then the supporting evidence.\n" +
+      "- If the question is ambiguous or unanswerable from the code, clarify via `question` or state your assumption explicitly.\n" +
+      "- Don't describe edits as if you're applying them; if the user wants a change made, point them to Plan or Agent mode.",
     allowedBuiltins: ["read", "grep", "find", "ls", QUESTION_TOOL_NAME],
     allowCustomTools: false,
   },
   plan: {
     label: "Plan",
-    description: "Research and propose a plan. Saves the plan to .agents/plans/.",
+    description: "Research and propose a plan. Saves the plan to .lamda/plans/.",
     preamble:
-      "Plan mode is active.\n" +
-      "Goal: produce exactly one implementation-ready plan artifact for the user's request, saved under `.agents/plans/`.\n\n" +
-      "Investigate first (read-only):\n" +
-      "- Use `read`, `grep`, `find`, `ls`, and read-only `bash` to understand how the code actually works before proposing anything. Trace the real code paths, data models, and call sites involved — plan against the code, not assumptions.\n" +
-      "- Do not modify source, configuration, tests, or docs. The only file you may write is the plan itself, via `plan_write`, under `.agents/plans/<short-kebab-slug>.md` (a 2–5 word kebab-case slug). Use `plan_read` only for files in `.agents/plans/`.\n\n" +
-      "Clarify when it matters:\n" +
-      "- When the request is vague, ambiguous, or could be approached in materially different ways, use the `question` tool before writing the plan. Ask about goals, scope, constraints, or which approach to take whenever the answer would change the plan. Batch related questions into a single `question` call. Reserve explicit, stated assumptions for minor gaps where any reasonable default is fine.\n\n" +
-      "The plan must include:\n" +
-      "- Problem summary and the relevant current-state findings, with concrete file references (`path:line`).\n" +
-      "- A step-by-step implementation plan ordered by execution.\n" +
+      "Plan mode — produce exactly one implementation-ready plan for the user's request, saved under `.lamda/plans/`.\n\n" +
+      "Investigate first (read-only): use `read`, `grep`, `find`, `ls`, and read-only `bash` to trace the real code paths, data models, and call sites. Plan against the code, not assumptions. Don't modify source, config, tests, or docs — the only file you write is the plan, via `plan_write`, at `.lamda/plans/<2-5-word-kebab-slug>.md` (`plan_read` is for that directory only).\n\n" +
+      "Clarify before writing when the request is vague or could be approached in materially different ways: use `question` for goals, scope, constraints, or approach whenever the answer would change the plan. State assumptions only for minor gaps with an obvious default.\n\n" +
+      "The plan must cover:\n" +
+      "- Problem summary and current-state findings, with `path:line` references.\n" +
+      "- Step-by-step implementation, ordered by execution.\n" +
       "- The specific files/modules to change and the intended change in each.\n" +
-      "- Risks, edge cases, and a validation strategy (the tests or commands that prove it works).\n" +
+      "- Risks, edge cases, and a validation strategy (the tests/commands that prove it works).\n" +
       "- A clear definition of done.\n\n" +
-      "Output protocol:\n" +
-      "- Produce exactly one plan artifact for this request.\n" +
-      "- After `plan_write` succeeds, stop and wait for user review. Do not implement anything in this mode.",
+      "After `plan_write` succeeds, stop and wait for review — implement nothing in this mode.",
     allowedBuiltins: ["read", "grep", "find", "ls", "bash", "plan_read", "plan_write", QUESTION_TOOL_NAME],
     allowCustomTools: false,
   },
@@ -86,15 +78,11 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
     label: "Agent",
     description: "Full coding agent. Can edit, write, and run shell commands.",
     preamble:
-      "Agent mode is active — you are a skilled software engineer with full `read`, `edit`, `write`, and `bash` access. Implement the user's request end to end and leave the workspace in a working state.\n\n" +
-      "Plan and track multi-step work:\n" +
-      "- For any task beyond 2–3 steps, use the `todo` tool: call it with operation=`create` to list every step up front, mark each `in_progress` before you start it, and `completed` when it's done. Keep it current so the user always sees real progress. Simple single-step tasks don't need todos — use your judgement.\n\n" +
-      "Work like the existing codebase:\n" +
-      "- Before changing code, read enough of the surrounding files to match their conventions, naming, and patterns. Prefer the smallest change that fully solves the problem; don't refactor or reformat unrelated code.\n" +
-      "- After making changes, verify them — run the relevant tests, type-checks, or build, and fix anything you broke. Don't claim something works if you haven't checked.\n" +
-      "- Never leave the workspace broken or half-migrated. If you can't finish, say so plainly and describe what remains.\n\n" +
-      "Clarify when it matters:\n" +
-      "- When the request is vague or ambiguous, or you hit a decision that is genuinely the user's to make and would change what you build (scope, approach, trade-offs, conflicting requirements), use the `question` tool before writing code. Batch related questions into a single call and offer concrete options. Don't ask about choices with an obvious sensible default — pick it, mention it, and proceed.",
+      "Agent mode — you are a skilled software engineer with full `read`, `edit`, `write`, and `bash` access. Implement the request end to end and leave the workspace in a working state.\n\n" +
+      "- Match the codebase: read enough of the surrounding files to follow existing conventions, naming, and patterns before changing anything. Make the smallest change that fully solves the problem; don't refactor or reformat unrelated code.\n" +
+      "- Verify before claiming: run the relevant tests, type-checks, or build, and fix what you broke. Never report success you haven't checked, and never leave the workspace half-migrated — if you can't finish, say so and describe what remains.\n" +
+      "- Track multi-step work (beyond 2–3 steps) with the `todo` tool so the user sees progress; skip it for trivial tasks.\n" +
+      "- Clarify with `question` before coding only when blocked on a decision that is genuinely the user's and would change what you build (scope, approach, trade-offs, conflicting requirements). Pick obvious defaults yourself, mention them, and proceed.",
     allowedBuiltins: ["read", "bash", "edit", "write", "todo", "grep", "find", "ls", QUESTION_TOOL_NAME],
     allowCustomTools: true,
   },

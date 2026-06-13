@@ -18,14 +18,23 @@ export async function bootstrapSessions(): Promise<void> {
   const tasks = workspaceList.flatMap((ws) =>
     ws.threads.map(async (thread) => {
       if (thread.sessionFile) {
-        const handle = await openSessionForThread(
-          thread.id,
-          thread.sessionFile,
-          ws.path,
-          ws.id,
-        );
-        store.create(handle, ws.path, thread.id, ws.id);
-        return;
+        try {
+          const handle = await openSessionForThread(
+            thread.id,
+            thread.sessionFile,
+            ws.path,
+            ws.id,
+          );
+          store.create(handle, ws.path, thread.id, ws.id);
+          return;
+        } catch (err) {
+          // A corrupt/unreadable session file must not leave a dead thread —
+          // fall back to a fresh session so the thread stays usable.
+          console.error(
+            `[bootstrap] failed to resume thread ${thread.id}; starting fresh:`,
+            err,
+          );
+        }
       }
 
       await createSessionForThread(thread.id, ws.path, ws.id);

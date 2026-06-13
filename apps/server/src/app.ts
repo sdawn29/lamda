@@ -16,6 +16,7 @@ import { lspRouter } from "./routes/lsp.js";
 import { tasksRouter } from "./routes/tasks.js";
 import terminal from "./routes/terminal.js";
 import usage from "./routes/usage.js";
+import memories from "./routes/memories.js";
 
 const app = new Hono();
 
@@ -53,6 +54,7 @@ app.route("/", localModels);
 app.route("/", file);
 app.route("/", terminal);
 app.route("/", usage);
+app.route("/", memories);
 app.route("/mcp", mcpRouter);
 app.route("/lsp", lspRouter);
 app.route("/tasks", tasksRouter);

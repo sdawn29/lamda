@@ -15,7 +15,7 @@ import { WriteView } from "./write-view"
 
 interface PlanSavedCardProps {
   msg: ToolMessage
-  /** Workspace-relative plan path (e.g. `.agents/plans/add-foo.md`). */
+  /** Workspace-relative plan path (e.g. `.lamda/plans/add-foo.md`). */
   relativePath: string
   /** Absolute path on disk, used for opening in the file viewer. */
   absolutePath: string

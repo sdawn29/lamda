@@ -82,7 +82,7 @@ import { getNextMode } from "./mode-combobox"
 import { QuestionView } from "./question-view"
 import { findActiveQuestion } from "../lib/active-question"
 
-const PLAN_DIR_PREFIX = ".agents/plans/"
+const PLAN_DIR_PREFIX = ".lamda/plans/"
 
 import { FileChangesCard } from "./file-changes-card"
 import { forkSession, listMessages } from "../api"

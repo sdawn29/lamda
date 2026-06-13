@@ -504,7 +504,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle("open-data-dir", () => {
-    const dataDir = path.join(homedir(), ".lamda-code");
+    const dataDir = path.join(homedir(), ".lamda");
     shell.openPath(dataDir);
   });
 

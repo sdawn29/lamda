@@ -5,6 +5,7 @@ import {
   fetchAppSettings,
   fetchLocalProviders,
   fetchAiUsage,
+  fetchMemories,
   type AiUsageRange,
 } from "./api"
 
@@ -16,6 +17,7 @@ export const settingsKeys = {
   providers: [...settingsRootKey, "providers"] as const,
   oauthProviders: [...settingsRootKey, "oauth-providers"] as const,
   localProviders: [...settingsRootKey, "local-providers"] as const,
+  memories: [...settingsRootKey, "memories"] as const,
   aiUsage: (range: AiUsageRange) =>
     [...settingsRootKey, "ai-usage", range] as const,
 }
@@ -68,6 +70,16 @@ export function useLocalProviders() {
   return useQuery({
     queryKey: localProvidersQueryKey,
     queryFn: ({ signal }) => fetchLocalProviders(signal),
+    staleTime: 30 * 1000,
+  })
+}
+
+export const memoriesQueryKey = settingsKeys.memories
+
+export function useMemories() {
+  return useQuery({
+    queryKey: memoriesQueryKey,
+    queryFn: ({ signal }) => fetchMemories(signal),
     staleTime: 30 * 1000,
   })
 }

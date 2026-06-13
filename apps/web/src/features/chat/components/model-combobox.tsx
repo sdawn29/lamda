@@ -27,11 +27,13 @@ export function ModelCombobox({
   selected,
   onSelect,
   disabled,
+  placeholder = "Select model",
 }: {
   groups: ModelGroup
   selected: { id: string; name: string; provider: string } | null
   onSelect: (compositeKey: string) => void
   disabled?: boolean
+  placeholder?: string
 }) {
   const [open, setOpen] = React.useState(false)
 
@@ -67,7 +69,7 @@ export function ModelCombobox({
             className="max-w-44"
           >
             {selectedMeta?.icon}
-            <span className="truncate">{selected?.name ?? "Select model"}</span>
+            <span className="truncate">{selected?.name ?? placeholder}</span>
             <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
           </Button>
         }

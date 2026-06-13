@@ -5,8 +5,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import * as schema from "./schema.js";
 
-const APP_DATA_DIR_NAME = ".lamda-code";
-const LEGACY_APP_DATA_DIR_NAME = ".lambda-code";
+const APP_DATA_DIR_NAME = ".lamda";
+const LEGACY_APP_DATA_DIR_NAMES = [".lamda-code", ".lambda-code"];
 const LEGACY_DB_FILENAME = "db-v2.sqlite";
 const DB_FILENAME =
   process.env.NODE_ENV === "development" ? "db-dev.sqlite" : "db.sqlite";
@@ -14,14 +14,19 @@ const DB_FILENAME =
 function resolveDbPath(): string {
   const homeDir = homedir();
   const dir = join(homeDir, APP_DATA_DIR_NAME);
-  const legacyDir = join(homeDir, LEGACY_APP_DATA_DIR_NAME);
 
-  // Migrate legacy directory name (.lambda-code → .lamda-code).
-  if (!existsSync(dir) && existsSync(legacyDir)) {
-    try {
-      renameSync(legacyDir, dir);
-    } catch {
-      return join(legacyDir, DB_FILENAME);
+  // Migrate legacy directory names (.lamda-code / .lambda-code → .lamda).
+  if (!existsSync(dir)) {
+    for (const legacyName of LEGACY_APP_DATA_DIR_NAMES) {
+      const legacyDir = join(homeDir, legacyName);
+      if (existsSync(legacyDir)) {
+        try {
+          renameSync(legacyDir, dir);
+        } catch {
+          return join(legacyDir, DB_FILENAME);
+        }
+        break;
+      }
     }
   }
 
@@ -205,6 +210,21 @@ function createDb() {
       was_created_by_turn INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS agent_memories (
+      id           TEXT PRIMARY KEY,
+      scope        TEXT NOT NULL CHECK(scope IN ('user', 'workspace')),
+      workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+      title        TEXT NOT NULL,
+      content      TEXT NOT NULL,
+      category     TEXT,
+      source       TEXT NOT NULL DEFAULT 'agent' CHECK(source IN ('agent', 'healing', 'user')),
+      pinned       INTEGER NOT NULL DEFAULT 0,
+      created_at   INTEGER NOT NULL,
+      updated_at   INTEGER NOT NULL,
+      last_used_at INTEGER,
+      use_count    INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE UNIQUE INDEX IF NOT EXISTS workspaces_path_unique ON workspaces(path);
     CREATE INDEX IF NOT EXISTS threads_workspace_idx ON threads(workspace_id);
     CREATE INDEX IF NOT EXISTS message_blocks_thread_idx ON message_blocks(thread_id, block_index);
@@ -217,6 +237,7 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS thread_todo_goals_thread_idx ON thread_todo_goals(thread_id, sort_order, created_at);
     CREATE INDEX IF NOT EXISTS thread_todos_thread_idx ON thread_todos(thread_id, sort_order, created_at);
     CREATE INDEX IF NOT EXISTS thread_todos_goal_idx ON thread_todos(goal_id);
+    CREATE INDEX IF NOT EXISTS agent_memories_scope_idx ON agent_memories(scope, workspace_id);
   `);
 
   // Migration: Add env column to workspaces table.
@@ -389,6 +410,51 @@ function createDb() {
     }
   } catch (e) {
     // Migration may fail on first run or if already migrated — safe to ignore.
+  }
+
+  // Migration: Add pinned column to agent_memories table (always-on core set).
+  try {
+    const memCols = sqlite.prepare("PRAGMA table_info(agent_memories)").all() as { name: string }[];
+    if (!memCols.some((col) => col.name === "pinned")) {
+      sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
+  // Memory retrieval: FTS5 index over agent_memories for BM25-ranked retrieval,
+  // kept in sync with the base table by triggers. Guarded so the app still runs
+  // on a SQLite build without FTS5 — callers fall back to LIKE search.
+  try {
+    sqlite.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS agent_memories_fts USING fts5(
+        id UNINDEXED, title, content, category, tokenize = 'unicode61'
+      );
+
+      CREATE TRIGGER IF NOT EXISTS agent_memories_fts_ai AFTER INSERT ON agent_memories BEGIN
+        INSERT INTO agent_memories_fts(id, title, content, category)
+        VALUES (new.id, new.title, new.content, coalesce(new.category, ''));
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS agent_memories_fts_ad AFTER DELETE ON agent_memories BEGIN
+        DELETE FROM agent_memories_fts WHERE id = old.id;
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS agent_memories_fts_au AFTER UPDATE ON agent_memories BEGIN
+        UPDATE agent_memories_fts
+        SET title = new.title, content = new.content, category = coalesce(new.category, '')
+        WHERE id = old.id;
+      END;
+    `);
+    // Backfill any rows that predate the FTS index (or a failed earlier attempt).
+    sqlite.exec(`
+      INSERT INTO agent_memories_fts(id, title, content, category)
+      SELECT id, title, content, coalesce(category, '')
+      FROM agent_memories
+      WHERE id NOT IN (SELECT id FROM agent_memories_fts);
+    `);
+  } catch {
+    // FTS5 unavailable — memory retrieval falls back to LIKE search.
   }
 
   return db;

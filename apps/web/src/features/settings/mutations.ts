@@ -9,6 +9,8 @@ import {
   updateAppSetting,
   saveLocalProvider,
   deleteLocalProvider,
+  updateMemoryApi,
+  deleteMemoryApi,
   type ProviderKeys,
   type LocalProviderConfig,
 } from "./api"
@@ -17,6 +19,7 @@ import {
   oauthProvidersQueryKey,
   providersQueryKey,
   localProvidersQueryKey,
+  memoriesQueryKey,
 } from "./queries"
 import { modelsQueryKey } from "@/features/chat/queries"
 
@@ -74,6 +77,32 @@ export function useDeleteLocalProvider() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: localProvidersQueryKey })
       queryClient.invalidateQueries({ queryKey: modelsQueryKey })
+    },
+  })
+}
+
+export function useUpdateMemory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      fields,
+    }: {
+      id: string
+      fields: { title?: string; content?: string; category?: string | null; pinned?: boolean }
+    }) => updateMemoryApi(id, fields),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: memoriesQueryKey })
+    },
+  })
+}
+
+export function useDeleteMemory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteMemoryApi(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: memoriesQueryKey })
     },
   })
 }

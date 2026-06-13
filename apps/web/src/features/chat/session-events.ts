@@ -73,7 +73,7 @@ export interface SessionTurnFileChangedEvent {
 export interface SessionPlanSavedEvent {
   /** Absolute path on the server's filesystem. */
   filePath: string;
-  /** Workspace-relative forward-slash path (always starts with `.agents/plans/`). */
+  /** Workspace-relative forward-slash path (always starts with `.lamda/plans/`). */
   relativePath: string;
 }
 

@@ -16,7 +16,12 @@ import {
   updateThreadStopped,
   updateThreadLastAccessed,
 } from "@lamda/db";
-import { createPlanModeTools, createTodoTool, normalizeMode } from "@lamda/pi-sdk";
+import {
+  createPlanModeTools,
+  createTodoTool,
+  createMemoryTool,
+  normalizeMode,
+} from "@lamda/pi-sdk";
 import { gitDeleteCheckpointRef } from "@lamda/git";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
@@ -152,7 +157,7 @@ threads.patch("/thread/:id/mode", async (c) => {
           ? createPlanModeTools(entry.cwd)
           : mode === "ask"
             ? []
-            : [createTodoTool(threadId)];
+            : [createTodoTool(threadId), createMemoryTool(undefined)];
       session.handle.setCustomTools(customTools);
     }
     session.handle.setMode(mode);

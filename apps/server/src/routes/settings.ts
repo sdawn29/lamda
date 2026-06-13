@@ -19,14 +19,33 @@ settings.put("/settings/:key", async (c) => {
 
 settings.post("/title", async (c) => {
   const body = await c.req
-    .json<{ message?: string; provider?: string; model?: string }>()
-    .catch((): { message?: string; provider?: string; model?: string } => ({}));
+    .json<{ message?: string }>()
+    .catch((): { message?: string } => ({}));
   if (!body.message) return c.json({ error: "message is required" }, 400);
-  const title = await generateThreadTitle(body.message, {
-    provider: body.provider,
-    model: body.model,
-  });
+
+  // Prompt template and model are configured in Settings → Chat, persisted in
+  // the app settings table. An empty/absent model falls back to the default.
+  const all = getAllSettings();
+  const promptTemplate = all["title_generation_prompt"] || undefined;
+  const { provider, model } = parseModelKey(all["title_generation_model"]);
+
+  const title = await generateThreadTitle(
+    body.message,
+    { provider, model },
+    promptTemplate,
+  );
   return c.json({ title });
 });
+
+/** Splits a stored `provider::model` key into its parts. */
+export function parseModelKey(key: string | undefined): {
+  provider?: string;
+  model?: string;
+} {
+  if (!key) return {};
+  const idx = key.indexOf("::");
+  if (idx === -1) return {};
+  return { provider: key.slice(0, idx), model: key.slice(idx + 2) };
+}
 
 export default settings;

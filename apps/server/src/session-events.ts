@@ -42,6 +42,43 @@ export type SessionStatus = {
   pendingError: SessionPendingError | null;
 };
 
+// ── Self-healing observers ──────────────────────────────────────────────────────
+// The healing service registers these; the hub stays decoupled (it imports
+// nothing from the service, avoiding an import cycle).
+
+export type AgentTurnOutcome = "success" | "error" | "aborted";
+
+export type AgentTurnEndInfo = {
+  sessionId: string;
+  threadId: string;
+  outcome: AgentTurnOutcome;
+  errorMessage?: string;
+};
+
+export type SessionCrashInfo = {
+  sessionId: string;
+  threadId: string;
+  message: string;
+  /** True when the event generator died mid-turn (an interrupted prompt). */
+  wasRunning: boolean;
+};
+
+/** Synthetic healing-status events reusing the client's auto-retry banner UI. */
+export type HealingStatusEvent =
+  | { type: "auto_retry_start"; attempt: number; errorMessage: string }
+  | { type: "auto_retry_end"; success: boolean; finalError?: string };
+
+let agentTurnObserver: ((info: AgentTurnEndInfo) => void) | null = null;
+let sessionCrashObserver: ((info: SessionCrashInfo) => void) | null = null;
+
+export function setAgentTurnObserver(cb: (info: AgentTurnEndInfo) => void): void {
+  agentTurnObserver = cb;
+}
+
+export function setSessionCrashObserver(cb: (info: SessionCrashInfo) => void): void {
+  sessionCrashObserver = cb;
+}
+
 // ── Internal event types ──────────────────────────────────────────────────────
 
 type ServerErrorEvent = { type: "server_error"; message: string };
@@ -55,7 +92,7 @@ type PlanSavedEvent = {
   type: "plan_saved";
   /** Absolute path to the plan file on disk. */
   filePath: string;
-  /** Workspace-relative path (always forward-slash, starts with `.agents/plans/`). */
+  /** Workspace-relative path (always forward-slash, starts with `.lamda/plans/`). */
   relativePath: string;
 };
 type HubEvent =
@@ -157,7 +194,7 @@ class SessionEventHub {
   constructor(
     private readonly sessionId: string,
     private readonly threadId: string,
-    private readonly handle: ManagedSessionHandle,
+    private handle: ManagedSessionHandle,
     private readonly cwd: string | null = null,
     onIdle?: () => void,
   ) {
@@ -276,7 +313,7 @@ class SessionEventHub {
 
     const absPath = isAbsolute(rawPath) ? rawPath : resolve(this.cwd, rawPath);
     const rel = relative(this.cwd, absPath).replace(/\\/g, "/");
-    // Must be inside <cwd>/.agents/plans and be a markdown file.
+    // Must be inside <cwd>/.lamda/plans and be a markdown file.
     if (!rel.startsWith(`${PLAN_DIR}/`) || rel.includes("..")) return;
     if (!rel.toLowerCase().endsWith(".md")) return;
 
@@ -557,6 +594,34 @@ class SessionEventHub {
     };
   }
 
+  /**
+   * Emit a synthetic auto-retry event so self-healing surfaces through the same
+   * "Retrying" banner the SDK's real transient retries use — no new chat UI.
+   */
+  emitHealingStatus(ev: HealingStatusEvent): void {
+    if (this.disposed) return;
+    this.emit(ev as HubEvent);
+  }
+
+  /**
+   * Swap in a freshly-rebuilt session handle after a crash, keeping this hub —
+   * and therefore every WS/SSE subscriber, the sessionId, and the event-id
+   * sequence — intact. The old event generator is returned and a new consume
+   * loop starts once it settles.
+   */
+  reattach(newHandle: ManagedSessionHandle): void {
+    if (this.disposed) return;
+    const previous = this.consumeTask;
+    this.generator?.return(undefined).catch(() => undefined);
+    this.generator = null;
+    this.consumeTask = null;
+    this.handle = newHandle;
+    this.runInProgress = false;
+    void (previous ?? Promise.resolve()).then(() => {
+      if (!this.disposed) this.ensureStarted();
+    });
+  }
+
   async dispose() {
     if (this.disposed) return;
     this.disposed = true;
@@ -652,16 +717,63 @@ class SessionEventHub {
         }
         this.persist(event);
         this.emit(event);
+
+        if (event.type === "agent_end") {
+          this.notifyTurnEnd(event);
+        }
       }
     } catch (error) {
       if (!this.disposed) {
         const message = error instanceof Error ? error.message : String(error);
+        // Capture before resetting: a mid-turn crash means there's a prompt to
+        // resume, which session-level healing keys off.
+        const wasRunning = this.runInProgress;
         this.toolMetaMap.clear();
         this.currentToolBlocks.clear();
         this.runInProgress = false;
         this.currentRunEvents = [];
         this.emit({ type: "server_error", message });
+        try {
+          sessionCrashObserver?.({
+            sessionId: this.sessionId,
+            threadId: this.threadId,
+            message,
+            wasRunning,
+          });
+        } catch {
+          // observer failures must never break event processing
+        }
       }
+    }
+  }
+
+  /** Derive a turn outcome from agent_end and notify the healing observer. */
+  private notifyTurnEnd(event: SessionEvent): void {
+    if (!agentTurnObserver) return;
+    const msg = event as {
+      messages?: { role: string; stopReason?: string; errorMessage?: string }[];
+    };
+    const lastAssistant = msg.messages
+      ?.slice()
+      .reverse()
+      .find((m) => m.role === "assistant");
+    let outcome: AgentTurnOutcome = "success";
+    let errorMessage: string | undefined;
+    if (lastAssistant?.stopReason === "aborted") {
+      outcome = "aborted";
+    } else if (lastAssistant?.stopReason === "error" && lastAssistant.errorMessage) {
+      outcome = "error";
+      errorMessage = lastAssistant.errorMessage;
+    }
+    try {
+      agentTurnObserver({
+        sessionId: this.sessionId,
+        threadId: this.threadId,
+        outcome,
+        errorMessage,
+      });
+    } catch {
+      // observer failures must never break event processing
     }
   }
 
@@ -1029,6 +1141,14 @@ class SessionEventRegistry {
 
   emitError(sessionId: string, message: string) {
     this.hubs.get(sessionId)?.emitError(message);
+  }
+
+  emitHealingStatus(sessionId: string, ev: HealingStatusEvent) {
+    this.hubs.get(sessionId)?.emitHealingStatus(ev);
+  }
+
+  reattach(sessionId: string, handle: ManagedSessionHandle) {
+    this.hubs.get(sessionId)?.reattach(handle);
   }
 
   dismissPendingErrors(sessionId: string): void {

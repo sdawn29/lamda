@@ -3,6 +3,7 @@ import {
   openManagedSession,
   createPlanModeTools,
   createTodoTool,
+  createMemoryTool,
   createQuestionTool,
   normalizeMode,
   PLAN_DIR,
@@ -36,7 +37,7 @@ async function buildSessionCustomTools(
       ? [...createPlanModeTools(cwd), questionTool]
       : mode === "ask"
         ? [questionTool]
-        : [createTodoTool(threadId), questionTool];
+        : [createTodoTool(threadId), createMemoryTool(undefined), questionTool];
 
   return { customTools, mode };
 }
@@ -146,6 +147,7 @@ export async function collectCustomTools(
   }
 
   const todoTool = threadId ? createTodoTool(threadId) : null;
+  const memoryTool = createMemoryTool(workspaceId);
 
   const [mcpTools, lspTools] = await Promise.all([
     import("./mcp-service.js")
@@ -161,7 +163,13 @@ export async function collectCustomTools(
         return [];
       }),
   ]);
-  return [...(todoTool ? [todoTool] : []), questionTool, ...mcpTools, ...lspTools];
+  return [
+    ...(todoTool ? [todoTool] : []),
+    memoryTool,
+    questionTool,
+    ...mcpTools,
+    ...lspTools,
+  ];
 }
 
 async function refreshSessionTools(

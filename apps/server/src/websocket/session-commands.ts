@@ -34,6 +34,8 @@ import {
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { ensureSessionEventHub, gitCwd } from "../services/session-service.js";
+import { withInjections } from "../services/prompt-injection.js";
+import { recoverSession } from "../services/healing-service.js";
 import {
   type ClientMessage,
   type ServerMessage,
@@ -152,7 +154,10 @@ async function handlePrompt(
   }
 
   ensureSessionEventHub(sessionId, entry);
+  // DB stores the clean user text; the SDK sees the injected preambles.
   insertUserBlock(entry.threadId, msg.text);
+  const text = withInjections(entry, msg.text);
+  entry.lastPromptText = text;
 
   // Acknowledge immediately
   send(ws, {
@@ -202,11 +207,12 @@ async function handlePrompt(
             }
           : undefined;
 
-      await entry.handle.prompt(msg.text, promptOptions);
+      await entry.handle.prompt(text, promptOptions);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[prompt:${sessionId}]`, err);
       sessionEvents.emitError(sessionId, message);
+      void recoverSession(sessionId);
     }
   };
 
@@ -226,10 +232,11 @@ async function handleSteer(
 
   ensureSessionEventHub(sessionId, entry);
   insertUserBlock(entry.threadId, msg.text);
+  const text = withInjections(entry, msg.text);
 
   send(ws, { type: "ack", operation: "steer", accepted: true });
 
-  entry.handle.steer(msg.text).catch((err: unknown) => {
+  entry.handle.steer(text).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[steer:${sessionId}]`, err);
     sessionEvents.emitError(sessionId, message);
@@ -249,10 +256,11 @@ async function handleFollowUp(
 
   ensureSessionEventHub(sessionId, entry);
   insertUserBlock(entry.threadId, msg.text);
+  const text = withInjections(entry, msg.text);
 
   send(ws, { type: "ack", operation: "follow-up", accepted: true });
 
-  entry.handle.followUp(msg.text).catch((err: unknown) => {
+  entry.handle.followUp(text).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[followUp:${sessionId}]`, err);
     sessionEvents.emitError(sessionId, message);

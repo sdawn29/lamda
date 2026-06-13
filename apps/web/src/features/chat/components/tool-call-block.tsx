@@ -31,7 +31,7 @@ import type { ToolMessage } from "../types"
 
 const PrismCode = lazy(() => import("./prism-code"))
 
-const PLAN_DIR_PREFIX = ".agents/plans/"
+const PLAN_DIR_PREFIX = ".lamda/plans/"
 
 
 
@@ -70,7 +70,7 @@ function isWriteArgs(args: unknown): args is WriteArgs {
 }
 
 /**
- * Detect a plan-mode artifact write (a write into `.agents/plans/*.md`).
+ * Detect a plan-mode artifact write (a write into `.lamda/plans/*.md`).
  * Returns workspace-relative + absolute paths, or null if the write doesn't
  * target the plan dir.
  */

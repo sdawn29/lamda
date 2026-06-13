@@ -5,6 +5,7 @@ import { URL } from "node:url";
 import { resolvePort } from "./port.js";
 import app from "./app.js";
 import { bootstrapSessions } from "./bootstrap.js";
+import { registerHealingHooks } from "./services/healing-service.js";
 import { handleTerminalConnection } from "./services/terminal-service.js";
 import { handleSessionEventsWs } from "./routes/sessions.js";
 import { handleGlobalEventsWs } from "./routes/health.js";
@@ -14,6 +15,9 @@ import { handleSessionCommands } from "./websocket/session-commands.js";
 import { isAllowedOrigin, isAuthEnabled, isValidToken } from "./auth.js";
 
 const port = resolvePort();
+
+// Wire self-healing observers before any session can emit events.
+registerHealingHooks();
 
 bootstrapSessions()
   .then(() => {
