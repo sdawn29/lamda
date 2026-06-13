@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.19.0](../../releases/tag/v0.19.0) — 2026-06-13
+
+### Features
+
+* update README with new features and enhance chat and todo components
+* add model setting component and memory management features
+* enhance chat functionality with agent questions and todos tracking
+
+### Bug Fixes
+
+* include mobile state in sidebar toggle logic for title bar
+* ensure chat input is filled after confirming mode change in implementPlan
+* correct ref type in useLazyFont to HTMLButtonElement
+
+### Other Changes
+
+* Refactor code structure for improved readability and maintainability
+
 ## [0.18.0](../../releases/tag/v0.18.0) — 2026-06-12
 
 ### Features
