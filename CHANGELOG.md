@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.20.0](../../releases/tag/v0.20.0) — 2026-06-13
+
+### Features
+
+* add About and Feedback sections with update management features
+
 ## [0.19.0](../../releases/tag/v0.19.0) — 2026-06-13
 
 ### Features
