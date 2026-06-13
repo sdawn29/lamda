@@ -4,6 +4,8 @@ A local-first desktop workspace for AI-powered coding sessions. Run [Pi coding a
 
 ![Version](https://img.shields.io/badge/version-0.18.0-blue) ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
 
+![lamda desktop app showing a chat session with live todo tracking, agent questions, and a side-by-side git diff review panel](image-1.png)
+
 ## Features
 
 - **Chat** — real-time streaming conversations with the Pi coding agent, with Agent / Ask / Plan modes per thread, inline agent questions, live todo tracking, and thread forking from any earlier message
@@ -42,12 +44,12 @@ See the [Quick Start Guide](docs/quick-start.md) for a 5-minute walkthrough, or 
 
 ## Tech Stack
 
-| Layer    | Technology                                              |
-|----------|---------------------------------------------------------|
-| Desktop  | Electron 41                                             |
-| UI       | React 19 + Vite + TanStack Router + Tailwind CSS 4      |
-| Server   | Hono (Node.js)                                          |
-| Database | Drizzle ORM + SQLite (better-sqlite3)                   |
+| Layer    | Technology                                                           |
+| -------- | -------------------------------------------------------------------- |
+| Desktop  | Electron 41                                                          |
+| UI       | React 19 + Vite + TanStack Router + Tailwind CSS 4                   |
+| Server   | Hono (Node.js)                                                       |
+| Database | Drizzle ORM + SQLite (better-sqlite3)                                |
 | Agent    | [@mariozechner/pi-coding-agent](https://github.com/badlogic/pi-mono) |
 
 ## Project Structure
@@ -68,19 +70,19 @@ packages/
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start all apps |
-| `npm run build` | Build everything |
+| Command               | Description            |
+| --------------------- | ---------------------- |
+| `npm run dev`         | Start all apps         |
+| `npm run build`       | Build everything       |
 | `npm run check-types` | TypeScript type checks |
-| `npm run lint` | Lint all packages |
-| `npm run format` | Format with Prettier |
+| `npm run lint`        | Lint all packages      |
+| `npm run format`      | Format with Prettier   |
 
 ## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3001` | Server port |
+| Variable          | Default                 | Description               |
+| ----------------- | ----------------------- | ------------------------- |
+| `PORT`            | `3001`                  | Server port               |
 | `VITE_SERVER_URL` | `http://localhost:3001` | Server URL for the web UI |
 
 See [Providers](docs/providers.md) for AI provider and API key configuration.
