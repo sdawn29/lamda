@@ -14,15 +14,17 @@ import {
   CommandList,
 } from "@/shared/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
+import { cn } from "@/shared/lib/utils"
 import type { Mode } from "@/features/workspace/api"
 
 interface ModeOption {
   value: Mode
   label: string
-  description: string
   icon: React.ReactNode
   /** Color class applied to the icon, both in the trigger and the menu. */
   iconAccent: string
+  /** Accent tint applied to the selected row in the menu. */
+  selectedBg: string
   /** Translucent background tint applied to the trigger button. */
   triggerBg: string
   /** Focus ring + border classes applied to the chat input wrapper. */
@@ -38,9 +40,9 @@ export const MODE_OPTIONS: ModeOption[] = [
   {
     value: "ask",
     label: "Ask",
-    description: "Read-only Q&A",
     icon: <MessageCircleQuestionIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-sky-600 dark:text-sky-400",
+    selectedBg: "data-[checked=true]:bg-sky-500/10",
     triggerBg:
       "bg-sky-500/10 hover:bg-sky-500/15 aria-expanded:bg-sky-500/20 dark:bg-sky-500/15 dark:hover:bg-sky-500/20 dark:aria-expanded:bg-sky-500/25",
     focusRing:
@@ -50,9 +52,9 @@ export const MODE_OPTIONS: ModeOption[] = [
   {
     value: "plan",
     label: "Plan",
-    description: "Research + propose",
     icon: <ListTodoIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-amber-600 dark:text-amber-400",
+    selectedBg: "data-[checked=true]:bg-amber-500/10",
     triggerBg:
       "bg-amber-500/10 hover:bg-amber-500/15 aria-expanded:bg-amber-500/20 dark:bg-amber-500/15 dark:hover:bg-amber-500/20 dark:aria-expanded:bg-amber-500/25",
     focusRing:
@@ -62,9 +64,9 @@ export const MODE_OPTIONS: ModeOption[] = [
   {
     value: "agent",
     label: "Agent",
-    description: "Full coding agent",
     icon: <BotIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-emerald-600 dark:text-emerald-400",
+    selectedBg: "data-[checked=true]:bg-emerald-500/10",
     triggerBg:
       "bg-emerald-500/10 hover:bg-emerald-500/15 aria-expanded:bg-emerald-500/20 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/20 dark:aria-expanded:bg-emerald-500/25",
     focusRing:
@@ -116,34 +118,30 @@ export function ModeCombobox({
         }
       />
       <PopoverContent
-        className="w-60 p-0"
+        className="w-40 p-0"
         side="top"
         align="start"
         sideOffset={6}
       >
         <Command>
           <CommandList>
-            <CommandGroup>
+            <CommandGroup className="p-1">
               {MODE_OPTIONS.map((mode) => (
                 <CommandItem
                   key={mode.value}
                   value={mode.value}
                   data-checked={mode.value === selected}
-                  className="items-start py-2"
+                  className={cn(
+                    "items-center gap-2 rounded-md px-2 py-1",
+                    mode.selectedBg
+                  )}
                   onSelect={() => {
                     onSelect(mode.value)
                     setOpen(false)
                   }}
                 >
-                  <span className={`mt-0.5 ${mode.iconAccent}`}>
-                    {mode.icon}
-                  </span>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-medium">{mode.label}</span>
-                    <span className="text-2xs text-muted-foreground">
-                      {mode.description}
-                    </span>
-                  </div>
+                  <span className={mode.iconAccent}>{mode.icon}</span>
+                  <span className="text-xs font-medium">{mode.label}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

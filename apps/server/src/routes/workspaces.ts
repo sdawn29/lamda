@@ -27,6 +27,7 @@ function mapThread(
     id: string;
     title: string | null;
     modelId: string | null;
+    mode: "ask" | "plan" | "agent";
     isStopped: boolean;
     createdAt: number;
     isPinned: boolean;
@@ -40,6 +41,7 @@ function mapThread(
     workspaceId,
     title: t.title,
     modelId: t.modelId ?? null,
+    mode: t.mode,
     isStopped: t.isStopped,
     isPinned: t.isPinned,
     forkedFromId: t.forkedFromId ?? null,
