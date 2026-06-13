@@ -222,6 +222,7 @@ function messagesToBlocks(messages: Message[]): MessageBlock[] {
       toolStatus: null,
       toolDuration: null,
       toolStartTime: null,
+      attachments: null,
       createdAt: Date.now(),
     }
 
