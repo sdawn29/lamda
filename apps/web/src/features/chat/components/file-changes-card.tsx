@@ -295,7 +295,7 @@ export const FileChangesCard = memo(function FileChangesCard({
                 className="h-7 gap-1.5 rounded-md px-2.5 text-2xs text-muted-foreground hover:text-foreground"
               >
                 <GitCompare className="h-3 w-3" />
-                Diff
+                Review
               </Button>
               <Button
                 size="sm"
