@@ -49,6 +49,7 @@ import {
   useAbortSession,
   useGenerateTitle,
   useSendPrompt,
+  useSteer,
   useRevertToMessage,
 } from "../mutations"
 import { useModels } from "../queries"
@@ -551,7 +552,9 @@ export function ChatView({
     isCompacting,
     compactionReason,
     pendingError,
+    queuedCount,
     startUserPrompt,
+    steerPrompt,
     markStopped,
     markSendFailed,
     dismissError,
@@ -720,6 +723,7 @@ export function ChatView({
   const abortSessionMutation = useAbortSession(sessionId)
   const generateTitleMutation = useGenerateTitle()
   const sendPromptMutation = useSendPrompt(sessionId)
+  const steerMutation = useSteer(sessionId)
 
   const handleErrorAction = useCallback(
     (action: ErrorAction, id: string) => {
@@ -1176,6 +1180,14 @@ export function ChatView({
   useShortcutHandler(SHORTCUT_ACTIONS.SCROLL_TO_BOTTOM, scrollToBottom)
   useShortcutHandler(SHORTCUT_ACTIONS.CYCLE_AGENT_MODE, cycleAgentMode)
 
+  const scrollToBottomImmediate = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (el) {
+      programmaticScrollRef.current = true
+      el.scrollTop = el.scrollHeight
+    }
+  }, [])
+
   const handleSend = useCallback(
     (
       text: string,
@@ -1183,6 +1195,25 @@ export function ChatView({
       provider: string,
       thinkingLevel?: string
     ) => {
+      pinnedRef.current = true
+
+      // The agent is already running — steer the live turn instead of starting a
+      // new one. The message is appended optimistically and the SDK injects it
+      // into the current run after the active tool call finishes.
+      if (isLoading) {
+        steerPrompt(text)
+        scrollToBottomImmediate()
+        steerMutation.mutate(text, {
+          onError: () => {
+            toast.error("Couldn't steer", {
+              description:
+                "Your message couldn't be delivered to the running agent. Try again.",
+            })
+          },
+        })
+        return
+      }
+
       if (!hasConversationHistory) {
         generateTitleMutation.mutate(text, {
           onSuccess: ({ title }) => {
@@ -1190,16 +1221,9 @@ export function ChatView({
           },
         })
       }
-      pinnedRef.current = true
       updateThreadStopped.mutate({ threadId, stopped: false })
       startUserPrompt(text, thinkingLevel)
-
-      // Scroll immediately when sending
-      const el = scrollContainerRef.current
-      if (el) {
-        programmaticScrollRef.current = true
-        el.scrollTop = el.scrollHeight
-      }
+      scrollToBottomImmediate()
 
       const model = modelId && provider ? { provider, modelId } : undefined
       sendPromptMutation.mutate(
@@ -1208,6 +1232,10 @@ export function ChatView({
       )
     },
     [
+      isLoading,
+      steerPrompt,
+      steerMutation,
+      scrollToBottomImmediate,
       hasConversationHistory,
       markSendFailed,
       sendPromptMutation,
@@ -1512,6 +1540,20 @@ export function ChatView({
           <div className="mx-auto w-full max-w-3xl px-6 pb-2 empty:hidden">
             <TodoPanel messages={visibleMessages} />
           </div>
+
+          {isLoading && queuedCount > 0 && !activeQuestion && (
+            <div className="mx-auto w-full max-w-3xl px-6 pb-1.5">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
+                </span>
+                {queuedCount === 1
+                  ? "1 message queued — the agent will pick it up shortly"
+                  : `${queuedCount} messages queued — the agent will pick them up shortly`}
+              </div>
+            </div>
+          )}
 
           <div
             ref={textboxWrapRef}

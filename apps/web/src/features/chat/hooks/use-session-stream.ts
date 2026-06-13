@@ -312,6 +312,8 @@ export interface UseSessionStreamOptions {
   onError?: () => void
   onToolExecutionEnd?: (toolName: string) => void
   onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
+  /** Live count of messages waiting in the steering / follow-up queues. */
+  onQueueUpdate?: (event: { steering: number; followUp: number }) => void
 }
 
 export function useSessionStream({
@@ -325,6 +327,7 @@ export function useSessionStream({
   onError,
   onToolExecutionEnd,
   onPlanSaved,
+  onQueueUpdate,
 }: UseSessionStreamOptions) {
   const queryClient = useQueryClient()
 
@@ -357,10 +360,10 @@ export function useSessionStream({
 
   // Always-current callbacks — stored in a ref so the queue processor (which
   // is stable across renders) always calls the latest versions.
-  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved })
+  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate })
   useEffect(() => {
-    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved }
-  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved])
+    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate }
+  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate])
 
   // ── Queue processor ───────────────────────────────────────────────────────
   //
@@ -757,7 +760,13 @@ export function useSessionStream({
           onMessageEnd: () => {},
           onTurnStart: () => {},
           onTurnEnd: () => {},
-          onQueueUpdate: () => {},
+          onQueueUpdate: (data) => {
+            if (doneFlag.current) return
+            callbacksRef.current.onQueueUpdate?.({
+              steering: data.steering.length,
+              followUp: data.followUp.length,
+            })
+          },
 
           onAutoRetryStart: ({ attempt, errorMessage }) => {
             if (doneFlag.current) return

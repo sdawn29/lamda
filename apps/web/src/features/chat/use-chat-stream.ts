@@ -60,7 +60,11 @@ interface UseChatStreamResult {
   isCompacting: boolean
   compactionReason: "manual" | "threshold" | "overflow" | null
   pendingError: ErrorMessage | null
+  /** Number of steering/follow-up messages queued for the running agent but not yet delivered. */
+  queuedCount: number
   startUserPrompt: (text: string, thinkingLevel?: string) => void
+  /** Optimistically append a steering message to the transcript while the agent is running. */
+  steerPrompt: (text: string) => void
   markStopped: () => void
   markSendFailed: () => void
   dismissError: (id: string) => void
@@ -82,6 +86,7 @@ export function useChatStream({
   const [compactionReason, setCompactionReason] = useState<"manual" | "threshold" | "overflow" | null>(null)
   const [pendingError, setPendingError] = useState<ReturnType<typeof createErrorMessage> | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [queuedCount, setQueuedCount] = useState(0)
 
   // Reset state synchronously during render when the session changes.
   const [localSessionId, setLocalSessionId] = useState(sessionId)
@@ -92,6 +97,7 @@ export function useChatStream({
     setIsCompacting(false)
     setCompactionReason(null)
     setPendingError(null)
+    setQueuedCount(0)
   }
 
   // Fetch the status snapshot from the server on every thread mount/switch.
@@ -134,6 +140,13 @@ export function useChatStream({
 
   const handleIsLoadingChange = useCallback((loading: boolean) => {
     setIsLoading(loading)
+    // The queue only exists for the duration of a run; clear it the moment the
+    // agent goes idle so a stale "queued" indicator never lingers.
+    if (!loading) setQueuedCount(0)
+  }, [])
+
+  const handleQueueUpdate = useCallback((event: { steering: number; followUp: number }) => {
+    setQueuedCount(event.steering + event.followUp)
   }, [])
 
   // All errors reaching this callback are from live events (no replay); mark
@@ -176,6 +189,7 @@ export function useChatStream({
     onError: handleError,
     onToolExecutionEnd: handleToolExecutionEnd,
     onPlanSaved,
+    onQueueUpdate: handleQueueUpdate,
   })
 
   // After the agent finishes, replace optimistic user-message placeholders (no
@@ -226,13 +240,10 @@ export function useChatStream({
 
   const hasLoadedMessages = messages.length > 0 || isLoading
 
-  const startUserPrompt = useCallback(
-    (text: string, thinkingLevel?: string) => {
-      setIsStopped(false)
-      setIsLoading(true)
-      lastPromptRef.current = { text, thinkingLevel }
-      pendingThinkingLevelRef.current = thinkingLevel ?? null
-
+  // Append a user message to the transcript immediately, deduping against an
+  // identical trailing user row (guards against double-fires from retry paths).
+  const appendOptimisticUserMessage = useCallback(
+    (text: string) => {
       const userMessage: Message = { role: "user", content: text }
       queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
         updateLastPageMessages(prev, (current) => {
@@ -248,7 +259,30 @@ export function useChatStream({
         })
       )
     },
-    [queryClient, sessionId, lastPromptRef, pendingThinkingLevelRef]
+    [queryClient, sessionId]
+  )
+
+  const startUserPrompt = useCallback(
+    (text: string, thinkingLevel?: string) => {
+      setIsStopped(false)
+      setIsLoading(true)
+      lastPromptRef.current = { text, thinkingLevel }
+      pendingThinkingLevelRef.current = thinkingLevel ?? null
+      appendOptimisticUserMessage(text)
+    },
+    [appendOptimisticUserMessage, lastPromptRef, pendingThinkingLevelRef]
+  )
+
+  // Steering: the agent is already running, so we only append the user's message
+  // to the transcript. isLoading/lastPrompt stay untouched — the in-flight run
+  // owns those, and the SDK delivers this message into the current turn. The
+  // "queued" count is driven by queue_update events from the server.
+  const steerPrompt = useCallback(
+    (text: string) => {
+      setQueuedCount((n) => n + 1)
+      appendOptimisticUserMessage(text)
+    },
+    [appendOptimisticUserMessage]
   )
 
   // Called when the server confirms an abort. Clear isLoading immediately
@@ -300,7 +334,9 @@ export function useChatStream({
     isCompacting,
     compactionReason,
     pendingError,
+    queuedCount,
     startUserPrompt,
+    steerPrompt,
     markStopped,
     markSendFailed,
     dismissError,

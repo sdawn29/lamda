@@ -27,6 +27,9 @@ import { toast } from "sonner"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
+import { ShortcutKbd } from "@/shared/ui/kbd"
+import { useShortcutBinding } from "@/shared/components/keyboard-shortcuts-provider"
+import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import {
   useModels,
   useSlashCommands,
@@ -483,7 +486,9 @@ export const ChatTextbox = memo(
     const noSkillsAvailable =
       !commandsLoading && (commandsData?.length ?? 0) === 0
 
-    const canSend = !isEmpty && !isLoading
+    // Sending is allowed even while the agent runs: a non-empty submit while
+    // loading steers the live turn (the parent decides steer vs. new prompt).
+    const canSend = !isEmpty
 
     function handleSend() {
       if (!canSend) return
@@ -614,6 +619,7 @@ export const ChatTextbox = memo(
 
     const modeStyles = getModeOption(mode)
     const modeSendButton = modeStyles.sendButton
+    const stopBinding = useShortcutBinding(SHORTCUT_ACTIONS.STOP_GENERATION)
 
     return (
       <div className={cn("flex w-full flex-col gap-1", className)}>
@@ -653,7 +659,9 @@ export const ChatTextbox = memo(
           <div className="p-4">
             <RichInput
               ref={richInputRef}
-              placeholder={placeholder}
+              placeholder={
+                isLoading ? "Steer the agent — your message joins this run…" : placeholder
+              }
               mentionActive={atMention !== null && mentionEntries2.length > 0}
               slashActive={
                 slashMention !== null &&
@@ -766,36 +774,19 @@ export const ChatTextbox = memo(
                 sessionId={sessionId}
                 sessionStats={sessionStats}
               />
-              {isLoading ? (
+              {isLoading && !isEmpty ? (
+                // While the agent runs, a non-empty submit steers the live turn.
+                // The steer button replaces Stop so there's a single primary
+                // action — Stop returns the moment the input is cleared.
                 <Tooltip>
                   <TooltipTrigger
                     render={
                       <Button
-                        size="icon-sm"
-                        onClick={onStop}
-                        disabled={isAborting}
-                        aria-label="Stop generation"
-                        className="aspect-square animate-in rounded-full bg-destructive duration-150 fade-in-0 zoom-in-90 hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <div className="h-2.5 w-2.5 rounded-sm bg-white" />
-                      </Button>
-                    }
-                  />
-                  <TooltipContent>
-                    {isAborting ? "Stopping…" : "Stop"}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        size="icon-sm"
+                        size="icon-lg"
                         onClick={handleSend}
-                        disabled={!canSend}
-                        aria-label="Send message"
+                        aria-label="Send to running agent"
                         className={cn(
-                          "aspect-square animate-in rounded-full transition-colors duration-150 fade-in-0 zoom-in-90",
+                          "aspect-square animate-in rounded-lg transition-colors duration-150 fade-in-0 zoom-in-90",
                           modeSendButton
                         )}
                       >
@@ -803,7 +794,55 @@ export const ChatTextbox = memo(
                       </Button>
                     }
                   />
-                  <TooltipContent>Send</TooltipContent>
+                  <TooltipContent>
+                    Send — steers the running agent
+                    <ShortcutKbd binding="enter" className="ml-1" />
+                  </TooltipContent>
+                </Tooltip>
+              ) : isLoading ? (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        size="icon-lg"
+                        onClick={onStop}
+                        disabled={isAborting}
+                        aria-label="Stop generation"
+                        className="aspect-square animate-in rounded-lg bg-destructive duration-150 fade-in-0 zoom-in-90 hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <div className="h-3 w-3 rounded-sm bg-white" />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>
+                    {isAborting ? "Stopping…" : "Stop"}
+                    {!isAborting && (
+                      <ShortcutKbd binding={stopBinding} className="ml-1" />
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        size="icon-lg"
+                        onClick={handleSend}
+                        disabled={!canSend}
+                        aria-label="Send message"
+                        className={cn(
+                          "aspect-square animate-in rounded-lg transition-colors duration-150 fade-in-0 zoom-in-90",
+                          modeSendButton
+                        )}
+                      >
+                        <ArrowUpIcon />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>
+                    Send
+                    <ShortcutKbd binding="enter" className="ml-1" />
+                  </TooltipContent>
                 </Tooltip>
               )}
             </div>
