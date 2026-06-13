@@ -15,6 +15,7 @@ export function MessageChip({
   detail,
   detailClassName,
   className,
+  onClick,
 }: {
   icon?: ReactNode
   label: ReactNode
@@ -22,25 +23,37 @@ export function MessageChip({
   detail?: ReactNode
   detailClassName?: string
   className?: string
+  /** When set, the chip becomes an interactive button. */
+  onClick?: () => void
 }) {
-  const chip = (
-    <span className="inline-flex align-middle">
-      <Badge
-        variant="outline"
-        className={cn(
-          "mx-0.5 rounded-md border-transparent bg-foreground/5! px-1.5 align-middle text-xs! text-foreground/80 transition-colors select-text hover:bg-foreground/10!",
-          className
-        )}
-      >
-        {icon}
-        <span className="max-w-36 truncate">{label}</span>
-        {meta && (
-          <span className="font-mono text-3xs text-muted-foreground">
-            {meta}
-          </span>
-        )}
-      </Badge>
-    </span>
+  const badge = (
+    <Badge
+      variant="outline"
+      className={cn(
+        "mx-0.5 rounded-md border-transparent bg-foreground/5! px-1.5 align-middle text-xs! text-foreground/80 transition-colors select-text hover:bg-foreground/10!",
+        onClick &&
+          "cursor-pointer select-none hover:bg-primary/10! hover:text-foreground",
+        className
+      )}
+    >
+      {icon}
+      <span className="max-w-36 truncate">{label}</span>
+      {meta && (
+        <span className="font-mono text-3xs text-muted-foreground">{meta}</span>
+      )}
+    </Badge>
+  )
+
+  const chip = onClick ? (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex align-middle focus-visible:outline-none"
+    >
+      {badge}
+    </button>
+  ) : (
+    <span className="inline-flex align-middle">{badge}</span>
   )
 
   if (!detail) return chip

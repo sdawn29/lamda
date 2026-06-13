@@ -31,7 +31,7 @@ const proseClass =
   "prose prose-sm max-w-none dark:prose-invert font-chat prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.4] prose-headings:my-0 prose-p:leading-[1.8] prose-p:mt-0 prose-p:mb-[0.75em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.8] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
 
 import { ToolCallBlock } from "./tool-call-block"
-import { markdownComponents } from "./markdown-components"
+import { getMarkdownComponents } from "./markdown-components"
 import { UserMessageContent } from "./user-message"
 import { CopyButton } from "@/shared/components/copy-button"
 import { Button } from "@/shared/ui/button"
@@ -88,6 +88,7 @@ interface AssistantMessageBlockProps {
   entryDelayMs?: number
   isLastInTurn?: boolean
   turnMessages?: AssistantMessage[]
+  rootPath?: string
 }
 
 const THINKING_LEVEL_LABELS: Record<string, string> = {
@@ -193,6 +194,7 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
   entryDelayMs = 0,
   isLastInTurn = true,
   turnMessages,
+  rootPath,
 }: AssistantMessageBlockProps) {
   const hasContent = message.content.length > 0
   const hasError = !!message.errorMessage
@@ -231,7 +233,7 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
         <div className={proseClass}>
           <Markdown
             remarkPlugins={remarkPlugins}
-            components={markdownComponents}
+            components={getMarkdownComponents(rootPath)}
           >
             {displayContent}
           </Markdown>
@@ -552,6 +554,7 @@ export const MessageRow = memo(function MessageRow({
       entryDelayMs={entryDelayMs}
       isLastInTurn={isLastInTurn}
       turnMessages={turnMessages}
+      rootPath={rootPath}
     />
   )
 })

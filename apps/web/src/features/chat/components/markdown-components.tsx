@@ -1,9 +1,14 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import type { Components } from "react-markdown"
+import { Icon } from "@iconify/react"
 import { useSyntaxTheme } from "@/features/themes"
+import { useMainTabsStore } from "@/features/main-tabs"
 import { Check, Copy } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
+import { getIconName } from "@/shared/ui/file-icon"
+import { SectionLabel } from "@/shared/ui/section-label"
+import { MessageChip } from "./message-chip"
 
 const PrismCode = lazy(() => import("./prism-code"))
 
@@ -82,6 +87,122 @@ function CodeBlock({
       </pre>
     </div>
   )
+}
+
+// File extensions we consider "pathish" even without a leading slash, so a
+// bare `markdown-components.tsx` still becomes clickable.
+const FILE_EXT_RE =
+  /\.(tsx?|jsx?|mjs|cjs|json|md|mdx|css|scss|less|html?|py|go|rs|rb|java|kt|swift|c|h|cpp|hpp|cs|php|sh|bash|zsh|sql|ya?ml|toml|ini|env|lock|txt|svg|vue|astro)$/i
+
+// Trailing `:line` or `:line:col` location suffix.
+const LINE_SUFFIX_RE = /:(\d+)(?::\d+)?$/
+
+interface FileReference {
+  path: string
+  line?: number
+}
+
+/**
+ * Decide whether an inline-code span is a navigable file reference. Conservative
+ * on purpose: only paths (a `/`) or bare filenames with a known extension count,
+ * so shell snippets like `npm install` or identifiers like `useState` stay plain.
+ */
+function parseFileReference(text: string): FileReference | null {
+  const trimmed = text.trim()
+  if (!trimmed || /\s/.test(trimmed)) return null
+  if (/^[a-z]+:\/\//i.test(trimmed)) return null // URLs (http://, file://, …)
+
+  const lineMatch = trimmed.match(LINE_SUFFIX_RE)
+  const line = lineMatch ? Number(lineMatch[1]) : undefined
+  const path = lineMatch ? trimmed.slice(0, lineMatch.index) : trimmed
+  if (!path) return null
+
+  const looksLikePath = path.includes("/") || FILE_EXT_RE.test(path)
+  if (!looksLikePath) return null
+
+  return { path, line }
+}
+
+function resolveAbsolutePath(path: string, rootPath?: string): string {
+  if (path.startsWith("/")) return path
+  if (rootPath) return `${rootPath.replace(/\/$/, "")}/${path}`
+  return path
+}
+
+function FileReferenceLink({
+  reference,
+  rootPath,
+}: {
+  reference: FileReference
+  rootPath?: string
+}) {
+  const basename = reference.path.split("/").pop() || reference.path
+
+  function handleClick() {
+    useMainTabsStore.getState().addFileTab({
+      filePath: resolveAbsolutePath(reference.path, rootPath),
+      title: basename,
+      workspacePath: rootPath,
+      scrollToLine: reference.line,
+    })
+  }
+
+  return (
+    <MessageChip
+      onClick={handleClick}
+      icon={
+        <Icon
+          icon={`catppuccin:${getIconName(basename)}`}
+          data-icon="inline-start"
+          aria-hidden
+        />
+      }
+      label={basename}
+      meta={reference.line != null ? `:${reference.line}` : undefined}
+      detail={
+        <div className="flex flex-col gap-1">
+          <SectionLabel>Open in review panel</SectionLabel>
+          <span className="font-mono text-xs break-all">
+            {reference.path}
+            {reference.line != null ? `:${reference.line}` : ""}
+          </span>
+        </div>
+      }
+    />
+  )
+}
+
+export function getMarkdownComponents(rootPath?: string): Components {
+  const cached = markdownComponentsCache.get(rootPath)
+  if (cached) return cached
+  const components = createMarkdownComponents(rootPath)
+  markdownComponentsCache.set(rootPath, components)
+  return components
+}
+
+const markdownComponentsCache = new Map<string | undefined, Components>()
+
+function createMarkdownComponents(rootPath?: string): Components {
+  return {
+    ...markdownComponents,
+    code: ({ className, children }) => {
+      const isBlock =
+        String(children).endsWith("\n") || className?.startsWith("language-")
+      if (!isBlock) {
+        const text = String(children)
+        const reference = parseFileReference(text)
+        if (reference) {
+          return <FileReferenceLink reference={reference} rootPath={rootPath} />
+        }
+        return (
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.8125rem] text-foreground">
+            {children}
+          </code>
+        )
+      }
+      return <CodeBlock className={className}>{children}</CodeBlock>
+    },
+  }
 }
 
 export const markdownComponents: Components = {
