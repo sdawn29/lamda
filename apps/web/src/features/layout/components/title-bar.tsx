@@ -151,7 +151,7 @@ export function TitleBar() {
     pinThread,
     unpinThread,
   } = useWorkspace()
-  const { toggleSidebar, state: sidebarState } = useSidebar()
+  const { toggleSidebar, state: sidebarState, isMobile } = useSidebar()
   const { isOpen: rightSidebarOpen, togglePanel } = useRightSidebar()
   const toggleDiff = () => togglePanel("changes")
   const { activeTab } = useMainTabs()
@@ -314,7 +314,11 @@ export function TitleBar() {
           aria-hidden
           className={cn(
             "h-full shrink-0 transition-[width] duration-200 ease-linear",
-            sidebarState === "collapsed"
+            // Below the sidebar's mobile breakpoint the desktop sidebar is
+            // replaced by an off-canvas sheet, so the floating controls (and the
+            // macOS traffic lights) overlay the title bar just like when the
+            // sidebar is collapsed — reserve the same left strip in both cases.
+            sidebarState === "collapsed" || isMobile
               ? isMac && !isFullscreen
                 ? "w-48"
                 : "w-28"
