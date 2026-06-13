@@ -6,6 +6,7 @@ import {
   AlertCircleIcon,
   CheckIcon,
   ChevronRightIcon,
+  CircleSlashIcon,
   CopyIcon,
   GitForkIcon,
   HistoryIcon,
@@ -341,12 +342,13 @@ export interface MessageRowProps {
 function AbortBlock({ message: _ }: { message: AbortMessage }) {
   void _
   return (
-    <div className="flex items-center gap-3 py-3">
-      <div className="h-px flex-1 bg-border" />
-      <div className="shrink-0 rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive/80">
-        Operation Aborted
+    <div className="flex items-center gap-3 py-2">
+      <div className="h-px flex-1 bg-border/40" />
+      <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1 text-2xs text-muted-foreground/60">
+        <CircleSlashIcon className="h-3 w-3 text-destructive/50" />
+        <span>Operation aborted</span>
       </div>
-      <div className="h-px flex-1 bg-border" />
+      <div className="h-px flex-1 bg-border/40" />
     </div>
   )
 }
