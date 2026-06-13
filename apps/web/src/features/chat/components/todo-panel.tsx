@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react"
-import { CheckIcon, ChevronRightIcon, ListTodoIcon, MinusIcon } from "lucide-react"
+import { CheckIcon, ChevronRightIcon, ListTodoIcon } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
 import type { Message, ToolMessage } from "../types"
 
@@ -192,24 +192,35 @@ export function deriveCompletedGoalLists(
 
 // ── Checkbox ──────────────────────────────────────────────────────────────────
 
-function Checkbox({ status }: { status: TodoStatus }) {
+function Checkbox({ status, isLive }: { status: TodoStatus; isLive?: boolean }) {
+  // Minimal status glyphs, all on a fixed 3.5×3.5 box so rows align:
+  //   • in_progress → filled accent dot (pulsing while live)
+  //   • completed   → small check
+  //   • pending     → hollow ring
+  if (status === "in_progress") {
+    return (
+      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+        <span
+          className={cn(
+            "h-1.5 w-1.5 rounded-full",
+            isLive ? "animate-pulse bg-primary" : "bg-muted-foreground/50",
+          )}
+        />
+      </span>
+    )
+  }
+
+  if (status === "completed") {
+    return (
+      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+        <CheckIcon className="h-3 w-3 text-muted-foreground/45" strokeWidth={2.5} />
+      </span>
+    )
+  }
+
   return (
-    <span
-      className={cn(
-        "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors duration-150",
-        status === "completed"
-          ? "border-muted-foreground/30 bg-muted-foreground/15"
-          : status === "in_progress"
-            ? "border-muted-foreground/50"
-            : "border-muted-foreground/25",
-      )}
-    >
-      {status === "completed" && (
-        <CheckIcon className="h-2.5 w-2.5 text-muted-foreground/60" strokeWidth={2.5} />
-      )}
-      {status === "in_progress" && (
-        <MinusIcon className="h-2.5 w-2.5 text-muted-foreground/50" strokeWidth={2.5} />
-      )}
+    <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+      <span className="h-1.5 w-1.5 rounded-full border border-muted-foreground/30" />
     </span>
   )
 }
@@ -233,17 +244,17 @@ function GoalSection({
   const activeTask = !isDone && goal.tasks.find((t) => t.status === "in_progress")
 
   return (
-    <div className={cn("px-3 py-2", !isLast && "border-b border-border/40")}>
+    <div className={cn("px-2.5 py-1.5", !isLast && "border-b border-border/30")}>
       {/* Goal header */}
-      <div className="mb-1.5 flex items-center gap-1.5">
+      <div className="mb-1 flex items-center gap-1.5">
         <span
           className={cn(
-            "flex-1 text-xs font-medium",
+            "flex-1 truncate text-2xs font-medium uppercase tracking-wide",
             isDone
               ? "text-muted-foreground/40 line-through"
               : isLive && activeTask
                 ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
-                : "text-muted-foreground/80",
+                : "text-muted-foreground/55",
           )}
         >
           {goal.description}
@@ -254,22 +265,23 @@ function GoalSection({
       </div>
 
       {/* Tasks — force all to "completed" appearance when goal is done */}
-      <ul className="flex flex-col">
+      <ul className="flex flex-col gap-px">
         {goal.tasks.map((task) => {
           const effectiveStatus: TodoStatus = isDone ? "completed" : task.status
+          const isActive = effectiveStatus === "in_progress"
           return (
-            <li key={task.id} className="flex items-center gap-2 py-0.5">
-              <Checkbox status={effectiveStatus} />
+            <li key={task.id} className="flex items-center gap-2 py-px">
+              <Checkbox status={effectiveStatus} isLive={isLive} />
               <span
                 className={cn(
-                  "text-sm leading-snug",
+                  "truncate text-xs leading-relaxed",
                   effectiveStatus === "completed"
                     ? "text-muted-foreground/40 line-through"
-                    : effectiveStatus === "in_progress"
+                    : isActive
                       ? isLive
-                        ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/50 via-foreground to-muted-foreground/50 bg-size-[200%_100%] bg-clip-text text-transparent"
-                        : "text-foreground/80"
-                      : "text-muted-foreground/60",
+                        ? "animate-thinking-shimmer bg-linear-to-r from-primary/70 via-foreground to-primary/70 bg-size-[200%_100%] bg-clip-text font-medium text-transparent"
+                        : "font-medium text-foreground/90"
+                      : "text-muted-foreground/65",
                 )}
               >
                 {task.content}
@@ -284,8 +296,18 @@ function GoalSection({
 
 // ── TodoListCard (presentational) ─────────────────────────────────────────────
 
-function TodoListCard({ goals, isLive }: { goals: TodoGoal[]; isLive: boolean }) {
-  const [expanded, setExpanded] = useState(false)
+function TodoListCard({
+  goals,
+  isLive,
+  defaultExpanded = false,
+}: {
+  goals: TodoGoal[]
+  isLive: boolean
+  defaultExpanded?: boolean
+}) {
+  // The live panel opens by default and never auto-collapses — only the user
+  // closes it. Inline completed lists stay collapsed unless expanded.
+  const [expanded, setExpanded] = useState(defaultExpanded)
 
   const totalTasks = goals.reduce((n, g) => n + g.tasks.length, 0)
   // A goal marked "completed" counts all its tasks as done — individual tasks
@@ -301,21 +323,21 @@ function TodoListCard({ goals, isLive }: { goals: TodoGoal[]; isLive: boolean })
   const allDone = totalTasks > 0 && completedTasks === totalTasks
 
   return (
-    <div className="w-full overflow-hidden rounded-lg border border-border/40">
+    <div className="w-full overflow-hidden rounded-md border border-border/40 bg-card/30">
       {/* Header / trigger */}
       <button
         type="button"
-        className="flex w-full items-center gap-1.5 px-3 py-2 text-left"
+        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/30"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
-        <ListTodoIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
+        <ListTodoIcon className="h-3 w-3 shrink-0 text-muted-foreground/40" />
         <span
           className={cn(
-            "flex-1 text-xs font-medium",
+            "flex-1 text-2xs font-medium",
             isLive && !allDone
               ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
-              : "text-muted-foreground",
+              : "text-muted-foreground/80",
           )}
         >
           {allDone
@@ -339,7 +361,7 @@ function TodoListCard({ goals, isLive }: { goals: TodoGoal[]; isLive: boolean })
         )}
       >
         <div className="overflow-hidden">
-          <div className="border-t border-border/40">
+          <div className="border-t border-border/30">
             {goals.map((goal, i) => (
               <GoalSection
                 key={goal.id}
@@ -374,7 +396,7 @@ export const TodoPanel = memo(function TodoPanel({ messages }: TodoPanelProps) {
 
   if (goals.length === 0) return null
 
-  return <TodoListCard goals={goals} isLive={isLive} />
+  return <TodoListCard goals={goals} isLive={isLive} defaultExpanded />
 })
 
 // ── CompletedTodoPanel (inline, docked into the conversation) ──────────────────

@@ -762,6 +762,22 @@ export function ChatView({
     [visibleMessages]
   )
 
+  // While the agent is working, the in-progress turn's metadata footer (model,
+  // duration, timestamp) isn't final yet, so we hide it. This is the index of
+  // that turn's last-in-turn assistant group — only its footer is suppressed
+  // during loading, so previously completed turns keep showing their metadata.
+  // Scans back from the end, stopping at the last user/abort boundary; -1 means
+  // there's no active assistant turn yet (e.g. a fresh turn still in tool calls).
+  const activeTurnFooterGroupIndex = useMemo(() => {
+    for (let i = groupedMessages.length - 1; i >= 0; i--) {
+      const g = groupedMessages[i]
+      if (g.type !== "regular") continue
+      if (g.message.role === "user" || g.message.role === "abort") break
+      if (g.message.role === "assistant" && g.isLastInTurnStatic) return i
+    }
+    return -1
+  }, [groupedMessages])
+
   // When the agent calls the `question` tool it blocks waiting for the user.
   // We replace the input box with a rich question picker until it's answered.
   const activeQuestion = useMemo(
@@ -1385,7 +1401,9 @@ export function ChatView({
                     initialSnapshot !== null &&
                     initialSnapshot.sessionId === sessionId &&
                     !initialSnapshot.keys.has(key)
-                  const isLastInTurn = !isLoading && isLastInTurnStatic
+                  const isLastInTurn =
+                    isLastInTurnStatic &&
+                    !(isLoading && groupIndex === activeTurnFooterGroupIndex)
                   const entryDelayMs = isNewMessage ? getEntryDelayMs(key) : 0
                   content = (
                     <div className="mx-auto w-full max-w-3xl px-6 pb-3">

@@ -6,7 +6,9 @@ A local-first desktop workspace for AI-powered coding sessions. Run [Pi coding a
 
 ## Features
 
-- **Chat** — real-time streaming conversations with the Pi coding agent, with Agent / Ask / Plan modes per thread and thread forking from any earlier message
+- **Chat** — real-time streaming conversations with the Pi coding agent, with Agent / Ask / Plan modes per thread, inline agent questions, live todo tracking, and thread forking from any earlier message
+- **Memory** — persistent agent memories that carry across sessions, scoped per-workspace or to all projects, with pinned core memories, categories, and search; relevant memories are injected into prompts and the agent manages them through a built-in `memory` tool
+- **Self-healing** — automatically re-prompt the agent to diagnose and fix a turn that ends in an error, with lessons from successful recoveries saved as workspace memories (errors the agent can't fix, like rate limits or auth, are left for you)
 - **Git** — view diffs, hunk-level staging, commit, branches, stashes, and a side-by-side review panel with last-turn file change tracking
 - **Terminal** — embedded multi-tab shell with persistent PTY sessions, auto-reconnect, and clickable links
 - **Workspaces** — organize multiple repos and conversation threads, with workspace-level task shortcuts
@@ -14,6 +16,7 @@ A local-first desktop workspace for AI-powered coding sessions. Run [Pi coding a
 - **LSP** — language server integration with one-click installs
 - **Themes** — built-in color themes (including Catppuccin variants) with Google Fonts integration
 - **Command palette** — Cmd+K access to commands and navigation
+- **Settings** — configure the agent model, chat behavior, providers, and memory from an in-app settings panel
 - **Usage tracking** — AI token usage stats with date-range filtering and context breakdowns
 
 ## Getting Started
