@@ -82,6 +82,37 @@ function readStoredThinkingLevel(): ThinkingLevel {
   return "medium"
 }
 
+// Persisted, shell-style history of messages the user has sent, recalled by
+// pressing ArrowUp / ArrowDown on the chat input. Stored newest-last and shared
+// across threads so the history follows the user like a terminal prompt.
+const MESSAGE_HISTORY_STORAGE_KEY = "chat:message_history"
+const MAX_MESSAGE_HISTORY = 100
+
+function readMessageHistory(): string[] {
+  try {
+    const raw = window.localStorage.getItem(MESSAGE_HISTORY_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      return parsed.filter((v): v is string => typeof v === "string")
+    }
+  } catch {
+    // Corrupt or unavailable storage — start with an empty history.
+  }
+  return []
+}
+
+function writeMessageHistory(history: string[]): void {
+  try {
+    window.localStorage.setItem(
+      MESSAGE_HISTORY_STORAGE_KEY,
+      JSON.stringify(history)
+    )
+  } catch {
+    // localStorage may be unavailable (private mode / disabled) — ignore.
+  }
+}
+
 interface ChatTextboxProps {
   onSend?: (
     message: string,
@@ -187,8 +218,16 @@ export const ChatTextbox = memo(
       ? controlledThinkingLevel
       : thinkingLevel
     const richInputRef = React.useRef<RichInputHandle>(null)
-    // Last message the user sent, recalled by pressing ArrowUp on an empty input.
-    const lastSentRef = React.useRef<string>("")
+    // Persisted history of sent messages (newest last), cycled with Up/Down.
+    const historyRef = React.useRef<string[]>(readMessageHistory())
+    // Position within `historyRef`; null means we're showing the live draft.
+    const historyCursorRef = React.useRef<number | null>(null)
+    // The draft that was in the input when history navigation began, restored
+    // when the user arrows back down past the newest entry.
+    const historyDraftRef = React.useRef<string>("")
+    // The exact value we last wrote to the input during navigation. If the
+    // current value differs, the user has edited it and navigation restarts.
+    const historyNavValueRef = React.useRef<string>("")
 
     useImperativeHandle(ref, () => ({
       getValue() {
@@ -525,12 +564,82 @@ export const ChatTextbox = memo(
         selectedModel?.provider ?? "",
         effectiveThinkingLevel
       )
-      lastSentRef.current = text
+      // Append to history (skipping consecutive duplicates) and reset the
+      // navigation cursor so the next ArrowUp starts from the newest message.
+      const history = historyRef.current
+      if (history[history.length - 1] !== text) {
+        history.push(text)
+        if (history.length > MAX_MESSAGE_HISTORY) {
+          history.splice(0, history.length - MAX_MESSAGE_HISTORY)
+        }
+        writeMessageHistory(history)
+      }
+      historyCursorRef.current = null
+      historyDraftRef.current = ""
+      historyNavValueRef.current = ""
       richInputRef.current?.clear()
       setIsEmpty(true)
       setAtMention(null)
       setSlashMention(null)
       richInputRef.current?.focus()
+    }
+
+    // Replace the input contents during history navigation, tracking the value
+    // we wrote so a later edit can be detected.
+    function applyHistoryValue(text: string) {
+      historyNavValueRef.current = text
+      if (text) {
+        richInputRef.current?.setValue(text)
+        setIsEmpty(text.trim().length === 0)
+      } else {
+        richInputRef.current?.clear()
+        setIsEmpty(true)
+        richInputRef.current?.focus()
+      }
+    }
+
+    // Move through sent-message history. `canStart` gates beginning navigation
+    // from a fresh (empty) input. Returns true when the key was consumed.
+    function navigateHistory(dir: "prev" | "next", canStart: boolean): boolean {
+      const history = historyRef.current
+      if (history.length === 0) return false
+
+      // If the user edited a recalled message, drop out of navigation mode so
+      // their edit becomes the live draft.
+      const current = richInputRef.current?.getValue() ?? ""
+      if (
+        historyCursorRef.current !== null &&
+        current !== historyNavValueRef.current
+      ) {
+        historyCursorRef.current = null
+      }
+
+      if (historyCursorRef.current === null) {
+        if (dir === "next") return false // nothing newer than the live draft
+        if (!canStart) return false // don't hijack arrows mid-draft
+        historyDraftRef.current = current
+        historyCursorRef.current = history.length - 1
+        applyHistoryValue(history[historyCursorRef.current]!)
+        return true
+      }
+
+      if (dir === "prev") {
+        if (historyCursorRef.current > 0) {
+          historyCursorRef.current -= 1
+          applyHistoryValue(history[historyCursorRef.current]!)
+        }
+        return true // consume even at the oldest entry
+      }
+
+      // dir === "next"
+      historyCursorRef.current += 1
+      if (historyCursorRef.current >= history.length) {
+        historyCursorRef.current = null
+        applyHistoryValue(historyDraftRef.current)
+        return true
+      }
+      applyHistoryValue(history[historyCursorRef.current]!)
+      return true
     }
 
     function handleInput() {
@@ -751,12 +860,8 @@ export const ChatTextbox = memo(
                 setAtMention(null)
                 setSlashMention(null)
               }}
-              onRecallHistory={() => {
-                const last = lastSentRef.current
-                if (!last) return
-                richInputRef.current?.setValue(last)
-                setIsEmpty(false)
-              }}
+              onHistoryPrev={(atStart) => navigateHistory("prev", atStart)}
+              onHistoryNext={() => navigateHistory("next", false)}
             />
           </div>
 

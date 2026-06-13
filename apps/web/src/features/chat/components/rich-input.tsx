@@ -226,8 +226,15 @@ export const RichInput = React.forwardRef<
     onArrowDown: () => void
     onEscape: () => void
     onInput: () => void
-    /** Called when ArrowUp is pressed while the input is empty (recall history). */
-    onRecallHistory: () => void
+    /**
+     * ArrowUp pressed outside a dropdown. `atStart` is true when the input is
+     * empty, signalling that history navigation may begin. Returns true if the
+     * parent consumed the key (recalled an older message), in which case the
+     * default caret movement is suppressed.
+     */
+    onHistoryPrev: (atStart: boolean) => boolean
+    /** ArrowDown pressed outside a dropdown. Returns true if consumed for history. */
+    onHistoryNext: () => boolean
   }
 >(function RichInput(
   {
@@ -243,7 +250,8 @@ export const RichInput = React.forwardRef<
     onArrowDown,
     onEscape,
     onInput,
-    onRecallHistory,
+    onHistoryPrev,
+    onHistoryNext,
   },
   ref
 ) {
@@ -454,12 +462,20 @@ export const RichInput = React.forwardRef<
       return
     }
 
-    // ArrowUp on an empty input recalls the last sent message.
+    // ArrowUp / ArrowDown cycle through previously sent messages. The parent
+    // decides whether to consume the key (e.g. only when the input is empty or
+    // already showing a recalled message); otherwise the caret moves normally.
     if (e.key === "ArrowUp") {
       const div = divRef.current
-      if (div && isRichInputEmpty(div)) {
+      const atStart = div ? isRichInputEmpty(div) : false
+      if (onHistoryPrev(atStart)) {
         e.preventDefault()
-        onRecallHistory()
+        return
+      }
+    }
+    if (e.key === "ArrowDown") {
+      if (onHistoryNext()) {
+        e.preventDefault()
         return
       }
     }
