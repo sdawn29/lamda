@@ -16,9 +16,8 @@ import { LspSection } from "@/features/settings/sections/lsp"
 import { McpSection } from "@/features/settings/sections/mcp"
 import { RetrySection } from "@/features/settings/sections/retry"
 import { MemorySection } from "@/features/settings/sections/memory"
-import { UpdatesSection } from "@/features/settings/sections/updates"
-import { DataSection } from "@/features/settings/sections/data"
 import { UsageSection } from "@/features/settings/sections/usage"
+import { AboutSection } from "@/features/settings/sections/about"
 
 const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
   appearance: AppearanceSection,
@@ -33,8 +32,7 @@ const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
   mcp: McpSection,
   memory: MemorySection,
   retry: RetrySection,
-  updates: UpdatesSection,
-  data: DataSection,
+  about: AboutSection,
 }
 
 interface SettingsSectionSearch {

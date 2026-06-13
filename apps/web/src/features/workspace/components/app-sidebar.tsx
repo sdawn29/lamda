@@ -8,6 +8,7 @@ import {
   KeyRound,
   Loader2,
   MessageSquarePlus,
+  MessagesSquare,
   MoreHorizontal,
   Pin,
   Search,
@@ -59,6 +60,7 @@ import { DEFAULT_SETTINGS_SECTION } from "@/features/settings"
 import { useMainTabs } from "@/features/main-tabs"
 import { useCommandPalette } from "@/features/command-palette"
 import { ArchivedThreadsDialog } from "./archived-threads-dialog"
+import { FeedbackDialog } from "./feedback-dialog"
 import { CreateWorkspaceDialog } from "./create-workspace-dialog"
 import { WorkspaceEnvDialog } from "./workspace-env-dialog"
 import type { WorkspaceDto } from "../api"
@@ -319,6 +321,7 @@ export function AppSidebar() {
     Record<string, boolean>
   >({})
   const [archivedOpen, setArchivedOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false)
   const [deletingWorkspace, setDeletingWorkspace] = useState<
     (typeof workspaces)[0] | null
@@ -701,6 +704,15 @@ export function AppSidebar() {
           <Archive />
           Archived
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          onClick={() => setFeedbackOpen(true)}
+        >
+          <MessagesSquare />
+          Feedback
+        </Button>
         <Tooltip>
           <TooltipTrigger
             render={
@@ -728,6 +740,8 @@ export function AppSidebar() {
         open={archivedOpen}
         onOpenChange={setArchivedOpen}
       />
+
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
 
       <CreateWorkspaceDialog
         open={createWorkspaceOpen}

@@ -13,8 +13,8 @@
     "check-types": "tsc --project tsconfig.json --noEmit"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Snehasish Dawn",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@lamda/server": "*",
