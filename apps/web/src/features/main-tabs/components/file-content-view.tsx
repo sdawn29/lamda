@@ -9,12 +9,10 @@ import { LANGUAGE_MAP } from "@/shared/lib/language-map"
 import {
   MonacoCodeViewer,
   ProblemsStrip,
-  OutlinePanel,
   useFileDiagnostics,
   useLspConnection,
   useOpenDocument,
   useResolveWorkspaceId,
-  useDocumentSymbols,
 } from "@/features/lsp"
 import { useChatActions } from "@/features/chat/contexts/chat-actions-context"
 import { subscribeToWorkspaceFileUpdates } from "@/features/chat/thread-status-store"
@@ -111,7 +109,6 @@ export const FileContentView = memo(function FileContentView({
   const lspFilePath = isCodeView ? filePath : null
   useOpenDocument(lsp, lspFilePath, isCodeView ? content : null)
   const diagnostics = useFileDiagnostics(lsp, lspFilePath)
-  const symbols = useDocumentSymbols(lsp, lspFilePath, isCodeView)
 
   const markdownLinkComponents = useMemo(
     () => ({
@@ -291,12 +288,6 @@ export const FileContentView = memo(function FileContentView({
           isPdf={isPdf}
         />
       </div>
-      {isCodeView && (
-        <OutlinePanel
-          symbols={symbols}
-          onJumpToLine={(line) => setScrollToLine(line)}
-        />
-      )}
       <div className="flex min-h-0 flex-1 flex-col p-2">
         <div
           className={cn(
