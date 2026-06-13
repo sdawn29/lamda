@@ -422,6 +422,16 @@ function createDb() {
     // Safe to ignore — column may already exist.
   }
 
+  // Migration: Add attachments column to message_blocks table for persisting file attachments.
+  try {
+    const msgBlockCols = sqlite.prepare("PRAGMA table_info(message_blocks)").all() as { name: string }[];
+    if (!msgBlockCols.some((col) => col.name === "attachments")) {
+      sqlite.exec(`ALTER TABLE message_blocks ADD COLUMN attachments TEXT`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
   // Memory retrieval: FTS5 index over agent_memories for BM25-ranked retrieval,
   // kept in sync with the base table by triggers. Guarded so the app still runs
   // on a SQLite build without FTS5 — callers fall back to LIKE search.

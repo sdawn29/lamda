@@ -692,11 +692,13 @@ const FileContent = memo(function FileContent({
   openWithAppId,
   workspacePath,
   initialScrollToLine,
+  sourceUrl,
 }: {
   filePath: string
   openWithAppId?: string | null
   workspacePath?: string
   initialScrollToLine?: number
+  sourceUrl?: string
 }) {
   const { addFileTab } = useMainTabs()
   return (
@@ -706,6 +708,7 @@ const FileContent = memo(function FileContent({
       openWithAppId={openWithAppId}
       workspacePath={workspacePath}
       initialScrollToLine={initialScrollToLine}
+      sourceUrl={sourceUrl}
       onOpenFile={(target, title, line) =>
         addFileTab({
           title,
@@ -923,9 +926,12 @@ export const ReviewPanel = memo(function ReviewPanel({
               filePath={activeFileTab.filePath}
               openWithAppId={openWithAppId}
               workspacePath={
-                currentWorkspacePath ?? activeFileTab.workspacePath
+                activeFileTab.sourceUrl
+                  ? activeFileTab.workspacePath
+                  : currentWorkspacePath ?? activeFileTab.workspacePath
               }
               initialScrollToLine={activeFileTab.scrollToLine}
+              sourceUrl={activeFileTab.sourceUrl}
             />
           ) : (
             <SourceControlContent

@@ -62,7 +62,11 @@ interface UseChatStreamResult {
   pendingError: ErrorMessage | null
   /** Number of steering/follow-up messages queued for the running agent but not yet delivered. */
   queuedCount: number
-  startUserPrompt: (text: string, thinkingLevel?: string) => void
+  startUserPrompt: (
+    text: string,
+    thinkingLevel?: string,
+    attachments?: UserMessage["attachments"]
+  ) => void
   /** Optimistically append a steering message to the transcript while the agent is running. */
   steerPrompt: (text: string) => void
   markStopped: () => void
@@ -243,15 +247,16 @@ export function useChatStream({
   // Append a user message to the transcript immediately, deduping against an
   // identical trailing user row (guards against double-fires from retry paths).
   const appendOptimisticUserMessage = useCallback(
-    (text: string) => {
-      const userMessage: Message = { role: "user", content: text }
+    (text: string, attachments?: UserMessage["attachments"]) => {
+      const userMessage: Message = { role: "user", content: text, attachments }
       queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
         updateLastPageMessages(prev, (current) => {
           const lastMsg = current[current.length - 1]
           if (
             current.length > 0 &&
             lastMsg.role === "user" &&
-            (lastMsg as Message & { content?: string }).content === text
+            (lastMsg as Message & { content?: string }).content === text &&
+            !attachments
           ) {
             return current
           }
@@ -263,12 +268,12 @@ export function useChatStream({
   )
 
   const startUserPrompt = useCallback(
-    (text: string, thinkingLevel?: string) => {
+    (text: string, thinkingLevel?: string, attachments?: UserMessage["attachments"]) => {
       setIsStopped(false)
       setIsLoading(true)
       lastPromptRef.current = { text, thinkingLevel }
       pendingThinkingLevelRef.current = thinkingLevel ?? null
-      appendOptimisticUserMessage(text)
+      appendOptimisticUserMessage(text, attachments)
     },
     [appendOptimisticUserMessage, lastPromptRef, pendingThinkingLevelRef]
   )

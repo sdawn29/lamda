@@ -4,7 +4,9 @@ import { Icon } from "@iconify/react"
 import { cn } from "@/shared/lib/utils"
 import { getIconName } from "@/shared/ui/file-icon"
 import { SectionLabel } from "@/shared/ui/section-label"
-import type { SlashCommand } from "../api"
+import { useMainTabsStore } from "@/features/main-tabs"
+import { attachmentUrl, type SlashCommand } from "../api"
+import type { UserMessage } from "../types"
 import { MessageChip } from "./message-chip"
 import {
   FILE_CONTEXT_RE,
@@ -182,12 +184,77 @@ function FileContextChip({ context }: { context: FileCommentContext }) {
   )
 }
 
+function AttachmentList({
+  attachments,
+  threadId,
+}: {
+  attachments: NonNullable<UserMessage["attachments"]>
+  threadId?: string
+}) {
+  const srcFor = (a: NonNullable<UserMessage["attachments"]>[number]) =>
+    a.dataUrl ?? (threadId ? attachmentUrl(threadId, a.id) : undefined)
+
+  // Open the attachment in the review-panel file viewer (right sidebar).
+  const openInViewer = (
+    a: NonNullable<UserMessage["attachments"]>[number],
+    src: string
+  ) => {
+    useMainTabsStore.getState().addFileTab({
+      filePath: a.filename,
+      title: a.filename,
+      sourceUrl: src,
+    })
+  }
+
+  return (
+    <div className="mb-1.5 flex flex-wrap gap-1.5">
+      {attachments.map((attachment) => {
+        const src = srcFor(attachment)
+        if (attachment.kind === "image" && src) {
+          return (
+            <button
+              key={attachment.id}
+              type="button"
+              onClick={() => openInViewer(attachment, src)}
+              className="block cursor-pointer overflow-hidden rounded-lg border border-foreground/10 transition-opacity hover:opacity-90"
+            >
+              <img
+                src={src}
+                alt={attachment.filename}
+                className="max-h-40 max-w-[200px] object-cover"
+              />
+            </button>
+          )
+        }
+        return (
+          <button
+            key={attachment.id}
+            type="button"
+            disabled={!src}
+            onClick={() => src && openInViewer(attachment, src)}
+            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-foreground/10 bg-foreground/5 px-2 py-1 text-xs text-foreground/80 hover:bg-foreground/10 disabled:cursor-default disabled:opacity-60"
+          >
+            <FileTextIcon className="size-3.5 shrink-0" aria-hidden />
+            <span className="max-w-[160px] truncate font-medium">
+              {attachment.filename}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function UserMessageContent({
   content,
   commandsByName,
+  attachments,
+  threadId,
 }: {
   content: string
   commandsByName?: ReadonlyMap<string, SlashCommand>
+  attachments?: UserMessage["attachments"]
+  threadId?: string
 }) {
   const parts: React.ReactNode[] = []
   let lastIndex = 0
@@ -260,5 +327,12 @@ export function UserMessageContent({
     pushInlineTokens(content.slice(lastIndex))
   }
 
-  return <>{parts}</>
+  return (
+    <>
+      {attachments && attachments.length > 0 && (
+        <AttachmentList attachments={attachments} threadId={threadId} />
+      )}
+      {parts}
+    </>
+  )
 }

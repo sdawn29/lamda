@@ -226,6 +226,7 @@ export const RichInput = React.forwardRef<
     onArrowDown: () => void
     onEscape: () => void
     onInput: () => void
+    onPasteFiles?: (files: File[]) => void
     /**
      * ArrowUp pressed outside a dropdown. `atStart` is true when the input is
      * empty, signalling that history navigation may begin. Returns true if the
@@ -250,6 +251,7 @@ export const RichInput = React.forwardRef<
     onArrowDown,
     onEscape,
     onInput,
+    onPasteFiles,
     onHistoryPrev,
     onHistoryNext,
   },
@@ -526,6 +528,15 @@ export const RichInput = React.forwardRef<
   }
 
   function handlePaste(e: React.ClipboardEvent<HTMLDivElement>) {
+    // Check for files in the clipboard first
+    const files = Array.from(e.clipboardData.files || [])
+    if (files.length > 0) {
+      e.preventDefault()
+      onPasteFiles?.(files)
+      return
+    }
+
+    // Fall back to text paste
     e.preventDefault()
     const text = e.clipboardData.getData("text/plain")
     if (!text) return

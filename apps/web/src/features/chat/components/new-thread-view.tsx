@@ -40,7 +40,9 @@ import {
   ChatTextbox,
   type ChatTextboxHandle,
   type ThinkingLevel,
+  type PendingAttachment,
 } from "./chat-textbox"
+import { pendingToUploads, pendingToDisplay } from "../lib/attachments"
 import { setPendingThreadPreferences } from "./pending-thread-preferences"
 import { getNextMode } from "./mode-combobox"
 import {
@@ -152,7 +154,8 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
       text: string,
       modelId: string,
       provider: string,
-      thinkingLevel?: string
+      thinkingLevel?: string,
+      attachments?: PendingAttachment[]
     ) => {
       if (!workspaceId || isSending) return
       setIsSending(true)
@@ -205,12 +208,19 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         thinkingLevel: thinkingLevel as ThinkingLevel | undefined,
       })
 
+      const uploads = attachments ? pendingToUploads(attachments) : undefined
+      const displayAttachments = attachments
+        ? pendingToDisplay(attachments)
+        : undefined
+
       // Pre-populate the messages cache so the optimistic user message is
       // visible the moment the new thread route mounts.
       const seed: MessagesInfiniteData = {
         pages: [
           {
-            messages: [{ role: "user", content: text }],
+            messages: [
+              { role: "user", content: text, attachments: displayAttachments },
+            ],
             hasMore: false,
             oldestBlockIndex: null,
           },
@@ -223,7 +233,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           prev
             ? updateLastPageMessages(prev, (msgs) => [
                 ...msgs,
-                { role: "user", content: text },
+                { role: "user", content: text, attachments: displayAttachments },
               ])!
             : seed
       )
@@ -249,7 +259,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           if (capturedBranch) {
             await checkoutBranch(sessionId, capturedBranch)
           }
-          await sendPrompt(sessionId, { text, model, thinkingLevel })
+          await sendPrompt(sessionId, { text, model, thinkingLevel, attachments: uploads })
         } catch (err) {
           // The prompt never reached the agent — drop the optimistic message
           // by refetching server truth, and tell the user.

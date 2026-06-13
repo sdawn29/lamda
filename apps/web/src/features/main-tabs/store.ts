@@ -16,6 +16,12 @@ export interface FileMainTab {
   workspacePath?: string
   openWithAppId?: string | null
   scrollToLine?: number
+  /**
+   * When set, the viewer loads the file bytes from this fully-qualified,
+   * token-appended URL instead of `/file?path=`. Used for chat attachments,
+   * which live outside any workspace directory.
+   */
+  sourceUrl?: string
 }
 
 export type MainTab = ThreadMainTab | FileMainTab
@@ -61,7 +67,7 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
           activeTabId: existing.id,
           tabs: s.tabs.map((item) =>
             item.id === existing.id && item.type === "file"
-              ? { ...item, scrollToLine: tab.scrollToLine }
+              ? { ...item, scrollToLine: tab.scrollToLine, sourceUrl: tab.sourceUrl }
               : item
           ),
         }

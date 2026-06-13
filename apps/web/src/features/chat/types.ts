@@ -10,6 +10,14 @@ export interface UserMessage {
   /** DB block id — present on persisted messages, absent on optimistic placeholders */
   id?: string
   content: string
+  attachments?: {
+    id: string
+    filename: string
+    mediaType: string
+    size: number
+    kind: "image" | "text" | "file"
+    dataUrl?: string // base64 data URL for in-session display
+  }[]
   createdAt?: number
 }
 
@@ -155,6 +163,7 @@ export interface MessageBlock {
   toolStatus: "running" | "done" | "error" | null
   toolDuration: number | null
   toolStartTime: number | null
+  attachments: string | null // JSON array of attachment metadata
   createdAt: number
 }
 
@@ -198,13 +207,23 @@ export function parseErrorMessage(raw: string): string {
  */
 export function blockToMessage(block: MessageBlock): Message {
   switch (block.role) {
-    case "user":
+    case "user": {
+      let attachments: UserMessage["attachments"] = undefined
+      if (block.attachments) {
+        try {
+          attachments = JSON.parse(block.attachments)
+        } catch {
+          // Invalid JSON, skip attachments
+        }
+      }
       return {
         role: "user",
         id: block.id,
         content: block.content ?? "",
+        attachments,
         createdAt: block.createdAt,
       }
+    }
 
     case "assistant":
       return {

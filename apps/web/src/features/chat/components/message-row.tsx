@@ -332,6 +332,8 @@ export interface MessageRowProps {
   isLastInTurn?: boolean
   turnMessages?: AssistantMessage[]
   rootPath?: string
+  /** Durable thread id — used to build URLs for persisted attachments. */
+  threadId?: string
   onFork?: (blockId: string) => Promise<void>
   onRevert?: (blockId: string) => Promise<void>
   isReverting?: boolean
@@ -381,6 +383,7 @@ export const MessageRow = memo(function MessageRow({
   isLastInTurn = true,
   turnMessages,
   rootPath,
+  threadId,
   onFork,
   onRevert,
   isReverting = false,
@@ -449,6 +452,8 @@ export const MessageRow = memo(function MessageRow({
             <UserMessageContent
               content={message.content}
               commandsByName={commandsByName}
+              attachments={userMsg.attachments}
+              threadId={threadId}
             />
           </div>
           <div className="flex items-center gap-2">

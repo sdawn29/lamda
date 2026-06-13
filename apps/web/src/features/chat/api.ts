@@ -1,5 +1,13 @@
-import { apiFetch, appendToken, getServerWsUrl } from "@/shared/lib/client"
+import { apiFetch, appendToken, apiUrl, getServerWsUrl } from "@/shared/lib/client"
 import type { MessageBlock } from "./types"
+
+/**
+ * Build an authenticated URL for fetching a persisted attachment file.
+ * Used as the `src` of `<img>` tags and for downloading text attachments.
+ */
+export function attachmentUrl(threadId: string, attachmentId: string): string {
+  return apiUrl(`/attachment/${threadId}/${attachmentId}`)
+}
 
 // ── WebSocket helpers ──────────────────────────────────────────────────────────
 
@@ -70,12 +78,22 @@ async function openWebSocketWithRetry(
 
 export interface ImageContent {
   type: "image"
-  source: {
-    type: "base64" | "url"
-    mediaType?: string
-    data: string
-    url?: string
-  }
+  /** Base64-encoded image data (no data-URL prefix). */
+  data: string
+  /** MIME type, e.g. "image/png". */
+  mimeType: string
+}
+
+export interface Attachment {
+  id: string
+  filename: string
+  mediaType: string
+  size: number
+  kind: "image" | "text" | "file"
+}
+
+export interface AttachmentUpload extends Attachment {
+  data: string // base64-encoded
 }
 
 export interface PromptOptions {
@@ -140,6 +158,7 @@ export interface SendPromptParams {
   text: string
   model?: { provider: string; modelId: string }
   thinkingLevel?: string
+  attachments?: AttachmentUpload[]
   images?: ImageContent[]
   streamingBehavior?: "steer" | "followUp"
   expandPromptTemplates?: boolean
@@ -157,6 +176,7 @@ export function sendPrompt(
       provider: params.model?.provider,
       model: params.model?.modelId,
       thinkingLevel: params.thinkingLevel,
+      attachments: params.attachments,
       images: params.images,
       streamingBehavior: params.streamingBehavior,
       expandPromptTemplates: params.expandPromptTemplates,

@@ -62,6 +62,7 @@ export const messageBlocks = sqliteTable("message_blocks", {
   toolStatus: text("tool_status", { enum: ["running", "done", "error"] }),
   toolDuration: integer("tool_duration"),
   toolStartTime: integer("tool_start_time"),
+  attachments: text("attachments"), // JSON array of attachment metadata
   createdAt: integer("created_at").notNull(),
 })
 

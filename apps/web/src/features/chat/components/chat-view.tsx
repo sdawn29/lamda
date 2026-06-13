@@ -24,7 +24,9 @@ import {
   ChatTextbox,
   type ChatTextboxHandle,
   type ThinkingLevel,
+  type PendingAttachment,
 } from "./chat-textbox"
+import { pendingToUploads, pendingToDisplay } from "../lib/attachments"
 import { MessageRow, getMessageKey } from "./message-row"
 import {
   AlertDialog,
@@ -1193,13 +1195,15 @@ export function ChatView({
       text: string,
       modelId: string,
       provider: string,
-      thinkingLevel?: string
+      thinkingLevel?: string,
+      attachments?: PendingAttachment[]
     ) => {
       pinnedRef.current = true
 
       // The agent is already running — steer the live turn instead of starting a
       // new one. The message is appended optimistically and the SDK injects it
       // into the current run after the active tool call finishes.
+      // Attachments aren't supported on steering messages — they go with new prompts.
       if (isLoading) {
         steerPrompt(text)
         scrollToBottomImmediate()
@@ -1214,7 +1218,7 @@ export function ChatView({
         return
       }
 
-      if (!hasConversationHistory) {
+      if (!hasConversationHistory && text.trim()) {
         generateTitleMutation.mutate(text, {
           onSuccess: ({ title }) => {
             updateTitleMutation.mutate({ workspaceId, threadId, title })
@@ -1222,12 +1226,16 @@ export function ChatView({
         })
       }
       updateThreadStopped.mutate({ threadId, stopped: false })
-      startUserPrompt(text, thinkingLevel)
+      const uploads = attachments ? pendingToUploads(attachments) : undefined
+      const displayAttachments = attachments
+        ? pendingToDisplay(attachments)
+        : undefined
+      startUserPrompt(text, thinkingLevel, displayAttachments)
       scrollToBottomImmediate()
 
       const model = modelId && provider ? { provider, modelId } : undefined
       sendPromptMutation.mutate(
-        { text, model, thinkingLevel },
+        { text, model, thinkingLevel, attachments: uploads },
         { onError: markSendFailed }
       )
     },
@@ -1446,6 +1454,7 @@ export function ChatView({
                         isLastInTurn={isLastInTurn}
                         turnMessages={turnMessages}
                         rootPath={rootPath}
+                        threadId={threadId}
                         onFork={handleFork}
                         onRevert={!isLoading ? handleRevert : undefined}
                         isReverting={

@@ -19,6 +19,143 @@ import { subscribeToWorkspaceFileUpdates } from "@/features/chat/thread-status-s
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
+const MIN_SCALE = 1
+const MAX_SCALE = 8
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max)
+
+/**
+ * Image viewer that supports trackpad pinch-to-zoom. macOS trackpad pinch
+ * gestures are delivered to the browser as `wheel` events with `ctrlKey`
+ * set, so we zoom toward the cursor on those and treat plain wheel events as
+ * panning once the image is zoomed in. Double-click resets the view.
+ */
+function ZoomableImage({ src, alt }: { src: string; alt: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const dragRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    originX: number
+    originY: number
+  } | null>(null)
+
+  // Reset the view whenever a different image is shown.
+  useEffect(() => {
+    setScale(1)
+    setOffset({ x: 0, y: 0 })
+  }, [src])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    const handleWheel = (e: WheelEvent) => {
+      const rect = el.getBoundingClientRect()
+      // Cursor position relative to the container center.
+      const cx = e.clientX - rect.left - rect.width / 2
+      const cy = e.clientY - rect.top - rect.height / 2
+
+      if (e.ctrlKey) {
+        // Trackpad pinch (or ctrl+scroll): zoom toward the cursor.
+        e.preventDefault()
+        setScale((prevScale) => {
+          const nextScale = clamp(
+            prevScale * Math.exp(-e.deltaY * 0.01),
+            MIN_SCALE,
+            MAX_SCALE
+          )
+          const ratio = nextScale / prevScale
+          setOffset((prev) => {
+            if (nextScale === MIN_SCALE) return { x: 0, y: 0 }
+            return {
+              x: cx * (1 - ratio) + ratio * prev.x,
+              y: cy * (1 - ratio) + ratio * prev.y,
+            }
+          })
+          return nextScale
+        })
+        return
+      }
+
+      // Plain two-finger scroll pans the image while it is zoomed in.
+      setScale((prevScale) => {
+        if (prevScale > MIN_SCALE) {
+          e.preventDefault()
+          setOffset((prev) => ({
+            x: prev.x - e.deltaX,
+            y: prev.y - e.deltaY,
+          }))
+        }
+        return prevScale
+      })
+    }
+
+    el.addEventListener("wheel", handleWheel, { passive: false })
+    return () => el.removeEventListener("wheel", handleWheel)
+  }, [])
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (scale <= MIN_SCALE) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: offset.x,
+      originY: offset.y,
+    }
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== e.pointerId) return
+    setOffset({
+      x: drag.originX + (e.clientX - drag.startX),
+      y: drag.originY + (e.clientY - drag.startY),
+    })
+  }
+
+  const endDrag = (e: React.PointerEvent) => {
+    if (dragRef.current?.pointerId === e.pointerId) dragRef.current = null
+  }
+
+  const resetView = () => {
+    setScale(1)
+    setOffset({ x: 0, y: 0 })
+  }
+
+  const isZoomed = scale > MIN_SCALE
+
+  return (
+    <div
+      ref={containerRef}
+      className="flex h-full w-full items-center justify-center overflow-hidden"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onDoubleClick={resetView}
+      style={{ cursor: isZoomed ? (dragRef.current ? "grabbing" : "grab") : "default" }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        draggable={false}
+        className="max-h-full max-w-full object-contain select-none"
+        style={{
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+          transformOrigin: "center center",
+          willChange: "transform",
+        }}
+      />
+    </div>
+  )
+}
+
 function resolveFilePath(currentFilePath: string, href: string): string {
   const dir = currentFilePath.split(/[/\\]/).slice(0, -1).join("/")
   const parts = `${dir}/${href}`.split("/")
@@ -37,6 +174,12 @@ interface FileContentViewProps {
   onOpenFile?: (filePath: string, title: string, line?: number) => void
   initialScrollToLine?: number
   /**
+   * When set, load the file's bytes from this fully-qualified, token-appended
+   * URL instead of `/file?path=`. Used for chat attachments stored outside any
+   * workspace directory.
+   */
+  sourceUrl?: string
+  /**
    * "tab" (default) renders for the main tab area: bordered/muted header,
    * blank loading state. "panel" renders for the embedded review sidebar:
    * transparent header, spinner while loading, sidebar-colored code gutter.
@@ -50,6 +193,7 @@ export const FileContentView = memo(function FileContentView({
   workspacePath,
   onOpenFile,
   initialScrollToLine,
+  sourceUrl,
   variant = "tab",
 }: FileContentViewProps) {
   const isPanel = variant === "panel"
@@ -195,7 +339,7 @@ export const FileContentView = memo(function FileContentView({
         }
 
         const response = await fetch(
-          appendToken(`${url}/file?path=${encodeURIComponent(filePath)}`)
+          sourceUrl ?? appendToken(`${url}/file?path=${encodeURIComponent(filePath)}`)
         )
         if (!response.ok) {
           throw new Error(`Failed to load file: ${response.statusText}`)
@@ -223,7 +367,7 @@ export const FileContentView = memo(function FileContentView({
     return () => {
       cancelled = true
     }
-  }, [filePath, isImage, fileRefreshKey])
+  }, [filePath, isImage, fileRefreshKey, sourceUrl])
 
   if (loading) {
     return (
@@ -310,18 +454,23 @@ export const FileContentView = memo(function FileContentView({
           }
         >
           {isImage ? (
-            <img
-              src={appendToken(
-                `${serverUrl}/file?path=${encodeURIComponent(filePath)}`
-              )}
+            <ZoomableImage
+              src={
+                sourceUrl ??
+                appendToken(
+                  `${serverUrl}/file?path=${encodeURIComponent(filePath)}`
+                )
+              }
               alt={fileName}
-              className="max-h-full max-w-full object-contain"
             />
           ) : isHtml && htmlPreview ? (
             <iframe
-              src={appendToken(
-                `${serverUrl}/file?path=${encodeURIComponent(filePath)}`
-              )}
+              src={
+                sourceUrl ??
+                appendToken(
+                  `${serverUrl}/file?path=${encodeURIComponent(filePath)}`
+                )
+              }
               title={fileName}
               className="h-full w-full border-0"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"

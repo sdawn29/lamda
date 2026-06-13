@@ -4,6 +4,18 @@ import { db } from "../client.js";
 import { messageBlocks } from "../schema.js";
 
 /**
+ * Attachment metadata stored with a message.
+ */
+export interface AttachmentMetadata {
+  id: string;
+  filename: string;
+  mediaType: string;
+  size: number;
+  kind: "image" | "text" | "file";
+  createdAt?: number;
+}
+
+/**
  * Complete message block structure matching pi-agent's message format.
  */
 export interface MessageBlock {
@@ -25,6 +37,7 @@ export interface MessageBlock {
   toolStatus: "running" | "done" | "error" | null;
   toolDuration: number | null;
   toolStartTime: number | null;
+  attachments: string | null;
   createdAt: number;
 }
 
@@ -103,6 +116,7 @@ function getNextBlockIndex(threadId: string): number {
 export function insertUserBlock(
   threadId: string,
   content: string,
+  attachments?: AttachmentMetadata[],
   createdAt?: number
 ): string {
   const id = randomUUID();
@@ -114,6 +128,7 @@ export function insertUserBlock(
       blockIndex,
       role: "user",
       content,
+      attachments: attachments ? JSON.stringify(attachments) : null,
       createdAt: createdAt ?? Date.now(),
     })
     .run();

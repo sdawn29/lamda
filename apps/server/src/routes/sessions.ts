@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { join, relative } from "path";
-import { readdir } from "fs/promises";
+import { readdir, stat } from "fs/promises";
+import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
 import type { WebSocket } from "ws";
 import {
   insertWorkspace,
@@ -39,6 +41,24 @@ import {
 } from "@lamda/pi-sdk";
 import { withInjections } from "../services/prompt-injection.js";
 import { recoverSession } from "../services/healing-service.js";
+import { findAttachmentFile, writeAttachment } from "../lib/attachments.js";
+import type { AttachmentMetadata } from "@lamda/db";
+
+/** Extension → MIME type for serving attachments (fallback: octet-stream). */
+const ATTACHMENT_MIME_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  bmp: "image/bmp",
+  txt: "text/plain; charset=utf-8",
+  md: "text/markdown; charset=utf-8",
+  json: "application/json",
+  csv: "text/csv; charset=utf-8",
+  pdf: "application/pdf",
+};
 import type { PromptOptions, SdkConfig } from "@lamda/pi-sdk";
 import { promises as fs } from "node:fs";
 import {
@@ -110,12 +130,23 @@ sessions.get("/session/:id/status", (c) => {
   return c.json(sessionEvents.getStatus(id));
 });
 
+interface AttachmentUpload {
+  id: string;
+  filename: string;
+  mediaType: string;
+  size: number;
+  kind: "image" | "text" | "file";
+  data: string; // base64-encoded
+}
+
 interface PromptRequestBody {
   text?: string;
   provider?: string;
   model?: string;
   thinkingLevel?: string;
-  /** Image attachments for the prompt */
+  /** File attachments (images and text files) */
+  attachments?: AttachmentUpload[];
+  /** Image attachments for the prompt (legacy, prefer attachments) */
   images?: PromptOptions["images"];
   /** How to queue when agent is streaming: "steer" (interrupt) or "followUp" (wait) */
   streamingBehavior?: PromptOptions["streamingBehavior"];
@@ -131,20 +162,69 @@ sessions.post("/session/:id/prompt", async (c) => {
   const body = await c.req
     .json<PromptRequestBody>()
     .catch((): PromptRequestBody => ({}));
-  if (!body.text) return c.json({ error: "text is required" }, 400);
+  // Allow attachment-only sends: require text OR at least one attachment.
+  if (!body.text && !(body.attachments && body.attachments.length > 0)) {
+    return c.json({ error: "text or attachments required" }, 400);
+  }
 
   ensureSessionEventHub(id, entry);
 
-  // Store user message as a block in the database (without the mode preamble)
-  insertUserBlock(entry.threadId, body.text);
-
-  // The SDK sees the mode/memory preambles only when they change.
-  const text = withInjections(entry, body.text);
-  // Kept so session-level self-healing can re-send the interrupted prompt.
-  entry.lastPromptText = text;
-
   // Fire and forget — events arrive via GET /session/:id/events
   const run = async () => {
+    // Process attachments: write to disk and build agent-facing prompt
+    const attachmentMetadata: AttachmentMetadata[] = [];
+    let agentFacingText = body.text || "";
+    const imageContents: PromptOptions["images"] = [];
+
+    if (body.attachments && body.attachments.length > 0) {
+      for (const attachment of body.attachments) {
+        try {
+          const { path, ...metadata } = await writeAttachment(
+            entry.threadId,
+            attachment.filename,
+            attachment.mediaType,
+            attachment.data,
+            attachment.kind,
+            attachment.id
+          );
+          // Persist metadata only (no absolute fs path) on the user message.
+          attachmentMetadata.push(metadata);
+
+          // Build ImageContent for images (flat base64 + mimeType, matching
+          // the underlying agent's expected content shape).
+          if (attachment.kind === "image") {
+            imageContents.push({
+              type: "image",
+              data: attachment.data,
+              mimeType: attachment.mediaType,
+            });
+          }
+          // Inject text file contents into agent-facing prompt.
+          else if (attachment.kind === "text") {
+            const fileContent = Buffer.from(attachment.data, "base64").toString("utf-8");
+            agentFacingText += `\n\nThe user attached "${attachment.filename}":\n\`\`\`\n${fileContent}\n\`\`\``;
+          }
+          // Other (binary) files can't be inlined — point the agent at the
+          // saved file so it can inspect it with its tools if needed.
+          else {
+            agentFacingText += `\n\n[The user attached a file "${attachment.filename}" (${attachment.mediaType || "unknown type"}, ${metadata.size} bytes), saved at: ${path}]`;
+          }
+        } catch (err) {
+          console.error(`[prompt:${id}] Failed to process attachment ${attachment.filename}:`, err);
+          // Continue processing other attachments rather than failing the whole prompt
+        }
+      }
+    }
+
+    // Store user message as a block in the database (without the mode preamble)
+    // Pass the original displayed text and attachment metadata
+    insertUserBlock(entry.threadId, body.text || "", attachmentMetadata);
+
+    // The SDK sees the mode/memory preambles and injected file contents
+    const text = withInjections(entry, agentFacingText);
+    // Kept so session-level self-healing can re-send the interrupted prompt.
+    entry.lastPromptText = text;
+
     if (body.provider && body.model)
       await entry.handle.setModel(body.provider, body.model);
     if (body.thinkingLevel) {
@@ -160,12 +240,18 @@ sessions.post("/session/:id/prompt", async (c) => {
       sessionEvents.setNextThinkingLevel(id, body.thinkingLevel);
     }
 
+    // Combine images from attachments with legacy images field
+    const allImages = [
+      ...imageContents,
+      ...(body.images || []),
+    ];
+
     const promptOptions: PromptOptions | undefined =
-      body.images ||
+      allImages.length > 0 ||
       body.streamingBehavior !== undefined ||
       body.expandPromptTemplates !== undefined
         ? {
-            images: body.images,
+            images: allImages.length > 0 ? allImages : undefined,
             streamingBehavior: body.streamingBehavior,
             expandPromptTemplates: body.expandPromptTemplates,
           }
@@ -622,6 +708,7 @@ sessions.post("/session/:id/fork", async (c) => {
         insertUserBlock(
           newThreadId,
           stripMemoryPreamble(stripModePreamble(block.content)),
+          undefined,
           block.createdAt,
         );
       } else if (block.role === "assistant") {
@@ -674,6 +761,54 @@ sessions.post("/session/:id/fork", async (c) => {
     { threadId: newThreadId, sessionId: newSessionId, initialInput },
     201,
   );
+});
+
+// Serve attachment files (images and text files)
+sessions.get("/attachment/:threadId/:attachmentId", async (c) => {
+  const threadId = c.req.param("threadId");
+  const attachmentId = c.req.param("attachmentId");
+
+  if (!threadId || !attachmentId) {
+    return c.json({ error: "threadId and attachmentId are required" }, 400);
+  }
+
+  // Reject path-traversal attempts — ids are plain UUIDs with no separators.
+  const isSafe = (s: string) => /^[A-Za-z0-9_-]+$/.test(s);
+  if (!isSafe(threadId) || !isSafe(attachmentId)) {
+    return c.json({ error: "Invalid attachment identifier" }, 400);
+  }
+
+  // Locate the stored file regardless of its (arbitrary) extension.
+  const foundPath = await findAttachmentFile(threadId, attachmentId);
+  if (!foundPath) {
+    return c.json({ error: "Attachment not found" }, 404);
+  }
+
+  let fileStat;
+  try {
+    fileStat = await stat(foundPath);
+  } catch (err: any) {
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
+  }
+
+  const ext = foundPath.split(".").pop()?.toLowerCase() || "";
+  const contentType = ATTACHMENT_MIME_TYPES[ext] ?? "application/octet-stream";
+  // Non-previewable types download with their original-ish name.
+  const isInline = contentType.startsWith("image/") || contentType.startsWith("text/");
+
+  const size = fileStat.size;
+  const nodeStream = createReadStream(foundPath);
+  const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+
+  return c.body(webStream, 200, {
+    "Content-Type": contentType,
+    "Content-Length": String(size),
+    "Content-Disposition": isInline ? "inline" : "attachment",
+    "Cache-Control": "public, immutable",
+  });
 });
 
 export function handleSessionEventsWs(

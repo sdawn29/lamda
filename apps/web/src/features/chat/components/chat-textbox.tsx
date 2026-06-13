@@ -11,15 +11,18 @@ import {
   BotIcon,
   ChartColumnIcon,
   EraserIcon,
+  FileTextIcon,
   HelpCircleIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
   MinimizeIcon,
   MoonIcon,
+  PaperclipIcon,
   PlusIcon,
   SettingsIcon,
   StopCircleIcon,
   SunIcon,
+  XIcon,
 } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
@@ -113,12 +116,22 @@ function writeMessageHistory(history: string[]): void {
   }
 }
 
+export interface PendingAttachment {
+  id: string
+  filename: string
+  mediaType: string
+  size: number
+  kind: "image" | "text" | "file"
+  dataUrl: string
+}
+
 interface ChatTextboxProps {
   onSend?: (
     message: string,
     modelId: string,
     provider: string,
-    thinkingLevel?: string
+    thinkingLevel?: string,
+    attachments?: PendingAttachment[]
   ) => void
   isLoading?: boolean
   /** True while the abort request is in-flight — disables the stop button to prevent double-clicks. */
@@ -192,6 +205,8 @@ export const ChatTextbox = memo(
     const [slashMention, setSlashMention] = React.useState<
       (SlashMention & { selectedIndex: number }) | null
     >(null)
+    const [attachments, setAttachments] = React.useState<PendingAttachment[]>([])
+    const fileInputRef = React.useRef<HTMLInputElement>(null)
     const mentionEntries = React.useRef<WorkspaceEntry[]>([])
     const slashItemsRef = React.useRef<ChatSlashItem[]>([])
     const isControlled = controlledModelId !== undefined
@@ -543,12 +558,78 @@ export const ChatTextbox = memo(
 
     // Sending is allowed even while the agent runs: a non-empty submit while
     // loading steers the live turn (the parent decides steer vs. new prompt).
-    const canSend = !isEmpty
+    const canSend = !isEmpty || attachments.length > 0
+
+    async function readFileAsBase64(file: File): Promise<string> {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result
+          if (typeof result === "string") {
+            resolve(result.split(",")[1] || result)
+          } else {
+            reject(new Error("Failed to read file"))
+          }
+        }
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(file)
+      })
+    }
+
+    // Extensions that are textual even when the browser reports a generic or
+    // empty MIME type (common for source files).
+    const TEXT_EXTENSIONS =
+      /\.(txt|md|markdown|json|jsonc|ya?ml|toml|ini|csv|tsv|log|xml|html?|css|scss|less|js|jsx|ts|tsx|mjs|cjs|py|rb|go|rs|java|kt|c|h|cpp|hpp|cs|php|swift|sh|bash|zsh|sql|graphql|env|gitignore|dockerfile|vue|svelte)$/i
+
+    function classifyFile(file: File): "image" | "text" | "file" {
+      if (file.type.startsWith("image/")) return "image"
+      if (
+        file.type.startsWith("text/") ||
+        file.type.includes("json") ||
+        file.type.includes("xml") ||
+        file.type.includes("javascript") ||
+        file.type.includes("typescript") ||
+        TEXT_EXTENSIONS.test(file.name)
+      ) {
+        return "text"
+      }
+      // Any other format is accepted and attached as a generic file.
+      return "file"
+    }
+
+    async function handleAddFiles(files: File[]) {
+      const newAttachments: PendingAttachment[] = []
+      for (const file of files) {
+        const kind = classifyFile(file)
+        try {
+          const base64 = await readFileAsBase64(file)
+          const dataUrl = `data:${file.type};base64,${base64}`
+          newAttachments.push({
+            id: crypto.randomUUID(),
+            filename: file.name,
+            mediaType: file.type,
+            size: file.size,
+            kind,
+            dataUrl,
+          })
+        } catch (err) {
+          toast.error("Failed to read file", {
+            description: `Could not read ${file.name}: ${err instanceof Error ? err.message : "Unknown error"}`,
+          })
+        }
+      }
+      setAttachments((prev) => [...prev, ...newAttachments])
+    }
+
+    function handleRemoveAttachment(id: string) {
+      setAttachments((prev) => prev.filter((a) => a.id !== id))
+    }
 
     function handleSend() {
       if (!canSend) return
       const text = richInputRef.current?.getValue() ?? ""
-      if (!text.trim()) return
+      // Allow sending when attachments are present even if the text is empty.
+      if (!text.trim() && attachments.length === 0) return
       const safeLevel =
         availableLevels.length &&
         !availableLevels.includes(selectedThinkingLevel)
@@ -562,12 +643,14 @@ export const ChatTextbox = memo(
         text,
         selectedModel?.id ?? "",
         selectedModel?.provider ?? "",
-        effectiveThinkingLevel
+        effectiveThinkingLevel,
+        attachments.length > 0 ? attachments : undefined
       )
       // Append to history (skipping consecutive duplicates) and reset the
       // navigation cursor so the next ArrowUp starts from the newest message.
+      // Empty text (attachment-only sends) is not recorded in history.
       const history = historyRef.current
-      if (history[history.length - 1] !== text) {
+      if (text.trim() && history[history.length - 1] !== text) {
         history.push(text)
         if (history.length > MAX_MESSAGE_HISTORY) {
           history.splice(0, history.length - MAX_MESSAGE_HISTORY)
@@ -579,6 +662,7 @@ export const ChatTextbox = memo(
       historyNavValueRef.current = ""
       richInputRef.current?.clear()
       setIsEmpty(true)
+      setAttachments([])
       setAtMention(null)
       setSlashMention(null)
       richInputRef.current?.focus()
@@ -796,6 +880,7 @@ export const ChatTextbox = memo(
               onSlashMentionChange={handleSlashMentionChange}
               onSend={handleSend}
               onInput={handleInput}
+              onPasteFiles={(files) => void handleAddFiles(files)}
               onMentionEnter={() => {
                 const idx = atMention?.selectedIndex ?? 0
                 const entry = mentionEntries2[idx]
@@ -865,6 +950,31 @@ export const ChatTextbox = memo(
             />
           </div>
 
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-4 pb-2">
+              {attachments.map((attachment) => (
+                <AttachmentPreview
+                  key={attachment.id}
+                  attachment={attachment}
+                  onRemove={() => handleRemoveAttachment(attachment.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? [])
+              if (files.length > 0) void handleAddFiles(files)
+              // Reset so selecting the same file again re-triggers onChange.
+              e.target.value = ""
+            }}
+          />
+
           <div className="flex items-center justify-between rounded-b-2xl border-t border-border/40 bg-muted/40 px-4 py-2.5">
             <div className="flex items-center gap-1">
               {onModeChange && (
@@ -895,6 +1005,23 @@ export const ChatTextbox = memo(
                 sessionId={sessionId}
                 sessionStats={sessionStats}
               />
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Attach files"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="size-7 text-muted-foreground hover:text-foreground"
+                    >
+                      <PaperclipIcon className="size-4" />
+                    </Button>
+                  }
+                />
+                <TooltipContent>Attach files</TooltipContent>
+              </Tooltip>
               {isLoading && !isEmpty ? (
                 // While the agent runs, a non-empty submit steers the live turn.
                 // The steer button replaces Stop so there's a single primary
@@ -984,3 +1111,49 @@ export const ChatTextbox = memo(
     )
   })
 )
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function AttachmentPreview({
+  attachment,
+  onRemove,
+}: {
+  attachment: PendingAttachment
+  onRemove: () => void
+}) {
+  return (
+    <div className="group relative flex items-center gap-2 rounded-lg border border-border/60 bg-card p-1.5 pr-2">
+      {attachment.kind === "image" ? (
+        <img
+          src={attachment.dataUrl}
+          alt={attachment.filename}
+          className="size-10 shrink-0 rounded object-cover"
+        />
+      ) : (
+        <div className="flex size-10 shrink-0 items-center justify-center rounded bg-muted">
+          <FileTextIcon className="size-5 text-muted-foreground" />
+        </div>
+      )}
+      <div className="flex min-w-0 flex-col">
+        <span className="max-w-[140px] truncate text-xs font-medium text-foreground">
+          {attachment.filename}
+        </span>
+        <span className="text-2xs text-muted-foreground">
+          {formatBytes(attachment.size)}
+        </span>
+      </div>
+      <button
+        type="button"
+        aria-label={`Remove ${attachment.filename}`}
+        onClick={onRemove}
+        className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full border border-border bg-background text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+      >
+        <XIcon className="size-2.5" />
+      </button>
+    </div>
+  )
+}

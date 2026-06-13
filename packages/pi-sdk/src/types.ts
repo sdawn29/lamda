@@ -38,15 +38,17 @@ export interface PromptOptions {
   expandPromptTemplates?: boolean;
 }
 
-/** Image content for prompts. */
+/**
+ * Image content for prompts. Matches the underlying agent's image content
+ * shape (`@earendil-works/pi-ai` `ImageContent`): a flat base64 payload plus
+ * its MIME type — NOT the Anthropic raw `{ source: {...} }` envelope.
+ */
 export interface ImageContent {
   type: "image";
-  source: {
-    type: "base64" | "url";
-    mediaType?: string;
-    data: string;
-    url?: string;
-  };
+  /** Base64-encoded image data (no data-URL prefix). */
+  data: string;
+  /** MIME type, e.g. "image/png". */
+  mimeType: string;
 }
 
 export interface SdkConfig {

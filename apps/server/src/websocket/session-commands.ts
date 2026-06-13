@@ -186,14 +186,11 @@ async function handlePrompt(
         sessionEvents.setNextThinkingLevel(sessionId, msg.thinkingLevel);
       }
 
-      // Transform images to pi-sdk format
+      // Transform images to the agent's content shape (flat base64 + mimeType).
       const images: ImageContent[] | undefined = msg.images?.map((img) => ({
         type: "image" as const,
-        source: {
-          type: "base64" as const,
-          mediaType: img.mediaType,
-          data: img.data,
-        },
+        data: img.data,
+        mimeType: img.mediaType,
       }));
 
       const promptOptions: PromptOptions | undefined =
