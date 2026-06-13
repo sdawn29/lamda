@@ -30,6 +30,7 @@ function mapThread(
     mode: "ask" | "plan" | "agent";
     isStopped: boolean;
     createdAt: number;
+    updatedAt: number;
     isPinned: boolean;
     forkedFromId?: string | null;
   },
@@ -46,6 +47,7 @@ function mapThread(
     isPinned: t.isPinned,
     forkedFromId: t.forkedFromId ?? null,
     createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
     sessionId: session?.sessionId ?? null,
   };
 }

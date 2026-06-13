@@ -76,7 +76,9 @@ import {
 } from "@/shared/ui/alert-dialog"
 
 function relativeTime(ts: number, now = Date.now()): string {
-  const diff = Math.floor((now - ts) / 1000)
+  // `now` only ticks every 60s, so a just-created timestamp can be slightly
+  // ahead of it — clamp to 0 instead of rendering a negative age.
+  const diff = Math.max(0, Math.floor((now - ts) / 1000))
   if (diff < 60) return `${diff}s`
   if (diff < 3600) return `${Math.floor(diff / 60)}m`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`
@@ -270,7 +272,7 @@ const ThreadRow = memo(function ThreadRow({
           <span className="min-w-0 truncate">{thread.title}</span>
           <div className="ml-auto grid shrink-0 items-center justify-items-end">
             <span className="col-start-1 row-start-1 text-xs text-muted-foreground/50 group-hover/thread:invisible">
-              {relativeTime(thread.createdAt, now)}
+              {relativeTime(thread.updatedAt, now)}
             </span>
             <IconButtonWithTooltip
               icon={Archive}
@@ -385,11 +387,13 @@ export function AppSidebar() {
   const openSettingsBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_SETTINGS)
 
   // Collect all pinned threads across all workspaces, excluding pending ones
-  const pinnedThreads = workspaces.flatMap((ws) =>
-    ws.threads
-      .filter((t) => t.isPinned && !pendingThreadIds.has(t.id))
-      .map((t) => ({ ...t, workspaceId: ws.id, workspaceName: ws.name }))
-  )
+  const pinnedThreads = workspaces
+    .flatMap((ws) =>
+      ws.threads
+        .filter((t) => t.isPinned && !pendingThreadIds.has(t.id))
+        .map((t) => ({ ...t, workspaceId: ws.id, workspaceName: ws.name }))
+    )
+    .sort((a, b) => b.updatedAt - a.updatedAt)
   const pinnedWorkspaces = workspaces
     .filter((ws) => ws.isPinned)
     .sort((a, b) => a.createdAt - b.createdAt)
@@ -516,9 +520,9 @@ export function AppSidebar() {
                   rootThreads.push(t)
                 }
               }
-              rootThreads.sort((a, b) => b.createdAt - a.createdAt)
+              rootThreads.sort((a, b) => b.updatedAt - a.updatedAt)
               const renderThread = (thread: Thread, depth: number): React.ReactNode[] => {
-                const children = (childrenMap.get(thread.id) ?? []).slice().sort((a, b) => b.createdAt - a.createdAt)
+                const children = (childrenMap.get(thread.id) ?? []).slice().sort((a, b) => b.updatedAt - a.updatedAt)
                 return [
                   <ThreadRow
                     key={thread.id}

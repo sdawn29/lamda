@@ -1,16 +1,37 @@
 import { randomUUID } from "node:crypto"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { db } from "../client.js"
-import { workspaces, threads } from "../schema.js"
+import { workspaces, threads, messageBlocks } from "../schema.js"
 
 export function listWorkspacesWithThreads() {
   const ws = db.select().from(workspaces).all()
   const th = db.select().from(threads).all()
+  // Latest message time per thread, used to derive each thread's "last updated"
+  // timestamp without an N+1 query.
+  const latestMessages = db
+    .select({
+      threadId: messageBlocks.threadId,
+      latest: sql<number>`max(${messageBlocks.createdAt})`,
+    })
+    .from(messageBlocks)
+    .groupBy(messageBlocks.threadId)
+    .all()
+  const latestByThread = new Map(latestMessages.map((r) => [r.threadId, r.latest]))
   return ws
     .map((w) => ({
       ...w,
       threads: th
         .filter((t) => t.workspaceId === w.id && !t.isArchived)
+        .map((t) => ({
+          ...t,
+          // "Last updated" = the most recent of last message, last access, or
+          // creation, so freshly created threads still get a sensible value.
+          updatedAt: Math.max(
+            latestByThread.get(t.id) ?? 0,
+            t.lastAccessedAt ?? 0,
+            t.createdAt,
+          ),
+        }))
         .sort((a, b) => {
           // Pinned threads first
           if (a.isPinned && !b.isPinned) return -1

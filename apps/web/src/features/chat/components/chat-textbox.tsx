@@ -832,7 +832,7 @@ export const ChatTextbox = memo(
 
     return (
       <div className={cn("flex w-full flex-col gap-1", className)}>
-        <div className="relative flex w-full flex-col rounded-2xl border border-input bg-card shadow-sm transition-colors">
+        <div className="relative flex w-full flex-col rounded-xl border border-input bg-card shadow-sm transition-colors">
           <SlashCommandDropdown
             groups={slashGroups}
             open={
@@ -865,7 +865,7 @@ export const ChatTextbox = memo(
             onSelect={handleSelectFile}
           />
 
-          <div className="p-4">
+          <div className="px-3 pt-2.5 pb-1.5">
             <RichInput
               ref={richInputRef}
               placeholder={
@@ -951,7 +951,7 @@ export const ChatTextbox = memo(
           </div>
 
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-4 pb-2">
+            <div className="flex flex-wrap gap-2 px-3 pb-1.5">
               {attachments.map((attachment) => (
                 <AttachmentPreview
                   key={attachment.id}
@@ -975,7 +975,7 @@ export const ChatTextbox = memo(
             }}
           />
 
-          <div className="flex items-center justify-between rounded-b-2xl border-t border-border/40 bg-muted/40 px-4 py-2.5">
+          <div className="flex items-center justify-between rounded-b-xl px-3 py-1.5">
             <div className="flex items-center gap-1">
               {onModeChange && (
                 <ModeCombobox selected={mode} onSelect={onModeChange} />

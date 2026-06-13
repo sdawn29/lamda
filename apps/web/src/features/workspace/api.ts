@@ -21,6 +21,7 @@ export interface ThreadDto {
   isStopped: boolean
   mode: Mode
   createdAt: number
+  updatedAt: number
   sessionId: string | null
   isPinned?: boolean
   forkedFromId?: string | null
