@@ -9,6 +9,7 @@ export interface ChatTextboxHandle {
 import {
   ArrowUpIcon,
   BotIcon,
+  ChartColumnIcon,
   EraserIcon,
   HelpCircleIcon,
   ListTodoIcon,
@@ -172,6 +173,12 @@ export const ChatTextbox = memo(
       navigate({
         to: "/settings/$section",
         params: { section: DEFAULT_SETTINGS_SECTION },
+      })
+    }, [navigate])
+    const openUsage = React.useCallback(() => {
+      navigate({
+        to: "/settings/$section",
+        params: { section: "usage" },
       })
     }, [navigate])
     const { resolvedTheme, setTheme } = useTheme()
@@ -400,6 +407,14 @@ export const ChatTextbox = memo(
 
       list.push({
         kind: "action",
+        name: "usage",
+        description: "Open the AI usage page",
+        icon: ChartColumnIcon,
+        onSelect: openUsage,
+      })
+
+      list.push({
+        kind: "action",
         name: "theme",
         description:
           resolvedTheme === "dark"
@@ -424,6 +439,7 @@ export const ChatTextbox = memo(
       queryClient,
       openPalette,
       openSettings,
+      openUsage,
       resolvedTheme,
       setTheme,
     ])
