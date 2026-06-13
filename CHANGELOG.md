@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.21.0](../../releases/tag/v0.21.0) — 2026-06-13
+
+### Features
+
+* **chat:** add support for file attachments in chat messages
+* update AbortBlock styling and add CircleSlashIcon for better visual indication
+* implement message history navigation in chat components
+* add usage page navigation and icon to chat textbox actions
+* enhance markdown components with file reference parsing and clickable links
+* enhance mode options with selected background and remove descriptions
+* implement steering functionality and queue updates in chat components
+
+### Bug Fixes
+
+* update button label from 'Diff' to 'Review' for clarity
+
+### Code Refactoring
+
+* remove unused OutlinePanel and document symbols from FileContentView
+
 ## [0.20.0](../../releases/tag/v0.20.0) — 2026-06-13
 
 ### Features
