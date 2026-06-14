@@ -1,7 +1,7 @@
 import * as React from "react"
 import { memo, forwardRef, useImperativeHandle } from "react"
 
-export interface ChatTextboxHandle {
+export interface ChatComposerHandle {
   getValue: () => string
   setValue: (text: string) => void
   focus: () => void
@@ -45,9 +45,10 @@ import { useWorkspaceIndex } from "@/features/workspace/queries"
 import { BranchSelector } from "@/features/git"
 import { ModelCombobox } from "./model-combobox"
 import { ModeCombobox, getModeOption } from "./mode-combobox"
+import { ApprovalModeCombobox } from "./approval-mode-combobox"
 import { ThinkingCombobox, type ThinkingLevel } from "./thinking-combobox"
 export type { ThinkingLevel } from "./thinking-combobox"
-import type { Mode } from "@/features/workspace/api"
+import type { Mode, ApprovalMode } from "@/features/workspace/api"
 import {
   RichInput,
   buildMentionChip,
@@ -125,7 +126,7 @@ export interface PendingAttachment {
   dataUrl: string
 }
 
-interface ChatTextboxProps {
+interface ChatComposerProps {
   onSend?: (
     message: string,
     modelId: string,
@@ -151,11 +152,13 @@ interface ChatTextboxProps {
   onThinkingLevelChange?: (level: ThinkingLevel) => void
   mode?: Mode
   onModeChange?: (mode: Mode) => void
+  approvalMode?: ApprovalMode
+  onApprovalModeChange?: (mode: ApprovalMode) => void
   sessionStats?: SessionStats | null
 }
 
-export const ChatTextbox = memo(
-  forwardRef<ChatTextboxHandle, ChatTextboxProps>(function ChatTextbox(
+export const ChatComposer = memo(
+  forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
     {
       onSend,
       isLoading = false,
@@ -175,8 +178,10 @@ export const ChatTextbox = memo(
       onThinkingLevelChange,
       mode = "agent",
       onModeChange,
+      approvalMode = "ask",
+      onApprovalModeChange,
       sessionStats,
-    }: ChatTextboxProps,
+    }: ChatComposerProps,
     ref
   ) {
     const [isEmpty, setIsEmpty] = React.useState(true)
@@ -830,9 +835,17 @@ export const ChatTextbox = memo(
     const modeSendButton = modeStyles.sendButton
     const stopBinding = useShortcutBinding(SHORTCUT_ACTIONS.STOP_GENERATION)
 
+    const showBranch = branch !== undefined
+    const showApproval = Boolean(onApprovalModeChange)
+
     return (
-      <div className={cn("flex w-full flex-col gap-1", className)}>
-        <div className="relative flex w-full flex-col rounded-xl border border-input bg-card shadow-sm transition-colors">
+      <div className={cn("w-full", className)}>
+        <div
+          className={cn(
+            "relative flex w-full flex-col rounded-2xl border border-border/70 bg-card shadow-sm",
+            "transition-all duration-150 focus-within:border-border focus-within:shadow-md"
+          )}
+        >
           <SlashCommandDropdown
             groups={slashGroups}
             open={
@@ -865,7 +878,29 @@ export const ChatTextbox = memo(
             onSelect={handleSelectFile}
           />
 
-          <div className="px-3 pt-2.5 pb-1.5">
+          {(showBranch || showApproval) && (
+            <div className="flex items-center justify-between gap-2 border-b border-border/50 px-2 py-1">
+              <div className="flex min-w-0 items-center">
+                {showBranch && (
+                  <BranchSelector
+                    branch={branch ?? null}
+                    branches={branches}
+                    onBranchSelect={onBranchSelect}
+                    onGitError={onBranchError}
+                    sessionId={sessionId}
+                  />
+                )}
+              </div>
+              {showApproval && (
+                <ApprovalModeCombobox
+                  selected={approvalMode}
+                  onSelect={onApprovalModeChange!}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="px-3.5 pt-3 pb-1.5">
             <RichInput
               ref={richInputRef}
               placeholder={
@@ -951,7 +986,7 @@ export const ChatTextbox = memo(
           </div>
 
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-3 pb-1.5">
+            <div className="flex flex-wrap gap-2 px-3.5 pb-1.5">
               {attachments.map((attachment) => (
                 <AttachmentPreview
                   key={attachment.id}
@@ -975,8 +1010,8 @@ export const ChatTextbox = memo(
             }}
           />
 
-          <div className="flex items-center justify-between rounded-b-xl px-3 py-1.5">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center justify-between gap-2 rounded-b-2xl px-2.5 pt-1 pb-2">
+            <div className="flex items-center gap-0.5">
               {onModeChange && (
                 <ModeCombobox selected={mode} onSelect={onModeChange} />
               )}
@@ -1096,17 +1131,6 @@ export const ChatTextbox = memo(
             </div>
           </div>
         </div>
-        {branch !== undefined && (
-          <div className="flex items-center gap-1 py-1">
-            <BranchSelector
-              branch={branch ?? null}
-              branches={branches}
-              onBranchSelect={onBranchSelect}
-              onGitError={onBranchError}
-              sessionId={sessionId}
-            />
-          </div>
-        )}
       </div>
     )
   })

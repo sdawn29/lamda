@@ -13,6 +13,9 @@ export interface CreateWorkspaceBody {
 
 export type Mode = "ask" | "plan" | "agent"
 
+/** Tool-approval gating for a thread: prompt before risky tools, or run freely. */
+export type ApprovalMode = "ask" | "all_allowed"
+
 export interface ThreadDto {
   id: string
   workspaceId: string
@@ -20,6 +23,7 @@ export interface ThreadDto {
   modelId: string | null
   isStopped: boolean
   mode: Mode
+  approvalMode: ApprovalMode
   createdAt: number
   updatedAt: number
   sessionId: string | null
@@ -153,6 +157,17 @@ export function updateThreadMode(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mode }),
+  })
+}
+
+export function updateThreadApprovalMode(
+  threadId: string,
+  approvalMode: ApprovalMode
+): Promise<void> {
+  return apiFetch<void>(`/thread/${threadId}/approval-mode`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ approvalMode }),
   })
 }
 

@@ -51,6 +51,36 @@ export interface ImageContent {
   mimeType: string;
 }
 
+/** A tool call the agent is about to execute, presented for approval. */
+export interface ToolApprovalRequest {
+  /** Globally-unique id for this tool call. */
+  toolCallId: string;
+  /** Name of the tool, e.g. "bash", "edit", or an MCP tool like "mcp__foo__bar". */
+  toolName: string;
+  /** The tool's arguments (e.g. `{ command }` for bash, `{ path }` for write). */
+  input: Record<string, unknown>;
+  /** Working directory of the session — used to scope persisted decisions. */
+  cwd: string;
+}
+
+/** Outcome of an approval decision. */
+export interface ToolApprovalDecision {
+  /** Whether the tool is allowed to run. */
+  allow: boolean;
+  /** When blocked, the reason surfaced to the agent as the tool result. */
+  reason?: string;
+}
+
+/**
+ * Host-supplied gate consulted before each tool executes. The host decides
+ * (possibly by prompting the user) whether the call may proceed. `signal` is
+ * the agent turn's abort signal, so the host can stop waiting if the turn is
+ * cancelled before the user responds.
+ */
+export interface ToolApprovalBridge {
+  decide(req: ToolApprovalRequest, signal?: AbortSignal): Promise<ToolApprovalDecision>;
+}
+
 export interface SdkConfig {
   /** Anthropic API key. Falls back to ANTHROPIC_API_KEY env var, then ~/.pi/agent/auth.json. */
   anthropicApiKey?: string;
@@ -70,6 +100,12 @@ export interface SdkConfig {
   customTools?: ToolDefinition[];
   /** Agent mode — controls base tool set ("agent" = full, "plan"/"ask" = read-only). Defaults to "agent". */
   mode?: Mode;
+  /**
+   * Optional gate consulted before each tool runs. When provided, the agent
+   * pauses on every tool call until `decide()` resolves. Omit to run tools
+   * without approval.
+   */
+  toolApproval?: ToolApprovalBridge;
 }
 
 /**

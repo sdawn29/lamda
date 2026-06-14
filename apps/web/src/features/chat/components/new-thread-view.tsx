@@ -37,11 +37,11 @@ import {
 } from "@/features/git"
 import { checkoutBranch, sendPrompt, generateTitle } from "../api"
 import {
-  ChatTextbox,
-  type ChatTextboxHandle,
+  ChatComposer,
+  type ChatComposerHandle,
   type ThinkingLevel,
   type PendingAttachment,
-} from "./chat-textbox"
+} from "./chat-composer"
 import { pendingToUploads, pendingToDisplay } from "../lib/attachments"
 import { setPendingThreadPreferences } from "./pending-thread-preferences"
 import { getNextMode } from "./mode-combobox"
@@ -83,7 +83,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
   const [selectedMode, setSelectedMode] = useState<Mode>("agent")
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
-  const chatTextboxRef = useRef<ChatTextboxHandle>(null)
+  const chatTextboxRef = useRef<ChatComposerHandle>(null)
 
   // An explicit ?ws= navigation overrides any earlier in-page pick.
   const [prevInitialWorkspaceId, setPrevInitialWorkspaceId] =
@@ -405,7 +405,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
             )}
           </div>
 
-          <ChatTextbox
+          <ChatComposer
             ref={chatTextboxRef}
             onSend={handleSend}
             isLoading={isSending}

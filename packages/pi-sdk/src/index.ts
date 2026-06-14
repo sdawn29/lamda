@@ -7,6 +7,7 @@ export {
 export { generateThreadTitle, DEFAULT_TITLE_PROMPT } from "./title.js";
 export { generateCommitMessage, DEFAULT_COMMIT_PROMPT } from "./commit-message.js";
 export { createPlanModeTools } from "./plan-tools.js";
+export { createToolApprovalExtension } from "./tool-approval-extension.js";
 export { createTodoTool, TODO_TOOL_NAME } from "./todo-tool.js";
 export type { TodoItem, TodoGoal, TodoStatus, GoalStatus, TodoResult } from "./todo-tool.js";
 export { createQuestionTool, QUESTION_TOOL_NAME } from "./question-tool.js";
@@ -44,4 +45,7 @@ export type {
   SlashCommand,
   ContextUsage,
   HistoryBlock,
+  ToolApprovalBridge,
+  ToolApprovalRequest,
+  ToolApprovalDecision,
 } from "./types.js"

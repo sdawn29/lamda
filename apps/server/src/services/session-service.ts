@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { waitForAnswer } from "./question-registry.js";
+import { createToolApprovalBridge } from "./tool-approval-bridge.js";
 
 // The `question` tool is host-driven and stateless across sessions, so a
 // single instance can be shared by every session. It blocks on the question
@@ -77,6 +78,7 @@ export async function createSessionForThread(
     cwd,
     customTools,
     mode,
+    toolApproval: createToolApprovalBridge(threadId),
     ...opts,
   });
   const sessionId = store.create(handle, cwd, threadId, workspaceId);
@@ -110,6 +112,7 @@ export async function openSessionForThread(
     cwd,
     customTools,
     mode,
+    toolApproval: createToolApprovalBridge(threadId),
     ...opts,
   });
 }

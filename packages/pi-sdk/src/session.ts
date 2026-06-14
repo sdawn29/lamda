@@ -12,6 +12,7 @@ import {
 import { buildAuthStorage } from "./auth.js"
 import { sessionEventGenerator } from "./stream.js"
 import { computeActiveToolsForMode, type Mode } from "./modes.js"
+import { createToolApprovalExtension } from "./tool-approval-extension.js"
 import { LAMDA_SYSTEM_CONTEXT } from "./system-prompt.js"
 import type { ContextBreakdown, HistoryBlock, ManagedSessionHandle, ManagedSessionStats, SdkConfig, SessionTokenStats } from "./types.js"
 
@@ -166,6 +167,9 @@ function buildRuntimeFactory(
       modelRegistry,
       resourceLoaderOptions: {
         appendSystemPromptOverride: (base) => [...base, LAMDA_SYSTEM_CONTEXT],
+        extensionFactories: config.toolApproval
+          ? [createToolApprovalExtension(config.toolApproval)]
+          : [],
       },
     })
     return {

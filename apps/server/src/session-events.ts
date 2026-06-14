@@ -35,11 +35,25 @@ export type SessionPendingError = {
   retryCount?: number;
 };
 
+/** A tool call paused awaiting the user's approval, surfaced in the status snapshot. */
+export type SessionPendingApproval = {
+  toolCallId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  scopeLabel: string;
+};
+
 export type SessionStatus = {
   isRunning: boolean;
   isCompacting: boolean;
   compactionReason: "manual" | "threshold" | "overflow" | null;
   pendingError: SessionPendingError | null;
+  /**
+   * The tool call currently awaiting approval, if any. Restored on thread
+   * mount so switching away and back doesn't lose the approval prompt (the
+   * live `tool_approval_request` event fires only once and isn't replayed).
+   */
+  pendingApproval: SessionPendingApproval | null;
 };
 
 // ── Self-healing observers ──────────────────────────────────────────────────────
@@ -95,11 +109,29 @@ type PlanSavedEvent = {
   /** Workspace-relative path (always forward-slash, starts with `.lamda/plans/`). */
   relativePath: string;
 };
+/** A gated tool is paused awaiting the user's approval decision. */
+type ToolApprovalRequestEvent = {
+  type: "tool_approval_request";
+  toolCallId: string;
+  toolName: string;
+  /** Tool arguments, so the UI can summarize what's about to run. */
+  input: Record<string, unknown>;
+  /** What an Always/Don't-allow decision will remember (e.g. `git status`). */
+  scopeLabel: string;
+};
+/** A previously-requested approval has been settled (or cancelled). */
+type ToolApprovalResolvedEvent = {
+  type: "tool_approval_resolved";
+  toolCallId: string;
+  decision: "once" | "always" | "never";
+};
 type HubEvent =
   | SessionEvent
   | ServerErrorEvent
   | TurnFileChangedEvent
-  | PlanSavedEvent;
+  | PlanSavedEvent
+  | ToolApprovalRequestEvent
+  | ToolApprovalResolvedEvent;
 
 type SessionEventRecord = {
   id: number;
@@ -172,6 +204,9 @@ class SessionEventHub {
   private isCompacting = false;
   private compactionReason: "manual" | "threshold" | "overflow" | null = null;
   private pendingErrorState: SessionPendingError | null = null;
+  // Tool calls paused awaiting user approval, keyed by toolCallId. Included in
+  // the status snapshot so a thread re-mount can restore the approval prompt.
+  private pendingApprovals = new Map<string, SessionPendingApproval>();
   private turnContext: TurnContext | null = null;
   private pendingThinkingLevel: string | null = null;
   private currentToolBlocks = new Map<string, ToolContext>();
@@ -539,11 +574,18 @@ class SessionEventHub {
   }
 
   getStatus(): SessionStatus {
+    // Surface the most-recent unresolved approval — the one the user was last
+    // prompted with (matches the single-prompt-at-a-time client UI).
+    let pendingApproval: SessionPendingApproval | null = null;
+    for (const approval of this.pendingApprovals.values()) {
+      pendingApproval = approval;
+    }
     return {
       isRunning: this.runInProgress,
       isCompacting: this.isCompacting,
       compactionReason: this.compactionReason,
       pendingError: this.pendingErrorState,
+      pendingApproval,
     };
   }
 
@@ -603,6 +645,29 @@ class SessionEventHub {
     this.emit(ev as HubEvent);
   }
 
+  /** Surface a paused tool call so the client can prompt for approval. */
+  emitToolApprovalRequest(payload: {
+    toolCallId: string;
+    toolName: string;
+    input: Record<string, unknown>;
+    scopeLabel: string;
+  }): void {
+    if (this.disposed) return;
+    // Remember it so a thread re-mount can restore the prompt via /status.
+    this.pendingApprovals.set(payload.toolCallId, payload);
+    this.emit({ type: "tool_approval_request", ...payload });
+  }
+
+  /** Notify the client that a pending approval has been settled or cancelled. */
+  emitToolApprovalResolved(payload: {
+    toolCallId: string;
+    decision: "once" | "always" | "never";
+  }): void {
+    if (this.disposed) return;
+    this.pendingApprovals.delete(payload.toolCallId);
+    this.emit({ type: "tool_approval_resolved", ...payload });
+  }
+
   /**
    * Swap in a freshly-rebuilt session handle after a crash, keeping this hub —
    * and therefore every WS/SSE subscriber, the sessionId, and the event-id
@@ -630,6 +695,7 @@ class SessionEventHub {
     this.toolMetaMap.clear();
     this.currentToolBlocks.clear();
     this.currentTurnEmittedFiles.clear();
+    this.pendingApprovals.clear();
     this.currentRunEvents = [];
     this.runInProgress = false;
     this.preTurnStatusMap = null;
@@ -730,6 +796,7 @@ class SessionEventHub {
         const wasRunning = this.runInProgress;
         this.toolMetaMap.clear();
         this.currentToolBlocks.clear();
+        this.pendingApprovals.clear();
         this.runInProgress = false;
         this.currentRunEvents = [];
         this.emit({ type: "server_error", message });
@@ -1093,6 +1160,10 @@ class SessionEventHub {
 
     if (event.type === "agent_end" || event.type === "server_error") {
       this.runInProgress = false;
+      // Defensive: a paused approval is normally cleared by its resolved event
+      // (including the abort path); clear any stragglers so the status snapshot
+      // never restores a prompt for a turn that has already ended.
+      this.pendingApprovals.clear();
       threadStatusBroadcaster.broadcast(this.threadId, "idle");
     }
 
@@ -1147,6 +1218,25 @@ class SessionEventRegistry {
     this.hubs.get(sessionId)?.emitHealingStatus(ev);
   }
 
+  emitToolApprovalRequest(
+    sessionId: string,
+    payload: {
+      toolCallId: string;
+      toolName: string;
+      input: Record<string, unknown>;
+      scopeLabel: string;
+    },
+  ) {
+    this.hubs.get(sessionId)?.emitToolApprovalRequest(payload);
+  }
+
+  emitToolApprovalResolved(
+    sessionId: string,
+    payload: { toolCallId: string; decision: "once" | "always" | "never" },
+  ) {
+    this.hubs.get(sessionId)?.emitToolApprovalResolved(payload);
+  }
+
   reattach(sessionId: string, handle: ManagedSessionHandle) {
     this.hubs.get(sessionId)?.reattach(handle);
   }
@@ -1162,6 +1252,7 @@ class SessionEventRegistry {
         isCompacting: false,
         compactionReason: null,
         pendingError: null,
+        pendingApproval: null,
       }
     );
   }

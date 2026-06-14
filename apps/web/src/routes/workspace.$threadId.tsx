@@ -103,6 +103,7 @@ function WorkspaceThreadRoute() {
       threadId={foundThread.id}
       initialModelId={foundThread.modelId}
       initialMode={foundThread.mode ?? "agent"}
+      initialApprovalMode={foundThread.approvalMode ?? "ask"}
       initialIsStopped={foundThread.isStopped}
     />
   )

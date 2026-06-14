@@ -311,6 +311,16 @@ function createDb() {
     // Safe to ignore — column may already exist.
   }
 
+  // Migration: Add approval_mode column to threads table (tool-approval gating).
+  try {
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!threadCols.some((col) => col.name === "approval_mode")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN approval_mode TEXT NOT NULL DEFAULT 'ask'`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
   // Migration: Update message_blocks CHECK constraint to include 'abort' and 'compaction' roles.
   // SQLite doesn't support ALTER TABLE for CHECK constraints, so we recreate the table when needed.
   try {

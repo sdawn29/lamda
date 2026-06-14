@@ -21,10 +21,12 @@ import {
   updateThreadTitle as apiUpdateThreadTitle,
   updateThreadModel as apiUpdateThreadModel,
   updateThreadMode as apiUpdateThreadMode,
+  updateThreadApprovalMode as apiUpdateThreadApprovalMode,
   updateThreadStopped as apiUpdateThreadStopped,
   updateThreadLastAccessed as apiUpdateThreadLastAccessed,
   resetAllData,
   type Mode,
+  type ApprovalMode,
   type WorkspaceDto,
 } from "./api"
 import { workspacesQueryKey } from "./queries"
@@ -344,6 +346,27 @@ export function useUpdateThreadMode() {
           ...ws,
           threads: ws.threads.map((t) =>
             t.id !== threadId ? t : { ...t, mode }
+          ),
+        }))
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+export function useUpdateThreadApprovalMode() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ threadId, approvalMode }: { threadId: string; approvalMode: ApprovalMode }) =>
+      apiUpdateThreadApprovalMode(threadId, approvalMode),
+    onMutate: ({ threadId, approvalMode }) => {
+      setWorkspacesData(queryClient, (workspaces) =>
+        workspaces.map((ws) => ({
+          ...ws,
+          threads: ws.threads.map((t) =>
+            t.id !== threadId ? t : { ...t, approvalMode }
           ),
         }))
       )

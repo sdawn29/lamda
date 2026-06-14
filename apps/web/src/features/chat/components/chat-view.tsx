@@ -21,11 +21,11 @@ import { ArrowDownIcon, PlugZapIcon } from "lucide-react"
 import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import {
-  ChatTextbox,
-  type ChatTextboxHandle,
+  ChatComposer,
+  type ChatComposerHandle,
   type ThinkingLevel,
   type PendingAttachment,
-} from "./chat-textbox"
+} from "./chat-composer"
 import { pendingToUploads, pendingToDisplay } from "../lib/attachments"
 import { MessageRow, getMessageKey } from "./message-row"
 import {
@@ -41,6 +41,7 @@ import { Button } from "@/shared/ui/button"
 import {
   useSlashCommands,
   useSessionStats,
+  useSessionStatus,
   chatKeys,
   messagesQueryKey,
 } from "../queries"
@@ -61,6 +62,7 @@ import { ChatErrorAlert } from "./chat-error-alert"
 import { useShowThinkingSetting } from "@/shared/lib/thinking-visibility"
 import {
   useUpdateThreadMode,
+  useUpdateThreadApprovalMode,
   useUpdateThreadModel,
   useUpdateThreadStopped,
   useUpdateThreadTitle,
@@ -84,6 +86,11 @@ import {
 import { getNextMode } from "./mode-combobox"
 import { QuestionView } from "./question-view"
 import { findActiveQuestion } from "../lib/active-question"
+import {
+  ToolApprovalBlock,
+  type PendingApproval,
+} from "./tool-approval-block"
+import type { ApprovalMode } from "@/features/workspace/api"
 
 const PLAN_DIR_PREFIX = ".lamda/plans/"
 
@@ -428,6 +435,7 @@ interface ChatViewProps {
   threadId: string
   initialModelId: string | null
   initialMode: "ask" | "plan" | "agent"
+  initialApprovalMode: ApprovalMode
   initialIsStopped: boolean
 }
 
@@ -437,6 +445,7 @@ export function ChatView({
   threadId,
   initialModelId,
   initialMode,
+  initialApprovalMode,
   initialIsStopped,
 }: ChatViewProps) {
   const queryClient = useQueryClient()
@@ -471,8 +480,15 @@ export function ChatView({
   const [selectedMode, setSelectedMode] = useState<"ask" | "plan" | "agent">(
     initialMode
   )
+  const [selectedApprovalMode, setSelectedApprovalMode] =
+    useState<ApprovalMode>(initialApprovalMode)
+  // The tool call currently paused awaiting the user's approval, if any.
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(
+    null
+  )
   const updateThreadModel = useUpdateThreadModel()
   const updateThreadMode = useUpdateThreadMode()
+  const updateThreadApprovalMode = useUpdateThreadApprovalMode()
   const updateThreadStopped = useUpdateThreadStopped()
 
   // Dedupe plan-saved announcements by relative path so a buffered/replayed
@@ -480,6 +496,7 @@ export function ChatView({
   const announcedPlansRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     announcedPlansRef.current = new Set()
+    resolvedApprovalsRef.current = new Set()
   }, [threadId])
 
   const handlePlanSaved = useCallback(
@@ -502,6 +519,44 @@ export function ChatView({
     },
     [rootPath]
   )
+
+  // Tool calls we've seen resolved this mount. Guards the status-snapshot
+  // restore below from resurrecting an approval that a live `resolved` event
+  // already cleared (the REST snapshot can arrive after that event).
+  const resolvedApprovalsRef = useRef<Set<string>>(new Set())
+
+  const handleToolApprovalRequest = useCallback(
+    (event: { toolCallId: string; toolName: string; input: Record<string, unknown>; scopeLabel: string }) => {
+      setPendingApproval(event)
+    },
+    []
+  )
+
+  const handleToolApprovalResolved = useCallback(
+    (event: { toolCallId: string }) => {
+      resolvedApprovalsRef.current.add(event.toolCallId)
+      // Clear only if it matches the request we're showing (a stale resolve for
+      // an already-replaced request shouldn't dismiss a newer prompt).
+      setPendingApproval((prev) =>
+        prev && prev.toolCallId === event.toolCallId ? null : prev
+      )
+    },
+    []
+  )
+
+  // Restore the approval prompt from the status snapshot fetched on every thread
+  // mount. The live `tool_approval_request` event fires once and isn't replayed
+  // on reconnect, so without this, switching away from a paused tool and back
+  // would leave the prompt gone — and the tool stuck — until the turn aborted.
+  const { data: sessionStatus } = useSessionStatus(sessionId)
+  useEffect(() => {
+    const approval = sessionStatus?.pendingApproval
+    if (!approval) return
+    if (resolvedApprovalsRef.current.has(approval.toolCallId)) return
+    setPendingApproval((prev) =>
+      prev?.toolCallId === approval.toolCallId ? prev : approval
+    )
+  }, [sessionStatus])
 
   const { data: turns = [] } = useTurns(sessionId)
 
@@ -568,6 +623,8 @@ export function ChatView({
     threadId,
     initialIsStopped,
     onPlanSaved: handlePlanSaved,
+    onToolApprovalRequest: handleToolApprovalRequest,
+    onToolApprovalResolved: handleToolApprovalResolved,
   })
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(false)
@@ -576,7 +633,7 @@ export function ChatView({
   // handleScroll ignores pinned-state changes until scrollend clears this flag,
   // preventing user-initiated scroll events from cancelling our animation.
   const programmaticScrollRef = useRef(false)
-  const chatTextboxRef = useRef<ChatTextboxHandle>(null)
+  const chatTextboxRef = useRef<ChatComposerHandle>(null)
   const bottomBarRef = useRef<HTMLDivElement>(null)
   const textboxWrapRef = useRef<HTMLDivElement>(null)
   // Messages present on the first non-empty render (from cache) skip entry animations.
@@ -607,6 +664,8 @@ export function ChatView({
     setSelectedModelId(nextPendingPreferences?.modelId ?? initialModelId)
     setSelectedThinkingLevel(nextPendingPreferences?.thinkingLevel)
     setSelectedMode(initialMode)
+    setSelectedApprovalMode(initialApprovalMode)
+    setPendingApproval(null)
   }
 
   // Capture initial keys for this session as soon as messages are available,
@@ -845,9 +904,11 @@ export function ChatView({
     return keys
   }, [groupedMessages])
 
-  // While a question is awaiting an answer the agent is idle, not working — hide
-  // the shimmering "thinking" phrase so it doesn't claim the agent is busy.
-  const showThinkingIndicator = isLoading && !isCompacting && !activeQuestion
+  // While a question or a tool approval is awaiting the user the agent is idle,
+  // not working — hide the shimmering "thinking" phrase so it doesn't claim the
+  // agent is busy.
+  const showThinkingIndicator =
+    isLoading && !isCompacting && !activeQuestion && !pendingApproval
 
   // Track group count + previous scrollHeight so we can restore scroll position
   // after older pages prepend (keeps the previously-first visible row in place
@@ -1133,6 +1194,14 @@ export function ChatView({
     const nextMode = getNextMode(selectedMode)
     handleModeChange(nextMode)
   }, [handleModeChange, selectedMode])
+
+  const handleApprovalModeChange = useCallback(
+    (approvalMode: ApprovalMode) => {
+      setSelectedApprovalMode(approvalMode)
+      updateThreadApprovalMode.mutate({ threadId, approvalMode })
+    },
+    [threadId, updateThreadApprovalMode]
+  )
 
   const handleGitError = useCallback((message: string) => {
     setGitError(message)
@@ -1510,6 +1579,17 @@ export function ChatView({
           <div className="mx-auto w-full max-w-3xl px-6">
             {isCompacting ? (
               <CompactingIndicator reason={compactionReason} />
+            ) : pendingApproval ? (
+              <div
+                aria-live="polite"
+                className="flex animate-in items-center gap-2 py-0.5 text-sm font-medium text-amber-600 duration-200 fade-in-0 dark:text-amber-400"
+              >
+                <span className="relative flex size-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500/60" />
+                  <span className="relative inline-flex size-1.5 rounded-full bg-amber-500" />
+                </span>
+                Waiting for approval…
+              </div>
             ) : (
               showThinkingIndicator && <ThinkingIndicator className="py-0.5" />
             )}
@@ -1568,14 +1648,20 @@ export function ChatView({
             ref={textboxWrapRef}
             className="mx-auto w-full max-w-3xl px-6 pb-2"
           >
-            {activeQuestion ? (
+            {pendingApproval ? (
+              <ToolApprovalBlock
+                key={pendingApproval.toolCallId}
+                sessionId={sessionId}
+                approval={pendingApproval}
+              />
+            ) : activeQuestion ? (
               <QuestionView
                 key={activeQuestion.toolCallId}
                 sessionId={sessionId}
                 question={activeQuestion}
               />
             ) : (
-              <ChatTextbox
+              <ChatComposer
                 ref={chatTextboxRef}
                 onSend={handleSend}
                 onStop={handleStop}
@@ -1593,6 +1679,8 @@ export function ChatView({
                 onThinkingLevelChange={setSelectedThinkingLevel}
                 mode={selectedMode}
                 onModeChange={handleModeChange}
+                approvalMode={selectedApprovalMode}
+                onApprovalModeChange={handleApprovalModeChange}
                 sessionStats={sessionStats}
               />
             )}

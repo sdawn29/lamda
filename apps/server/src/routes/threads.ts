@@ -13,6 +13,7 @@ import {
   updateThreadTitle,
   updateThreadModel,
   updateThreadMode,
+  updateThreadApprovalMode,
   updateThreadStopped,
   updateThreadLastAccessed,
 } from "@lamda/db";
@@ -78,6 +79,7 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
         modelId,
         isStopped: false,
         mode,
+        approvalMode: "ask",
         isPinned: false,
         createdAt: Date.now(),
         sessionId,
@@ -162,6 +164,22 @@ threads.patch("/thread/:id/mode", async (c) => {
     }
     session.handle.setMode(mode);
   }
+  return c.json({ ok: true });
+});
+
+threads.patch("/thread/:id/approval-mode", async (c) => {
+  const threadId = c.req.param("id");
+  const body = await c.req
+    .json<{ approvalMode?: string }>()
+    .catch((): { approvalMode?: string } => ({}));
+  if (body.approvalMode !== "ask" && body.approvalMode !== "all_allowed") {
+    return c.json({ error: "approvalMode must be 'ask' or 'all_allowed'" }, 400);
+  }
+  const thread = getThread(threadId);
+  if (!thread) return c.json({ error: "Thread not found" }, 404);
+  // The bridge reads approval_mode fresh on each tool call, so persisting is
+  // enough — no session handle update needed.
+  updateThreadApprovalMode(threadId, body.approvalMode);
   return c.json({ ok: true });
 });
 

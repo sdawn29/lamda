@@ -232,6 +232,26 @@ export function submitQuestionAnswer(
   })
 }
 
+// ── Tool approvals ───────────────────────────────────────────────────────────
+
+export type ToolApprovalChoice = "once" | "always" | "never"
+
+/**
+ * Submit the user's decision for a paused tool call. The server resolves the
+ * blocked approval gate so the agent either runs or skips the tool.
+ */
+export function submitToolApproval(
+  sessionId: string,
+  toolCallId: string,
+  decision: ToolApprovalChoice
+): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(`/session/${sessionId}/tool-approval`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ toolCallId, decision }),
+  })
+}
+
 // ── Messages ─────────────────────────────────────────────────────────────────
 
 export interface SessionMessagesResponse {
@@ -432,6 +452,13 @@ export interface SessionStatus {
     message: string
     retryable: boolean
     retryCount?: number
+  } | null
+  /** A tool call awaiting approval, restored on thread mount. */
+  pendingApproval: {
+    toolCallId: string
+    toolName: string
+    input: Record<string, unknown>
+    scopeLabel: string
   } | null
 }
 

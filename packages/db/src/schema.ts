@@ -28,6 +28,9 @@ export const threads = sqliteTable("threads", {
   isArchived: integer("is_archived", { mode: "boolean" }).notNull().default(false),
   isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
   mode: text("mode", { enum: ["ask", "plan", "agent"] }).notNull().default("agent"),
+  approvalMode: text("approval_mode", { enum: ["ask", "all_allowed"] })
+    .notNull()
+    .default("ask"),
   lastAccessedAt: integer("last_accessed_at"),
   createdAt: integer("created_at").notNull(),
   forkedFromId: text("forked_from_id"),

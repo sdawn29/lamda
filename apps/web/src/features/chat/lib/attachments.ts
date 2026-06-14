@@ -1,6 +1,6 @@
 import type { AttachmentUpload } from "../api"
 import type { UserMessage } from "../types"
-import type { PendingAttachment } from "../components/chat-textbox"
+import type { PendingAttachment } from "../components/chat-composer"
 
 /**
  * Extract the raw base64 payload from a `data:<mime>;base64,<data>` URL.

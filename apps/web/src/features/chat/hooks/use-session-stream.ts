@@ -299,6 +299,15 @@ function getSessionDoneFlag(sessionId: string): DoneFlag {
   return flag
 }
 
+// Last server event id seen per session, preserved across hook re-mounts (thread
+// switches / page navigations). The per-hook lastEventIdRef resets to undefined
+// when the component re-mounts, so without this a return to a running thread
+// reconnects with no lastEventId — the server then replays the entire in-progress
+// turn from message_start, re-appending a duplicate assistant block each time.
+// Keying by sessionId lets the reconnect resume from the last seen event so only
+// genuinely-missed events are replayed.
+const sessionLastEventIds = new Map<string, string>()
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export interface UseSessionStreamOptions {
@@ -314,6 +323,10 @@ export interface UseSessionStreamOptions {
   onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
   /** Live count of messages waiting in the steering / follow-up queues. */
   onQueueUpdate?: (event: { steering: number; followUp: number }) => void
+  /** A gated tool is paused awaiting the user's approval. */
+  onToolApprovalRequest?: (event: { toolCallId: string; toolName: string; input: Record<string, unknown>; scopeLabel: string }) => void
+  /** A pending approval was settled or cancelled. */
+  onToolApprovalResolved?: (event: { toolCallId: string; decision: "once" | "always" | "never" }) => void
 }
 
 export function useSessionStream({
@@ -328,6 +341,8 @@ export function useSessionStream({
   onToolExecutionEnd,
   onPlanSaved,
   onQueueUpdate,
+  onToolApprovalRequest,
+  onToolApprovalResolved,
 }: UseSessionStreamOptions) {
   const queryClient = useQueryClient()
 
@@ -360,10 +375,10 @@ export function useSessionStream({
 
   // Always-current callbacks — stored in a ref so the queue processor (which
   // is stable across renders) always calls the latest versions.
-  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate })
+  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate, onToolApprovalRequest, onToolApprovalResolved })
   useEffect(() => {
-    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate }
-  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate])
+    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate, onToolApprovalRequest, onToolApprovalResolved }
+  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate, onToolApprovalRequest, onToolApprovalResolved])
 
   // ── Queue processor ───────────────────────────────────────────────────────
   //
@@ -593,6 +608,9 @@ export function useSessionStream({
   useEffect(() => {
     const doneFlag = getSessionDoneFlag(sessionId)
     doneFlag.current = false
+    // Resume from the last event seen for this session (survives thread switches),
+    // so a reconnect replays only missed events rather than the whole turn.
+    lastEventIdRef.current = sessionLastEventIds.get(sessionId)
     let ws: WebSocket | null = null
     let unsubscribe: (() => void) | undefined
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -768,6 +786,16 @@ export function useSessionStream({
             })
           },
 
+          onToolApprovalRequest: (data) => {
+            if (doneFlag.current) return
+            callbacksRef.current.onToolApprovalRequest?.(data)
+          },
+
+          onToolApprovalResolved: (data) => {
+            if (doneFlag.current) return
+            callbacksRef.current.onToolApprovalResolved?.(data)
+          },
+
           onAutoRetryStart: ({ attempt, errorMessage }) => {
             if (doneFlag.current) return
             enqueue({ kind: "auto_retry_start", attempt, errorMessage })
@@ -805,6 +833,9 @@ export function useSessionStream({
 
           onEventId: (id: string) => {
             lastEventIdRef.current = id
+            // Persist across hook re-mounts so returning to a running thread
+            // resumes the stream instead of replaying the whole turn.
+            sessionLastEventIds.set(sessionId, id)
             // Reset the counter whenever a server event is received — consecutive
             // failures is what we care about, not lifetime reconnects.
             reconnectAttempts = 0
@@ -821,7 +852,7 @@ export function useSessionStream({
               unsubscribe = undefined
               reconnectTimer = setTimeout(() => {
                 reconnectTimer = null
-                if (!doneFlag.current) connect().catch(console.debug)
+                if (!doneFlag.current) connect(lastEventIdRef.current).catch(console.debug)
               }, 2000)
               return
             }
@@ -852,7 +883,7 @@ export function useSessionStream({
         })
     }
 
-    connect().catch((err) => {
+    connect(lastEventIdRef.current).catch((err) => {
       if (doneFlag.current) return
       doneFlag.current = true
       callbacksRef.current.onIsLoadingChange?.(false)
@@ -865,7 +896,7 @@ export function useSessionStream({
         ws = null
         unsubscribe?.()
         unsubscribe = undefined
-        if (reconnectTimer === null) connect().catch(console.debug)
+        if (reconnectTimer === null) connect(lastEventIdRef.current).catch(console.debug)
       }
     }
     document.addEventListener("visibilitychange", handleVisibilityChange)

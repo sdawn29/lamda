@@ -47,6 +47,8 @@ interface UseChatStreamOptions {
   threadId: string
   initialIsStopped: boolean
   onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
+  onToolApprovalRequest?: (event: { toolCallId: string; toolName: string; input: Record<string, unknown>; scopeLabel: string }) => void
+  onToolApprovalResolved?: (event: { toolCallId: string; decision: "once" | "always" | "never" }) => void
 }
 
 interface UseChatStreamResult {
@@ -82,6 +84,8 @@ export function useChatStream({
   threadId,
   initialIsStopped,
   onPlanSaved,
+  onToolApprovalRequest,
+  onToolApprovalResolved,
 }: UseChatStreamOptions): UseChatStreamResult {
   const setThreadStatus = useSetThreadStatus()
   const queryClient = useQueryClient()
@@ -194,6 +198,8 @@ export function useChatStream({
     onToolExecutionEnd: handleToolExecutionEnd,
     onPlanSaved,
     onQueueUpdate: handleQueueUpdate,
+    onToolApprovalRequest,
+    onToolApprovalResolved,
   })
 
   // After the agent finishes, replace optimistic user-message placeholders (no

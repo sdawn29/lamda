@@ -81,6 +81,19 @@ export interface SessionAgentEndEvent {
   messages?: AgentEndMessage[];
 }
 
+export interface SessionToolApprovalRequestEvent {
+  toolCallId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  /** What an Always/Don't-allow decision will remember (e.g. `git status`). */
+  scopeLabel: string;
+}
+
+export interface SessionToolApprovalResolvedEvent {
+  toolCallId: string;
+  decision: "once" | "always" | "never";
+}
+
 export interface SessionAutoRetryStartEvent {
   attempt: number;
   maxAttempts: number;
@@ -111,6 +124,8 @@ export interface SessionEventHandlers {
   onAgentEnd: (event: SessionAgentEndEvent) => void;
   onTurnFileChanged?: (event: SessionTurnFileChangedEvent) => void;
   onPlanSaved?: (event: SessionPlanSavedEvent) => void;
+  onToolApprovalRequest?: (event: SessionToolApprovalRequestEvent) => void;
+  onToolApprovalResolved?: (event: SessionToolApprovalResolvedEvent) => void;
   onQueueUpdate: (event: SessionQueueUpdateEvent) => void;
   onAutoRetryStart: (event: SessionAutoRetryStartEvent) => void;
   onAutoRetryEnd: (event: SessionAutoRetryEndEvent) => void;
@@ -177,6 +192,12 @@ export function subscribeToSessionEvents(
           break
         case "plan_saved":
           handlers.onPlanSaved?.(data as unknown as SessionPlanSavedEvent)
+          break
+        case "tool_approval_request":
+          handlers.onToolApprovalRequest?.(data as unknown as SessionToolApprovalRequestEvent)
+          break
+        case "tool_approval_resolved":
+          handlers.onToolApprovalResolved?.(data as unknown as SessionToolApprovalResolvedEvent)
           break
         case "queue_update":
           handlers.onQueueUpdate(data as unknown as SessionQueueUpdateEvent)

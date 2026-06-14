@@ -34,6 +34,7 @@ import {
   openSessionForThread,
 } from "../services/session-service.js";
 import { submitAnswer } from "../services/question-registry.js";
+import { submitApproval } from "../services/approval-registry.js";
 import {
   readSessionHistory,
   stripModePreamble,
@@ -350,6 +351,36 @@ sessions.post("/session/:id/answer", async (c) => {
   const accepted = submitAnswer(body.toolCallId, body.answer);
   if (!accepted) {
     return c.json({ error: "No pending question for that toolCallId" }, 404);
+  }
+  return c.json({ ok: true });
+});
+
+/**
+ * Submit the user's decision for a paused tool call. Resolves the blocked
+ * approval bridge so the agent either runs or skips the tool.
+ */
+sessions.post("/session/:id/tool-approval", async (c) => {
+  const id = c.req.param("id");
+  if (!store.has(id)) return c.json({ error: "Not found" }, 404);
+
+  const body = await c.req
+    .json<{ toolCallId?: string; decision?: string }>()
+    .catch((): { toolCallId?: string; decision?: string } => ({}));
+  if (
+    !body.toolCallId ||
+    (body.decision !== "once" &&
+      body.decision !== "always" &&
+      body.decision !== "never")
+  ) {
+    return c.json(
+      { error: "toolCallId and decision ('once'|'always'|'never') are required" },
+      400,
+    );
+  }
+
+  const accepted = submitApproval(body.toolCallId, body.decision);
+  if (!accepted) {
+    return c.json({ error: "No pending approval for that toolCallId" }, 404);
   }
   return c.json({ ok: true });
 });
