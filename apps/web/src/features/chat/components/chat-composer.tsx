@@ -49,6 +49,7 @@ import { ModeCombobox, getModeOption } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
 import { ThinkingCombobox, type ThinkingLevel } from "./thinking-combobox"
 export type { ThinkingLevel } from "./thinking-combobox"
+import { useComposerPrefsStore, MAX_MESSAGE_HISTORY } from "../composer-prefs-store"
 import type { Mode, ApprovalMode } from "@/features/workspace/api"
 import {
   RichInput,
@@ -72,50 +73,22 @@ import { useCommandPalette } from "@/features/command-palette"
 import { DEFAULT_SETTINGS_SECTION } from "@/features/settings"
 import { useTheme } from "@/shared/components/theme-provider"
 
-const THINKING_LEVEL_STORAGE_KEY = "chat:thinking_level"
-const THINKING_LEVELS = ["low", "medium", "high", "xhigh"] as const
-
+// Composer preferences (thinking level + sent-message history) live in a
+// persisted zustand store. These thin wrappers preserve the call sites below.
 function readStoredThinkingLevel(): ThinkingLevel {
-  try {
-    const v = window.localStorage.getItem(THINKING_LEVEL_STORAGE_KEY)
-    if (v && (THINKING_LEVELS as readonly string[]).includes(v)) {
-      return v as ThinkingLevel
-    }
-  } catch {
-    // localStorage may be unavailable (SSR / private mode) — fall through.
-  }
-  return "medium"
+  return useComposerPrefsStore.getState().thinkingLevel
 }
 
-// Persisted, shell-style history of messages the user has sent, recalled by
-// pressing ArrowUp / ArrowDown on the chat input. Stored newest-last and shared
-// across threads so the history follows the user like a terminal prompt.
-const MESSAGE_HISTORY_STORAGE_KEY = "chat:message_history"
-const MAX_MESSAGE_HISTORY = 100
-
+// Shell-style history of messages the user has sent, recalled by pressing
+// ArrowUp / ArrowDown on the chat input. Stored newest-last and shared across
+// threads so the history follows the user like a terminal prompt.
 function readMessageHistory(): string[] {
-  try {
-    const raw = window.localStorage.getItem(MESSAGE_HISTORY_STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) {
-      return parsed.filter((v): v is string => typeof v === "string")
-    }
-  } catch {
-    // Corrupt or unavailable storage — start with an empty history.
-  }
-  return []
+  // Return a copy — callers mutate the array in place before persisting.
+  return [...useComposerPrefsStore.getState().messageHistory]
 }
 
 function writeMessageHistory(history: string[]): void {
-  try {
-    window.localStorage.setItem(
-      MESSAGE_HISTORY_STORAGE_KEY,
-      JSON.stringify(history)
-    )
-  } catch {
-    // localStorage may be unavailable (private mode / disabled) — ignore.
-  }
+  useComposerPrefsStore.getState().setMessageHistory(history)
 }
 
 export interface PendingAttachment {
@@ -204,11 +177,7 @@ export const ChatComposer = memo(
       (level: ThinkingLevel) => {
         setThinkingLevelState(level)
         onThinkingLevelChange?.(level)
-        try {
-          window.localStorage.setItem(THINKING_LEVEL_STORAGE_KEY, level)
-        } catch {
-          // localStorage may be unavailable (private mode / disabled) — ignore.
-        }
+        useComposerPrefsStore.getState().setThinkingLevel(level)
       },
       [onThinkingLevelChange]
     )

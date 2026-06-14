@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { persist, createJSONStorage } from "zustand/middleware"
 import { openGlobalWebSocket } from "./api"
 import { queryClient } from "@/shared/lib/query-client"
 
@@ -6,25 +7,6 @@ export type ThreadStatus = "streaming" | "completed" | "idle" | "error"
 
 const STREAMED_THREADS_KEY = "lamda:streamed-threads"
 const COMPLETED_VIEW_TIMEOUT_MS = 5000
-
-function getStreamedThreads(): Set<string> {
-  try {
-    const stored = localStorage.getItem(STREAMED_THREADS_KEY)
-    return stored ? new Set(JSON.parse(stored)) : new Set()
-  } catch {
-    return new Set()
-  }
-}
-
-function markThreadStreamed(threadId: string): void {
-  try {
-    const streamed = getStreamedThreads()
-    streamed.add(threadId)
-    localStorage.setItem(STREAMED_THREADS_KEY, JSON.stringify([...streamed]))
-  } catch {
-    // localStorage quota issues — ignore
-  }
-}
 
 // Module-level timer registry — not reactive state, never drives re-renders
 const timers: Record<string, ReturnType<typeof setTimeout>> = {}
@@ -52,43 +34,64 @@ function cancelTimer(threadId: string): void {
 interface ThreadStatusStore {
   statuses: Record<string, ThreadStatus>
   activeThreadId: string | null
+  /**
+   * Threads that have streamed at least once. Persisted to localStorage so an
+   * "idle" status arriving after a reload can be shown as "completed".
+   */
+  streamedThreads: Record<string, true>
+  isThreadStreamed: (threadId: string) => boolean
   setStatus: (threadId: string, status: ThreadStatus) => void
   setActiveThreadId: (threadId: string | null) => void
 }
 
-export const useThreadStatusStore = create<ThreadStatusStore>()((set, get) => ({
-  statuses: {},
-  activeThreadId: null,
+export const useThreadStatusStore = create<ThreadStatusStore>()(
+  persist(
+    (set, get) => ({
+      statuses: {},
+      activeThreadId: null,
+      streamedThreads: {},
 
-  setStatus: (threadId, status) => {
-    // Error state persists until a new stream starts — ignore other overrides.
-    if (status !== "streaming" && (get().statuses[threadId] ?? "idle") === "error") return
+      isThreadStreamed: (threadId) => Boolean(get().streamedThreads[threadId]),
 
-    if (status === "streaming") markThreadStreamed(threadId)
+      setStatus: (threadId, status) => {
+        // Error state persists until a new stream starts — ignore other overrides.
+        if (status !== "streaming" && (get().statuses[threadId] ?? "idle") === "error") return
 
-    set((s) => ({ statuses: { ...s.statuses, [threadId]: status } }))
+        if (status === "streaming" && !get().streamedThreads[threadId]) {
+          set((s) => ({ streamedThreads: { ...s.streamedThreads, [threadId]: true } }))
+        }
 
-    if (status === "completed" && get().activeThreadId === threadId) {
-      // Thread finished while user is viewing it — start countdown to idle.
-      startTimer(threadId)
-    } else if (status !== "completed") {
-      // No longer completed — cancel any pending transition timer.
-      cancelTimer(threadId)
+        set((s) => ({ statuses: { ...s.statuses, [threadId]: status } }))
+
+        if (status === "completed" && get().activeThreadId === threadId) {
+          // Thread finished while user is viewing it — start countdown to idle.
+          startTimer(threadId)
+        } else if (status !== "completed") {
+          // No longer completed — cancel any pending transition timer.
+          cancelTimer(threadId)
+        }
+      },
+
+      setActiveThreadId: (threadId) => {
+        const prev = get().activeThreadId
+        if (prev) cancelTimer(prev)
+
+        set({ activeThreadId: threadId })
+
+        // If the incoming thread is already completed, start the countdown.
+        if (threadId && (get().statuses[threadId] ?? "idle") === "completed") {
+          startTimer(threadId)
+        }
+      },
+    }),
+    {
+      name: STREAMED_THREADS_KEY,
+      storage: createJSONStorage(() => localStorage),
+      // Only the streamed-thread set is durable; live statuses are per-session.
+      partialize: (s) => ({ streamedThreads: s.streamedThreads }),
     }
-  },
-
-  setActiveThreadId: (threadId) => {
-    const prev = get().activeThreadId
-    if (prev) cancelTimer(prev)
-
-    set({ activeThreadId: threadId })
-
-    // If the incoming thread is already completed, start the countdown.
-    if (threadId && (get().statuses[threadId] ?? "idle") === "completed") {
-      startTimer(threadId)
-    }
-  },
-}))
+  )
+)
 
 // ── Public hooks ──────────────────────────────────────────────────────────────
 
@@ -135,10 +138,9 @@ function handleGlobalMessage(e: MessageEvent): void {
       dir?: string
     }
     if (data.type === "thread_status" && data.threadId && data.status) {
-      const { setStatus } = useThreadStatusStore.getState()
+      const { setStatus, isThreadStreamed } = useThreadStatusStore.getState()
       if (data.status === "idle") {
-        const streamed = getStreamedThreads()
-        setStatus(data.threadId, streamed.has(data.threadId) ? "completed" : "idle")
+        setStatus(data.threadId, isThreadStreamed(data.threadId) ? "completed" : "idle")
       } else {
         setStatus(data.threadId, data.status)
       }
