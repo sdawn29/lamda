@@ -97,38 +97,38 @@
   --app-font-code: var(--app-font-mono);
 }
 
-/* ── Jellybeans Light ─────────────────────────────────────────────── */
+/* ── macOS Light ──────────────────────────────────────────────────── */
 :root {
   /* ── Base: clean near-white neutral page background ── */
-  --background: #f7f7f5;
-  --foreground: #1c1c1c;
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
 
-  /* ── Card: elevated neutral surface (step −7) ── */
-  --card: #f0f0ed;
-  --card-foreground: #1c1c1c;
+  /* ── Card: elevated neutral surface ── */
+  --card: #ffffff;
+  --card-foreground: #1d1d1f;
 
   /* ── Popover: same as card ── */
-  --popover: #f0f0ed;
-  --popover-foreground: #1c1c1c;
+  --popover: #ffffff;
+  --popover-foreground: #1d1d1f;
 
-  /* ── Secondary: recessed inputs / nested panels (step −8) ── */
-  --secondary: #e8e8e4;
-  --secondary-foreground: #1c1c1c;
+  /* ── Secondary: recessed inputs / nested panels ── */
+  --secondary: #eaeaef;
+  --secondary-foreground: #1d1d1f;
 
-  /* ── Muted: disabled / faded areas (step −8) ── */
-  --muted: #dcdcd8;
-  --muted-foreground: #6b6b6b;
+  /* ── Muted: disabled / faded areas ── */
+  --muted: #e3e3e8;
+  --muted-foreground: #6e6e73;
 
-  /* ── Accent: hover / selection highlight (step −8) ── */
-  --accent: #d0d0cb;
-  --accent-foreground: #1c1c1c;
+  /* ── Accent: hover / selection highlight ── */
+  --accent: #d9d9e0;
+  --accent-foreground: #1d1d1f;
 
-  /* ── Primary (jellybeans steel blue) ── */
-  --primary: #1a4080;
-  --primary-foreground: #f7f7f5;
+  /* ── Primary (macOS system blue) ── */
+  --primary: #007aff;
+  --primary-foreground: #ffffff;
 
-  /* ── Destructive (jellybeans error red) ── */
-  --destructive: #902020;
+  /* ── Destructive (macOS system red) ── */
+  --destructive: #ff3b30;
 
   /* ── Diff add/remove: clean, saturated green/red for code diffs. Kept
        separate from --chart-2 / --destructive (which stay olive/brick for
@@ -140,30 +140,30 @@
   /* ── Border: separator that reads against both bg and card. Sits just
        below the card/secondary level so card edges are legible and panel
        borders never invert (lighter than the surface they bound). ── */
-  --border: #e3e3df;
+  --border: #e0e0e5;
   /* ── Input: stronger outline so form fields read as recessed wells ── */
-  --input: #d9d9d4;
-  --ring: #1a4080;
+  --input: #d1d1d6;
+  --ring: #007aff;
 
-  /* ── Charts (jellybeans syntax colors, darkened for light bg) ── */
-  --chart-1: #1a4080;
-  --chart-2: #5a7842;
-  --chart-3: #c4870a;
-  --chart-4: #9f4e32;
-  --chart-5: #a06820;
+  /* ── Charts (macOS system accent colors) ── */
+  --chart-1: #007aff;
+  --chart-2: #34c759;
+  --chart-3: #ff9500;
+  --chart-4: #ff2d55;
+  --chart-5: #af52de;
 
   /* ── Radius (macOS-like 10px controls) ── */
   --radius: 0.625rem;
 
   /* ── Sidebar: distinct panel, slightly darker than content area ── */
-  --sidebar: #ededea;
-  --sidebar-foreground: #1c1c1c;
-  --sidebar-primary: #1a4080;
-  --sidebar-primary-foreground: #f7f7f5;
-  --sidebar-accent: #e5e5e1;
-  --sidebar-accent-foreground: #1c1c1c;
-  --sidebar-border: #dcdcd8;
-  --sidebar-ring: #1a4080;
+  --sidebar: #ececf0;
+  --sidebar-foreground: #1d1d1f;
+  --sidebar-primary: #007aff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dfdfe4;
+  --sidebar-accent-foreground: #1d1d1f;
+  --sidebar-border: #dcdce1;
+  --sidebar-ring: #007aff;
 }
 
 /* ── Prose theming — single source of truth ──────────────────────────────
@@ -195,64 +195,64 @@
   --tw-prose-td-borders: var(--border) !important;
 }
 
-/* ── Jellybeans Dark ──────────────────────────────────────────────── */
+/* ── macOS Dark ───────────────────────────────────────────────────── */
 .dark {
   /* ── Base ── */
-  --background: #0d0d0d;
-  --foreground: #e8e8d3;
+  --background: #161618;
+  --foreground: #f5f5f7;
 
   /* ── Surface 1 · card: darker, denser surface ── */
-  --card: #161616;
-  --card-foreground: #e8e8d3;
+  --card: #202023;
+  --card-foreground: #f5f5f7;
 
   /* ── Overlay · popover: matches card ── */
-  --popover: #161616;
-  --popover-foreground: #e8e8d3;
+  --popover: #242427;
+  --popover-foreground: #f5f5f7;
 
   /* ── Surface 2 · secondary: recessed inputs/panels ── */
-  --secondary: #222222;
-  --secondary-foreground: #e8e8d3;
+  --secondary: #2a2a2e;
+  --secondary-foreground: #f5f5f7;
 
   /* ── Surface 3 · muted: disabled / faded areas ── */
-  --muted: #2b2b2b;
-  --muted-foreground: #9e9e9e;
+  --muted: #323237;
+  --muted-foreground: #98989d;
 
   /* ── Accent · hover / selection highlight ── */
-  --accent: #393939;
-  --accent-foreground: #e8e8d3;
+  --accent: #38383e;
+  --accent-foreground: #f5f5f7;
 
-  /* ── Primary (jellybeans keyword steel blue, darker) ── */
-  --primary: #3a6090;
-  --primary-foreground: #e8e8d3;
+  /* ── Primary (macOS system blue) ── */
+  --primary: #0a84ff;
+  --primary-foreground: #ffffff;
 
-  /* ── Destructive (jellybeans error red) ── */
-  --destructive: #cc3333;
+  /* ── Destructive (macOS system red) ── */
+  --destructive: #ff453a;
 
   /* ── Diff add/remove: brighter for dark surfaces (GitHub-style). ── */
   --diff-add: #3fb950;
   --diff-remove: #f85149;
 
   /* ── Borders: subtle separators · Input: border of form fields ── */
-  --border: #1e1e1e;
-  --input: #252525;
-  --ring: #3a6090;
+  --border: #28282c;
+  --input: #36363c;
+  --ring: #0a84ff;
 
-  /* ── Charts (jellybeans full syntax palette) ── */
-  --chart-1: #3a6090;
-  --chart-2: #99ad6a;
-  --chart-3: #fad07a;
-  --chart-4: #cf6a4c;
-  --chart-5: #ffb964;
+  /* ── Charts (macOS system accent colors) ── */
+  --chart-1: #0a84ff;
+  --chart-2: #30d158;
+  --chart-3: #ff9f0a;
+  --chart-4: #ff375f;
+  --chart-5: #bf5af2;
 
   /* ── Sidebar: darker than content area ── */
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #e8e8d3;
-  --sidebar-primary: #3a6090;
-  --sidebar-primary-foreground: #e8e8d3;
-  --sidebar-accent: #1a1a1a;
-  --sidebar-accent-foreground: #e8e8d3;
-  --sidebar-border: #141414;
-  --sidebar-ring: #3a6090;
+  --sidebar: #111113;
+  --sidebar-foreground: #f5f5f7;
+  --sidebar-primary: #0a84ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #222226;
+  --sidebar-accent-foreground: #f5f5f7;
+  --sidebar-border: #1e1e22;
+  --sidebar-ring: #0a84ff;
 }
 
 /* ── Thinking shimmer animation ────────────────────────────────────────── */

@@ -66,7 +66,7 @@ export function ModelCombobox({
             size="sm"
             disabled={disabled}
             aria-expanded={open}
-            className="max-w-44"
+            className="max-w-60"
           >
             {selectedMeta?.icon}
             <span className="truncate">{selected?.name ?? placeholder}</span>

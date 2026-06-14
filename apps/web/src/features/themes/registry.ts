@@ -713,8 +713,8 @@ const tokyoNight: ColorTheme = {
 
 /** All built-in themes, in display order. The first entry is the default. */
 export const BUILT_IN_THEMES: ColorTheme[] = [
-  jellybeans,
   macos,
+  jellybeans,
   graphite,
   cursorAnysphere,
   nord,
@@ -725,7 +725,7 @@ export const BUILT_IN_THEMES: ColorTheme[] = [
 ]
 
 /** The default theme id — matches the palette baked into `index.css`. */
-export const DEFAULT_THEME_ID = jellybeans.id
+export const DEFAULT_THEME_ID = macos.id
 
 /** Look up a theme by id, falling back to the default when unknown. */
 export function getThemeById(id: string | null | undefined): ColorTheme {
