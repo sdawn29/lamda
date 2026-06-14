@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.22.0](../../releases/tag/v0.22.0) — 2026-06-14
+
+### Features
+
+* update styles for macOS theme and adjust model combobox width
+* **chat:** implement optimistic UI for new thread creation with pending prompts
+* add approval mode to thread creation and enhance workspace command fetching
+* add tool approval block component and SDK extension for tool call approvals
+* **workspace:** add updatedAt field to threads and workspaces for better tracking
+* **chat:** add attachments field to message blocks
+
+### Other Changes
+
+* Refactor chat sync engine and storage management
+
 ## [0.21.0](../../releases/tag/v0.21.0) — 2026-06-13
 
 ### Features
