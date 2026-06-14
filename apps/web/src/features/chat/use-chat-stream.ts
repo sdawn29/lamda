@@ -24,6 +24,7 @@ import { dismissSessionError, listMessages } from "./api"
 import { createErrorMessage, blocksToMessages } from "./types"
 import type { ErrorMessage, Message, UserMessage, MessageBlock } from "./types"
 import { useSetThreadStatus, useThreadStatusStore } from "./thread-status-store"
+import { hasPendingPrompt, clearPendingPrompt } from "./pending-prompts"
 import { gitStatusKey, gitKeys } from "@/features/git/queries"
 
 const FILE_MODIFYING_TOOLS = new Set([
@@ -96,11 +97,23 @@ export function useChatStream({
   const [isLoading, setIsLoading] = useState(false)
   const [queuedCount, setQueuedCount] = useState(0)
 
+  // A just-created thread navigates here with its prompt already in flight. Seed
+  // the working state from the pending-prompt hint so the thread view shows it
+  // immediately, instead of waiting for the stream's first agent_start event
+  // (which lags on slow model starts). Kept separate from isLoading so the
+  // server-status sync can stay a pure mirror; cleared once the stream speaks or
+  // a safety timeout elapses. The UI treats `isLoading || optimisticRunning` as
+  // "working".
+  const [optimisticRunning, setOptimisticRunning] = useState(() =>
+    hasPendingPrompt(sessionId)
+  )
+
   // Reset state synchronously during render when the session changes.
   const [localSessionId, setLocalSessionId] = useState(sessionId)
   if (localSessionId !== sessionId) {
     setLocalSessionId(sessionId)
     setIsLoading(false)
+    setOptimisticRunning(hasPendingPrompt(sessionId))
     setIsStopped(initialIsStopped)
     setIsCompacting(false)
     setCompactionReason(null)
@@ -112,6 +125,18 @@ export function useChatStream({
   // This replaces event-replay as the mechanism for restoring transient UI state
   // (isRunning, isCompacting, pendingError) without side-effect re-fires.
   const { data: sessionStatus } = useSessionStatus(sessionId)
+
+  // Consume the one-shot optimistic hint for this session and bound it with a
+  // safety timeout, so a prompt that never reaches the agent (e.g. send failure)
+  // can't leave the working indicator stuck on screen forever. The stream
+  // normally clears it well before this fires (see handleIsLoadingChange).
+  useEffect(() => {
+    const pending = hasPendingPrompt(sessionId)
+    clearPendingPrompt(sessionId)
+    if (!pending) return
+    const timer = setTimeout(() => setOptimisticRunning(false), 30_000)
+    return () => clearTimeout(timer)
+  }, [sessionId])
 
   useEffect(() => {
     if (!sessionStatus) return
@@ -147,6 +172,9 @@ export function useChatStream({
   } = useVisibleMessages({ sessionId })
 
   const handleIsLoadingChange = useCallback((loading: boolean) => {
+    // The stream is the source of truth — once it speaks, the optimistic hint
+    // has served its purpose.
+    setOptimisticRunning(false)
     setIsLoading(loading)
     // The queue only exists for the duration of a run; clear it the moment the
     // agent goes idle so a stale "queued" indicator never lingers.
@@ -248,7 +276,11 @@ export function useChatStream({
     return () => clearTimeout(timer)
   }, [isLoading, queryClient, sessionId])
 
-  const hasLoadedMessages = messages.length > 0 || isLoading
+  // What the UI should treat as "the agent is working" — the real stream state
+  // OR the optimistic pre-stream window for a freshly-sent thread.
+  const isWorking = isLoading || optimisticRunning
+
+  const hasLoadedMessages = messages.length > 0 || isWorking
 
   // Append a user message to the transcript immediately, deduping against an
   // identical trailing user row (guards against double-fires from retry paths).
@@ -339,7 +371,7 @@ export function useChatStream({
     visibleMessages: messages,
     hasConversationHistory: messages.length > 0,
     hasLoadedMessages,
-    isLoading,
+    isLoading: isWorking,
     isLoadingMessages,
     isStopped,
     isCompacting,

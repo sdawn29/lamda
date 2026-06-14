@@ -45,6 +45,10 @@ import {
 import { pendingToUploads, pendingToDisplay } from "../lib/attachments"
 import { setPendingThreadPreferences } from "./pending-thread-preferences"
 import { getNextMode } from "./mode-combobox"
+import { ThinkingIndicator } from "./thinking-indicator"
+import { UserMessageContent } from "./user-message"
+import { markPendingPrompt, clearPendingPrompt } from "../pending-prompts"
+import type { UserMessage } from "../types"
 import {
   messagesQueryKey,
   updateLastPageMessages,
@@ -85,6 +89,13 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
     useState<ApprovalMode>("ask")
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
+  // The just-submitted message. Set the instant the user hits enter so the view
+  // flips straight to the working/conversation state — we don't wait for the
+  // (slow) thread + session creation to finish before transitioning.
+  const [pendingSend, setPendingSend] = useState<{
+    text: string
+    attachments?: NonNullable<UserMessage["attachments"]>
+  } | null>(null)
   const chatTextboxRef = useRef<ChatComposerHandle>(null)
 
   // An explicit ?ws= navigation overrides any earlier in-page pick.
@@ -162,6 +173,15 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
       if (!workspaceId || isSending) return
       setIsSending(true)
 
+      // Flip to the working state immediately — show the user's message and a
+      // thinking indicator while the thread + session are built in the
+      // background. This makes the transition feel instant instead of stalling
+      // on the centered hero until the slow session setup returns.
+      const displayAttachments = attachments
+        ? pendingToDisplay(attachments)
+        : undefined
+      setPendingSend({ text, attachments: displayAttachments })
+
       // Seed the title with the user's message so it shows up instead of
       // "New Thread" until the generated title arrives below.
       const provisionalTitle = deriveTitleFromMessage(text)
@@ -182,6 +202,8 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         })
       } catch (err) {
         setIsSending(false)
+        // Thread creation failed — drop back to the hero so the user can retry.
+        setPendingSend(null)
         toast.error("Couldn't start thread", {
           description: err instanceof Error ? err.message : String(err),
         })
@@ -194,6 +216,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         deleteThread(thread.id).catch(() => {})
         queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
         setIsSending(false)
+        setPendingSend(null)
         toast.error("Couldn't start thread", {
           description: "Session was not created for the new thread",
         })
@@ -212,9 +235,6 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
       })
 
       const uploads = attachments ? pendingToUploads(attachments) : undefined
-      const displayAttachments = attachments
-        ? pendingToDisplay(attachments)
-        : undefined
 
       // Pre-populate the messages cache so the optimistic user message is
       // visible the moment the new thread route mounts.
@@ -241,6 +261,11 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
             : seed
       )
 
+      // Tell the thread view a prompt is already on its way, so it shows the
+      // working state immediately instead of waiting for the stream's first
+      // agent_start event (which lags behind on slow model starts).
+      markPendingPrompt(sessionId)
+
       // Navigate immediately — the optimistic message is already in the cache.
       // Checkout, prompt, and title generation continue in the background; raw
       // API calls + queryClient survive component unmount.
@@ -265,7 +290,9 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           await sendPrompt(sessionId, { text, model, thinkingLevel, attachments: uploads })
         } catch (err) {
           // The prompt never reached the agent — drop the optimistic message
-          // by refetching server truth, and tell the user.
+          // by refetching server truth, clear the optimistic working hint, and
+          // tell the user.
+          clearPendingPrompt(sessionId)
           queryClient.invalidateQueries({
             queryKey: messagesQueryKey(sessionId),
           })
@@ -395,52 +422,96 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
 
   return (
     <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
-      <div className="flex flex-1 items-center justify-center overflow-y-auto px-6">
-        <div className="-mt-12 flex w-full max-w-2xl flex-col items-stretch">
-          <div className="mb-7 flex flex-col items-center gap-3 text-center select-none">
-            <LambdaMark />
-            <div className="space-y-1.5">
-              <h1 className="text-xl font-semibold tracking-tight">
-                What should we build?
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {noWorkspaces
-                  ? "Add a workspace to begin your first conversation."
-                  : "Type / for skills and commands, @ to reference files."}
-              </p>
+      {pendingSend ? (
+        // Working state — mirrors ChatView's layout so the handoff to the real
+        // thread view (which mounts with this same message already cached) is
+        // seamless. Shown the instant the user sends, before the session exists.
+        <>
+          <div className="flex w-full min-h-0 flex-1 flex-col overflow-y-auto pt-4 pb-8 [overflow-anchor:none]">
+            <div className="mx-auto w-full max-w-3xl px-6 pb-3">
+              <div className="flex flex-col items-end gap-1.5 self-end">
+                <div
+                  className="max-w-3/4 rounded-xl bg-muted/70 px-2 py-2 text-sm wrap-break-word whitespace-pre-wrap ring-1 ring-foreground/5"
+                  data-selectable
+                >
+                  <UserMessageContent
+                    content={pendingSend.text}
+                    attachments={pendingSend.attachments}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="mx-auto w-full max-w-3xl px-6 pt-4 pb-8">
+              <ThinkingIndicator className="py-0.5" />
             </div>
           </div>
 
-          <ChatComposer
-            ref={chatTextboxRef}
-            onSend={handleSend}
-            isLoading={isSending}
-            workspaceId={workspaceId ?? undefined}
-            selectedModelId={selectedModelId}
-            onModelChange={setSelectedModelId}
-            selectedThinkingLevel={selectedThinkingLevel}
-            onThinkingLevelChange={setSelectedThinkingLevel}
-            mode={selectedMode}
-            onModeChange={setSelectedMode}
-            approvalMode={selectedApprovalMode}
-            onApprovalModeChange={setSelectedApprovalMode}
-            contextLeading={contextLeading}
-            placeholder={
-              noWorkspaces
-                ? "Add a workspace to start a thread"
-                : "Ask anything… / for commands, @ for files"
-            }
-          />
-
-          {!noWorkspaces && (
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-2xs text-muted-foreground/70 select-none">
-              <HintItem keys="/" label="Commands & skills" />
-              <HintItem keys="@" label="Reference files" />
-              <HintItem keys="⏎" label="Send" />
+          <div className="shrink-0 bg-background">
+            <div className="mx-auto w-full max-w-3xl px-6 pb-2">
+              <ChatComposer
+                onSend={() => {}}
+                isLoading
+                workspaceId={workspaceId ?? undefined}
+                selectedModelId={selectedModelId}
+                onModelChange={setSelectedModelId}
+                selectedThinkingLevel={selectedThinkingLevel}
+                onThinkingLevelChange={setSelectedThinkingLevel}
+                mode={selectedMode}
+                onModeChange={setSelectedMode}
+                approvalMode={selectedApprovalMode}
+                onApprovalModeChange={setSelectedApprovalMode}
+              />
             </div>
-          )}
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-1 items-center justify-center overflow-y-auto px-6">
+          <div className="-mt-12 flex w-full max-w-2xl flex-col items-stretch">
+            <div className="mb-7 flex flex-col items-center gap-3 text-center select-none">
+              <LambdaMark />
+              <div className="space-y-1.5">
+                <h1 className="text-xl font-semibold tracking-tight">
+                  What should we build?
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {noWorkspaces
+                    ? "Add a workspace to begin your first conversation."
+                    : "Type / for skills and commands, @ to reference files."}
+                </p>
+              </div>
+            </div>
+
+            <ChatComposer
+              ref={chatTextboxRef}
+              onSend={handleSend}
+              isLoading={isSending}
+              workspaceId={workspaceId ?? undefined}
+              selectedModelId={selectedModelId}
+              onModelChange={setSelectedModelId}
+              selectedThinkingLevel={selectedThinkingLevel}
+              onThinkingLevelChange={setSelectedThinkingLevel}
+              mode={selectedMode}
+              onModeChange={setSelectedMode}
+              approvalMode={selectedApprovalMode}
+              onApprovalModeChange={setSelectedApprovalMode}
+              contextLeading={contextLeading}
+              placeholder={
+                noWorkspaces
+                  ? "Add a workspace to start a thread"
+                  : "Ask anything… / for commands, @ for files"
+              }
+            />
+
+            {!noWorkspaces && (
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-2xs text-muted-foreground/70 select-none">
+                <HintItem keys="/" label="Commands & skills" />
+                <HintItem keys="@" label="Reference files" />
+                <HintItem keys="⏎" label="Send" />
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <CreateWorkspaceDialog
         open={createWorkspaceOpen}
