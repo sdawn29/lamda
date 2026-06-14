@@ -25,7 +25,7 @@ import {
   updateThreadTitle,
 } from "@/features/workspace/api"
 import { workspacesQueryKey } from "@/features/workspace/queries"
-import type { Mode, WorkspaceDto } from "@/features/workspace/api"
+import type { ApprovalMode, Mode, WorkspaceDto } from "@/features/workspace/api"
 import { useAppSettings } from "@/features/settings/queries"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
 import {
@@ -81,6 +81,8 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
     ThinkingLevel | undefined
   >(undefined)
   const [selectedMode, setSelectedMode] = useState<Mode>("agent")
+  const [selectedApprovalMode, setSelectedApprovalMode] =
+    useState<ApprovalMode>("ask")
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
   const chatTextboxRef = useRef<ChatComposerHandle>(null)
@@ -175,6 +177,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         thread = await createThread(workspaceId, {
           title: provisionalTitle,
           mode: selectedMode,
+          approvalMode: selectedApprovalMode,
           modelId: threadModelId,
         })
       } catch (err) {
@@ -298,6 +301,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
       isSending,
       selectedBranch,
       selectedMode,
+      selectedApprovalMode,
       selectedModelId,
       createThread,
       updateAppSetting,
@@ -308,101 +312,103 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
 
   const noWorkspaces = workspaces.length === 0
 
+  // The workspace picker + branch selector live inside the composer's context
+  // strip so workspace, branch, and approval read as one connected bar — the
+  // Cursor-style composer header. Branch creation still works because the
+  // selector keeps the reference session.
+  const contextLeading = noWorkspaces ? (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-7 gap-1.5 px-2 text-xs"
+      onClick={() => setCreateWorkspaceOpen(true)}
+    >
+      <FolderPlusIcon data-icon="inline-start" />
+      <span className="whitespace-nowrap">Add workspace</span>
+    </Button>
+  ) : (
+    <div className="flex min-w-0 items-center">
+      <Popover open={wsPickerOpen} onOpenChange={setWsPickerOpen}>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={wsPickerOpen}
+              className="h-7 gap-1.5 px-2 text-xs"
+            >
+              <FolderIcon data-icon="inline-start" />
+              <span className="max-w-[12rem] truncate">
+                {selectedWorkspace?.name ?? "Select workspace"}
+              </span>
+              <ChevronsUpDownIcon
+                data-icon="inline-end"
+                className="opacity-50"
+              />
+            </Button>
+          }
+        />
+        <PopoverContent
+          className="w-auto min-w-40 p-0"
+          side="top"
+          align="start"
+          sideOffset={6}
+        >
+          <Command>
+            <CommandInput placeholder="Search workspaces…" />
+            <CommandList>
+              <CommandEmpty>No workspaces found</CommandEmpty>
+              <CommandGroup>
+                {workspaces.map((ws) => (
+                  <CommandItem
+                    key={ws.id}
+                    value={ws.name}
+                    data-checked={ws.id === workspaceId}
+                    className="whitespace-nowrap"
+                    onSelect={() => {
+                      setPickedWorkspaceId(ws.id)
+                      setWsPickerOpen(false)
+                    }}
+                  >
+                    <FolderIcon />
+                    {ws.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {hasBranchInfo && (
+        <>
+          <span className="px-0.5 text-muted-foreground/50">/</span>
+          <BranchSelector
+            branch={selectedBranch ?? currentBranch}
+            branches={branches}
+            onBranchSelect={setSelectedBranch}
+            sessionId={refSessionId}
+          />
+        </>
+      )}
+    </div>
+  )
+
   return (
     <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
       <div className="flex flex-1 items-center justify-center overflow-y-auto px-6">
-        <div className="-mt-8 flex w-full max-w-2xl flex-col items-stretch">
-          <div className="mb-8 flex flex-col items-center gap-3 text-center select-none">
+        <div className="-mt-12 flex w-full max-w-2xl flex-col items-stretch">
+          <div className="mb-7 flex flex-col items-center gap-3 text-center select-none">
             <LambdaMark />
             <div className="space-y-1.5">
-              <p className="text-lg font-semibold tracking-tight">
-                Start a new thread
-              </p>
-              <p className="text-xs text-muted-foreground">
+              <h1 className="text-xl font-semibold tracking-tight">
+                What should we build?
+              </h1>
+              <p className="text-sm text-muted-foreground">
                 {noWorkspaces
                   ? "Add a workspace to begin your first conversation."
-                  : "Pick a workspace, then ask anything to begin the conversation."}
+                  : "Type / for skills and commands, @ to reference files."}
               </p>
             </div>
-          </div>
-
-          <div className="mb-2 flex items-center gap-2">
-            {noWorkspaces ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-auto"
-                onClick={() => setCreateWorkspaceOpen(true)}
-              >
-                <FolderPlusIcon data-icon="inline-start" />
-                <span className="whitespace-nowrap">Add workspace</span>
-              </Button>
-            ) : (
-              <Popover open={wsPickerOpen} onOpenChange={setWsPickerOpen}>
-                <PopoverTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-expanded={wsPickerOpen}
-                      className="h-8 w-auto"
-                    >
-                      <FolderIcon data-icon="inline-start" />
-                      <span className="whitespace-nowrap">
-                        {selectedWorkspace?.name ?? "Select workspace"}
-                      </span>
-                      <ChevronsUpDownIcon
-                        data-icon="inline-end"
-                        className="opacity-50"
-                      />
-                    </Button>
-                  }
-                />
-                <PopoverContent
-                  className="w-auto min-w-40 p-0"
-                  side="top"
-                  align="start"
-                  sideOffset={6}
-                >
-                  <Command>
-                    <CommandInput placeholder="Search workspaces…" />
-                    <CommandList>
-                      <CommandEmpty>No workspaces found</CommandEmpty>
-                      <CommandGroup>
-                        {workspaces.map((ws) => (
-                          <CommandItem
-                            key={ws.id}
-                            value={ws.name}
-                            data-checked={ws.id === workspaceId}
-                            className="whitespace-nowrap"
-                            onSelect={() => {
-                              setPickedWorkspaceId(ws.id)
-                              setWsPickerOpen(false)
-                            }}
-                          >
-                            <FolderIcon />
-                            {ws.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            )}
-            {hasBranchInfo && (
-              <>
-                <span className="text-muted-foreground/60">/</span>
-                <div className="flex h-8 items-center">
-                  <BranchSelector
-                    branch={selectedBranch ?? currentBranch}
-                    branches={branches}
-                    onBranchSelect={setSelectedBranch}
-                    sessionId={refSessionId}
-                  />
-                </div>
-              </>
-            )}
           </div>
 
           <ChatComposer
@@ -416,12 +422,23 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
             onThinkingLevelChange={setSelectedThinkingLevel}
             mode={selectedMode}
             onModeChange={setSelectedMode}
+            approvalMode={selectedApprovalMode}
+            onApprovalModeChange={setSelectedApprovalMode}
+            contextLeading={contextLeading}
             placeholder={
               noWorkspaces
                 ? "Add a workspace to start a thread"
-                : "Ask anything… @ for files"
+                : "Ask anything… / for commands, @ for files"
             }
           />
+
+          {!noWorkspaces && (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-2xs text-muted-foreground/70 select-none">
+              <HintItem keys="/" label="Commands & skills" />
+              <HintItem keys="@" label="Reference files" />
+              <HintItem keys="⏎" label="Send" />
+            </div>
+          )}
         </div>
       </div>
 
@@ -432,5 +449,16 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         onCreateRemote={handleCreateRemote}
       />
     </div>
+  )
+}
+
+function HintItem({ keys, label }: { keys: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <kbd className="flex h-4 min-w-4 items-center justify-center rounded border border-border/60 bg-muted px-1 font-mono text-[10px] text-muted-foreground">
+        {keys}
+      </kbd>
+      <span>{label}</span>
+    </span>
   )
 }

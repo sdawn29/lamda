@@ -15,6 +15,7 @@ import {
   unpinWorkspace,
   createWorkspaceTask,
 } from "@lamda/db";
+import { getWorkspaceCommands } from "@lamda/pi-sdk";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { workspaceIndexer } from "../services/workspace-indexer.js";
@@ -236,6 +237,23 @@ workspaces.delete("/reset", async (_c) => {
   }
   deleteAllWorkspaces();
   return new Response(null, { status: 204 });
+});
+
+// Slash commands (skills + prompt templates) available for the workspace,
+// resolved without an active session. Lets the new-thread composer preview
+// skills before the workspace's first thread (and its session) exists.
+workspaces.get("/workspace/:id/commands", async (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  try {
+    const commands = await getWorkspaceCommands(ws.path);
+    return c.json({ commands });
+  } catch {
+    // A workspace whose resources can't be loaded (missing path, bad skill)
+    // shouldn't break the composer — fall back to no skills.
+    return c.json({ commands: [] });
+  }
 });
 
 workspaces.get("/workspace/:id/files", (c) => {

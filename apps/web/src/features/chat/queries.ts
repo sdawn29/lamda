@@ -4,6 +4,7 @@ import {
   listMessages,
   fetchModels,
   fetchSlashCommands,
+  fetchWorkspaceCommands,
   fetchContextUsage,
   fetchThinkingLevels,
   fetchSessionStats,
@@ -29,6 +30,8 @@ export const chatKeys = {
   models: [...chatRootKey, "models"] as const,
   commands: (sessionId: string) =>
     [...chatSessionKey(sessionId), "commands"] as const,
+  workspaceCommands: (workspaceId: string) =>
+    [...chatRootKey, "workspace", workspaceId, "commands"] as const,
   contextUsage: (sessionId: string) =>
     [...chatSessionKey(sessionId), "context-usage"] as const,
   sessionStats: (sessionId: string) =>
@@ -209,6 +212,25 @@ export function useSlashCommands(
     enabled: enabled && !!sessionId,
     gcTime: 60 * 1000,
     staleTime: 0,
+  })
+}
+
+// Slash commands resolved for a workspace without a session — used by the
+// new-thread composer, which has no session until the first prompt is sent.
+export function useWorkspaceSlashCommands(
+  workspaceId: string | undefined,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: workspaceId
+      ? chatKeys.workspaceCommands(workspaceId)
+      : chatKeys.all,
+    queryFn: () => fetchWorkspaceCommands(workspaceId!),
+    enabled: enabled && !!workspaceId,
+    gcTime: 60 * 1000,
+    // Resolving these rebuilds the workspace's resource loader server-side, so
+    // (unlike the cheap session read) reuse a recent result across re-opens.
+    staleTime: 30 * 1000,
   })
 }
 

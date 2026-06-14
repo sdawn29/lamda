@@ -402,6 +402,16 @@ export async function fetchSlashCommands(
   return data.commands
 }
 
+// Slash commands for a workspace with no active session (new-thread composer).
+export async function fetchWorkspaceCommands(
+  workspaceId: string
+): Promise<SlashCommand[]> {
+  const data = await apiFetch<{ commands: SlashCommand[] }>(
+    `/workspace/${workspaceId}/commands`
+  )
+  return data.commands
+}
+
 // ── Context usage ──────────────────────────────────────────────────────────
 
 export function fetchThinkingLevels(

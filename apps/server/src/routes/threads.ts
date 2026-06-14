@@ -41,6 +41,7 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
     title?: string;
     mode?: string;
     modelId?: string | null;
+    approvalMode?: string;
   };
   const body = await c.req
     .json<CreateThreadBody>()
@@ -53,13 +54,31 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
     return c.json({ error: "mode must be 'ask', 'plan', or 'agent'" }, 400);
   }
 
+  if (
+    body.approvalMode !== undefined &&
+    body.approvalMode !== "ask" &&
+    body.approvalMode !== "all_allowed"
+  ) {
+    return c.json(
+      { error: "approvalMode must be 'ask' or 'all_allowed'" },
+      400,
+    );
+  }
+
   const title = body.title?.trim() || "New Thread";
   const mode = normalizeMode(body.mode) ?? "agent";
   const modelId = body.modelId ?? null;
+  const approvalMode =
+    body.approvalMode === "all_allowed" ? "all_allowed" : "ask";
 
   // Insert with the requested mode before creating the session — the session
   // builds its custom tools from the thread's persisted mode.
-  const threadId = insertThread(workspaceId, { title, mode, modelId });
+  const threadId = insertThread(workspaceId, {
+    title,
+    mode,
+    modelId,
+    approvalMode,
+  });
   const sessionId = await createSessionForThread(
     threadId,
     ws.path,
@@ -79,7 +98,7 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
         modelId,
         isStopped: false,
         mode,
-        approvalMode: "ask",
+        approvalMode,
         isPinned: false,
         createdAt: Date.now(),
         sessionId,

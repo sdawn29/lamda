@@ -37,6 +37,7 @@ import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import {
   useModels,
   useSlashCommands,
+  useWorkspaceSlashCommands,
   useContextUsage,
   chatKeys,
   type WorkspaceEntry,
@@ -155,6 +156,12 @@ interface ChatComposerProps {
   approvalMode?: ApprovalMode
   onApprovalModeChange?: (mode: ApprovalMode) => void
   sessionStats?: SessionStats | null
+  /**
+   * Extra content rendered at the start of the composer's context strip, before
+   * the branch selector. The new-thread composer uses this for its workspace
+   * picker so workspace, branch, and approval share one connected bar.
+   */
+  contextLeading?: React.ReactNode
 }
 
 export const ChatComposer = memo(
@@ -181,6 +188,7 @@ export const ChatComposer = memo(
       approvalMode = "ask",
       onApprovalModeChange,
       sessionStats,
+      contextLeading,
     }: ChatComposerProps,
     ref
   ) {
@@ -313,21 +321,44 @@ export const ChatComposer = memo(
         type: f.isDirectory ? "dir" : "file",
       }))
     }, [indexedFiles])
+    // Skills/prompts come from the live session once one exists; before then
+    // (the new-thread composer) they're resolved from the workspace directly so
+    // the dropdown can still preview the workspace's skills.
+    const useWorkspaceCommands = !sessionId
     const {
-      data: commandsData,
-      isLoading: commandsLoading,
-      refetch: refetchSlashCommands,
-    } = useSlashCommands(sessionId, slashCommandOpen)
+      data: sessionCommandsData,
+      isLoading: sessionCommandsLoading,
+      refetch: refetchSessionCommands,
+    } = useSlashCommands(sessionId, slashCommandOpen && !useWorkspaceCommands)
+    const {
+      data: workspaceCommandsData,
+      isLoading: workspaceCommandsLoading,
+    } = useWorkspaceSlashCommands(
+      workspaceId,
+      slashCommandOpen && useWorkspaceCommands
+    )
+    const commandsData = useWorkspaceCommands
+      ? workspaceCommandsData
+      : sessionCommandsData
+    const commandsLoading = useWorkspaceCommands
+      ? workspaceCommandsLoading
+      : sessionCommandsLoading
 
-    // Re-fetch skills / prompt-templates every time the slash-command dropdown
-    // opens (i.e. every time the user types "/" into the input).
+    // Re-fetch session skills / prompt-templates every time the slash-command
+    // dropdown opens (reading them off the live session is cheap). Workspace
+    // commands rebuild the resource loader server-side, so those rely on the
+    // query's own staleTime rather than a forced refetch on every "/".
     const prevSlashCommandOpen = React.useRef(false)
     React.useEffect(() => {
-      if (slashCommandOpen && !prevSlashCommandOpen.current) {
-        void refetchSlashCommands()
+      if (
+        slashCommandOpen &&
+        !prevSlashCommandOpen.current &&
+        !useWorkspaceCommands
+      ) {
+        void refetchSessionCommands()
       }
       prevSlashCommandOpen.current = slashCommandOpen
-    }, [slashCommandOpen, refetchSlashCommands])
+    }, [slashCommandOpen, useWorkspaceCommands, refetchSessionCommands])
     const { data: contextUsage } = useContextUsage(sessionId)
 
     const mentionEntries2 = React.useMemo(() => {
@@ -837,6 +868,7 @@ export const ChatComposer = memo(
 
     const showBranch = branch !== undefined
     const showApproval = Boolean(onApprovalModeChange)
+    const showContextStrip = showBranch || showApproval || Boolean(contextLeading)
 
     return (
       <div className={cn("w-full", className)}>
@@ -878,9 +910,10 @@ export const ChatComposer = memo(
             onSelect={handleSelectFile}
           />
 
-          {(showBranch || showApproval) && (
+          {showContextStrip && (
             <div className="flex items-center justify-between gap-2 border-b border-border/50 px-2 py-1">
-              <div className="flex min-w-0 items-center">
+              <div className="flex min-w-0 items-center gap-1">
+                {contextLeading}
                 {showBranch && (
                   <BranchSelector
                     branch={branch ?? null}

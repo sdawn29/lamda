@@ -109,6 +109,7 @@ export function unpinWorkspace(workspaceId: string): Promise<void> {
 export interface CreateThreadOptions {
   title?: string
   mode?: Mode
+  approvalMode?: ApprovalMode
   modelId?: string | null
 }
 

@@ -8,6 +8,7 @@ export function insertThread(
   options?: {
     title?: string
     mode?: "ask" | "plan" | "agent"
+    approvalMode?: "ask" | "all_allowed"
     modelId?: string | null
     forkedFromId?: string
     baseCheckpointSha?: string
@@ -20,6 +21,7 @@ export function insertThread(
       workspaceId,
       title: options?.title ?? "New Thread",
       mode: options?.mode ?? "agent",
+      approvalMode: options?.approvalMode ?? "ask",
       modelId: options?.modelId ?? null,
       forkedFromId: options?.forkedFromId ?? null,
       baseCheckpointSha: options?.baseCheckpointSha ?? null,
