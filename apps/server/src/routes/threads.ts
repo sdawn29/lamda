@@ -30,6 +30,7 @@ import {
   collectCustomTools,
   createSessionForThread,
 } from "../services/session-service.js";
+import { scheduleReflection } from "../services/memory-reflection.js";
 
 const threads = new Hono();
 
@@ -224,6 +225,9 @@ threads.patch("/thread/:id/archive", (c) => {
   const thread = getThread(threadId);
   if (!thread) return c.json({ error: "Thread not found" }, 404);
   archiveThread(threadId);
+  // Archiving is the natural "done with this thread" signal: consolidate durable
+  // memories from it in the background (data is preserved, unlike on delete).
+  scheduleReflection(threadId);
   return c.json({ ok: true });
 });
 

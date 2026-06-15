@@ -6,6 +6,7 @@ import { resolvePort } from "./port.js";
 import app from "./app.js";
 import { bootstrapSessions } from "./bootstrap.js";
 import { registerHealingHooks } from "./services/healing-service.js";
+import { scheduleEmbeddingBackfill } from "./services/memory-embeddings.js";
 import { handleTerminalConnection } from "./services/terminal-service.js";
 import { handleSessionEventsWs } from "./routes/sessions.js";
 import { handleGlobalEventsWs } from "./routes/health.js";
@@ -21,6 +22,9 @@ registerHealingHooks();
 
 bootstrapSessions()
   .then(() => {
+    // Embed any memories missing a vector (no-op without sqlite-vec / VOYAGE_API_KEY).
+    scheduleEmbeddingBackfill();
+
     const server = serve(
       { fetch: app.fetch, port, hostname: "127.0.0.1" },
       (info) => {

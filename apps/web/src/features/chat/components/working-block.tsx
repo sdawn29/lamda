@@ -22,14 +22,14 @@ const SHIMMER_TEXT_CLASS =
 /**
  * Tool-group categories. Consecutive calls to tools in the same category
  * collapse into a single verbose row, e.g. "Exploring · read 4 files, ran
- * 2 searches, ran 1 command". Tools not mapped here (todo, question,
- * plan_write…) always stay individually visible.
+ * 2 searches, ran 1 command". Tools not mapped here (todo, question, the
+ * `plan` tool…) always stay individually visible — the `plan` tool is left
+ * ungrouped so its plan-write PlanSavedCard CTA stays visible.
  */
 type ToolGroupId = "exploring" | "terminal" | "web" | "editing"
 
 const TOOL_GROUP_IDS: Record<string, ToolGroupId> = {
   read: "exploring",
-  plan_read: "exploring",
   grep: "exploring",
   glob: "exploring",
   find: "exploring",
@@ -43,7 +43,6 @@ const TOOL_GROUP_IDS: Record<string, ToolGroupId> = {
   web_fetch: "web",
   fetch: "web",
   edit: "editing",
-  // plan_write intentionally excluded — its PlanSavedCard CTA must stay visible
   write: "editing",
 }
 
@@ -71,7 +70,7 @@ function toolGroupId(t: ToolMessage): ToolGroupId | null {
 }
 
 function isReadTool(name: string): boolean {
-  return name === "read" || name === "plan_read"
+  return name === "read"
 }
 
 /** Verbose action phrase per tool kind, keyed off the call count. */

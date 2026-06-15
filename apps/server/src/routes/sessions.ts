@@ -222,7 +222,7 @@ sessions.post("/session/:id/prompt", async (c) => {
     insertUserBlock(entry.threadId, body.text || "", attachmentMetadata);
 
     // The SDK sees the mode/memory preambles and injected file contents
-    const text = withInjections(entry, agentFacingText);
+    const text = await withInjections(entry, agentFacingText);
     // Kept so session-level self-healing can re-send the interrupted prompt.
     entry.lastPromptText = text;
 
@@ -290,7 +290,7 @@ sessions.post("/session/:id/steer", async (c) => {
   // Store user message as a block in the database (without the mode preamble)
   insertUserBlock(entry.threadId, body.text);
 
-  const text = withInjections(entry, body.text);
+  const text = await withInjections(entry, body.text);
 
   // Fire and forget
   entry.handle.steer(text).catch((err: unknown) => {
@@ -321,7 +321,7 @@ sessions.post("/session/:id/follow-up", async (c) => {
   // Store user message as a block in the database (without the mode preamble)
   insertUserBlock(entry.threadId, body.text);
 
-  const text = withInjections(entry, body.text);
+  const text = await withInjections(entry, body.text);
 
   // Fire and forget
   entry.handle.followUp(text).catch((err: unknown) => {

@@ -24,8 +24,7 @@ export const BUILTIN_TOOL_NAMES = [
   "bash",
   "edit",
   "write",
-  "plan_read",
-  "plan_write",
+  "plan",
   "todo",
   "grep",
   "find",
@@ -62,7 +61,7 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
     description: "Research and propose a plan. Saves the plan to .lamda/plans/.",
     preamble:
       "Plan mode — produce exactly one implementation-ready plan for the user's request, saved under `.lamda/plans/`.\n\n" +
-      "Investigate first (read-only): use `read`, `grep`, `find`, `ls`, read-only `bash`, and any available custom tools (memory, LSP, MCP) to trace the real code paths, data models, and call sites. Plan against the code, not assumptions. Don't modify source, config, tests, or docs — the only file you write is the plan, via `plan_write`, at `.lamda/plans/<2-5-word-kebab-slug>.md` (`plan_read` is for that directory only).\n\n" +
+      "Investigate first (read-only): use `read`, `grep`, `find`, `ls`, read-only `bash`, and any available custom tools (memory, LSP, MCP) to trace the real code paths, data models, and call sites. Plan against the code, not assumptions. Use the `plan` tool to manage plans: `plan` with operation `list` to see existing plans, `read` to revisit one, and `write` to save. Don't modify source, config, tests, or docs — the only file you write is the plan, via `plan` (operation `write`), at `.lamda/plans/<2-5-word-kebab-slug>.md`. To revise an existing plan, write to its existing name.\n\n" +
       "Clarify before writing when the request is vague or could be approached in materially different ways: use `question` for goals, scope, constraints, or approach whenever the answer would change the plan. State assumptions only for minor gaps with an obvious default.\n\n" +
       "The plan must cover:\n" +
       "- Problem summary and current-state findings, with `path:line` references.\n" +
@@ -70,8 +69,9 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
       "- The specific files/modules to change and the intended change in each.\n" +
       "- Risks, edge cases, and a validation strategy (the tests/commands that prove it works).\n" +
       "- A clear definition of done.\n\n" +
-      "After `plan_write` succeeds, stop and wait for review — implement nothing in this mode.",
-    allowedBuiltins: ["read", "grep", "find", "ls", "bash", "plan_read", "plan_write", QUESTION_TOOL_NAME],
+      "End the plan with a `## Todos` section as the very last section: a GitHub-style checklist (`- [ ] …`) of the concrete, ordered, actionable steps from the plan, each one short enough to be a single unit of work. This is what the agent will work through when implementing.\n\n" +
+      "After the `plan` write succeeds, stop and wait for review — implement nothing in this mode.",
+    allowedBuiltins: ["read", "grep", "find", "ls", "bash", "plan", QUESTION_TOOL_NAME],
     allowCustomTools: true,
   },
   agent: {

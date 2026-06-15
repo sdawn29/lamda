@@ -6,7 +6,7 @@ export {
 } from "./models.js";
 export { generateThreadTitle, DEFAULT_TITLE_PROMPT } from "./title.js";
 export { generateCommitMessage, DEFAULT_COMMIT_PROMPT } from "./commit-message.js";
-export { createPlanModeTools } from "./plan-tools.js";
+export { createPlanModeTools, PLAN_TOOL_NAME } from "./plan-tools.js";
 export { getWorkspaceCommands, mapResourceCommands } from "./commands.js";
 export { createToolApprovalExtension } from "./tool-approval-extension.js";
 export { createTodoTool, TODO_TOOL_NAME } from "./todo-tool.js";
@@ -14,6 +14,9 @@ export type { TodoItem, TodoGoal, TodoStatus, GoalStatus, TodoResult } from "./t
 export { createQuestionTool, QUESTION_TOOL_NAME } from "./question-tool.js";
 export { createMemoryTool, MEMORY_TOOL_NAME } from "./memory-tool.js";
 export type { MemoryItem, MemoryToolResult, MemoryScope } from "./memory-tool.js";
+export { generateMemoryProposals } from "./memory-reflection.js";
+export type { MemoryProposal } from "./memory-reflection.js";
+export { embeddingsEnabled, embedDocuments, embedQuery } from "./embeddings.js";
 export {
   renderMemoryBlock,
   applyMemoryPreamble,

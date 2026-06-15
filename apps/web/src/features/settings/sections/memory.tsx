@@ -5,6 +5,7 @@ import {
   Check,
   Clock,
   FolderGit2,
+  Gauge,
   Globe,
   Pencil,
   Pin,
@@ -31,7 +32,7 @@ import {
   useDeleteMemory,
 } from "../mutations"
 import { SettingsGroup, SettingsRow } from "../components/settings-ui"
-import type { MemoryItem, MemorySource } from "../api"
+import type { MemoryItem, MemoryKind, MemorySource } from "../api"
 
 // ── Self-healing settings ─────────────────────────────────────────────────────
 
@@ -68,6 +69,15 @@ const SOURCE_META: Record<
   user: { label: "You", short: "You", dot: "bg-emerald-500" },
   agent: { label: "Agent", short: "Agent", dot: "bg-sky-500" },
   healing: { label: "Self-healing", short: "Healing", dot: "bg-amber-500" },
+}
+
+// Labels for the memory `kind` taxonomy. `fact` is the default/neutral kind and
+// gets no badge to keep the list uncluttered.
+const KIND_META: Record<Exclude<MemoryKind, "fact">, string> = {
+  preference: "Preference",
+  convention: "Convention",
+  decision: "Decision",
+  episode: "Episode",
 }
 
 type SourceFilter = "all" | MemorySource
@@ -369,6 +379,11 @@ function SourceBadge({ source }: { source: MemorySource }) {
   )
 }
 
+function KindBadge({ kind }: { kind: MemoryKind }) {
+  if (kind === "fact") return null
+  return <Badge variant="outline">{KIND_META[kind]}</Badge>
+}
+
 function MemoryMeta({ memory }: { memory: MemoryItem }) {
   const parts: { icon: typeof Clock; label: string }[] = [
     { icon: Calendar, label: `Added ${relativeTime(memory.createdAt)}` },
@@ -381,6 +396,11 @@ function MemoryMeta({ memory }: { memory: MemoryItem }) {
     if (memory.lastUsedAt) {
       parts.push({ icon: Clock, label: `Last used ${relativeTime(memory.lastUsedAt)}` })
     }
+  }
+  // Surface confidence only when it deviates from full strength, so reinforced
+  // and not-yet-confirmed memories are distinguishable at a glance.
+  if (memory.confidence < 0.999) {
+    parts.push({ icon: Gauge, label: `Confidence ${Math.round(memory.confidence * 100)}%` })
   }
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6875rem] text-muted-foreground/80">
@@ -468,6 +488,7 @@ function MemoryCard({ memory }: { memory: MemoryItem }) {
               Pinned
             </Badge>
           )}
+          <KindBadge kind={memory.kind} />
           <SourceBadge source={memory.source} />
           {memory.category && <Badge variant="ghost">{memory.category}</Badge>}
         </div>

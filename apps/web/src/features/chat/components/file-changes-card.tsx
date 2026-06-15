@@ -244,7 +244,7 @@ export const FileChangesCard = memo(function FileChangesCard({
 
   return (
     <>
-      <div className="mx-auto mb-3 w-full max-w-3xl px-6 py-2">
+      <div className="mx-auto mb-3 w-full max-w-3xl px-3 py-2">
         <div className="overflow-hidden rounded-lg border border-border/60 bg-card/75 shadow-sm shadow-black/[0.03] dark:bg-card/60 dark:shadow-black/20">
           {/* Header */}
           <div className={cn("flex items-center gap-3 px-3 py-3", expanded && "border-b border-border/40")}>

@@ -1,9 +1,20 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import * as sqliteVec from "sqlite-vec";
 import { existsSync, mkdirSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import * as schema from "./schema.js";
+
+/** Dimension of memory embedding vectors (Voyage voyage-3.5-lite default). */
+export const MEMORY_EMBEDDING_DIM = 1024;
+
+// Whether the sqlite-vec extension loaded and the vector table exists. When
+// false, semantic memory retrieval is unavailable and callers fall back to FTS.
+let vecAvailable = false;
+export function isVecAvailable(): boolean {
+  return vecAvailable;
+}
 
 const APP_DATA_DIR_NAME = ".lamda";
 const LEGACY_APP_DATA_DIR_NAMES = [".lamda-code", ".lambda-code"];
@@ -65,6 +76,16 @@ function createDb() {
   sqlite.pragma("busy_timeout = 10000");
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
+
+  // Load sqlite-vec for semantic memory retrieval. Guarded: a build without the
+  // native extension simply leaves vecAvailable false and retrieval falls back
+  // to FTS keyword search.
+  try {
+    sqliteVec.load(sqlite);
+    vecAvailable = true;
+  } catch {
+    vecAvailable = false;
+  }
 
   const db = drizzle(sqlite, { schema });
 
@@ -211,18 +232,23 @@ function createDb() {
     );
 
     CREATE TABLE IF NOT EXISTS agent_memories (
-      id           TEXT PRIMARY KEY,
-      scope        TEXT NOT NULL CHECK(scope IN ('user', 'workspace')),
-      workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-      title        TEXT NOT NULL,
-      content      TEXT NOT NULL,
-      category     TEXT,
-      source       TEXT NOT NULL DEFAULT 'agent' CHECK(source IN ('agent', 'healing', 'user')),
-      pinned       INTEGER NOT NULL DEFAULT 0,
-      created_at   INTEGER NOT NULL,
-      updated_at   INTEGER NOT NULL,
-      last_used_at INTEGER,
-      use_count    INTEGER NOT NULL DEFAULT 0
+      id            TEXT PRIMARY KEY,
+      scope         TEXT NOT NULL CHECK(scope IN ('user', 'workspace')),
+      workspace_id  TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+      title         TEXT NOT NULL,
+      content       TEXT NOT NULL,
+      category      TEXT,
+      kind          TEXT NOT NULL DEFAULT 'fact' CHECK(kind IN ('fact', 'preference', 'convention', 'decision', 'episode')),
+      source        TEXT NOT NULL DEFAULT 'agent' CHECK(source IN ('agent', 'healing', 'user')),
+      thread_id     TEXT,
+      file_paths    TEXT,
+      confidence    REAL NOT NULL DEFAULT 1,
+      superseded_by TEXT,
+      pinned        INTEGER NOT NULL DEFAULT 0,
+      created_at    INTEGER NOT NULL,
+      updated_at    INTEGER NOT NULL,
+      last_used_at  INTEGER,
+      use_count     INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS workspaces_path_unique ON workspaces(path);
@@ -432,6 +458,33 @@ function createDb() {
     // Safe to ignore — column may already exist.
   }
 
+  // Migration: Add kind/thread_id/file_paths/confidence/superseded_by columns to
+  // agent_memories (taxonomy + episodic links + reinforcement). Each guarded so a
+  // partially-migrated DB still converges.
+  try {
+    const memCols = sqlite.prepare("PRAGMA table_info(agent_memories)").all() as { name: string }[];
+    const has = (name: string) => memCols.some((col) => col.name === name);
+    if (!has("kind")) {
+      sqlite.exec(
+        `ALTER TABLE agent_memories ADD COLUMN kind TEXT NOT NULL DEFAULT 'fact' CHECK(kind IN ('fact', 'preference', 'convention', 'decision', 'episode'))`,
+      );
+    }
+    if (!has("thread_id")) {
+      sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN thread_id TEXT`);
+    }
+    if (!has("file_paths")) {
+      sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN file_paths TEXT`);
+    }
+    if (!has("confidence")) {
+      sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN confidence REAL NOT NULL DEFAULT 1`);
+    }
+    if (!has("superseded_by")) {
+      sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN superseded_by TEXT`);
+    }
+  } catch {
+    // Safe to ignore — columns may already exist.
+  }
+
   // Migration: Add attachments column to message_blocks table for persisting file attachments.
   try {
     const msgBlockCols = sqlite.prepare("PRAGMA table_info(message_blocks)").all() as { name: string }[];
@@ -475,6 +528,26 @@ function createDb() {
     `);
   } catch {
     // FTS5 unavailable — memory retrieval falls back to LIKE search.
+  }
+
+  // Memory retrieval: vec0 virtual table holding one embedding per memory,
+  // keyed by the memory id, for semantic KNN search. Rows are populated
+  // asynchronously by the embedding backfill (Voyage), so an empty table just
+  // means no semantic hits yet — never an error. Unlike FTS we cannot keep this
+  // in sync via triggers (vec0 isn't writable from a trigger), so the embedding
+  // service deletes/upserts vectors alongside memory writes.
+  if (vecAvailable) {
+    try {
+      sqlite.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS agent_memories_vec USING vec0(
+          id TEXT PRIMARY KEY,
+          embedding float[${MEMORY_EMBEDDING_DIM}]
+        );
+      `);
+    } catch {
+      // vec0 unavailable despite the extension loading — disable semantic search.
+      vecAvailable = false;
+    }
   }
 
   return db;

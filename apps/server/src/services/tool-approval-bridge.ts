@@ -3,6 +3,7 @@ import {
   QUESTION_TOOL_NAME,
   TODO_TOOL_NAME,
   MEMORY_TOOL_NAME,
+  PLAN_TOOL_NAME,
 } from "@lamda/pi-sdk";
 import { getThread } from "@lamda/db";
 import { store } from "../store.js";
@@ -21,8 +22,9 @@ const AUTO_ALLOW = new Set<string>([
   "grep",
   "find",
   "ls",
-  "plan_read",
-  "plan_write",
+  // The `plan` tool is constrained to .lamda/plans/ (read/list/write), so it's
+  // safe to auto-allow including its writes.
+  PLAN_TOOL_NAME,
   QUESTION_TOOL_NAME,
   TODO_TOOL_NAME,
   MEMORY_TOOL_NAME,

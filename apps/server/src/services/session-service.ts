@@ -143,14 +143,16 @@ export async function collectCustomTools(
   mode?: SdkConfig["mode"],
   threadId?: string,
 ) {
-  if (mode === "plan" || mode === "ask") {
-    return mode === "plan"
-      ? [...createPlanModeTools(workspacePath), questionTool]
-      : [questionTool];
-  }
-
+  // All custom (non-builtin) tools are registered in every mode — MCP, LSP, and
+  // memory stay available in Ask and Plan, matching `MODE_CONFIG.allowCustomTools`.
+  // Mode gating of the *builtins* (edit/write/bash vs read/grep) happens via
+  // `setMode` → `computeActiveToolsForMode`, which preserves these custom tools
+  // and filters builtin-named ones (e.g. `todo`, `plan_*`) by the mode's allowlist.
   const todoTool = threadId ? createTodoTool(threadId) : null;
   const memoryTool = createMemoryTool(workspaceId);
+  // The `plan` tool is only meaningful in Plan mode and is gated out of other
+  // modes by the builtin allowlist anyway; create it only when needed.
+  const planTools = mode === "plan" ? createPlanModeTools(workspacePath) : [];
 
   const [mcpTools, lspTools] = await Promise.all([
     import("./mcp-service.js")
@@ -170,6 +172,7 @@ export async function collectCustomTools(
     ...(todoTool ? [todoTool] : []),
     memoryTool,
     questionTool,
+    ...planTools,
     ...mcpTools,
     ...lspTools,
   ];

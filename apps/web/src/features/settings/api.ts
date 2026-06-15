@@ -22,6 +22,7 @@ export async function updateAppSetting(
 
 export type MemoryScope = "user" | "workspace"
 export type MemorySource = "agent" | "healing" | "user"
+export type MemoryKind = "fact" | "preference" | "convention" | "decision" | "episode"
 
 export interface MemoryItem {
   id: string
@@ -30,7 +31,12 @@ export interface MemoryItem {
   title: string
   content: string
   category: string | null
+  kind: MemoryKind
   source: MemorySource
+  threadId: string | null
+  filePaths: string | null
+  confidence: number
+  supersededBy: string | null
   pinned: boolean
   createdAt: number
   updatedAt: number

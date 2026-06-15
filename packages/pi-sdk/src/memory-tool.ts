@@ -9,6 +9,7 @@ import {
   touchMemoryUse,
   type MemoryRow,
   type MemoryScope,
+  type MemoryKind,
 } from "@lamda/db"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@ export interface MemoryItem {
   title: string
   content: string
   category: string | null
+  kind: MemoryKind
   pinned: boolean
 }
 
@@ -43,6 +45,7 @@ function toItem(row: MemoryRow): MemoryItem {
     title: row.title,
     content: row.content,
     category: row.category,
+    kind: row.kind,
     pinned: row.pinned,
   }
 }
@@ -89,6 +92,8 @@ export function createMemoryTool(workspaceId?: string): ToolDefinition {
 Operations:
 - save    — Store a new memory. Required: \`title\` (short), \`content\` (one concrete fact).
             Optional: \`scope\` ("workspace" = this project, default; "user" = applies to every project),
+            \`kind\` (see below; default "fact"),
+            \`filePaths\` (paths this memory concerns — lets it resurface when you revisit that code),
             \`category\` (free-form label, e.g. "convention", "environment"),
             \`pinned\` (true = always-on core context shown every session — reserve for a few high-value, broadly-relevant facts).
 - list    — Show stored memories. Optional: \`scope\` filter.
@@ -96,10 +101,18 @@ Operations:
 - update  — Change a memory. Required: \`id\`. Optional: \`title\`, \`content\`, \`category\`, \`pinned\`.
 - delete  — Remove a memory by \`id\` (use when you learn it is wrong or obsolete).
 
+Kinds (the \`kind\` field) — pick the one that fits; it shapes how the memory is surfaced:
+- "fact"       — a plain durable fact (default).
+- "preference" — how the user likes to work (style, tone, workflow); usually "user" scope.
+- "convention" — a project rule or norm (build quirk, naming, preferred library).
+- "decision"   — a notable choice and *why*. Put the decision, rationale, and alternatives rejected in \`content\`.
+- "episode"     — a short record of what a piece of work accomplished. Reserve for the reflection pass; rarely set by hand.
+
 When to save — sparingly, only durable facts that will matter in future sessions:
 - Project conventions not written down anywhere (build quirks, naming rules, preferred libraries).
-- Corrections the user gives you ("we use pnpm, not npm") — save these immediately.
+- Corrections the user gives you ("we use pnpm, not npm") — save these immediately as kind "preference".
 - Environment quirks discovered the hard way (flaky commands, required env vars, port conflicts).
+- A non-obvious decision and the reasoning behind it — save as kind "decision" so the rationale survives.
 - Use "user" scope only for the user's cross-project preferences (style, tone, workflow).
 
 Never save: secrets, credentials, API keys, tokens, or anything derivable by reading the repo. One fact per memory. Update or delete outdated memories instead of stacking duplicates.`,
@@ -131,6 +144,18 @@ Never save: secrets, credentials, API keys, tokens, or anything derivable by rea
           type: "string",
           description: "Optional free-form category label (for 'save' and 'update').",
         },
+        kind: {
+          type: "string",
+          enum: ["fact", "preference", "convention", "decision", "episode"],
+          description:
+            "What kind of memory this is (for 'save' and 'update'); default 'fact'. See the operation guide.",
+        },
+        filePaths: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Paths this memory concerns, so it resurfaces when you revisit them (for 'save' and 'update').",
+        },
         pinned: {
           type: "boolean",
           description:
@@ -151,6 +176,16 @@ Never save: secrets, credentials, API keys, tokens, or anything derivable by rea
       const p = (params && typeof params === "object" ? params : {}) as Record<string, unknown>
       const operation = typeof p.operation === "string" ? p.operation : undefined
       if (!operation) return err("Missing required parameter: operation")
+
+      const KINDS = ["fact", "preference", "convention", "decision", "episode"] as const
+      const parseKind = (): MemoryKind | undefined =>
+        typeof p.kind === "string" && (KINDS as readonly string[]).includes(p.kind)
+          ? (p.kind as MemoryKind)
+          : undefined
+      const parseFilePaths = (): string[] | undefined =>
+        Array.isArray(p.filePaths)
+          ? p.filePaths.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+          : undefined
 
       try {
         switch (operation) {
@@ -175,6 +210,8 @@ Never save: secrets, credentials, API keys, tokens, or anything derivable by rea
               title,
               content,
               category,
+              kind: parseKind() ?? "fact",
+              filePaths: parseFilePaths() ?? null,
               pinned: p.pinned === true,
               source: "agent",
             })
@@ -217,16 +254,22 @@ Never save: secrets, credentials, API keys, tokens, or anything derivable by rea
               title?: string
               content?: string
               category?: string | null
+              kind?: MemoryKind
+              filePaths?: string[] | null
               pinned?: boolean
             } = {}
             if (typeof p.title === "string" && p.title.trim()) updates.title = p.title.trim()
             if (typeof p.content === "string" && p.content.trim())
               updates.content = p.content.trim()
             if (typeof p.category === "string") updates.category = p.category.trim() || null
+            const kind = parseKind()
+            if (kind) updates.kind = kind
+            const filePaths = parseFilePaths()
+            if (filePaths) updates.filePaths = filePaths
             if (typeof p.pinned === "boolean") updates.pinned = p.pinned
             if (Object.keys(updates).length === 0) {
               return err(
-                "'update' requires at least one of 'title', 'content', 'category', or 'pinned'.",
+                "'update' requires at least one of 'title', 'content', 'category', 'kind', 'filePaths', or 'pinned'.",
               )
             }
 

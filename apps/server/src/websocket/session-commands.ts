@@ -156,7 +156,7 @@ async function handlePrompt(
   ensureSessionEventHub(sessionId, entry);
   // DB stores the clean user text; the SDK sees the injected preambles.
   insertUserBlock(entry.threadId, msg.text);
-  const text = withInjections(entry, msg.text);
+  const text = await withInjections(entry, msg.text);
   entry.lastPromptText = text;
 
   // Acknowledge immediately
@@ -229,7 +229,7 @@ async function handleSteer(
 
   ensureSessionEventHub(sessionId, entry);
   insertUserBlock(entry.threadId, msg.text);
-  const text = withInjections(entry, msg.text);
+  const text = await withInjections(entry, msg.text);
 
   send(ws, { type: "ack", operation: "steer", accepted: true });
 
@@ -253,7 +253,7 @@ async function handleFollowUp(
 
   ensureSessionEventHub(sessionId, entry);
   insertUserBlock(entry.threadId, msg.text);
-  const text = withInjections(entry, msg.text);
+  const text = await withInjections(entry, msg.text);
 
   send(ws, { type: "ack", operation: "follow-up", accepted: true });
 

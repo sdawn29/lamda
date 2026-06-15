@@ -3,6 +3,7 @@ import {
   applyMemoryPreamble,
   renderMemoryBlock,
   normalizeMode,
+  embedQuery,
 } from "@lamda/pi-sdk";
 import { getThread, selectMemoriesForPrompt, touchMemoryUse } from "@lamda/db";
 import type { StoredSession } from "../store.js";
@@ -40,8 +41,18 @@ function withModePreamble(entry: StoredSession, userText: string): string {
  * facts remain available even though we only inject the newly-relevant ones now.
  * The DB always stores the clean user text without the block.
  */
-function withMemoryPreamble(entry: StoredSession, userText: string): string {
-  const candidates = selectMemoriesForPrompt(userText, entry.workspaceId);
+async function withMemoryPreamble(entry: StoredSession, userText: string): Promise<string> {
+  // Embed the prompt for semantic retrieval. Best-effort and timeout-guarded:
+  // returns null (→ FTS-only) when no embedding provider is configured or the
+  // call is slow/fails, so the hot path never blocks on it.
+  const queryVector = (await embedQuery(userText).catch(() => null)) ?? undefined;
+
+  const candidates = selectMemoriesForPrompt(
+    userText,
+    entry.workspaceId,
+    entry.activeFiles,
+    queryVector,
+  );
   if (candidates.length === 0) return userText;
 
   const injected = (entry.injectedMemories ??= new Map<string, number>());
@@ -62,6 +73,6 @@ function withMemoryPreamble(entry: StoredSession, userText: string): string {
  * the mode preamble stays outermost (stored text = mode preamble + memory block
  * + user text), matching the strip order used when seeding forked threads.
  */
-export function withInjections(entry: StoredSession, userText: string): string {
-  return withModePreamble(entry, withMemoryPreamble(entry, userText));
+export async function withInjections(entry: StoredSession, userText: string): Promise<string> {
+  return withModePreamble(entry, await withMemoryPreamble(entry, userText));
 }

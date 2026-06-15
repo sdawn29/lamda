@@ -56,6 +56,19 @@ function getEditDiff(result: unknown): string | null {
   return typeof diff === "string" ? diff : null
 }
 
+// ── Plan tool detection ────────────────────────────────────────────────────────
+
+/**
+ * The `plan` tool dispatches on an `operation` arg (list/read/write). Returns the
+ * operation when this is a `plan` call, so read/write rendering can treat a plan
+ * read like a read and a plan write like a write. Null for any other tool.
+ */
+function getPlanOperation(toolName: string, args: unknown): "list" | "read" | "write" | null {
+  if (toolName.toLowerCase() !== "plan") return null
+  const op = args && typeof args === "object" ? (args as Record<string, unknown>).operation : null
+  return op === "list" || op === "read" || op === "write" ? op : null
+}
+
 // ── Write tool detection ───────────────────────────────────────────────────────
 
 interface WriteArgs {
@@ -142,9 +155,9 @@ export function ToolGlyph({
       ? SquareTerminalIcon
       : name.includes("edit")
         ? FilePenLineIcon
-        : name === "write" || name === "plan_write"
+        : name === "write"
           ? FilePlus2Icon
-          : name === "read" || name === "plan_read"
+          : name === "read" || name === "plan"
             ? FileTextIcon
             : name.includes("fetch") || name.includes("web")
               ? GlobeIcon
@@ -222,7 +235,8 @@ function getReadFilePath(args: unknown): string | null {
 
 function isReadTool(toolName: string, args: unknown): boolean {
   const name = toolName.toLowerCase()
-  return (name === "read" || name === "plan_read") && getReadFilePath(args) !== null
+  const isRead = name === "read" || getPlanOperation(toolName, args) === "read"
+  return isRead && getReadFilePath(args) !== null
 }
 
 /**
@@ -248,7 +262,7 @@ function getReadSkillName(filePath: string | null): string | null {
  */
 export function isSkillRead(msg: ToolMessage): boolean {
   const name = msg.toolName.toLowerCase()
-  if (name !== "read" && name !== "plan_read") return false
+  if (name !== "read") return false
   return getReadSkillName(getReadFilePath(msg.args)) !== null
 }
 
@@ -425,7 +439,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const readLineRange = isRead ? getReadLineRange(msg.args) : null
   const skillName = isRead ? getReadSkillName(readFilePath) : null
   const isWrite =
-    (normalizedToolName === "write" || normalizedToolName === "plan_write") &&
+    (normalizedToolName === "write" ||
+      getPlanOperation(msg.toolName, msg.args) === "write") &&
     isWriteArgs(msg.args)
   const writeArgs = isWrite ? (msg.args as WriteArgs) : null
   const filePath = (isEdit || isWrite) ? getReadFilePath(msg.args) : null

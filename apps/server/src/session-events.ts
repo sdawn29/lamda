@@ -23,6 +23,8 @@ import {
   threadStatusBroadcaster,
   type ThreadStatus,
 } from "./thread-status-broadcaster.js";
+import { scheduleReflection } from "./services/memory-reflection.js";
+import { store } from "./store.js";
 
 const MAX_RECENT_EVENTS = 512;
 
@@ -340,9 +342,12 @@ class SessionEventHub {
     // Tool name may arrive on the event or only on the earlier _start.
     const meta = this.toolMetaMap.get(msg.toolCallId);
     const toolName = (msg.toolName ?? meta?.toolName ?? "").toLowerCase();
-    if (toolName !== "plan_write" && toolName !== "write") return;
+    const args = meta?.args as { path?: unknown; operation?: unknown } | undefined;
+    // A plan is saved by either the `plan` tool (operation "write") or a raw
+    // `write` that happens to target the plan dir.
+    const isPlanToolWrite = toolName === "plan" && args?.operation === "write";
+    if (!isPlanToolWrite && toolName !== "write") return;
 
-    const args = meta?.args as { path?: unknown } | undefined;
     const rawPath = typeof args?.path === "string" ? args.path : null;
     if (!rawPath) return;
 
@@ -544,6 +549,10 @@ class SessionEventHub {
           checkpointSha,
           files: turnFiles,
         });
+        // Surface the files just touched as the session's "active files", so the
+        // next prompt can retrieve memories tied to this area of the code.
+        const entry = store.get(this.sessionId);
+        if (entry) entry.activeFiles = turnFiles.map((f) => f.filePath);
       }
     } catch {
       // keep previous value
@@ -1129,6 +1138,9 @@ class SessionEventHub {
             r.event.type !== "compaction_start" &&
             r.event.type !== "compaction_end",
         );
+        // History is about to be summarized away — consolidate durable memories
+        // from what's still in the transcript before it's compacted.
+        scheduleReflection(this.threadId);
       }
     } else if (event.type === "server_error") {
       const se = event as { message: string };

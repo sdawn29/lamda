@@ -183,9 +183,29 @@ export const agentMemories = sqliteTable("agent_memories", {
   title: text("title").notNull(),
   content: text("content").notNull(),
   category: text("category"),
+  // What kind of memory this is. `fact` is the original flat-fact behaviour and
+  // the default; the others let retrieval and rendering treat memories
+  // differently (preferences always-on, episodes/decisions linked to a thread).
+  kind: text("kind", {
+    enum: ["fact", "preference", "convention", "decision", "episode"],
+  })
+    .notNull()
+    .default("fact"),
   source: text("source", { enum: ["agent", "healing", "user"] })
     .notNull()
     .default("agent"),
+  // Provenance + episodic link: the thread this memory was learned from. Nulled
+  // (not cascaded) when the thread is deleted, so the learning survives.
+  threadId: text("thread_id").references(() => threads.id, { onDelete: "set null" }),
+  // JSON array of file paths this memory concerns (touched/affected), enabling
+  // file-association retrieval when the agent re-enters that area of the code.
+  filePaths: text("file_paths"),
+  // Reinforcement score. Bumped when a memory is re-observed; lowered when it is
+  // superseded. Feeds retrieval ranking and garbage collection.
+  confidence: real("confidence").notNull().default(1),
+  // When this memory is contradicted by a newer one, the newer memory's id is
+  // recorded here rather than deleting the row (auditable supersession).
+  supersededBy: text("superseded_by"),
   // Pinned memories form the always-on "core" injected into every session,
   // regardless of relevance to the current prompt.
   pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),

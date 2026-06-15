@@ -31,6 +31,12 @@ export interface StoredSession {
    * a crashed handle.
    */
   lastPromptText?: string;
+  /**
+   * Repo-relative paths the agent touched on the most recent turn. Used by
+   * `withMemoryPreamble` to surface memories (episodes/decisions) tied to the
+   * area of code currently in play, even when the prompt shares no keywords.
+   */
+  activeFiles?: string[];
 }
 
 class SessionStore {
