@@ -47,6 +47,8 @@ interface UseChatStreamOptions {
   sessionId: string
   threadId: string
   initialIsStopped: boolean
+  /** Thinking level for a prompt already sent from the new-thread view (never flowed through startUserPrompt). */
+  initialPendingThinkingLevel?: string
   onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
   onToolApprovalRequest?: (event: { toolCallId: string; toolName: string; input: Record<string, unknown>; scopeLabel: string }) => void
   onToolApprovalResolved?: (event: { toolCallId: string; decision: "once" | "always" | "never" }) => void
@@ -84,6 +86,7 @@ export function useChatStream({
   sessionId,
   threadId,
   initialIsStopped,
+  initialPendingThinkingLevel,
   onPlanSaved,
   onToolApprovalRequest,
   onToolApprovalResolved,
@@ -229,6 +232,13 @@ export function useChatStream({
     onToolApprovalRequest,
     onToolApprovalResolved,
   })
+
+  // When a new thread is created from new-thread-view, the prompt is sent
+  // directly to the server (not through startUserPrompt), so pendingThinkingLevelRef
+  // is never seeded. Seed it here so onMessageStart picks up the correct level.
+  if (optimisticRunning && initialPendingThinkingLevel != null && pendingThinkingLevelRef.current === null) {
+    pendingThinkingLevelRef.current = initialPendingThinkingLevel
+  }
 
   // After the agent finishes, replace optimistic user-message placeholders (no
   // DB id) with server-persisted versions so fork/revert blockIds appear.

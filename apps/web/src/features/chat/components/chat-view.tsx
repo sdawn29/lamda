@@ -625,6 +625,7 @@ export function ChatView({
     sessionId,
     threadId,
     initialIsStopped,
+    initialPendingThinkingLevel: initialThinkingLevel,
     onPlanSaved: handlePlanSaved,
     onToolApprovalRequest: handleToolApprovalRequest,
     onToolApprovalResolved: handleToolApprovalResolved,
