@@ -447,7 +447,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           </div>
 
           <div className="shrink-0 bg-background">
-            <div className="mx-auto w-full max-w-3xl px-6 pb-2">
+            <div className="mx-auto w-full max-w-3xl px-3 pb-2">
               <ChatComposer
                 onSend={() => {}}
                 isLoading
@@ -466,7 +466,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         </>
       ) : (
         <div className="flex flex-1 items-center justify-center overflow-y-auto px-6">
-          <div className="-mt-12 flex w-full max-w-2xl flex-col items-stretch">
+          <div className="-mt-12 flex w-full max-w-3xl flex-col items-stretch">
             <div className="mb-7 flex flex-col items-center gap-3 text-center select-none">
               <LambdaMark />
               <div className="space-y-1.5">
