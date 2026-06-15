@@ -1,7 +1,7 @@
 import * as React from "react"
 import {
   BotIcon,
-  ChevronsUpDownIcon,
+  ChevronDownIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
 } from "lucide-react"
@@ -110,9 +110,9 @@ export function ModeCombobox({
             <span className={selectedOption.iconAccent}>
               {selectedOption.label}
             </span>
-            <ChevronsUpDownIcon
+            <ChevronDownIcon
               data-icon="inline-end"
-              className={`opacity-60 ${selectedOption.iconAccent}`}
+              className={`opacity-60 transition-transform duration-200 ${open ? "rotate-180" : ""} ${selectedOption.iconAccent}`}
             />
           </Button>
         }

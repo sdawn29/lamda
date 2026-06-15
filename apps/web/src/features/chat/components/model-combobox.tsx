@@ -1,5 +1,5 @@
 import * as React from "react"
-import { ChevronsUpDownIcon } from "lucide-react"
+import { ChevronDownIcon } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
 import {
@@ -70,7 +70,7 @@ export function ModelCombobox({
           >
             {selectedMeta?.icon}
             <span className="truncate">{selected?.name ?? placeholder}</span>
-            <ChevronsUpDownIcon data-icon="inline-end" className="opacity-50" />
+            <ChevronDownIcon data-icon="inline-end" className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
           </Button>
         }
       />

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { ChevronsUpDownIcon, FolderIcon, FolderPlusIcon } from "lucide-react"
+import { ChevronDownIcon, FolderIcon, FolderPlusIcon } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
 import { LambdaMark } from "@/shared/components/lambda-mark"
@@ -368,9 +368,9 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               <span className="max-w-[12rem] truncate">
                 {selectedWorkspace?.name ?? "Select workspace"}
               </span>
-              <ChevronsUpDownIcon
+              <ChevronDownIcon
                 data-icon="inline-end"
-                className="opacity-50"
+                className={`opacity-50 transition-transform duration-200 ${wsPickerOpen ? "rotate-180" : ""}`}
               />
             </Button>
           }

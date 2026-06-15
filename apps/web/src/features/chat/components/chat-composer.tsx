@@ -879,30 +879,8 @@ export const ChatComposer = memo(
             onSelect={handleSelectFile}
           />
 
-          {showContextStrip && (
-            <div className="flex items-center justify-between gap-2 border-b border-border/50 px-2 py-1">
-              <div className="flex min-w-0 items-center gap-1">
-                {contextLeading}
-                {showBranch && (
-                  <BranchSelector
-                    branch={branch ?? null}
-                    branches={branches}
-                    onBranchSelect={onBranchSelect}
-                    onGitError={onBranchError}
-                    sessionId={sessionId}
-                  />
-                )}
-              </div>
-              {showApproval && (
-                <ApprovalModeCombobox
-                  selected={approvalMode}
-                  onSelect={onApprovalModeChange!}
-                />
-              )}
-            </div>
-          )}
-
-          <div className="px-3.5 pt-3 pb-1.5">
+          <div className="mx-2 mt-2 mb-2 rounded-xl bg-muted/60">
+            <div className="px-2.5 pt-3 pb-1.5">
             <RichInput
               ref={richInputRef}
               placeholder={
@@ -988,7 +966,7 @@ export const ChatComposer = memo(
           </div>
 
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-3.5 pb-1.5">
+            <div className="flex flex-wrap gap-2 px-2.5 pb-1.5">
               {attachments.map((attachment) => (
                 <AttachmentPreview
                   key={attachment.id}
@@ -1012,7 +990,7 @@ export const ChatComposer = memo(
             }}
           />
 
-          <div className="flex items-center justify-between gap-2 rounded-b-2xl px-2.5 pt-1 pb-2">
+          <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-2">
             <div className="flex items-center gap-0.5">
               {onModeChange && (
                 <ModeCombobox selected={mode} onSelect={onModeChange} />
@@ -1132,6 +1110,30 @@ export const ChatComposer = memo(
               )}
             </div>
           </div>
+          </div>
+
+          {showContextStrip && (
+            <div className="flex items-center justify-between gap-2 border-t border-border/50 px-2 py-1">
+              <div className="flex min-w-0 items-center gap-1">
+                {contextLeading}
+                {showBranch && (
+                  <BranchSelector
+                    branch={branch ?? null}
+                    branches={branches}
+                    onBranchSelect={onBranchSelect}
+                    onGitError={onBranchError}
+                    sessionId={sessionId}
+                  />
+                )}
+              </div>
+              {showApproval && (
+                <ApprovalModeCombobox
+                  selected={approvalMode}
+                  onSelect={onApprovalModeChange!}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
     )

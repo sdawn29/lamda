@@ -1646,7 +1646,7 @@ export function ChatView({
 
           <div
             ref={textboxWrapRef}
-            className="mx-auto w-full max-w-3xl px-6 pb-2"
+            className="mx-auto w-full max-w-3xl px-6 pb-4"
           >
             {pendingApproval ? (
               <ToolApprovalBlock

@@ -1,5 +1,5 @@
 import * as React from "react"
-import { ChevronsUpDownIcon, ShieldCheckIcon, ShieldOffIcon } from "lucide-react"
+import { ChevronDownIcon, ShieldCheckIcon, ShieldOffIcon } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
 import {
@@ -84,9 +84,9 @@ export function ApprovalModeCombobox({
             <span className={selectedOption.iconAccent}>
               {selectedOption.label}
             </span>
-            <ChevronsUpDownIcon
+            <ChevronDownIcon
               data-icon="inline-end"
-              className={`opacity-60 ${selectedOption.iconAccent}`}
+              className={`opacity-60 transition-transform duration-200 ${open ? "rotate-180" : ""} ${selectedOption.iconAccent}`}
             />
           </Button>
         }

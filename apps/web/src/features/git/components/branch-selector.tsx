@@ -1,5 +1,5 @@
 import * as React from "react"
-import { GitBranchIcon, ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+import { GitBranchIcon, ChevronDownIcon, PlusIcon } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import {
   Command,
@@ -104,9 +104,9 @@ export function BranchSelector({
                   ↓{aheadBehind.behind}
                 </span>
               )}
-              <ChevronsUpDownIcon
+              <ChevronDownIcon
                 data-icon="inline-end"
-                className="opacity-50"
+                className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
               />
             </Button>
           }
