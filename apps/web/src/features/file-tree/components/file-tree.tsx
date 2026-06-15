@@ -183,6 +183,8 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
   const expanded = useFileTree((s) => s.expanded)
   const toggleDir = useFileTree((s) => s.toggleDir)
   const collapseAll = useFileTree((s) => s.collapseAll)
+  const revealTarget = useFileTree((s) => s.revealTarget)
+  const clearRevealTarget = useFileTree((s) => s.clearRevealTarget)
 
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState("")
@@ -252,6 +254,18 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
     estimateSize: () => ROW_HEIGHT,
     overscan: 12,
   })
+
+  // Scroll a revealed directory into view once its row exists (its ancestors
+  // have loaded). Filter mode hides the tree rows, so skip while filtering.
+  useEffect(() => {
+    if (!revealTarget || isFiltering) return
+    const index = treeRows.findIndex(
+      (row) => row.entry.relativePath === revealTarget
+    )
+    if (index === -1) return
+    virtualizer.scrollToIndex(index, { align: "center" })
+    clearRevealTarget()
+  }, [revealTarget, isFiltering, treeRows, virtualizer, clearRevealTarget])
 
   const handleSelectFile = useCallback(
     (relativePath: string) => {

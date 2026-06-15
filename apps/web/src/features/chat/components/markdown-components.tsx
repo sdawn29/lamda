@@ -3,6 +3,8 @@ import type { Components } from "react-markdown"
 import { Icon } from "@iconify/react"
 import { useSyntaxTheme } from "@/features/themes"
 import { useMainTabsStore } from "@/features/main-tabs"
+import { useFileTree } from "@/features/file-tree"
+import { useRightSidebarStore } from "@/features/layout/store/right-sidebar"
 import { Check, Copy } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
@@ -100,6 +102,20 @@ const LINE_SUFFIX_RE = /:(\d+)(?::\d+)?$/
 interface FileReference {
   path: string
   line?: number
+  isDirectory: boolean
+}
+
+/**
+ * A reference points at a directory when it ends in a slash, or when its
+ * basename has no file extension. Mirrors the file/folder heuristic used for
+ * `@`-mention chips in user-message.tsx so both surfaces agree.
+ */
+function looksLikeDirectory(path: string): boolean {
+  if (path.endsWith("/")) return true
+  const basename = path.replace(/\/+$/, "").split("/").pop() ?? path
+  // Dotfiles (.npmrc, .env, .gitignore) start with a dot — always a file.
+  if (basename.startsWith(".")) return false
+  return basename.lastIndexOf(".") <= 0
 }
 
 /**
@@ -120,13 +136,21 @@ function parseFileReference(text: string): FileReference | null {
   const looksLikePath = path.includes("/") || FILE_EXT_RE.test(path)
   if (!looksLikePath) return null
 
-  return { path, line }
+  return { path, line, isDirectory: looksLikeDirectory(path) }
 }
 
 function resolveAbsolutePath(path: string, rootPath?: string): string {
   if (path.startsWith("/")) return path
   if (rootPath) return `${rootPath.replace(/\/$/, "")}/${path}`
   return path
+}
+
+/** Strip the workspace root (and any leading/trailing slashes) to get a tree-relative path. */
+function toWorkspaceRelative(path: string, rootPath?: string): string {
+  let rel = path
+  const root = rootPath?.replace(/\/$/, "")
+  if (root && rel.startsWith(root)) rel = rel.slice(root.length)
+  return rel.replace(/^\/+|\/+$/g, "")
 }
 
 function FileReferenceLink({
@@ -136,9 +160,17 @@ function FileReferenceLink({
   reference: FileReference
   rootPath?: string
 }) {
-  const basename = reference.path.split("/").pop() || reference.path
+  const normalizedPath = reference.path.replace(/\/+$/, "")
+  const basename = normalizedPath.split("/").pop() || normalizedPath
 
   function handleClick() {
+    if (reference.isDirectory) {
+      // Folders can't open in a file viewer — reveal them in the file tree.
+      useRightSidebarStore.getState().open()
+      useRightSidebarStore.getState().openFileTree()
+      useFileTree.getState().reveal(toWorkspaceRelative(reference.path, rootPath))
+      return
+    }
     useMainTabsStore.getState().addFileTab({
       filePath: resolveAbsolutePath(reference.path, rootPath),
       title: basename,
@@ -152,7 +184,11 @@ function FileReferenceLink({
       onClick={handleClick}
       icon={
         <Icon
-          icon={`catppuccin:${getIconName(basename)}`}
+          icon={
+            reference.isDirectory
+              ? "catppuccin:folder"
+              : `catppuccin:${getIconName(basename)}`
+          }
           data-icon="inline-start"
           aria-hidden
         />
@@ -161,7 +197,9 @@ function FileReferenceLink({
       meta={reference.line != null ? `:${reference.line}` : undefined}
       detail={
         <div className="flex flex-col gap-1">
-          <SectionLabel>Open in review panel</SectionLabel>
+          <SectionLabel>
+            {reference.isDirectory ? "Reveal in file tree" : "Open in review panel"}
+          </SectionLabel>
           <span className="font-mono text-xs break-all">
             {reference.path}
             {reference.line != null ? `:${reference.line}` : ""}
