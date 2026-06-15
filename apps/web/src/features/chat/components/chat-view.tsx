@@ -86,10 +86,7 @@ import {
 import { getNextMode } from "./mode-combobox"
 import { QuestionView } from "./question-view"
 import { findActiveQuestion } from "../lib/active-question"
-import {
-  ToolApprovalBlock,
-  type PendingApproval,
-} from "./tool-approval-block"
+import { ToolApprovalBlock, type PendingApproval } from "./tool-approval-block"
 import type { ApprovalMode } from "@/features/workspace/api"
 
 const PLAN_DIR_PREFIX = ".lamda/plans/"
@@ -365,7 +362,8 @@ function buildCheckpointByUserBlock(
     const files = new Set<string>()
     let hasCheckpoint = false
     for (const turn of completedTurns) {
-      if (turn.startedAt < createdAt || turn.startedAt >= nextCreatedAt) continue
+      if (turn.startedAt < createdAt || turn.startedAt >= nextCreatedAt)
+        continue
       for (const f of turn.files) files.add(f.filePath)
       if (turn.checkpointSha) hasCheckpoint = true
     }
@@ -483,9 +481,8 @@ export function ChatView({
   const [selectedApprovalMode, setSelectedApprovalMode] =
     useState<ApprovalMode>(initialApprovalMode)
   // The tool call currently paused awaiting the user's approval, if any.
-  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(
-    null
-  )
+  const [pendingApproval, setPendingApproval] =
+    useState<PendingApproval | null>(null)
   const updateThreadModel = useUpdateThreadModel()
   const updateThreadMode = useUpdateThreadMode()
   const updateThreadApprovalMode = useUpdateThreadApprovalMode()
@@ -526,7 +523,12 @@ export function ChatView({
   const resolvedApprovalsRef = useRef<Set<string>>(new Set())
 
   const handleToolApprovalRequest = useCallback(
-    (event: { toolCallId: string; toolName: string; input: Record<string, unknown>; scopeLabel: string }) => {
+    (event: {
+      toolCallId: string
+      toolName: string
+      input: Record<string, unknown>
+      scopeLabel: string
+    }) => {
       setPendingApproval(event)
     },
     []
@@ -577,7 +579,8 @@ export function ChatView({
         // run in plan mode (no edit/write tools) and leaving FileChangesCard blank.
         setSelectedMode("agent")
         const prompt = `Implement the plan in @${relativePath}`
-        updateThreadMode.mutateAsync({ threadId, mode: "agent" })
+        updateThreadMode
+          .mutateAsync({ threadId, mode: "agent" })
           .then(() => {
             chatTextboxRef.current?.setValue(prompt)
             chatTextboxRef.current?.focus()
@@ -1437,7 +1440,7 @@ export function ChatView({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex w-full min-h-0 flex-1 flex-col overflow-y-auto pt-4 pb-8 [overflow-anchor:none]"
+          className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pt-4 pb-8 [overflow-anchor:none]"
         >
           <div ref={messagesContainerRef}>
             {/* Load earlier messages button — visible when older history exists and isn't loading */}
@@ -1588,7 +1591,7 @@ export function ChatView({
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500/60" />
                   <span className="relative inline-flex size-1.5 rounded-full bg-amber-500" />
                 </span>
-                Waiting for approval…
+                Waiting for approval
               </div>
             ) : (
               showThinkingIndicator && <ThinkingIndicator className="py-0.5" />
