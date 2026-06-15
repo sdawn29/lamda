@@ -27,7 +27,7 @@ import {
   type PendingAttachment,
 } from "./chat-composer"
 import { pendingToUploads, pendingToDisplay } from "../lib/attachments"
-import { MessageRow, getMessageKey } from "./message-row"
+import { MessageRow, getMessageKey, estimateMessageSize } from "./message-row"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -119,6 +119,21 @@ type MessageGroup =
       startIndex: number
       finalThinking?: string
     }
+
+// Rough height estimate (px) for a group, used as `contain-intrinsic-size` so
+// off-screen groups can be skipped from layout/paint without collapsing the
+// scrollbar. Only an initial guess matters — `content-visibility: auto` makes
+// the browser remember each group's real measured size once it has scrolled
+// into view, so this just needs to be in the right ballpark.
+function estimateGroupSize(group: MessageGroup): number {
+  if (group.type === "working") {
+    if (group.messages.length === 0) return 80
+    let total = 0
+    for (const m of group.messages) total += estimateMessageSize(m)
+    return total
+  }
+  return estimateMessageSize(group.message)
+}
 
 function groupChatMessages(messages: Message[]): MessageGroup[] {
   const groups: MessageGroup[] = []
@@ -1548,8 +1563,24 @@ export function ChatView({
               const completedTodoLists =
                 completedTodosByGroup.get(groupIndex) ?? []
 
+              // Browser-native windowing: skip layout/paint for groups that are
+              // off-screen so resizing the window no longer reflows the entire
+              // thread at once. The last group is left un-contained since it's
+              // the actively streaming turn (always on-screen, growing rapidly).
+              const isLastGroup = groupIndex === groupedMessages.length - 1
+
               return (
-                <div key={itemKey}>
+                <div
+                  key={itemKey}
+                  style={
+                    isLastGroup
+                      ? undefined
+                      : {
+                          contentVisibility: "auto",
+                          containIntrinsicSize: `auto ${estimateGroupSize(group)}px`,
+                        }
+                  }
+                >
                   {content}
                   {completedTodoLists.map((goals) => (
                     <div

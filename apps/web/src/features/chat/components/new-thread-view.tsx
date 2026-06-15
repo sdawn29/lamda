@@ -506,6 +506,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-2xs text-muted-foreground/70 select-none">
                 <HintItem keys="/" label="Commands & skills" />
                 <HintItem keys="@" label="Reference files" />
+                <HintItem keys={["⇧", "Tab"]} label="Cycle mode" />
                 <HintItem keys="⏎" label="Send" />
               </div>
             )}
@@ -523,12 +524,17 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
   )
 }
 
-function HintItem({ keys, label }: { keys: string; label: string }) {
+function HintItem({ keys, label }: { keys: string | string[]; label: string }) {
+  const keyList = Array.isArray(keys) ? keys : [keys]
   return (
     <span className="flex items-center gap-1.5">
-      <kbd className="flex h-4 min-w-4 items-center justify-center rounded border border-border/60 bg-muted px-1 font-mono text-[10px] text-muted-foreground">
-        {keys}
-      </kbd>
+      <span className="flex items-center gap-0.5">
+        {keyList.map((k, i) => (
+          <kbd key={i} className="flex h-4 min-w-4 items-center justify-center rounded border border-border/60 bg-muted px-1 font-mono text-[10px] text-muted-foreground">
+            {k}
+          </kbd>
+        ))}
+      </span>
       <span>{label}</span>
     </span>
   )

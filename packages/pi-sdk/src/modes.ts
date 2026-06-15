@@ -48,21 +48,21 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
     label: "Ask",
     description: "Read-only Q&A. Cannot edit, write, or run shell commands.",
     preamble:
-      "Ask mode — read-only Q&A about this codebase. You have `read`, `grep`, `find`, and `ls`; editing, writing, and shell are disabled here.\n\n" +
+      "Ask mode — read-only Q&A about this codebase. You have `read`, `grep`, `find`, `ls`, and any available custom tools (memory, LSP, MCP); editing, writing, and shell are disabled here.\n\n" +
       "- Ground every non-trivial answer in the actual code: search and read the relevant files before answering rather than relying on memory.\n" +
       "- Cite concrete locations as `path/to/file.ts:line`.\n" +
       "- Lead with the answer, then the supporting evidence.\n" +
       "- If the question is ambiguous or unanswerable from the code, clarify via `question` or state your assumption explicitly.\n" +
       "- Don't describe edits as if you're applying them; if the user wants a change made, point them to Plan or Agent mode.",
     allowedBuiltins: ["read", "grep", "find", "ls", QUESTION_TOOL_NAME],
-    allowCustomTools: false,
+    allowCustomTools: true,
   },
   plan: {
     label: "Plan",
     description: "Research and propose a plan. Saves the plan to .lamda/plans/.",
     preamble:
       "Plan mode — produce exactly one implementation-ready plan for the user's request, saved under `.lamda/plans/`.\n\n" +
-      "Investigate first (read-only): use `read`, `grep`, `find`, `ls`, and read-only `bash` to trace the real code paths, data models, and call sites. Plan against the code, not assumptions. Don't modify source, config, tests, or docs — the only file you write is the plan, via `plan_write`, at `.lamda/plans/<2-5-word-kebab-slug>.md` (`plan_read` is for that directory only).\n\n" +
+      "Investigate first (read-only): use `read`, `grep`, `find`, `ls`, read-only `bash`, and any available custom tools (memory, LSP, MCP) to trace the real code paths, data models, and call sites. Plan against the code, not assumptions. Don't modify source, config, tests, or docs — the only file you write is the plan, via `plan_write`, at `.lamda/plans/<2-5-word-kebab-slug>.md` (`plan_read` is for that directory only).\n\n" +
       "Clarify before writing when the request is vague or could be approached in materially different ways: use `question` for goals, scope, constraints, or approach whenever the answer would change the plan. State assumptions only for minor gaps with an obvious default.\n\n" +
       "The plan must cover:\n" +
       "- Problem summary and current-state findings, with `path:line` references.\n" +
@@ -72,7 +72,7 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
       "- A clear definition of done.\n\n" +
       "After `plan_write` succeeds, stop and wait for review — implement nothing in this mode.",
     allowedBuiltins: ["read", "grep", "find", "ls", "bash", "plan_read", "plan_write", QUESTION_TOOL_NAME],
-    allowCustomTools: false,
+    allowCustomTools: true,
   },
   agent: {
     label: "Agent",
