@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.23.0](../../releases/tag/v0.23.0) — 2026-06-15
+
+### Features
+
+* **file-tree:** add directory reveal functionality and enhance file reference handling
+
 ## [0.22.0](../../releases/tag/v0.22.0) — 2026-06-14
 
 ### Features
