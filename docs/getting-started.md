@@ -27,6 +27,7 @@ npm run dev
 ```
 
 This starts all apps in parallel via Turborepo:
+
 - Web UI at `http://localhost:5173`
 - Server at `http://localhost:3001`
 - Desktop app (if Electron is configured)
@@ -60,14 +61,21 @@ npm run build -w desktop
 
 Output: `apps/desktop/release/` containing `.dmg` and `.zip` artifacts.
 
+For notarized release builds, the machine must have a valid Apple Developer ID
+Application signing identity available to electron-builder. Install the
+certificate in the keychain, or provide it via `CSC_LINK` and
+`CSC_KEY_PASSWORD`. Notarization also requires `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`; `apps/desktop/.env` is
+loaded during the desktop build.
+
 ## Configuration
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable          | Default                 | Description           |
+| ----------------- | ----------------------- | --------------------- |
 | `VITE_SERVER_URL` | `http://localhost:3001` | Server URL for web UI |
-| `PORT` | `3001` | Server port |
+| `PORT`            | `3001`                  | Server port           |
 
 ### Provider Configuration
 
@@ -84,11 +92,11 @@ See [providers.md](providers.md) for the full list of supported providers.
 
 ## Data Storage
 
-| Location | Description |
-|----------|-------------|
+| Location                     | Description                                        |
+| ---------------------------- | -------------------------------------------------- |
 | `~/.lamda-code/db-v2.sqlite` | SQLite database with workspaces, threads, messages |
-| `~/.pi/agent/auth.json` | API keys and provider credentials |
-| `~/.lamda-code/logs/` | Application logs |
+| `~/.pi/agent/auth.json`      | API keys and provider credentials                  |
+| `~/.lamda-code/logs/`        | Application logs                                   |
 
 ## Next Steps
 

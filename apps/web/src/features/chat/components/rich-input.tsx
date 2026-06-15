@@ -52,6 +52,15 @@ function readRichInputValue(root: Node): string {
           text += formatFileCommentContext({
             path: el.dataset.contextPath,
             line: Number(el.dataset.contextLine),
+            startColumn: el.dataset.contextStartColumn
+              ? Number(el.dataset.contextStartColumn)
+              : undefined,
+            endLine: el.dataset.contextEndLine
+              ? Number(el.dataset.contextEndLine)
+              : undefined,
+            endColumn: el.dataset.contextEndColumn
+              ? Number(el.dataset.contextEndColumn)
+              : undefined,
             comment: el.dataset.contextComment ?? "",
             code: el.dataset.contextCode,
           })
@@ -157,12 +166,25 @@ function buildFileContextChip(context: FileCommentContext): HTMLSpanElement {
   const chip = buildChipBase()
   chip.dataset.contextPath = context.path
   chip.dataset.contextLine = String(context.line)
+  if (context.startColumn) {
+    chip.dataset.contextStartColumn = String(context.startColumn)
+  }
+  if (context.endLine && context.endLine !== context.line) {
+    chip.dataset.contextEndLine = String(context.endLine)
+  }
+  if (context.endColumn) {
+    chip.dataset.contextEndColumn = String(context.endColumn)
+  }
   chip.dataset.contextComment = context.comment
   if (context.code) chip.dataset.contextCode = context.code
-  chip.title = `${context.path}:${context.line}\n${context.comment}`
+  const rangeLabel =
+    context.startColumn && context.endColumn
+      ? `L${context.line}:C${context.startColumn}-L${context.endLine ?? context.line}:C${context.endColumn}`
+      : `L${context.line}-L${context.endLine ?? context.line}`
+  chip.title = `${context.path}:${rangeLabel}\n${context.comment}`
   const line = document.createElement("span")
-  line.className = "font-mono text-3xs uppercase tracking-wide opacity-70"
-  line.textContent = `L${context.line}`
+  line.className = "font-mono text-3xs uppercase tracking-wide opacity-80"
+  line.textContent = rangeLabel
   chip.append(
     buildIconifyIcon(getIconName(basename)),
     document.createTextNode(basename),

@@ -309,13 +309,19 @@ export function estimateMessageSize(message: Message): number {
     return message.status === "running" ? 84 : 120
   }
 
+  if (
+    message.role === "error" ||
+    message.role === "abort" ||
+    message.role === "compaction"
+  ) {
+    return 68
+  }
+
   if (message.role === "user") {
     return message.content.length > 220 ? 96 : 68
   }
 
-  const contentLength =
-    (message as AssistantMessage).content.length +
-    (message as AssistantMessage).thinking.length
+  const contentLength = message.content.length + message.thinking.length
   if (contentLength > 1_200) return 320
   if (contentLength > 400) return 220
   if (contentLength > 120) return 144

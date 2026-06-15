@@ -141,6 +141,12 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
 
 function FileContextChip({ context }: { context: FileCommentContext }) {
   const basename = context.path.split("/").pop() ?? context.path
+  const rangeLabel =
+    context.startColumn && context.endColumn
+      ? `L${context.line}:C${context.startColumn}-L${context.endLine ?? context.line}:C${context.endColumn}`
+      : `L${context.line}-L${context.endLine ?? context.line}`
+  const hideCommentRow =
+    !!context.code && context.code.trim() === context.comment.trim()
   return (
     <MessageChip
       icon={
@@ -151,7 +157,7 @@ function FileContextChip({ context }: { context: FileCommentContext }) {
         />
       }
       label={basename}
-      meta={`L${context.line}`}
+      meta={rangeLabel}
       detailClassName="w-80 flex-col items-start gap-0 overflow-hidden p-0"
       detail={
         <>
@@ -166,18 +172,20 @@ function FileContextChip({ context }: { context: FileCommentContext }) {
                 {context.path}
               </p>
               <p className="text-3xs text-muted-foreground">
-                Line {context.line} context
+                Selection {rangeLabel}
               </p>
             </div>
           </div>
           {context.code && (
-            <pre className="max-h-20 w-full overflow-auto border-b border-foreground/10 bg-muted/40 px-3 py-2 font-mono text-3xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
+            <pre className="max-h-20 w-full overflow-auto bg-muted/40 px-3 py-2 font-mono text-3xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
               {context.code}
             </pre>
           )}
-          <p className="px-3 py-2.5 text-2xs leading-relaxed text-foreground/80">
-            {context.comment}
-          </p>
+          {!hideCommentRow && (
+            <p className="border-t border-foreground/10 px-3 py-2.5 text-2xs leading-relaxed text-foreground/80">
+              {context.comment}
+            </p>
+          )}
         </>
       }
     />
