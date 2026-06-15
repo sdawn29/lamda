@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef, memo } from "react"
-import { Loader2 } from "lucide-react"
+import { Check, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { FileHeader } from "@/features/git/components/file-header"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
@@ -282,6 +282,65 @@ export const FileContentView = memo(function FileContentView({
           >
             {children}
           </button>
+        )
+      },
+      // GFM task lists (`- [ ]` / `- [x]`). remark-gfm tags the wrapping list
+      // with `contains-task-list` and each item with `task-list-item`, emitting
+      // a disabled native checkbox. We strip the bullet/indent and swap the raw
+      // checkbox for a styled box so the todo list reads as a real checklist.
+      ul: ({
+        className,
+        children,
+        node: _node,
+        ...props
+      }: React.ComponentProps<"ul"> & { node?: unknown }) => {
+        const isTaskList = (className ?? "").includes("contains-task-list")
+        return (
+          <ul
+            className={cn(className, isTaskList && "list-none pl-0")}
+            {...props}
+          >
+            {children}
+          </ul>
+        )
+      },
+      li: ({
+        className,
+        children,
+        node: _node,
+        ...props
+      }: React.ComponentProps<"li"> & { node?: unknown }) => {
+        const isTask = (className ?? "").includes("task-list-item")
+        if (isTask) {
+          return (
+            <li className="my-1 flex items-start gap-2 pl-0 [&::marker]:content-['']">
+              {children}
+            </li>
+          )
+        }
+        return (
+          <li className={className} {...props}>
+            {children}
+          </li>
+        )
+      },
+      input: ({
+        type,
+        checked,
+      }: React.ComponentProps<"input"> & { node?: unknown }) => {
+        if (type !== "checkbox") return null
+        return (
+          <span
+            aria-hidden
+            className={cn(
+              "mt-[0.2em] inline-flex size-[1.05em] shrink-0 items-center justify-center rounded-[0.3em] border transition-colors",
+              checked
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-muted-foreground/40"
+            )}
+          >
+            {checked && <Check className="size-[0.8em] stroke-[3]" />}
+          </span>
         )
       },
       img: ({ src, alt }: { src?: string; alt?: string }) => {
