@@ -16,12 +16,12 @@ if (!rawElectronVersion) {
 const electronVersion = String(rawElectronVersion).replace(/^[^\d]*/, "");
 const bundleOnly = process.argv.includes("--bundle-only");
 
-function run(command, args, cwd = monorepoRoot) {
+function run(command, args, cwd = monorepoRoot, env = process.env) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
       stdio: "inherit",
-      env: process.env,
+      env,
     });
 
     child.on("error", reject);
@@ -34,6 +34,21 @@ function run(command, args, cwd = monorepoRoot) {
       reject(new Error(`${command} ${args.join(" ")} failed with ${reason}`));
     });
   });
+}
+
+function withoutCertificateFileEnv(env) {
+  const nextEnv = { ...env };
+  for (const key of [
+    "CSC_LINK",
+    "CSC_KEY_PASSWORD",
+    "CSC_NAME",
+    "CSC_IDENTITY_AUTO_DISCOVERY",
+    "WIN_CSC_LINK",
+    "WIN_CSC_KEY_PASSWORD",
+  ]) {
+    delete nextEnv[key];
+  }
+  return nextEnv;
 }
 
 await run("npm", ["run", "build", "-w", "web"]);
@@ -128,9 +143,11 @@ await Promise.all([
 
 if (!bundleOnly) {
   const publishFlag = process.env.PUBLISH === "1" ? "always" : "never";
+  const electronBuilderEnv = withoutCertificateFileEnv(process.env);
   await run(
     path.join(monorepoRoot, "node_modules", ".bin", "electron-builder"),
     ["--mac", "dmg", "zip", "--arm64", "--publish", publishFlag],
     __dirname,
+    electronBuilderEnv,
   );
 }
