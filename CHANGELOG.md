@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.25.1](../../releases/tag/v0.25.1) — 2026-06-16
+
+### Other Changes
+
+* Refactor code structure for improved readability and maintainability
+
 ## [0.25.0](../../releases/tag/v0.25.0) — 2026-06-16
 
 ### Features
