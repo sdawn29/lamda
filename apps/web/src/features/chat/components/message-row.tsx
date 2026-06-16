@@ -28,11 +28,8 @@ import {
 
 const remarkPlugins: PluggableList = [remarkGfm]
 
-const proseClass =
-  "prose prose-sm max-w-none dark:prose-invert font-chat prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.4] prose-headings:my-0 prose-p:leading-[1.8] prose-p:mt-0 prose-p:mb-[0.75em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.8] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
-
 import { ToolCallBlock } from "./tool-call-block"
-import { getMarkdownComponents } from "./markdown-components"
+import { chatProseClass, getMarkdownComponents } from "./markdown-components"
 import { UserMessageContent } from "./user-message"
 import { CopyButton } from "@/shared/components/copy-button"
 import { Button } from "@/shared/ui/button"
@@ -231,7 +228,7 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
       }
     >
       {hasContent && (
-        <div className={proseClass}>
+        <div className={chatProseClass}>
           <Markdown
             remarkPlugins={remarkPlugins}
             components={getMarkdownComponents(rootPath)}
@@ -297,7 +294,8 @@ export function getMessageKey(message: Message, index: number): string {
   // Prefer DB id when present — stable across prepends & remounts and unique
   // even when two messages share the same millisecond-precision createdAt.
   if (message.role === "user" && message.id) return `user-${message.id}`
-  if (message.role === "assistant" && message.id) return `assistant-${message.id}`
+  if (message.role === "assistant" && message.id)
+    return `assistant-${message.id}`
   // Streaming messages have no id yet — fall back to createdAt + role, then index.
   // index covers the in-flight optimistic/streaming message that has neither.
   if (message.createdAt != null) return `${message.role}-t${message.createdAt}`

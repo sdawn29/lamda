@@ -47,27 +47,6 @@ function FileChip({ filePath }: { filePath: string }) {
   )
 }
 
-function FolderChip({ folderPath }: { folderPath: string }) {
-  const normalized = folderPath.replace(/\/+$/, "")
-  const basename = normalized.split("/").pop() || normalized
-  return (
-    <MessageChip
-      icon={
-        <Icon icon="catppuccin:folder" data-icon="inline-start" aria-hidden />
-      }
-      label={basename}
-      detail={
-        <div className="flex flex-col gap-1">
-          <SectionLabel>
-            Folder
-          </SectionLabel>
-          <span className="font-mono text-xs break-all">{normalized}</span>
-        </div>
-      }
-    />
-  )
-}
-
 function SlashCommandChip({ command }: { command: SlashCommand }) {
   const isSkill = command.source === "skill"
   // Skill commands carry a `skill:` prefix in their name — drop it for display
@@ -286,11 +265,12 @@ export function UserMessageContent({
 
       if (token.startsWith("@")) {
         const path = token.slice(1)
+        // Only files get a chip; folder mentions render as plain text.
         parts.push(
           isFileMention(path) ? (
             <FileChip key={`token-${key++}`} filePath={path} />
           ) : (
-            <FolderChip key={`token-${key++}`} folderPath={path} />
+            token
           )
         )
         tokenLastIndex = start + token.length

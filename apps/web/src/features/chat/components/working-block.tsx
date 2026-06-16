@@ -1,6 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react"
 import {
-  ChevronRightIcon,
   FilePenLineIcon,
   GlobeIcon,
   SearchIcon,
@@ -11,6 +10,14 @@ import { cn } from "@/shared/lib/utils"
 import { formatDuration } from "@/shared/lib/formatters"
 import { ThinkingBlock } from "./thinking-block"
 import { ToolCallBlock, argsSummary, isSkillRead } from "./tool-call-block"
+import {
+  CollapsibleBody,
+  DISCLOSURE_DIM,
+  DISCLOSURE_LABEL_DONE,
+  DISCLOSURE_ROW_CLASS,
+  DisclosureChevron,
+  NESTED_BODY_CLASS,
+} from "./disclosure"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
 import type { AssistantMessage, ToolMessage } from "../types"
 
@@ -50,7 +57,11 @@ const TOOL_GROUP_META: Record<
   ToolGroupId,
   { activeLabel: string; doneLabel: string; icon: LucideIcon }
 > = {
-  exploring: { activeLabel: "Exploring", doneLabel: "Explored", icon: SearchIcon },
+  exploring: {
+    activeLabel: "Exploring",
+    doneLabel: "Explored",
+    icon: SearchIcon,
+  },
   terminal: {
     activeLabel: "Running commands",
     doneLabel: "Ran commands",
@@ -61,7 +72,11 @@ const TOOL_GROUP_META: Record<
     doneLabel: "Searched the web",
     icon: GlobeIcon,
   },
-  editing: { activeLabel: "Editing", doneLabel: "Edited", icon: FilePenLineIcon },
+  editing: {
+    activeLabel: "Editing",
+    doneLabel: "Edited",
+    icon: FilePenLineIcon,
+  },
 }
 
 function toolGroupId(t: ToolMessage): ToolGroupId | null {
@@ -181,7 +196,7 @@ function ToolRunGroup({
     <div className="w-full text-xs">
       <button
         type="button"
-        className="group/row -mx-1.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-muted/40"
+        className={DISCLOSURE_ROW_CLASS}
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
@@ -192,7 +207,7 @@ function ToolRunGroup({
               ? "animate-pulse text-foreground/50"
               : errored
                 ? "text-destructive/60"
-                : "text-muted-foreground/40"
+                : DISCLOSURE_DIM
           )}
         />
         <span
@@ -202,7 +217,7 @@ function ToolRunGroup({
               ? SHIMMER_TEXT_CLASS
               : errored
                 ? "text-destructive/70"
-                : "text-muted-foreground/55"
+                : DISCLOSURE_LABEL_DONE
           )}
         >
           {isLive ? meta.activeLabel : meta.doneLabel}
@@ -210,7 +225,8 @@ function ToolRunGroup({
         {description && (
           <span
             className={cn(
-              "min-w-0 flex-1 truncate text-muted-foreground/40",
+              "min-w-0 flex-1 truncate",
+              DISCLOSURE_DIM,
               groupId === "terminal" ? "font-mono text-2xs" : "text-xs"
             )}
           >
@@ -218,40 +234,26 @@ function ToolRunGroup({
           </span>
         )}
         {!isLive && errorCount > 0 && (
-          <span className="shrink-0 text-2xs tabular-nums text-destructive/50">
+          <span className="shrink-0 text-2xs text-destructive/50 tabular-nums">
             {errorCount} err
           </span>
         )}
-        <ChevronRightIcon
-          className={cn(
-            "h-3 w-3 shrink-0 text-muted-foreground/30 transition-all duration-200",
-            expanded
-              ? "rotate-90 opacity-100"
-              : "opacity-0 group-hover/row:opacity-100"
-          )}
-        />
+        <DisclosureChevron expanded={expanded} revealOnHover />
       </button>
 
-      <div
-        className={cn(
-          "grid transition-all duration-300 ease-in-out",
-          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        )}
-      >
-        <div className="overflow-hidden">
-          <div className="mt-1 ml-[5px] flex flex-col gap-1 border-l border-border/40 pl-3">
-            {tools.map((t) => (
-              <ToolCallBlock
-                key={t.toolCallId}
-                msg={t}
-                isNew={false}
-                rootPath={rootPath}
-                suppressPlanSavedCard
-              />
-            ))}
-          </div>
+      <CollapsibleBody open={expanded}>
+        <div className={NESTED_BODY_CLASS}>
+          {tools.map((t) => (
+            <ToolCallBlock
+              key={t.toolCallId}
+              msg={t}
+              isNew={false}
+              rootPath={rootPath}
+              suppressPlanSavedCard
+            />
+          ))}
         </div>
-      </div>
+      </CollapsibleBody>
     </div>
   )
 }
@@ -278,7 +280,11 @@ function buildWorkingEntries(
     if (m.role === "assistant") {
       const a = m as AssistantMessage
       if (showThinking && a.thinking.trim()) {
-        out.push({ kind: "thinking", key: `thinking-${out.length}`, thinking: a.thinking })
+        out.push({
+          kind: "thinking",
+          key: `thinking-${out.length}`,
+          thinking: a.thinking,
+        })
       }
       continue
     }
@@ -459,19 +465,18 @@ export const WorkingBlock = memo(function WorkingBlock({
   )
   const hasThinkingContent = messages.some(
     (m) =>
-      m.role === "assistant" && (m as AssistantMessage).thinking.trim().length > 0
+      m.role === "assistant" &&
+      (m as AssistantMessage).thinking.trim().length > 0
   )
   const hasFinalThinking = showThinking && !!finalThinking?.trim()
-  const hasVisibleContent = hasTools || (showThinking && hasThinkingContent) || hasFinalThinking
+  const hasVisibleContent =
+    hasTools || (showThinking && hasThinkingContent) || hasFinalThinking
 
   if (!hasVisibleContent) return null
 
   return (
     <div
-      className={cn(
-        "w-full text-xs",
-        isNew && "animate-chat-message-in"
-      )}
+      className={cn("w-full text-xs", isNew && "animate-chat-message-in")}
       style={
         isNew && entryDelayMs > 0
           ? { animationDelay: `${entryDelayMs}ms` }
@@ -481,7 +486,7 @@ export const WorkingBlock = memo(function WorkingBlock({
       {/* Trigger row — looks like inline text, no card chrome */}
       <button
         type="button"
-        className="group/row -mx-1.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-muted/40"
+        className={DISCLOSURE_ROW_CLASS}
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
@@ -493,15 +498,19 @@ export const WorkingBlock = memo(function WorkingBlock({
         )}
         <span
           className={cn(
-            "shrink-0 text-xs font-medium",
-            isActive ? "text-foreground/65" : "text-muted-foreground/60"
+            "shrink-0 text-xs font-medium transition-colors",
+            isActive
+              ? "text-foreground/65"
+              : "text-muted-foreground/60 group-hover/row:text-foreground/80"
           )}
         >
           {isActive ? (
             pendingQuestion ? (
               "Waiting for your answer"
             ) : (
-              <>Working for <RollingTimerText text={formatDuration(elapsed)} /></>
+              <>
+                Working for <RollingTimerText text={formatDuration(elapsed)} />
+              </>
             )
           ) : displayDuration > 0 ? (
             `Worked for ${formatDuration(displayDuration)}`
@@ -511,69 +520,59 @@ export const WorkingBlock = memo(function WorkingBlock({
         </span>
 
         {!isActive && toolCount > 0 && (
-          <span className="shrink-0 text-2xs tabular-nums text-muted-foreground/40">
+          <span
+            className={cn("shrink-0 text-2xs tabular-nums", DISCLOSURE_DIM)}
+          >
             · {toolCount} {toolCount === 1 ? "tool" : "tools"}
           </span>
         )}
 
-        <ChevronRightIcon
-          className={cn(
-            "h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform duration-200",
-            expanded && "rotate-90"
-          )}
-        />
+        <DisclosureChevron expanded={expanded} />
       </button>
 
       {/* Collapsible content */}
-      <div
-        className={cn(
-          "grid transition-all duration-300 ease-in-out",
-          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        )}
-      >
-        <div className="overflow-hidden">
-          <div className="mt-1.5 ml-[5px] flex flex-col gap-1 border-l border-border/40 pl-3.5">
-            {entries.map((entry, idx) => {
-              if (entry.kind === "thinking") {
-                return (
-                  <ThinkingBlock
-                    key={entry.key}
-                    thinking={entry.thinking}
-                    isNew={isNew}
-                  />
-                )
-              }
-              if (entry.kind === "run") {
-                return (
-                  <ToolRunGroup
-                    key={entry.key}
-                    tools={entry.tools}
-                    rootPath={rootPath}
-                    live={
-                      isActive &&
-                      !pendingQuestion &&
-                      !hasFinalThinking &&
-                      idx === entries.length - 1
-                    }
-                  />
-                )
-              }
+      <CollapsibleBody open={expanded}>
+        <div className={NESTED_BODY_CLASS}>
+          {entries.map((entry, idx) => {
+            if (entry.kind === "thinking") {
               return (
-                <ToolCallBlock
+                <ThinkingBlock
                   key={entry.key}
-                  msg={entry.msg}
-                  isNew={false}
-                  rootPath={rootPath}
-                  suppressPlanSavedCard
+                  thinking={entry.thinking}
+                  isNew={isNew}
                 />
               )
-            })}
-            {hasFinalThinking && finalThinking && (
-              <ThinkingBlock thinking={finalThinking} isNew={isNew} />
-            )}
-          </div>
+            }
+            if (entry.kind === "run") {
+              return (
+                <ToolRunGroup
+                  key={entry.key}
+                  tools={entry.tools}
+                  rootPath={rootPath}
+                  live={
+                    isActive &&
+                    !pendingQuestion &&
+                    !hasFinalThinking &&
+                    idx === entries.length - 1
+                  }
+                />
+              )
+            }
+            return (
+              <ToolCallBlock
+                key={entry.key}
+                msg={entry.msg}
+                isNew={false}
+                rootPath={rootPath}
+                suppressPlanSavedCard
+              />
+            )
+          })}
+          {hasFinalThinking && finalThinking && (
+            <ThinkingBlock thinking={finalThinking} isNew={isNew} />
+          )}
         </div>
-      </div>
+      </CollapsibleBody>
     </div>
   )
 })

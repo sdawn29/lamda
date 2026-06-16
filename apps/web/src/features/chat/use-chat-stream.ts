@@ -129,6 +129,13 @@ export function useChatStream({
   // (isRunning, isCompacting, pendingError) without side-effect re-fires.
   const { data: sessionStatus } = useSessionStatus(sessionId)
 
+  // Guards the one-time cache resync below to the *first* status snapshot after
+  // this hook mounts. Deliberately NOT reset on session change (warm thread
+  // switches keep the same instance) so rapid switching still serves messages
+  // instantly from cache — only a genuine remount (e.g. returning from the
+  // settings route, which unmounts the whole chat view) triggers a resync.
+  const didMountResyncRef = useRef(false)
+
   // Consume the one-shot optimistic hint for this session and bound it with a
   // safety timeout, so a prompt that never reaches the agent (e.g. send failure)
   // can't leave the working indicator stuck on screen forever. The stream
@@ -150,6 +157,23 @@ export function useChatStream({
       const { title, message, retryable, retryCount } = sessionStatus.pendingError
       setPendingError(createErrorMessage(title, message, { retryable, retryCount, action: { type: "dismiss" } }))
       setThreadStatus(threadId, "error")
+    }
+
+    // On the first status snapshot after a (re)mount, resync the messages cache
+    // if the session is idle. Returning from a route that unmounts the chat view
+    // (e.g. settings) tears down the per-session WebSocket, so any turn that
+    // completed in the meantime never reached the cache — and the query's
+    // staleTime can suppress the mount refetch, leaving a stale transcript.
+    // Gated on `isRunning === false`: a running session is served live by the
+    // reconnected stream, and refetching would race the server's DB write.
+    // Skipped on warm thread switches (ref stays set) to preserve instant,
+    // cache-served switching.
+    if (!didMountResyncRef.current) {
+      didMountResyncRef.current = true
+      if (!sessionStatus.isRunning) {
+        void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+      }
+      return
     }
 
     // If the agent finished while we were viewing another thread, the per-session

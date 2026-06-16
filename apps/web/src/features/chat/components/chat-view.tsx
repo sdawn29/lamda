@@ -891,7 +891,7 @@ export function ChatView({
                   !initialSnapshot.keys.has(firstKey)
                 const entryDelayMs = isNewGroup ? getEntryDelayMs(firstKey) : 0
                 content = (
-                  <div className="mx-auto w-full max-w-3xl px-3 pt-4 pb-8">
+                  <div className="mx-auto w-full max-w-3xl px-3 pb-3">
                     <WorkingBlock
                       messages={group.messages}
                       isActive={isGroupActive}

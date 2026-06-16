@@ -3,7 +3,6 @@ import {
   AlertCircleIcon,
   ArrowRightIcon,
   CheckIcon,
-  ChevronRightIcon,
   CircleDotIcon,
   CopyIcon,
   FilePenLineIcon,
@@ -20,6 +19,13 @@ import {
 import { FileIcon } from "@/shared/ui/file-icon"
 
 import { cn } from "@/shared/lib/utils"
+import {
+  CollapsibleBody,
+  DISCLOSURE_DIM,
+  DISCLOSURE_LABEL_DONE,
+  DISCLOSURE_ROW_CLASS,
+  DisclosureChevron,
+} from "./disclosure"
 import { LivePre } from "./live-pre"
 import { DiffView, detectLanguage, parseDiffCounts } from "@/features/git"
 import { useSyntaxTheme } from "@/features/themes"
@@ -32,8 +38,6 @@ import type { ToolMessage } from "../types"
 const PrismCode = lazy(() => import("./prism-code"))
 
 const PLAN_DIR_PREFIX = ".lamda/plans/"
-
-
 
 // ── Edit tool detection ────────────────────────────────────────────────────────
 
@@ -63,9 +67,15 @@ function getEditDiff(result: unknown): string | null {
  * operation when this is a `plan` call, so read/write rendering can treat a plan
  * read like a read and a plan write like a write. Null for any other tool.
  */
-function getPlanOperation(toolName: string, args: unknown): "list" | "read" | "write" | null {
+function getPlanOperation(
+  toolName: string,
+  args: unknown
+): "list" | "read" | "write" | null {
   if (toolName.toLowerCase() !== "plan") return null
-  const op = args && typeof args === "object" ? (args as Record<string, unknown>).operation : null
+  const op =
+    args && typeof args === "object"
+      ? (args as Record<string, unknown>).operation
+      : null
   return op === "list" || op === "read" || op === "write" ? op : null
 }
 
@@ -89,10 +99,14 @@ function isWriteArgs(args: unknown): args is WriteArgs {
  */
 function planWriteMeta(
   rawPath: string,
-  rootPath: string | undefined,
+  rootPath: string | undefined
 ): { relativePath: string; absolutePath: string } | null {
   if (!rawPath.toLowerCase().endsWith(".md")) return null
-  const root = rootPath ? (rootPath.endsWith("/") ? rootPath : rootPath + "/") : null
+  const root = rootPath
+    ? rootPath.endsWith("/")
+      ? rootPath
+      : rootPath + "/"
+    : null
   let rel = rawPath
   let abs = rawPath
   if (rawPath.startsWith("/")) {
@@ -175,7 +189,8 @@ export function argsSummary(args: unknown, rootPath?: string): string {
   const a = args as Record<string, unknown>
   if (typeof a.command === "string") return a.command
   if (typeof a.path === "string") return toRelativePath(a.path, rootPath)
-  if (typeof a.file_path === "string") return toRelativePath(a.file_path, rootPath)
+  if (typeof a.file_path === "string")
+    return toRelativePath(a.file_path, rootPath)
   if (typeof a.pattern === "string") return a.pattern
   const first = Object.values(a)[0]
   return typeof first === "string" ? first : ""
@@ -190,7 +205,9 @@ function getQuestionPrompts(args: unknown): string[] {
   if (!Array.isArray(list)) return []
   return list
     .map((q) =>
-      q && typeof q === "object" && typeof (q as Record<string, unknown>).question === "string"
+      q &&
+      typeof q === "object" &&
+      typeof (q as Record<string, unknown>).question === "string"
         ? ((q as Record<string, unknown>).question as string).trim()
         : ""
     )
@@ -198,7 +215,8 @@ function getQuestionPrompts(args: unknown): string[] {
 }
 
 /** Returned to the agent when the turn is aborted before the user answers. */
-const QUESTION_DISMISSED = "[The user dismissed the question without answering.]"
+const QUESTION_DISMISSED =
+  "[The user dismissed the question without answering.]"
 
 /**
  * Recover each question's chosen answer from the tool result. The result is the
@@ -314,7 +332,7 @@ function parseTodoGoals(msg: ToolMessage): TodoGoalLite[] | null {
 /** Find a task by id across every goal in the snapshot. */
 function findTodoTask(
   goals: TodoGoalLite[] | null,
-  id: string,
+  id: string
 ): TodoTaskLite | null {
   if (!goals || !id) return null
   for (const g of goals) {
@@ -344,10 +362,16 @@ function describeTodo(msg: ToolMessage): { label: string; tone: TodoTone } {
     const goal = typeof a.goal === "string" ? a.goal.trim() : null
     const n = Array.isArray(a.items) ? a.items.length : 0
     if (running) {
-      return { label: goal ? `Creating "${goal}"…` : "Creating tasks…", tone: "active" }
+      return {
+        label: goal ? `Creating "${goal}"…` : "Creating tasks…",
+        tone: "active",
+      }
     }
     const count = `${n} task${n === 1 ? "" : "s"}`
-    return { label: goal ? `Created "${goal}" · ${count}` : "Tasks created", tone: "done" }
+    return {
+      label: goal ? `Created "${goal}" · ${count}` : "Tasks created",
+      tone: "done",
+    }
   }
 
   if (op === "update") {
@@ -359,11 +383,21 @@ function describeTodo(msg: ToolMessage): { label: string; tone: TodoTone } {
 
     if (status === "completed") {
       if (content) return { label: `Completed "${content}"`, tone: "done" }
-      return { label: running ? "Completing task…" : "Task completed", tone: "done" }
+      return {
+        label: running ? "Completing task…" : "Task completed",
+        tone: "done",
+      }
     }
     if (status === "in_progress") {
-      if (content) return { label: `Working on "${content}"`, tone: running ? "active" : "done" }
-      return { label: running ? "Starting task…" : "Task in progress", tone: "active" }
+      if (content)
+        return {
+          label: `Working on "${content}"`,
+          tone: running ? "active" : "done",
+        }
+      return {
+        label: running ? "Starting task…" : "Task in progress",
+        tone: "active",
+      }
     }
     if (content) return { label: `Updated: ${content}`, tone: "done" }
     return { label: running ? "Updating task…" : "Task updated", tone: "done" }
@@ -443,7 +477,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       getPlanOperation(msg.toolName, msg.args) === "write") &&
     isWriteArgs(msg.args)
   const writeArgs = isWrite ? (msg.args as WriteArgs) : null
-  const filePath = (isEdit || isWrite) ? getReadFilePath(msg.args) : null
+  const filePath = isEdit || isWrite ? getReadFilePath(msg.args) : null
   // Reads get the same file-icon + basename row treatment as edits/writes
   const displayFilePath = filePath ?? (skillName ? null : readFilePath)
 
@@ -480,7 +514,10 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             ? prompts[0]
             : `Asked you ${prompts.length} questions`
       return (
-        <div {...containerProps} className={cn("flex items-center gap-1.5", containerProps.className)}>
+        <div
+          {...containerProps}
+          className={cn("flex items-center gap-1.5", containerProps.className)}
+        >
           <MessageCircleQuestionIcon className="h-3 w-3 shrink-0 text-primary/70" />
           <span className="min-w-0 truncate text-foreground/70">{summary}</span>
         </div>
@@ -501,13 +538,17 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       <div {...containerProps}>
         <div className="flex items-center gap-1.5">
           <MessageCircleQuestionIcon className="h-3 w-3 shrink-0 text-muted-foreground/40" />
-          <span className="font-medium text-muted-foreground/45">{headerLabel}</span>
+          <span className="font-medium text-muted-foreground/45">
+            {headerLabel}
+          </span>
         </div>
         {!dismissed && prompts.length > 0 && (
           <div className="mt-1.5 ml-[1.125rem] flex flex-col gap-1.5">
             {prompts.map((prompt, i) => (
               <div key={i} className="flex flex-col gap-0.5">
-                <span className="text-xs text-muted-foreground/70">{prompt}</span>
+                <span className="text-xs text-muted-foreground/70">
+                  {prompt}
+                </span>
                 <span className="flex items-start gap-1 text-xs font-medium text-foreground/80">
                   <ArrowRightIcon
                     className="mt-0.5 h-3 w-3 shrink-0 text-primary/70"
@@ -540,15 +581,25 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       todoArgs.status === "completed"
     return (
       <div
-        className={cn("flex items-center gap-1.5 text-xs", isNew && "animate-chat-message-in")}
-        style={isNew && entryDelayMs > 0 ? { animationDelay: `${entryDelayMs}ms` } : undefined}
+        className={cn(
+          "flex items-center gap-1.5 text-xs",
+          isNew && "animate-chat-message-in"
+        )}
+        style={
+          isNew && entryDelayMs > 0
+            ? { animationDelay: `${entryDelayMs}ms` }
+            : undefined
+        }
       >
         {msg.status === "error" ? (
           <AlertCircleIcon className="h-3 w-3 shrink-0 text-destructive/60" />
         ) : msg.status === "running" ? (
           <CircleDotIcon className="h-3 w-3 shrink-0 animate-pulse text-blue-500/60" />
         ) : isCompleted ? (
-          <CheckIcon className="h-3 w-3 shrink-0 text-muted-foreground/45" strokeWidth={2.5} />
+          <CheckIcon
+            className="h-3 w-3 shrink-0 text-muted-foreground/45"
+            strokeWidth={2.5}
+          />
         ) : (
           <ListTodoIcon className="h-3 w-3 shrink-0 text-muted-foreground/30" />
         )}
@@ -559,7 +610,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground/70 to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
               : todo.tone === "error"
                 ? "text-destructive/60"
-                : "text-muted-foreground/45",
+                : "text-muted-foreground/45"
           )}
         >
           {todo.label}
@@ -570,7 +621,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
   // Plan-mode writes get a custom card with Review + Implement CTAs.
   // Must come after the hooks above to keep call order stable.
-  const planMeta = isWrite && writeArgs ? planWriteMeta(writeArgs.path, rootPath) : null
+  const planMeta =
+    isWrite && writeArgs ? planWriteMeta(writeArgs.path, rootPath) : null
   if (!suppressPlanSavedCard && planMeta && writeArgs) {
     return (
       <PlanSavedCard
@@ -630,12 +682,19 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const hasBody =
     showEditContent || showReadContent || showWriteContent || showOtherContent
 
+  // Bash reads as an action, not a tool name: "Running" while the command is in
+  // flight, "Ran" once it has finished (or errored — it still ran).
+  const toolLabel =
+    skillName ??
+    (normalizedToolName === "bash"
+      ? msg.status === "running"
+        ? "Running"
+        : "Ran"
+      : msg.toolName)
+
   return (
     <div
-      className={cn(
-        "w-full text-xs",
-        isNew && "animate-chat-message-in"
-      )}
+      className={cn("w-full text-xs", isNew && "animate-chat-message-in")}
       style={
         isNew && entryDelayMs > 0
           ? { animationDelay: `${entryDelayMs}ms` }
@@ -645,7 +704,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       {/* Trigger row — text accordion style */}
       <button
         type="button"
-        className="group/row -mx-1.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-muted/40"
+        className={DISCLOSURE_ROW_CLASS}
         onClick={toggle}
         aria-expanded={hasBody ? expanded : undefined}
       >
@@ -663,34 +722,45 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                 ? "animate-pulse text-foreground/50"
                 : msg.status === "error"
                   ? "text-destructive/60"
-                  : "text-muted-foreground/40"
+                  : DISCLOSURE_DIM
             )}
           />
         )}
 
-        <span className={cn(
-          "text-xs font-medium",
-          skillName ? "min-w-0 truncate" : "shrink-0",
-          msg.status === "running"
-            ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
-            : msg.status === "error"
-              ? "text-destructive/70"
-              : skillName
-                ? "text-foreground/70"
-                : "text-muted-foreground/55"
-        )}>
-          {skillName ?? msg.toolName}
+        <span
+          className={cn(
+            "text-xs font-medium",
+            skillName ? "min-w-0 truncate" : "shrink-0",
+            msg.status === "running"
+              ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
+              : msg.status === "error"
+                ? "text-destructive/70"
+                : skillName
+                  ? "text-foreground/70"
+                  : DISCLOSURE_LABEL_DONE
+          )}
+        >
+          {toolLabel}
         </span>
 
         {skillName ? null : displayFilePath ? (
-          <span className="flex min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground/40">
-            <FileIcon filename={displayFilePath} className="h-3 w-3 shrink-0 opacity-60" />
+          <span
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-1 text-xs",
+              DISCLOSURE_DIM
+            )}
+          >
+            <FileIcon
+              filename={displayFilePath}
+              className="h-3 w-3 shrink-0 opacity-60"
+            />
             <span className="truncate">{fileBasename(displayFilePath)}</span>
           </span>
         ) : summary ? (
           <span
             className={cn(
-              "min-w-0 flex-1 truncate text-muted-foreground/40",
+              "min-w-0 flex-1 truncate",
+              DISCLOSURE_DIM,
               normalizedToolName === "bash" ? "font-mono text-2xs" : "text-xs"
             )}
           >
@@ -699,7 +769,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         ) : null}
 
         {readLineRange && (
-          <span className="shrink-0 font-mono text-2xs tabular-nums text-muted-foreground/40">
+          <span className="shrink-0 font-mono text-2xs text-muted-foreground/40 tabular-nums">
             {readLineRange}
           </span>
         )}
@@ -727,137 +797,123 @@ export const ToolCallBlock = memo(function ToolCallBlock({
           </span>
         )}
 
-        {hasBody && (
-          <ChevronRightIcon
-            className={cn(
-              "h-3 w-3 shrink-0 text-muted-foreground/30 transition-all duration-200",
-              expanded
-                ? "rotate-90 opacity-100"
-                : "opacity-0 group-hover/row:opacity-100"
-            )}
-          />
-        )}
+        {hasBody && <DisclosureChevron expanded={expanded} revealOnHover />}
       </button>
 
       {/* Collapsible content */}
-      <div
-        className={cn(
-          "grid transition-all duration-300 ease-in-out",
-          expanded && hasBody ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        )}
-      >
-        <div className="overflow-hidden">
-          <div className="group/copy relative mt-1.5 overflow-hidden rounded-lg border border-border/50 bg-muted/20 shadow-xs">
-            <button
-              type="button"
-              onClick={handleCopy}
-              className={cn(
-                "absolute top-1.5 right-1.5 z-10 shrink-0 rounded-md border border-border/50 bg-background/80 p-1 text-muted-foreground/50 opacity-0 shadow-xs backdrop-blur-sm transition-all group-hover/copy:opacity-100 hover:text-foreground",
-                copied && "border-emerald-500/40 text-emerald-500 opacity-100"
-              )}
-              aria-label="Copy result"
-            >
-              {copied ? (
-                <CheckIcon className="h-3 w-3" />
-              ) : (
-                <CopyIcon className="h-3 w-3" />
-              )}
-            </button>
+      <CollapsibleBody open={expanded && hasBody}>
+        <div className="group/copy relative mt-1.5 overflow-hidden rounded-lg border border-border/50 bg-muted/20 shadow-xs">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className={cn(
+              "absolute top-1.5 right-1.5 z-10 shrink-0 rounded-md border border-border/50 bg-background/80 p-1 text-muted-foreground/50 opacity-0 shadow-xs backdrop-blur-sm transition-all group-hover/copy:opacity-100 hover:text-foreground",
+              copied && "border-emerald-500/40 text-emerald-500 opacity-100"
+            )}
+            aria-label="Copy result"
+          >
+            {copied ? (
+              <CheckIcon className="h-3 w-3" />
+            ) : (
+              <CopyIcon className="h-3 w-3" />
+            )}
+          </button>
 
-            {/* Bash: trigger row truncates the command, so repeat it in full */}
-            {normalizedToolName === "bash" && summary && (
-              <div className="flex items-start justify-between gap-2 border-b border-border/40 bg-muted/30 px-3 py-2 pr-9">
-                <div className="flex min-w-0 flex-1 items-start gap-2">
-                  <span className="mt-px font-mono text-2xs font-bold text-primary/60 select-none">$</span>
-                  <span className="flex-1 font-mono text-2xs break-all whitespace-pre-wrap text-foreground/70">
-                    {summary}
-                  </span>
-                </div>
-                {msg.status === "done" && resultText && (
-                  <span className="shrink-0 self-center tabular-nums text-2xs text-muted-foreground/40">
-                    {resultText.split("\n").length} lines
-                  </span>
-                )}
+          {/* Bash: trigger row truncates the command, so repeat it in full */}
+          {normalizedToolName === "bash" && summary && (
+            <div className="flex items-start justify-between gap-2 border-b border-border/40 bg-muted/30 px-3 py-2 pr-9">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                <span className="mt-px font-mono text-2xs font-bold text-primary/60 select-none">
+                  $
+                </span>
+                <span className="flex-1 font-mono text-2xs break-all whitespace-pre-wrap text-foreground/70">
+                  {summary}
+                </span>
               </div>
+              {msg.status === "done" && resultText && (
+                <span className="shrink-0 self-center text-2xs text-muted-foreground/40 tabular-nums">
+                  {resultText.split("\n").length} lines
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="px-3 py-2">
+            {/* Write tool: show content from args immediately — available at tool_start */}
+            {isWrite && writeArgs && msg.status !== "error" && (
+              <WriteView
+                content={writeArgs.content}
+                filePath={writeArgs.path}
+                live={msg.status === "running"}
+              />
             )}
 
-            {/* Content */}
-            <div className="px-3 py-2">
-              {/* Write tool: show content from args immediately — available at tool_start */}
-              {isWrite && writeArgs && msg.status !== "error" && (
-                <WriteView
-                  content={writeArgs.content}
-                  filePath={writeArgs.path}
-                  live={msg.status === "running"}
-                />
-              )}
-
-              {/* Running placeholder — always for edit (no partial results), only
+            {/* Running placeholder — always for edit (no partial results), only
                   when there is no content yet for read/other tools */}
-              {msg.status === "running" &&
-                !isWrite &&
-                (isEdit || !resultText) && (
-                  <span className="animate-thinking-shimmer bg-linear-to-r from-muted-foreground/30 via-foreground/80 to-muted-foreground/30 bg-size-[200%_100%] bg-clip-text text-transparent">
-                    {isEdit ? "Editing…" : isRead ? "Reading…" : "Running…"}
-                  </span>
-                )}
-
-              {/* Running: partial result for read / other tools */}
-              {msg.status === "running" && !isWrite && resultText && (
-                <>
-                  {isRead && readFilePath && (
-                    <ReadView
-                      text={resultText}
-                      filePath={readFilePath}
-                      live={true}
-                    />
-                  )}
-                  {!isRead && <LivePre text={resultText} live={true} />}
-                </>
+            {msg.status === "running" &&
+              !isWrite &&
+              (isEdit || !resultText) && (
+                <span className="animate-thinking-shimmer bg-linear-to-r from-muted-foreground/30 via-foreground/80 to-muted-foreground/30 bg-size-[200%_100%] bg-clip-text text-transparent">
+                  {isEdit ? "Editing…" : isRead ? "Reading…" : "Running…"}
+                </span>
               )}
 
-              {/* Done state */}
-              {msg.status === "done" && (
-                <>
-                  {/* Only mount the (heavy) Monaco diff while expanded. The
+            {/* Running: partial result for read / other tools */}
+            {msg.status === "running" && !isWrite && resultText && (
+              <>
+                {isRead && readFilePath && (
+                  <ReadView
+                    text={resultText}
+                    filePath={readFilePath}
+                    live={true}
+                  />
+                )}
+                {!isRead && <LivePre text={resultText} live={true} />}
+              </>
+            )}
+
+            {/* Done state */}
+            {msg.status === "done" && (
+              <>
+                {/* Only mount the (heavy) Monaco diff while expanded. The
                       collapsible wrapper keeps children in the DOM, so without
                       this gate every collapsed edit would carry a live editor
                       whose automatic layout thrashes on window resize. */}
-                  {isEdit && diff !== null && expanded && (
-                    <DiffView
-                      diff={diff}
-                      filePath={(msg.args as { path?: string }).path}
-                      showHeader
-                    />
-                  )}
+                {isEdit && diff !== null && expanded && (
+                  <DiffView
+                    diff={diff}
+                    filePath={(msg.args as { path?: string }).path}
+                    showHeader
+                  />
+                )}
 
-                  {isRead && readFilePath && resultText && (
-                    <ReadView
-                      text={resultText}
-                      filePath={readFilePath}
-                      live={false}
-                    />
-                  )}
+                {isRead && readFilePath && resultText && (
+                  <ReadView
+                    text={resultText}
+                    filePath={readFilePath}
+                    live={false}
+                  />
+                )}
 
-                  {!isEdit && !isRead && !isWrite && resultText && (
-                    <LivePre text={resultText} live={false} />
-                  )}
-                </>
-              )}
+                {!isEdit && !isRead && !isWrite && resultText && (
+                  <LivePre text={resultText} live={false} />
+                )}
+              </>
+            )}
 
-              {/* Error state */}
-              {msg.status === "error" && (
-                <div className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2">
-                  <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/70" />
-                  <pre className="flex-1 overflow-auto text-xs break-all whitespace-pre-wrap text-destructive/80">
-                    {resultText ?? "Tool execution failed"}
-                  </pre>
-                </div>
-              )}
-            </div>
+            {/* Error state */}
+            {msg.status === "error" && (
+              <div className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2">
+                <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/70" />
+                <pre className="flex-1 overflow-auto text-xs break-all whitespace-pre-wrap text-destructive/80">
+                  {resultText ?? "Tool execution failed"}
+                </pre>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      </CollapsibleBody>
     </div>
   )
 })
