@@ -175,7 +175,15 @@ export function useChatScroll({
       const distanceFromBottom = el.scrollHeight - scrollTop - el.clientHeight
       // Movement up since the last frame, beyond a small jitter tolerance — the
       // user taking over (catches scrollbar drag the wheel/touch listeners miss).
-      const scrolledUp = scrollTop < lastScrollTopRef.current - 2
+      // Gated on still being away from the bottom: while pinned, content
+      // *shrinking* below us (a tool block collapsing, the thinking indicator
+      // clearing at turn end, a word-reveal reflow) lowers scrollHeight and the
+      // browser clamps scrollTop down — an upward move that must NOT be read as
+      // the user scrolling away, or auto-follow would silently die mid-stream.
+      // A real scroll-up moves us off the bottom; a clamp leaves us glued to it.
+      const scrolledUp =
+        scrollTop < lastScrollTopRef.current - 2 &&
+        distanceFromBottom > PIN_BOTTOM_THRESHOLD
       lastScrollTopRef.current = scrollTop
 
       // Auto-load older history before the user reaches the very top. Position

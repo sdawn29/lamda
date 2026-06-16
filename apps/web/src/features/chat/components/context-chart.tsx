@@ -97,6 +97,20 @@ export function ContextChart({
         ? "text-yellow-500 dark:text-yellow-400"
         : "text-foreground"
 
+  // Status pill — a quick read on how much headroom remains.
+  const status =
+    fill >= 0.9
+      ? { label: "Nearly full", pill: "bg-destructive/10 text-destructive" }
+      : fill >= 0.75
+        ? {
+            label: "Filling up",
+            pill: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+          }
+        : {
+            label: "Healthy",
+            pill: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+          }
+
   const usedLabel = display.tokens != null ? formatTokens(display.tokens) : "?"
   const totalLabel = formatTokens(display.contextWindow)
 
@@ -176,47 +190,67 @@ export function ContextChart({
       <PopoverContent side="top" align="end" className="w-64 p-0 overflow-hidden">
 
         {/* ── Context window (hero) ─────────────────────────────────────── */}
-        <div className="px-3.5 pt-3 pb-3">
+        <div className="px-3.5 pt-3.5 pb-3">
           <div className="flex items-center justify-between">
-            <SectionLabel>
-              Context window
-            </SectionLabel>
-            {display.tokens != null && (
-              <span className="text-3xs tabular-nums text-muted-foreground/60">
-                {usedLabel} / {totalLabel}
+            <SectionLabel>Context window</SectionLabel>
+            <span
+              className={cn(
+                "rounded-full px-1.5 py-0.5 text-3xs font-medium leading-none",
+                status.pill,
+              )}
+            >
+              {status.label}
+            </span>
+          </div>
+
+          <div className="mt-2.5 flex items-end justify-between">
+            <div className="flex items-baseline gap-0.5">
+              <span
+                className={cn(
+                  "text-[2rem] font-semibold leading-none tracking-tight tabular-nums",
+                  pctTextColor,
+                )}
+              >
+                {pct != null ? Math.round(pct) : "—"}
               </span>
+              <span
+                className={cn("text-base font-medium opacity-50", pctTextColor)}
+              >
+                %
+              </span>
+            </div>
+            {display.tokens != null && (
+              <div className="flex flex-col items-end leading-none">
+                <span className="text-2xs font-medium tabular-nums text-foreground/80">
+                  {usedLabel}
+                </span>
+                <span className="mt-0.5 text-3xs tabular-nums text-muted-foreground/60">
+                  of {totalLabel}
+                </span>
+              </div>
             )}
           </div>
 
-          <div className="mt-1.5 flex items-baseline gap-1">
-            <span
-              className={cn(
-                "text-3xl font-semibold leading-none tabular-nums",
-                pctTextColor,
-              )}
-            >
-              {pct != null ? Math.round(pct) : "—"}
-            </span>
-            <span className={cn("text-base font-medium opacity-60", pctTextColor)}>
-              %
-            </span>
-            <span className="ml-1 text-3xs text-muted-foreground/60">used</span>
-          </div>
-
           {/* Stacked usage bar */}
-          <div className="mt-3 flex h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div className="mt-3 flex h-2 w-full gap-px overflow-hidden rounded-full bg-muted">
             {hasSegments ? (
               segments.map((s) => (
                 <div
                   key={s.key}
-                  className={cn("h-full transition-all duration-500", s.color)}
+                  className={cn(
+                    "h-full rounded-full transition-all duration-500 first:rounded-l-full last:rounded-r-full",
+                    s.color,
+                  )}
                   style={{ width: `${(s.value / display.contextWindow) * 100}%` }}
                   title={`${s.label}: ${formatTokens(s.value)}`}
                 />
               ))
             ) : (
               <div
-                className={cn("h-full rounded-full transition-all duration-500", barColor)}
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  barColor,
+                )}
                 style={{ width: `${Math.min(fill * 100, 100)}%` }}
               />
             )}
@@ -224,10 +258,10 @@ export function ContextChart({
 
           {/* Legend */}
           {hasSegments && (
-            <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
               {segments.map((s) => (
                 <div key={s.key} className="flex items-center gap-1.5">
-                  <span className={cn("size-2 shrink-0 rounded-[3px]", s.color)} />
+                  <span className={cn("size-1.5 shrink-0 rounded-full", s.color)} />
                   <span className="text-3xs text-muted-foreground">{s.label}</span>
                   <span className="ml-auto text-3xs font-medium tabular-nums text-foreground/80">
                     {formatTokens(s.value)}
@@ -240,31 +274,38 @@ export function ContextChart({
 
         {/* ── Session totals ────────────────────────────────────────────── */}
         {(tokens || sessionStats) && (
-          <div className="space-y-1.5 border-t border-border/50 px-3.5 py-2.5">
+          <div className="space-y-2 border-t border-border/50 bg-muted/30 px-3.5 py-2.5">
             {tokens && (
               <div className="flex items-center justify-between">
-                <SectionLabel>
-                  Session total
-                </SectionLabel>
-                <div className="flex items-center gap-2.5">
+                <SectionLabel>Session total</SectionLabel>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xs font-semibold tabular-nums text-foreground">
+                    {formatTokens(tokens.total)}
+                  </span>
                   {hasCost && (
                     <span className="text-3xs tabular-nums text-muted-foreground/60">
                       {formatCost(cost)}
                     </span>
                   )}
-                  <span className="text-2xs font-semibold tabular-nums text-foreground">
-                    {formatTokens(tokens.total)}
-                  </span>
                 </div>
               </div>
             )}
             {sessionStats && (
-              <div className="flex items-center gap-2 text-3xs text-muted-foreground/60 tabular-nums">
-                <span>{sessionStats.userMessages} user</span>
-                <span className="opacity-40">·</span>
-                <span>{sessionStats.assistantMessages} assistant</span>
-                <span className="opacity-40">·</span>
-                <span>{sessionStats.toolCalls} tools</span>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { label: "User", value: sessionStats.userMessages },
+                  { label: "Assistant", value: sessionStats.assistantMessages },
+                  { label: "Tools", value: sessionStats.toolCalls },
+                ].map((stat) => (
+                  <div key={stat.label} className="flex flex-col items-center gap-0.5 rounded-md bg-background/60 py-1.5">
+                    <span className="text-2xs font-semibold tabular-nums text-foreground/90">
+                      {stat.value}
+                    </span>
+                    <span className="text-3xs text-muted-foreground/60">
+                      {stat.label}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
