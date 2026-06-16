@@ -30,14 +30,14 @@ export function MessageChip({
     <Badge
       variant="outline"
       className={cn(
-        "mx-0.5 rounded-md border-transparent bg-foreground/5! px-1.5 align-middle text-xs! text-foreground/80 transition-colors select-text hover:bg-foreground/10!",
+        "mx-0.5 rounded-md border-transparent bg-foreground/5! px-1.5 align-middle text-sm! text-foreground/80 transition-colors select-text hover:bg-foreground/10!",
         onClick &&
           "cursor-pointer select-none hover:bg-primary/10! hover:text-foreground",
         className
       )}
     >
       {icon}
-      <span className="max-w-36 truncate">{label}</span>
+      <span>{label}</span>
       {meta && (
         <span className="font-mono text-3xs text-muted-foreground">{meta}</span>
       )}
