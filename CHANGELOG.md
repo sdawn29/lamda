@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.24.0](../../releases/tag/v0.24.0) — 2026-06-16
+
+### Features
+
+* **build:** enhance run function to accept custom environment and add withoutCertificateFileEnv utility
+* **chat:** enhance file context handling with start/end column support and improved selection range display
+* **file-content-view:** add custom rendering for GFM task lists and styled checkboxes
+* enhance memory management and embedding capabilities
+* **chat-view:** implement group size estimation for improved off-screen rendering feat(new-thread-view): add keyboard shortcut hint for cycle mode fix(modes): enable custom tools in Ask and Plan modes for enhanced functionality
+* **chat-stream:** add initialPendingThinkingLevel to manage prompt thinking level in new-thread view
+
+### Bug Fixes
+
+* **new-thread-view:** adjust padding in new-thread layout for improved spacing
+* **chat-view:** adjust padding in chat components for improved layout
+* **package-lock:** change license from ISC to MIT and update CLI path
+
+### Code Refactoring
+
+* **chat-view:** clean up imports and improve code formatting for readability
+* replace ChevronsUpDownIcon with ChevronDownIcon across multiple components and adjust styles
+
 ## [0.23.0](../../releases/tag/v0.23.0) — 2026-06-15
 
 ### Features
