@@ -442,6 +442,38 @@ function entryDelayFor(seq: number): number {
   return Math.min(seq * ENTRY_STAGGER_MS, ENTRY_MAX_DELAY_MS)
 }
 
+// Find the first message group at or below the scroll viewport's top edge. This
+// is the element we pin in place across an older-history prepend: it's on-screen,
+// so it has a real (non-estimated) measured height and rect, making it a reliable
+// anchor regardless of content-visibility estimates for off-screen groups.
+function captureTopGroupAnchor(
+  container: HTMLElement
+): { key: string; top: number } | null {
+  const containerTop = container.getBoundingClientRect().top
+  const nodes = container.querySelectorAll<HTMLElement>("[data-group-key]")
+  for (const node of nodes) {
+    const rect = node.getBoundingClientRect()
+    if (rect.bottom > containerTop) {
+      const key = node.getAttribute("data-group-key")
+      if (key) return { key, top: rect.top }
+    }
+  }
+  return null
+}
+
+// Locate a group element by its data-group-key. Iterates rather than using a
+// selector so keys containing CSS-special characters need no escaping.
+function findGroupByKey(
+  container: HTMLElement,
+  key: string
+): HTMLElement | null {
+  const nodes = container.querySelectorAll<HTMLElement>("[data-group-key]")
+  for (const node of nodes) {
+    if (node.getAttribute("data-group-key") === key) return node
+  }
+  return null
+}
+
 interface ChatViewProps {
   sessionId: string
   workspaceId: string
@@ -933,7 +965,10 @@ export function ChatView({
   // after older pages prepend (keeps the previously-first visible row in place
   // instead of jumping to the top).
   const prevGroupCountRef = useRef(groupedMessages.length)
-  const prevScrollHeightRef = useRef(0)
+  // The on-screen group pinned across an older-history prepend (key + the
+  // viewport-relative top it had before loading), so we can restore that exact
+  // position afterward.
+  const prependAnchorRef = useRef<{ key: string; top: number } | null>(null)
   const isLoadingOlderRef = useRef(false)
 
   // ── Scroll position persistence via query cache & localStorage ──────────────────
@@ -1037,6 +1072,11 @@ export function ChatView({
   ])
 
   useLayoutEffect(() => {
+    // A prepend of older history also grows groupedMessages.length and fires
+    // this effect. Never auto-scroll to the bottom in that case — the
+    // offset-restore effect below keeps the user's place. (This effect runs
+    // before that one, while isLoadingOlderRef is still set.)
+    if (isLoadingOlderRef.current) return
     if (!pinnedRef.current || groupedMessages.length === 0) return
     const el = scrollContainerRef.current
     if (!el) return
@@ -1046,17 +1086,26 @@ export function ChatView({
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
   }, [isLoading, groupedMessages.length])
 
-  // After older pages are prepended, offset scrollTop by the height delta so
-  // the previously-first visible item stays in place instead of jumping.
+  // After older pages are prepended, restore the pinned anchor group to the
+  // exact viewport offset it held before loading, so the view stays put instead
+  // of jumping. Measuring the real element (rather than a scrollHeight delta)
+  // keeps this correct even when content-visibility size estimates for the newly
+  // prepended off-screen groups differ from their eventual real heights, and it
+  // absorbs any concurrent height changes above the anchor too.
   useLayoutEffect(() => {
     const prevCount = prevGroupCountRef.current
     const newCount = groupedMessages.length
     if (isLoadingOlderRef.current && newCount > prevCount) {
       isLoadingOlderRef.current = false
       const el = scrollContainerRef.current
-      if (el) {
-        const delta = el.scrollHeight - prevScrollHeightRef.current
-        if (delta > 0) el.scrollTop = el.scrollTop + delta
+      const anchor = prependAnchorRef.current
+      prependAnchorRef.current = null
+      if (el && anchor) {
+        const node = findGroupByKey(el, anchor.key)
+        if (node) {
+          const delta = node.getBoundingClientRect().top - anchor.top
+          if (delta !== 0) el.scrollTop += delta
+        }
       }
     }
     prevGroupCountRef.current = newCount
@@ -1133,22 +1182,37 @@ export function ChatView({
   const showScrollButtonRef = useRef(showScrollButton)
   showScrollButtonRef.current = showScrollButton
 
-  const handleScroll = useCallback(() => {
+  // Single entry point for loading older history, used by both the scroll-to-top
+  // trigger and the "Load earlier messages" button. Records the pre-prepend
+  // group count + scrollHeight so the offset-restore effect can keep the user's
+  // place — without this, a button click skipped that bookkeeping and the view
+  // jumped (to the bottom when pinned). Latest-ref so the DOM/scroll callers stay
+  // stable while always seeing fresh query state.
+  const loadOlderMessagesRef = useRef<() => void>(() => {})
+  loadOlderMessagesRef.current = () => {
+    if (!hasPreviousPage || isFetchingPreviousPage || isLoadingOlderRef.current)
+      return
+    const el = scrollContainerRef.current
+    isLoadingOlderRef.current = true
+    prevGroupCountRef.current = groupedMessages.length
+    prependAnchorRef.current = el ? captureTopGroupAnchor(el) : null
+    fetchPreviousPage()
+  }
+  const handleLoadOlder = useCallback(() => loadOlderMessagesRef.current(), [])
+
+  // The actual scroll-processing work. Reads layout (scrollHeight), so it's
+  // run at most once per frame from inside a rAF (see handleScroll). Kept in a
+  // ref so the rAF-throttled DOM listener stays stable while always invoking the
+  // latest closure (fresh hasPreviousPage / groupedMessages / etc.).
+  const processScrollRef = useRef<() => void>(() => {})
+  processScrollRef.current = () => {
     const el = scrollContainerRef.current
     if (!el) return
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
 
     // Trigger loading older messages when near the top
-    if (
-      el.scrollTop < 200 &&
-      hasPreviousPage &&
-      !isFetchingPreviousPage &&
-      !isLoadingOlderRef.current
-    ) {
-      isLoadingOlderRef.current = true
-      prevGroupCountRef.current = groupedMessages.length
-      prevScrollHeightRef.current = el.scrollHeight
-      fetchPreviousPage()
+    if (el.scrollTop < 200 && hasPreviousPage) {
+      loadOlderMessagesRef.current()
     }
 
     // While a programmatic scroll is in progress, don't touch pinnedRef.
@@ -1174,13 +1238,32 @@ export function ChatView({
       setShowScrollButton(shouldShow)
     }
     saveScrollPosition(el.scrollTop)
-  }, [
-    saveScrollPosition,
-    hasPreviousPage,
-    isFetchingPreviousPage,
-    fetchPreviousPage,
-    groupedMessages.length,
-  ])
+  }
+
+  // rAF-throttle the scroll listener. Native scroll events can fire several
+  // times per frame, and each invocation reads scrollHeight — a synchronous
+  // layout flush made expensive by `content-visibility: auto` on every
+  // off-screen group. Coalescing to one rAF per frame reads layout once, at the
+  // point the browser is about to lay out anyway, eliminating the thrash that
+  // made long upward scrolls stutter.
+  const scrollRafRef = useRef<number | null>(null)
+  const handleScroll = useCallback(() => {
+    if (scrollRafRef.current !== null) return
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null
+      processScrollRef.current()
+    })
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current)
+        scrollRafRef.current = null
+      }
+    },
+    []
+  )
 
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current
@@ -1464,7 +1547,7 @@ export function ChatView({
               <div className="flex justify-center py-3">
                 <button
                   type="button"
-                  onClick={fetchPreviousPage}
+                  onClick={handleLoadOlder}
                   className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   Load earlier messages
@@ -1572,6 +1655,7 @@ export function ChatView({
               return (
                 <div
                   key={itemKey}
+                  data-group-key={String(itemKey)}
                   style={
                     isLastGroup
                       ? undefined
