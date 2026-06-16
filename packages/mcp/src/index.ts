@@ -6,8 +6,10 @@
  */
 
 export { McpClient, createMcpClient } from "./client.js";
+export { resolveTransportType } from "./types.js";
 export type {
   McpServerConfig,
+  McpTransportType,
   McpTool,
   McpToolResult,
   McpServerState,

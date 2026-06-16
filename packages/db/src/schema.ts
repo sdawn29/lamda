@@ -231,10 +231,16 @@ export const workspaceTasks = sqliteTable("workspace_tasks", {
 export const mcpServers = sqliteTable("mcp_servers", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
-  command: text("command").notNull(),
-  args: text("args"), // JSON array stored as string
-  env: text("env"), // JSON object stored as string
-  cwd: text("cwd"),
+  // Transport: "stdio" (local process) | "http" (Streamable HTTP) | "sse" (legacy).
+  transport: text("transport", { enum: ["stdio", "http", "sse"] })
+    .notNull()
+    .default("stdio"),
+  command: text("command"), // stdio only
+  args: text("args"), // JSON array stored as string — stdio only
+  env: text("env"), // JSON object stored as string — stdio only
+  cwd: text("cwd"), // stdio only
+  url: text("url"), // http/sse only
+  headers: text("headers"), // JSON object stored as string — http/sse only
   description: text("description"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at").notNull(),

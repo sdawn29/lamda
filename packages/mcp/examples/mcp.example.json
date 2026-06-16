@@ -4,12 +4,22 @@
  * Copy this file to .pi/mcp.json in your project directory
  * or to ~/.pi/mcp.json for global MCP server configuration.
  * 
- * Each server entry specifies:
- * - name: Unique identifier for the server
+ * A server uses one of two transports:
+ *
+ * stdio (local process — the default):
  * - command: The command to run (npx, node, python, etc.)
- * - args: Arguments passed to the command (typically includes the MCP server package)
+ * - args: Arguments passed to the command (typically the MCP server package)
  * - env: Optional environment variables (e.g., API tokens)
  * - cwd: Optional working directory for the server process
+ *
+ * http / sse (remote server):
+ * - transport: "http" (Streamable HTTP) or "sse" (legacy HTTP+SSE)
+ * - url: The MCP server endpoint URL
+ * - headers: Optional HTTP headers (e.g., Authorization)
+ *
+ * Common to both:
+ * - name: Unique identifier for the server
+ * - description: Optional human-readable summary
  */
 
 {
@@ -19,6 +29,15 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "./"],
       "description": "Access local filesystem with read/write capabilities"
+    },
+    {
+      "name": "remote-api",
+      "transport": "http",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer your-token-here"
+      },
+      "description": "Remote MCP server over Streamable HTTP"
     },
     {
       "name": "github",

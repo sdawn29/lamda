@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   Plus,
@@ -14,6 +14,8 @@ import {
   Wrench,
   AlertTriangle,
   ArrowLeft,
+  TerminalSquare,
+  Globe,
 } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/shared/ui/alert"
@@ -39,7 +41,7 @@ import {
   FieldLabel,
 } from "@/shared/ui/field"
 import { cn } from "@/shared/lib/utils"
-import type { McpServerConfig, ServerFormState } from "../types"
+import type { McpServerConfig, McpTransportType, ServerFormState } from "../types"
 import { createEmptyServerForm, formStateToConfig, configToFormState } from "../types"
 import { useMcpSettings } from "../queries"
 import { useSaveMcpSettings, useTestMcpConnection, useSetMcpServerEnabled } from "../mutations"
@@ -51,13 +53,29 @@ interface EnvVarRowProps {
   index: number
   onChange: (field: "key" | "value", value: string) => void
   onRemove: () => void
+  /** Placeholder for the key input. */
+  keyPlaceholder?: string
+  /** Placeholder for the value input. */
+  valuePlaceholder?: string
+  /** Separator rendered between key and value (e.g. "=" for env, ":" for headers). */
+  separator?: string
 }
 
-function EnvVarRow({ envVar, index, onChange, onRemove }: EnvVarRowProps) {
+function EnvVarRow({
+  envVar,
+  index,
+  onChange,
+  onRemove,
+  keyPlaceholder = "VARIABLE_NAME",
+  valuePlaceholder = "value",
+  separator = "=",
+}: EnvVarRowProps) {
+  const lowerKey = envVar.key.toLowerCase()
   const isSecret =
-    envVar.key.toLowerCase().includes("token") ||
-    envVar.key.toLowerCase().includes("key") ||
-    envVar.key.toLowerCase().includes("secret")
+    lowerKey.includes("token") ||
+    lowerKey.includes("key") ||
+    lowerKey.includes("secret") ||
+    lowerKey.includes("authorization")
 
   return (
     <div className="group flex items-center gap-2 rounded-md border bg-muted/30 px-2 py-1.5">
@@ -67,14 +85,14 @@ function EnvVarRow({ envVar, index, onChange, onRemove }: EnvVarRowProps) {
       <Input
         value={envVar.key}
         onChange={(e) => onChange("key", e.target.value)}
-        placeholder="VARIABLE_NAME"
+        placeholder={keyPlaceholder}
         className="h-6 flex-1 font-mono text-xs"
       />
-      <span className="shrink-0 select-none text-xs text-muted-foreground">=</span>
+      <span className="shrink-0 select-none text-xs text-muted-foreground">{separator}</span>
       <Input
         value={envVar.value}
         onChange={(e) => onChange("value", e.target.value)}
-        placeholder="value"
+        placeholder={valuePlaceholder}
         className="h-6 flex-1 text-xs"
         type={isSecret ? "password" : "text"}
       />
@@ -105,13 +123,13 @@ function JsonImport({ onImport }: JsonImportProps) {
   function handleImport() {
     try {
       const parsed = JSON.parse(jsonText)
-      if (parsed.name && parsed.command) {
+      if (parsed.name && (parsed.command || parsed.url)) {
         onImport(parsed as McpServerConfig)
         setJsonText("")
         setExpanded(false)
         setError("")
       } else {
-        setError("Config must include 'name' and 'command' fields")
+        setError("Config must include 'name' and either 'command' (stdio) or 'url' (http)")
       }
     } catch {
       setError("Invalid JSON format")
@@ -147,7 +165,7 @@ function JsonImport({ onImport }: JsonImportProps) {
               setJsonText(e.target.value)
               setError("")
             }}
-            placeholder={'{\n  "name": "my-server",\n  "command": "npx",\n  "args": ["-y", "package-name"]\n}'}
+            placeholder={'{\n  "name": "my-server",\n  "command": "npx",\n  "args": ["-y", "package-name"]\n}\n\n// or HTTP:\n{\n  "name": "remote",\n  "transport": "http",\n  "url": "https://example.com/mcp"\n}'}
             className="min-h-[96px] resize-none font-mono text-xs"
             rows={5}
           />
@@ -176,6 +194,37 @@ function JsonImport({ onImport }: JsonImportProps) {
   )
 }
 
+// ── Transport Option (segmented control button) ───────────────────────────────
+
+interface TransportOptionProps {
+  active: boolean
+  icon: ReactNode
+  label: string
+  hint: string
+  onClick: () => void
+}
+
+function TransportOption({ active, icon, label, hint, onClick }: TransportOptionProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center gap-1 rounded-md border px-2 py-2.5 text-center transition-colors",
+        active
+          ? "border-primary/40 bg-primary/5 text-foreground"
+          : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+      )}
+    >
+      <span className="flex items-center gap-1.5 text-xs font-medium">
+        {icon}
+        {label}
+      </span>
+      <span className="text-3xs text-muted-foreground">{hint}</span>
+    </button>
+  )
+}
+
 // ── Server Form Fields (shared body) ──────────────────────────────────────────
 
 interface ServerFormFieldsProps {
@@ -195,7 +244,9 @@ function ServerFormFields({
   setFormErrors,
 }: ServerFormFieldsProps) {
   const testConnection = useTestMcpConnection()
-  const [showAdvanced, setShowAdvanced] = useState(() => formState.envVars.length > 0)
+  const [showAdvanced, setShowAdvanced] = useState(
+    () => formState.envVars.length > 0 || formState.headers.length > 0
+  )
 
   function updateField<K extends keyof ServerFormState>(key: K, value: ServerFormState[K]) {
     setFormState({ ...formState, [key]: value })
@@ -226,73 +277,156 @@ function ServerFormFields({
     })
   }
 
-  const canTest = formState.name.trim() && formState.command.trim()
+  function addHeader() {
+    setFormState({
+      ...formState,
+      headers: [...formState.headers, { key: "", value: "" }],
+    })
+  }
+
+  function updateHeader(index: number, field: "key" | "value", value: string) {
+    setFormState({
+      ...formState,
+      headers: formState.headers.map((v, i) => (i === index ? { ...v, [field]: value } : v)),
+    })
+  }
+
+  function removeHeader(index: number) {
+    setFormState({
+      ...formState,
+      headers: formState.headers.filter((_, i) => i !== index),
+    })
+  }
+
+  function setTransport(transport: McpTransportType) {
+    setFormState({ ...formState, transport })
+    const next = { ...formErrors }
+    delete next.command
+    delete next.url
+    setFormErrors(next)
+  }
+
+  const isHttp = formState.transport === "http" || formState.transport === "sse"
+  const canTest = isHttp
+    ? Boolean(formState.name.trim() && formState.url.trim())
+    : Boolean(formState.name.trim() && formState.command.trim())
+  const advancedCount = isHttp ? formState.headers.length : formState.envVars.length
 
   return (
     <div className="space-y-5">
       {/* JSON Quick Import */}
       <JsonImport onImport={(config) => setFormState(configToFormState(config))} />
 
+      {/* Transport selector */}
+      <Field>
+        <FieldLabel>Transport</FieldLabel>
+        <FieldDescription>
+          How to reach the server — a local process (stdio) or a remote HTTP
+          endpoint.
+        </FieldDescription>
+        <div className="mt-1.5 grid grid-cols-3 gap-2">
+          <TransportOption
+            active={formState.transport === "stdio"}
+            icon={<TerminalSquare className="h-3.5 w-3.5" />}
+            label="stdio"
+            hint="Local process"
+            onClick={() => setTransport("stdio")}
+          />
+          <TransportOption
+            active={formState.transport === "http"}
+            icon={<Globe className="h-3.5 w-3.5" />}
+            label="HTTP"
+            hint="Streamable"
+            onClick={() => setTransport("http")}
+          />
+          <TransportOption
+            active={formState.transport === "sse"}
+            icon={<Globe className="h-3.5 w-3.5" />}
+            label="SSE"
+            hint="Legacy"
+            onClick={() => setTransport("sse")}
+          />
+        </div>
+      </Field>
+
       {/* Core configuration */}
       <FieldGroup>
-        {/* Name + Command in a 2-col grid */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field data-invalid={formErrors.name ? true : undefined}>
-            <FieldLabel htmlFor="server-name">
-              Name <span className="text-destructive">*</span>
-            </FieldLabel>
-            <FieldDescription>Unique identifier for this server.</FieldDescription>
-            <Input
-              id="server-name"
-              value={formState.name}
-              onChange={(e) => updateField("name", e.target.value)}
-              placeholder="my-mcp-server"
-              disabled={!!server}
-              autoFocus
-              className="mt-1.5"
-            />
-            {formErrors.name && <FieldError>{formErrors.name}</FieldError>}
-          </Field>
-
-          <Field data-invalid={formErrors.command ? true : undefined}>
-            <FieldLabel htmlFor="server-command">
-              Command <span className="text-destructive">*</span>
-            </FieldLabel>
-            <FieldDescription>Executable to run — e.g. npx, uvx.</FieldDescription>
-            <Input
-              id="server-command"
-              value={formState.command}
-              onChange={(e) => updateField("command", e.target.value)}
-              placeholder="npx"
-              className="mt-1.5 font-mono"
-            />
-            {formErrors.command && <FieldError>{formErrors.command}</FieldError>}
-          </Field>
-        </div>
-
-        <Field>
-          <FieldLabel htmlFor="server-args">Arguments</FieldLabel>
-          <FieldDescription>
-            Space-separated arguments passed to the command.
-          </FieldDescription>
+        <Field data-invalid={formErrors.name ? true : undefined}>
+          <FieldLabel htmlFor="server-name">
+            Name <span className="text-destructive">*</span>
+          </FieldLabel>
+          <FieldDescription>Unique identifier for this server.</FieldDescription>
           <Input
-            id="server-args"
-            value={formState.args}
-            onChange={(e) => updateField("args", e.target.value)}
-            placeholder="-y @modelcontextprotocol/server-filesystem ./path"
-            className="mt-1.5 font-mono text-xs"
+            id="server-name"
+            value={formState.name}
+            onChange={(e) => updateField("name", e.target.value)}
+            placeholder="my-mcp-server"
+            disabled={!!server}
+            autoFocus
+            className="mt-1.5"
           />
+          {formErrors.name && <FieldError>{formErrors.name}</FieldError>}
         </Field>
 
-        {/* Command preview — shown when command is filled */}
-        {formState.command && (
-          <div className="rounded-md bg-muted/50 px-3 py-2.5">
-            <SectionLabel className="mb-1 block">Preview</SectionLabel>
-            <code className="break-all font-mono text-xs">
-              {formState.command}
-              {formState.args && ` ${formState.args}`}
-            </code>
-          </div>
+        {isHttp ? (
+          <Field data-invalid={formErrors.url ? true : undefined}>
+            <FieldLabel htmlFor="server-url">
+              Server URL <span className="text-destructive">*</span>
+            </FieldLabel>
+            <FieldDescription>
+              Endpoint of the remote MCP server.
+            </FieldDescription>
+            <Input
+              id="server-url"
+              value={formState.url}
+              onChange={(e) => updateField("url", e.target.value)}
+              placeholder="https://example.com/mcp"
+              className="mt-1.5 font-mono text-xs"
+            />
+            {formErrors.url && <FieldError>{formErrors.url}</FieldError>}
+          </Field>
+        ) : (
+          <>
+            <Field data-invalid={formErrors.command ? true : undefined}>
+              <FieldLabel htmlFor="server-command">
+                Command <span className="text-destructive">*</span>
+              </FieldLabel>
+              <FieldDescription>Executable to run — e.g. npx, uvx.</FieldDescription>
+              <Input
+                id="server-command"
+                value={formState.command}
+                onChange={(e) => updateField("command", e.target.value)}
+                placeholder="npx"
+                className="mt-1.5 font-mono"
+              />
+              {formErrors.command && <FieldError>{formErrors.command}</FieldError>}
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="server-args">Arguments</FieldLabel>
+              <FieldDescription>
+                Space-separated arguments passed to the command.
+              </FieldDescription>
+              <Input
+                id="server-args"
+                value={formState.args}
+                onChange={(e) => updateField("args", e.target.value)}
+                placeholder="-y @modelcontextprotocol/server-filesystem ./path"
+                className="mt-1.5 font-mono text-xs"
+              />
+            </Field>
+
+            {/* Command preview — shown when command is filled */}
+            {formState.command && (
+              <div className="rounded-md bg-muted/50 px-3 py-2.5">
+                <SectionLabel className="mb-1 block">Preview</SectionLabel>
+                <code className="break-all font-mono text-xs">
+                  {formState.command}
+                  {formState.args && ` ${formState.args}`}
+                </code>
+              </div>
+            )}
+          </>
         )}
 
         <Field>
@@ -323,9 +457,9 @@ function ServerFormFields({
           <div className="flex items-center gap-2">
             <Settings2 className="h-3.5 w-3.5" />
             Advanced Options
-            {formState.envVars.length > 0 && (
+            {advancedCount > 0 && (
               <span className="rounded-full bg-primary/10 px-1.5 py-px text-3xs font-semibold text-primary">
-                {formState.envVars.length}
+                {advancedCount}
               </span>
             )}
           </div>
@@ -339,61 +473,108 @@ function ServerFormFields({
 
         {showAdvanced && (
           <div className="space-y-5 border-t p-4">
-            <Field>
-              <FieldLabel htmlFor="server-cwd">Working Directory</FieldLabel>
-              <FieldDescription>
-                Directory where the server process is launched.
-              </FieldDescription>
-              <Input
-                id="server-cwd"
-                value={formState.cwd}
-                onChange={(e) => updateField("cwd", e.target.value)}
-                placeholder="/path/to/directory"
-                className="mt-1.5 font-mono text-xs"
-              />
-            </Field>
-
-            <Separator />
-
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-medium">Environment Variables</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    API keys, tokens, and secrets passed to the server process.
-                  </p>
+            {isHttp ? (
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium">HTTP Headers</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Sent with every request — e.g. an Authorization bearer token.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addHeader}
+                    className="shrink-0"
+                  >
+                    <Plus />
+                    Add Header
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={addEnvVar}
-                  className="shrink-0"
-                >
-                  <Plus />
-                  Add Variable
-                </Button>
+
+                {formState.headers.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {formState.headers.map((header, index) => (
+                      <EnvVarRow
+                        key={index}
+                        envVar={header}
+                        index={index}
+                        keyPlaceholder="Authorization"
+                        valuePlaceholder="Bearer …"
+                        separator=":"
+                        onChange={(field, value) => updateHeader(index, field, value)}
+                        onRemove={() => removeHeader(index)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed px-4 py-4 text-center">
+                    <p className="text-xs text-muted-foreground">
+                      No headers configured
+                    </p>
+                  </div>
+                )}
               </div>
+            ) : (
+              <>
+                <Field>
+                  <FieldLabel htmlFor="server-cwd">Working Directory</FieldLabel>
+                  <FieldDescription>
+                    Directory where the server process is launched.
+                  </FieldDescription>
+                  <Input
+                    id="server-cwd"
+                    value={formState.cwd}
+                    onChange={(e) => updateField("cwd", e.target.value)}
+                    placeholder="/path/to/directory"
+                    className="mt-1.5 font-mono text-xs"
+                  />
+                </Field>
 
-              {formState.envVars.length > 0 ? (
-                <div className="space-y-1.5">
-                  {formState.envVars.map((envVar, index) => (
-                    <EnvVarRow
-                      key={index}
-                      envVar={envVar}
-                      index={index}
-                      onChange={(field, value) => updateEnvVar(index, field, value)}
-                      onRemove={() => removeEnvVar(index)}
-                    />
-                  ))}
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium">Environment Variables</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        API keys, tokens, and secrets passed to the server process.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={addEnvVar}
+                      className="shrink-0"
+                    >
+                      <Plus />
+                      Add Variable
+                    </Button>
+                  </div>
+
+                  {formState.envVars.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {formState.envVars.map((envVar, index) => (
+                        <EnvVarRow
+                          key={index}
+                          envVar={envVar}
+                          index={index}
+                          onChange={(field, value) => updateEnvVar(index, field, value)}
+                          onRemove={() => removeEnvVar(index)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-dashed px-4 py-4 text-center">
+                      <p className="text-xs text-muted-foreground">
+                        No environment variables configured
+                      </p>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="rounded-md border border-dashed px-4 py-4 text-center">
-                  <p className="text-xs text-muted-foreground">
-                    No environment variables configured
-                  </p>
-                </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -522,9 +703,10 @@ export function ServerFormPage({ serverName }: ServerFormPageProps) {
     )
   }
 
+  const isHttp = formState.transport === "http" || formState.transport === "sse"
   const canSave =
     formState.name.trim() &&
-    formState.command.trim() &&
+    (isHttp ? formState.url.trim() : formState.command.trim()) &&
     Object.keys(formErrors).length === 0
 
   return (
@@ -652,8 +834,9 @@ export function ServerListItem({
             )}
           </div>
           <code className="mt-1 block truncate font-mono text-2xs text-muted-foreground/60">
-            {server.command}
-            {server.args?.length ? ` ${server.args.join(" ")}` : ""}
+            {server.url
+              ? server.url
+              : `${server.command ?? ""}${server.args?.length ? ` ${server.args.join(" ")}` : ""}`}
           </code>
           {checked && status?.error && (
             <p className="mt-1 truncate text-2xs text-destructive">{status.error}</p>
@@ -787,7 +970,19 @@ export function validateForm(form: ServerFormState): Record<string, string> {
     errors.name = "Only letters, numbers, underscores, and hyphens allowed"
   }
 
-  if (!form.command.trim()) {
+  const isHttp = form.transport === "http" || form.transport === "sse"
+
+  if (isHttp) {
+    if (!form.url.trim()) {
+      errors.url = "Server URL is required"
+    } else {
+      try {
+        new URL(form.url)
+      } catch {
+        errors.url = "Enter a valid URL (e.g. https://example.com/mcp)"
+      }
+    }
+  } else if (!form.command.trim()) {
     errors.command = "Command is required"
   }
 

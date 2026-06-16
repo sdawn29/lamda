@@ -39,10 +39,13 @@ mcpRouter.put("/settings", async (c) => {
     settings: {
       servers: Array<{
         name: string;
-        command: string;
+        transport?: "stdio" | "http" | "sse";
+        command?: string;
         args?: string[];
         env?: Record<string, string>;
         cwd?: string;
+        url?: string;
+        headers?: Record<string, string>;
         description?: string;
       }>;
     };
@@ -79,10 +82,13 @@ mcpRouter.post("/test-connection", async (c) => {
   const { server } = await c.req.json<{
     server: {
       name: string;
-      command: string;
+      transport?: "stdio" | "http" | "sse";
+      command?: string;
       args?: string[];
       env?: Record<string, string>;
       cwd?: string;
+      url?: string;
+      headers?: Record<string, string>;
     };
   }>();
 

@@ -169,10 +169,13 @@ function createDb() {
     CREATE TABLE IF NOT EXISTS mcp_servers (
       id           TEXT PRIMARY KEY,
       name         TEXT NOT NULL UNIQUE,
-      command      TEXT NOT NULL,
+      transport    TEXT NOT NULL DEFAULT 'stdio',
+      command      TEXT,
       args         TEXT,
       env          TEXT,
       cwd          TEXT,
+      url          TEXT,
+      headers      TEXT,
       description  TEXT,
       enabled      INTEGER NOT NULL DEFAULT 1,
       created_at   INTEGER NOT NULL
@@ -439,6 +442,42 @@ function createDb() {
           WHERE created_at = (SELECT MAX(created_at) FROM mcp_servers WHERE name = m.name)
           GROUP BY name
         );
+
+        DROP TABLE mcp_servers;
+        ALTER TABLE mcp_servers_new RENAME TO mcp_servers;
+      `);
+    }
+  } catch (e) {
+    // Migration may fail on first run or if already migrated — safe to ignore.
+  }
+
+  // Migration: Add HTTP/SSE transport support to mcp_servers. Adds transport/
+  // url/headers columns and relaxes command to nullable (remote servers have no
+  // command). SQLite can't drop a NOT NULL constraint via ALTER, so when the new
+  // `transport` column is absent we recreate the table preserving existing rows
+  // (all pre-existing rows are stdio servers with a command).
+  try {
+    const mcpCols = sqlite.prepare("PRAGMA table_info(mcp_servers)").all() as { name: string }[];
+    if (mcpCols.length > 0 && !mcpCols.some((col) => col.name === "transport")) {
+      sqlite.exec(`
+        CREATE TABLE mcp_servers_new (
+          id           TEXT PRIMARY KEY,
+          name         TEXT NOT NULL UNIQUE,
+          transport    TEXT NOT NULL DEFAULT 'stdio',
+          command      TEXT,
+          args         TEXT,
+          env          TEXT,
+          cwd          TEXT,
+          url          TEXT,
+          headers      TEXT,
+          description  TEXT,
+          enabled      INTEGER NOT NULL DEFAULT 1,
+          created_at   INTEGER NOT NULL
+        );
+
+        INSERT INTO mcp_servers_new (id, name, transport, command, args, env, cwd, description, enabled, created_at)
+        SELECT id, name, 'stdio', command, args, env, cwd, description, enabled, created_at
+        FROM mcp_servers;
 
         DROP TABLE mcp_servers;
         ALTER TABLE mcp_servers_new RENAME TO mcp_servers;

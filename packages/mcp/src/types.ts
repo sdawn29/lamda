@@ -3,21 +3,47 @@
  */
 
 /**
- * Configuration for an MCP server connection
+ * Transport used to reach an MCP server.
+ * - `stdio`: spawn a local process and talk over stdin/stdout (default).
+ * - `http`: remote server over Streamable HTTP (the modern MCP HTTP transport).
+ * - `sse`: remote server over the legacy HTTP+SSE transport.
+ */
+export type McpTransportType = "stdio" | "http" | "sse";
+
+/**
+ * Configuration for an MCP server connection.
+ *
+ * `transport` selects how we reach the server. `command`/`args`/`env`/`cwd`
+ * apply to `stdio`; `url`/`headers` apply to `http` and `sse`. When `transport`
+ * is omitted it is inferred: a `url` implies `http`, otherwise `stdio`.
  */
 export interface McpServerConfig {
   /** Unique name for this server */
   name: string;
-  /** Command to run (e.g., "npx", "node", "python") */
-  command: string;
-  /** Arguments to pass to the command */
+  /** Transport type. Defaults to "stdio" (or "http" when only a url is given). */
+  transport?: McpTransportType;
+  /** Command to run (e.g., "npx", "node", "python") — stdio only */
+  command?: string;
+  /** Arguments to pass to the command — stdio only */
   args?: string[];
-  /** Environment variables */
+  /** Environment variables — stdio only */
   env?: Record<string, string>;
-  /** Working directory for the server process */
+  /** Working directory for the server process — stdio only */
   cwd?: string;
+  /** Endpoint URL for the MCP server — http/sse only */
+  url?: string;
+  /** Extra HTTP headers (e.g. Authorization) sent with requests — http/sse only */
+  headers?: Record<string, string>;
   /** Optional description */
   description?: string;
+}
+
+/**
+ * Resolve the effective transport for a config, inferring it when not set.
+ */
+export function resolveTransportType(config: McpServerConfig): McpTransportType {
+  if (config.transport) return config.transport;
+  return config.url ? "http" : "stdio";
 }
 
 /**

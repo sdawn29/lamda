@@ -5,7 +5,11 @@
 import { execSync } from "child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import { resolveTransportType } from "./types.js";
 import type { McpServerConfig, McpTool, McpToolResult, McpEvent, McpEventHandler } from "./types.js";
 
 // Lazily resolved login-shell PATH so we pick up nvm/volta/fnm/mise/asdf etc.
@@ -44,11 +48,71 @@ function getShellPath(): string {
 }
 
 /**
+ * Build the SDK transport for a server config based on its transport type.
+ *
+ * For `http` we use Streamable HTTP (the modern MCP transport); for `sse` the
+ * legacy HTTP+SSE transport. Custom headers (e.g. Authorization) are attached
+ * to every request, including the SSE GET stream.
+ */
+function createTransport(config: McpServerConfig): Transport {
+  const transportType = resolveTransportType(config);
+
+  if (transportType === "http" || transportType === "sse") {
+    if (!config.url) {
+      throw new Error(`MCP server "${config.name}" is missing a url for ${transportType} transport`);
+    }
+
+    let url: URL;
+    try {
+      url = new URL(config.url);
+    } catch {
+      throw new Error(`MCP server "${config.name}" has an invalid url: ${config.url}`);
+    }
+
+    const headers = config.headers;
+    const requestInit: RequestInit | undefined = headers ? { headers } : undefined;
+
+    if (transportType === "sse") {
+      return new SSEClientTransport(url, {
+        requestInit,
+        // The SSE GET stream goes through EventSource, which won't pick up
+        // requestInit headers — inject them via a custom fetch so auth works.
+        ...(headers
+          ? {
+              eventSourceInit: {
+                fetch: (input: string | URL, init?: RequestInit) =>
+                  fetch(input, { ...init, headers: { ...init?.headers, ...headers } }),
+              },
+            }
+          : {}),
+      });
+    }
+
+    return new StreamableHTTPClientTransport(url, { requestInit });
+  }
+
+  // stdio (default).
+  if (!config.command) {
+    throw new Error(`MCP server "${config.name}" is missing a command for stdio transport`);
+  }
+
+  // In a packaged Electron app, macOS provides only a minimal PATH
+  // (/usr/bin:/bin:/usr/sbin:/sbin). Use the login-shell PATH so that
+  // commands installed via nvm/volta/fnm/mise/asdf/homebrew all resolve.
+  return new StdioClientTransport({
+    command: config.command,
+    args: config.args,
+    env: { ...process.env, ...config.env, PATH: getShellPath() },
+    cwd: config.cwd,
+  });
+}
+
+/**
  * Internal server connection state
  */
 interface ServerConnection {
   client: Client;
-  transport: StdioClientTransport;
+  transport: Transport;
   config: McpServerConfig;
 }
 
@@ -62,7 +126,8 @@ export class McpClient {
   private eventHandlersByType: Map<string, McpEventHandler[]> = new Map();
 
   /**
-   * Connect to an MCP server using stdio transport
+   * Connect to an MCP server. The transport (stdio / http / sse) is selected
+   * from the config; see {@link createTransport}.
    */
   async connect(config: McpServerConfig): Promise<void> {
     if (this.servers.has(config.name)) {
@@ -82,14 +147,7 @@ export class McpClient {
 
   private async _doConnect(config: McpServerConfig): Promise<void> {
     try {
-      // In a packaged Electron app, macOS provides only a minimal PATH
-      // (/usr/bin:/bin:/usr/sbin:/sbin). Use the login-shell PATH so that
-      // commands installed via nvm/volta/fnm/mise/asdf/homebrew all resolve.
-      const transport = new StdioClientTransport({
-        command: config.command,
-        args: config.args,
-        env: { ...process.env, ...config.env, PATH: getShellPath() },
-      });
+      const transport = createTransport(config);
 
       const client = new Client(
         { name: `lambda-mcp-${config.name}`, version: "1.0.0" },

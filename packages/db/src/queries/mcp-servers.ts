@@ -6,10 +6,13 @@ import type { McpServerConfig } from "@lamda/mcp"
 export interface DbMcpServer {
   id: string
   name: string
-  command: string
+  transport: "stdio" | "http" | "sse"
+  command: string | null
   args: string | null
   env: string | null
   cwd: string | null
+  url: string | null
+  headers: string | null
   description: string | null
   enabled: boolean
   createdAt: number
@@ -53,14 +56,19 @@ export function upsertMcpServer(
   const id = config.id ?? crypto.randomUUID()
   const createdAt = Date.now()
 
+  const transport = config.transport ?? (config.url ? "http" : "stdio")
+
   db.insert(mcpServers)
     .values({
       id,
       name: config.name,
-      command: config.command,
+      transport,
+      command: config.command ?? null,
       args: config.args ? JSON.stringify(config.args) : null,
       env: config.env ? JSON.stringify(config.env) : null,
       cwd: config.cwd ?? null,
+      url: config.url ?? null,
+      headers: config.headers ? JSON.stringify(config.headers) : null,
       description: config.description ?? null,
       enabled: config.enabled ?? true,
       createdAt,
@@ -68,10 +76,13 @@ export function upsertMcpServer(
     .onConflictDoUpdate({
       target: mcpServers.name,
       set: {
-        command: config.command,
+        transport,
+        command: config.command ?? null,
         args: config.args ? JSON.stringify(config.args) : null,
         env: config.env ? JSON.stringify(config.env) : null,
         cwd: config.cwd ?? null,
+        url: config.url ?? null,
+        headers: config.headers ? JSON.stringify(config.headers) : null,
         description: config.description ?? null,
         enabled: config.enabled ?? true,
       },
@@ -97,10 +108,13 @@ export function saveMcpServers(configs: McpServerConfig[]): void {
       .values({
         id: crypto.randomUUID(),
         name: config.name,
-        command: config.command,
+        transport: config.transport ?? (config.url ? "http" : "stdio"),
+        command: config.command ?? null,
         args: config.args ? JSON.stringify(config.args) : null,
         env: config.env ? JSON.stringify(config.env) : null,
         cwd: config.cwd ?? null,
+        url: config.url ?? null,
+        headers: config.headers ? JSON.stringify(config.headers) : null,
         description: config.description ?? null,
         enabled: enabledMap.get(config.name) ?? true,
         createdAt: now,
@@ -132,10 +146,13 @@ export function setMcpServerEnabled(name: string, enabled: boolean): void {
 export function dbToMcpConfig(server: DbMcpServer): McpServerConfig {
   return {
     name: server.name,
-    command: server.command,
+    transport: server.transport ?? "stdio",
+    command: server.command ?? undefined,
     args: server.args ? JSON.parse(server.args) : undefined,
     env: server.env ? JSON.parse(server.env) : undefined,
     cwd: server.cwd ?? undefined,
+    url: server.url ?? undefined,
+    headers: server.headers ? JSON.parse(server.headers) : undefined,
     description: server.description ?? undefined,
   }
 }
