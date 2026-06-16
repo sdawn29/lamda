@@ -272,8 +272,7 @@ type WorkingEntry =
  */
 function buildWorkingEntries(
   messages: WorkingMessage[],
-  showThinking: boolean,
-  keepTrailingGroup: boolean
+  showThinking: boolean
 ): WorkingEntry[] {
   const out: WorkingEntry[] = []
   for (const m of messages) {
@@ -305,16 +304,9 @@ function buildWorkingEntries(
     }
     out.push({ kind: "tool", key: t.toolCallId, msg: t })
   }
-  // Single-call runs render as a plain tool row — except a trailing run while
-  // the block is active, which stays grouped so it can carry the live state
-  // until the next entry arrives.
-  return out.map((e, i) =>
-    e.kind === "run" &&
-    e.tools.length === 1 &&
-    !(keepTrailingGroup && i === out.length - 1)
-      ? { kind: "tool" as const, key: e.key, msg: e.tools[0] }
-      : e
-  )
+  // Every groupable tool call stays behind its collapsible group disclosure,
+  // even a single-call run — so a lone read still reads as "Explored …".
+  return out
 }
 
 export function RollingTimerText({ text }: { text: string }) {
@@ -460,7 +452,7 @@ export const WorkingBlock = memo(function WorkingBlock({
     [messages]
   )
   const entries = useMemo(
-    () => buildWorkingEntries(messages, showThinking, isActive),
+    () => buildWorkingEntries(messages, showThinking),
     [messages, showThinking, isActive]
   )
   const hasThinkingContent = messages.some(

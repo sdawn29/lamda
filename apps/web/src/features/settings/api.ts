@@ -49,6 +49,21 @@ export async function fetchMemories(signal?: AbortSignal): Promise<MemoryItem[]>
   return res.memories
 }
 
+export async function createMemory(input: {
+  scope: MemoryScope
+  workspaceId?: string
+  title: string
+  content: string
+  category?: string
+}): Promise<MemoryItem> {
+  const res = await apiFetch<{ memory: MemoryItem }>("/memories", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  })
+  return res.memory
+}
+
 export async function updateMemoryApi(
   id: string,
   fields: { title?: string; content?: string; category?: string | null; pinned?: boolean }

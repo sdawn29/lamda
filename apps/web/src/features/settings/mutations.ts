@@ -9,10 +9,12 @@ import {
   updateAppSetting,
   saveLocalProvider,
   deleteLocalProvider,
+  createMemory,
   updateMemoryApi,
   deleteMemoryApi,
   type ProviderKeys,
   type LocalProviderConfig,
+  type MemoryScope,
 } from "./api"
 import {
   appSettingsQueryKey,
@@ -77,6 +79,22 @@ export function useDeleteLocalProvider() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: localProvidersQueryKey })
       queryClient.invalidateQueries({ queryKey: modelsQueryKey })
+    },
+  })
+}
+
+export function useCreateMemory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      scope: MemoryScope
+      workspaceId?: string
+      title: string
+      content: string
+      category?: string
+    }) => createMemory(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: memoriesQueryKey })
     },
   })
 }
