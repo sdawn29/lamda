@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.25.0](../../releases/tag/v0.25.0) — 2026-06-16
+
+### Features
+
+* **onboarding:** implement onboarding wizard with user profile setup and theme selection
+* **chat:** add status pill to ContextChart for better context usage visibility
+* **chat:** implement useChatScroll hook for enhanced chat scrolling experience
+* Enhance MCP server configuration and transport handling
+* **chat:** implement scroll position persistence and group anchor restoration for message loading
+
+### Bug Fixes
+
+* **chat:** adjust badge text size and remove label truncation
+
+### Code Refactoring
+
+* enhance collapsible components and improve code readability
+* **chat:** streamline chat view and useChatScroll for improved performance and readability
+
 ## [0.24.0](../../releases/tag/v0.24.0) — 2026-06-16
 
 ### Features
