@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { QueryClient } from "@tanstack/react-query"
 import { chatKeys } from "../queries"
 import type { getChatSyncEngine } from "./use-chat-sync-engine"
@@ -13,56 +7,21 @@ import type { ScrollMeta } from "./use-chat-sync-engine"
 // Distance (px) from the bottom at which we consider the user "at the bottom"
 // and resume auto-following. Deliberately tight: once the user scrolls up past
 // this we stop yanking them back, and only re-pin when they return near the very
-// bottom — this is what keeps streaming from fighting the user's scroll. (The
-// previous behaviour re-pinned anywhere within 80px, so streaming repeatedly
-// snapped a reading user back down.)
+// bottom — this is what keeps streaming from fighting the user's scroll.
 const PIN_BOTTOM_THRESHOLD = 24
 // Distance (px) past which the "scroll to bottom" affordance appears.
 const SHOW_BUTTON_THRESHOLD = 80
-// Trigger loading older history once the user scrolls within this of the top.
-const LOAD_OLDER_THRESHOLD = 200
-// Safety net for clearing the programmatic-scroll guard if `scrollend` never
-// fires (older Safari, or an instant scroll that doesn't actually move).
-const PROGRAMMATIC_FALLBACK_MS = 600
+// Distance (px) from the top at which older history starts auto-loading. Set
+// generously so the next page is fetched before the user reaches the very top,
+// keeping upward scrolling seamless (there is no manual "load earlier" button).
+const LOAD_OLDER_THRESHOLD = 600
 // Debounce for persisting scroll position to the query cache / localStorage.
 const SCROLL_SAVE_DEBOUNCE_MS = 150
-
-// Find the first message group at or below the scroll viewport's top edge. This
-// is the element we pin in place across an older-history prepend: it's on-screen,
-// so it has a real (non-estimated) measured height and rect, making it a reliable
-// anchor regardless of content-visibility estimates for off-screen groups.
-function captureTopGroupAnchor(
-  container: HTMLElement
-): { key: string; top: number } | null {
-  const containerTop = container.getBoundingClientRect().top
-  const nodes = container.querySelectorAll<HTMLElement>("[data-group-key]")
-  for (const node of nodes) {
-    const rect = node.getBoundingClientRect()
-    if (rect.bottom > containerTop) {
-      const key = node.getAttribute("data-group-key")
-      if (key) return { key, top: rect.top }
-    }
-  }
-  return null
-}
-
-// Locate a group element by its data-group-key. Iterates rather than using a
-// selector so keys containing CSS-special characters need no escaping.
-function findGroupByKey(
-  container: HTMLElement,
-  key: string
-): HTMLElement | null {
-  const nodes = container.querySelectorAll<HTMLElement>("[data-group-key]")
-  for (const node of nodes) {
-    if (node.getAttribute("data-group-key") === key) return node
-  }
-  return null
-}
 
 interface UseChatScrollOptions {
   sessionId: string
   threadId: string
-  /** Number of rendered message groups — drives auto-scroll + prepend restore. */
+  /** Number of rendered message groups — drives auto-scroll. */
   groupCount: number
   /** Agent is actively streaming a turn. */
   isLoading: boolean
@@ -90,8 +49,6 @@ export interface UseChatScrollResult {
   scrollToBottom: () => void
   /** Instantly jump to the bottom and pin (used when sending a message). */
   pinToBottom: () => void
-  /** Load older history while preserving the user's scroll position. */
-  loadOlder: () => void
 }
 
 /**
@@ -99,13 +56,18 @@ export interface UseChatScrollResult {
  *   • stick-to-bottom while the agent streams, without fighting the user
  *   • one-time restore of a saved position (or jump to bottom) per thread
  *   • position persistence (debounced) to the query cache + localStorage
- *   • position-preserving prepend of older history
+ *   • auto-loading older history as the user nears the top
  *   • the "scroll to bottom" affordance
  *
- * The pin model is intent-driven: any upward user gesture (wheel / touch /
- * keyboard) immediately stops auto-following, and we only resume once the user
- * is back at the very bottom. Programmatic scrolls are guarded so they don't get
- * mistaken for user input.
+ * Position preservation across an older-history prepend (and across the height
+ * corrections that `content-visibility: auto` produces while scrolling up) is
+ * delegated to the browser's native CSS scroll anchoring — but only while the
+ * user is reading history. The container's `overflow-anchor` tracks the pin
+ * state (see `setPinned`): OFF while pinned (we actively force the view to the
+ * bottom each growth frame, and anchoring would otherwise fight that), ON while
+ * scrolled up (so prepends and CV height corrections never shift the view). The
+ * streaming/last group is additionally excluded as an anchor candidate. The hook
+ * only ever writes `scrollTop` while pinned; scrolled up, it never touches it.
  */
 export function useChatScroll({
   sessionId,
@@ -125,12 +87,22 @@ export function useChatScroll({
 
   // Whether we're auto-following the bottom of the transcript.
   const pinnedRef = useRef(true)
-  // True while a programmatic scroll is in flight; onScroll ignores pin/button
-  // updates during this window so our own scrolling isn't read as user intent.
-  const programmaticScrollRef = useRef(false)
-  const programmaticTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  )
+  // Last observed scrollTop — lets us detect the *direction* of a scroll so an
+  // upward move (scrollbar drag included) is read as the user taking over.
+  const lastScrollTopRef = useRef(0)
+
+  // Pin state also drives native CSS scroll anchoring on the container. The two
+  // are mutually exclusive: while pinned we actively own scrolling (force the
+  // view to the bottom each growth frame), so anchoring is OFF — otherwise it
+  // would try to hold an older element stationary and fight the bottom-follow,
+  // most visibly right after sending a message from a scrolled-up position.
+  // While the user is reading history (not pinned) anchoring is ON, so prepends
+  // and content-visibility height corrections never shift the view.
+  const setPinned = useCallback((value: boolean) => {
+    pinnedRef.current = value
+    const el = scrollContainerRef.current
+    if (el) el.style.overflowAnchor = value ? "none" : "auto"
+  }, [])
 
   const [showScrollButton, setShowScrollButton] = useState(false)
 
@@ -138,26 +110,6 @@ export function useChatScroll({
   // unchanged — safe to call on every scroll frame.
   const setButtonVisible = useCallback((visible: boolean) => {
     setShowScrollButton((prev) => (prev === visible ? prev : visible))
-  }, [])
-
-  // ── Programmatic-scroll guard ─────────────────────────────────────────────
-  const clearProgrammatic = useCallback(() => {
-    programmaticScrollRef.current = false
-    if (programmaticTimeoutRef.current !== null) {
-      clearTimeout(programmaticTimeoutRef.current)
-      programmaticTimeoutRef.current = null
-    }
-  }, [])
-
-  const armProgrammatic = useCallback(() => {
-    programmaticScrollRef.current = true
-    // Keep a single pending fallback timer; repeated calls during streaming
-    // (every ResizeObserver snap) must not churn timers.
-    if (programmaticTimeoutRef.current !== null) return
-    programmaticTimeoutRef.current = setTimeout(() => {
-      programmaticTimeoutRef.current = null
-      programmaticScrollRef.current = false
-    }, PROGRAMMATIC_FALLBACK_MS)
   }, [])
 
   // ── Position persistence (debounced) ──────────────────────────────────────
@@ -201,20 +153,10 @@ export function useChatScroll({
     }
   }, [flushScrollMeta])
 
-  // ── Older-history loading (position-preserving) ───────────────────────────
-  const prevGroupCountRef = useRef(groupCount)
-  const prependAnchorRef = useRef<{ key: string; top: number } | null>(null)
-  const isLoadingOlderRef = useRef(false)
-
-  // These hold the latest closures so the stable callbacks below always read
-  // fresh query state. They're (re)assigned in an effect rather than during
-  // render so we never write a ref while rendering.
-  const loadOlderImplRef = useRef<() => void>(() => {})
-  const loadOlder = useCallback(() => loadOlderImplRef.current(), [])
-
   // ── Scroll event processing (rAF-throttled) ───────────────────────────────
   // Reads layout (scrollHeight) which `content-visibility: auto` makes costly,
-  // so it runs at most once per frame.
+  // so it runs at most once per frame. Reassigned every render so it closes over
+  // fresh query state (`hasPreviousPage` / `isFetchingPreviousPage`).
   const processScrollRef = useRef<() => void>(() => {})
   const scrollRafRef = useRef<number | null>(null)
   const onScroll = useCallback(() => {
@@ -226,39 +168,36 @@ export function useChatScroll({
   }, [])
 
   useEffect(() => {
-    loadOlderImplRef.current = () => {
-      if (
-        !hasPreviousPage ||
-        isFetchingPreviousPage ||
-        isLoadingOlderRef.current
-      )
-        return
-      const el = scrollContainerRef.current
-      isLoadingOlderRef.current = true
-      prevGroupCountRef.current = groupCount
-      prependAnchorRef.current = el ? captureTopGroupAnchor(el) : null
-      fetchPreviousPage()
-    }
     processScrollRef.current = () => {
       const el = scrollContainerRef.current
       if (!el) return
-      const distanceFromBottom =
-        el.scrollHeight - el.scrollTop - el.clientHeight
+      const scrollTop = el.scrollTop
+      const distanceFromBottom = el.scrollHeight - scrollTop - el.clientHeight
+      // Movement up since the last frame, beyond a small jitter tolerance — the
+      // user taking over (catches scrollbar drag the wheel/touch listeners miss).
+      const scrolledUp = scrollTop < lastScrollTopRef.current - 2
+      lastScrollTopRef.current = scrollTop
 
-      if (el.scrollTop < LOAD_OLDER_THRESHOLD && hasPreviousPage) {
-        loadOlderImplRef.current()
+      // Auto-load older history before the user reaches the very top. Position
+      // preservation across the prepend is handled by native scroll anchoring,
+      // so there's no anchor to capture; re-entrancy is guarded here.
+      if (
+        scrollTop < LOAD_OLDER_THRESHOLD &&
+        hasPreviousPage &&
+        !isFetchingPreviousPage
+      ) {
+        fetchPreviousPage()
       }
 
-      // While our own programmatic scroll is animating, don't reinterpret it as
-      // user input. Real user gestures cancel the guard via the input listeners.
-      if (programmaticScrollRef.current) {
-        saveScrollPosition(el.scrollTop)
-        return
-      }
-
-      pinnedRef.current = distanceFromBottom <= PIN_BOTTOM_THRESHOLD
+      // Only ever UN-pin on a genuine upward move; only ever RE-pin when the
+      // user lands back near the bottom. Crucially we do NOT un-pin just because
+      // `distanceFromBottom` grew — appending the just-sent message (or streaming
+      // text) below the viewport spikes that distance for a frame before the
+      // auto-follow snap catches up, and un-pinning there would kill autoscroll.
+      if (scrolledUp) setPinned(false)
+      else if (distanceFromBottom <= PIN_BOTTOM_THRESHOLD) setPinned(true)
       setButtonVisible(distanceFromBottom >= SHOW_BUTTON_THRESHOLD)
-      saveScrollPosition(el.scrollTop)
+      saveScrollPosition(scrollTop)
     }
   })
 
@@ -273,17 +212,15 @@ export function useChatScroll({
   )
 
   // ── User-intent detection ─────────────────────────────────────────────────
-  // Any upward gesture immediately stops auto-following and cancels an in-flight
-  // programmatic scroll, so streaming/auto-scroll never fights the user. These
-  // listeners only fire for genuine user input — programmatic scrollTop changes
-  // don't dispatch wheel/touch/key events.
+  // Any upward gesture immediately stops auto-following so streaming/auto-scroll
+  // never fights the user. These listeners only fire for genuine user input —
+  // programmatic scrollTop changes don't dispatch wheel/touch/key events.
   useEffect(() => {
     const el = scrollContainerRef.current
     if (!el) return
 
     const interrupt = () => {
-      clearProgrammatic()
-      pinnedRef.current = false
+      setPinned(false)
     }
 
     const onWheel = (e: WheelEvent) => {
@@ -314,37 +251,26 @@ export function useChatScroll({
       el.removeEventListener("touchmove", onTouchMove)
       el.removeEventListener("keydown", onKeyDown)
     }
-  }, [clearProgrammatic])
-
-  // Clear the programmatic guard once the browser reports the scroll settled.
-  useEffect(() => {
-    const el = scrollContainerRef.current
-    if (!el) return
-    const onScrollEnd = () => clearProgrammatic()
-    el.addEventListener("scrollend", onScrollEnd)
-    return () => el.removeEventListener("scrollend", onScrollEnd)
-  }, [clearProgrammatic])
+  }, [setPinned])
 
   // ── Imperative scrollers ──────────────────────────────────────────────────
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
-    pinnedRef.current = true
+    setPinned(true)
     setButtonVisible(false)
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     if (distanceFromBottom < 10) return
-    armProgrammatic()
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
-  }, [armProgrammatic, setButtonVisible])
+  }, [setButtonVisible, setPinned])
 
   const pinToBottom = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
-    pinnedRef.current = true
+    setPinned(true)
     setButtonVisible(false)
-    armProgrammatic()
     el.scrollTop = el.scrollHeight
-  }, [armProgrammatic, setButtonVisible])
+  }, [setButtonVisible, setPinned])
 
   // ── One-time restore (or jump to bottom) per thread ───────────────────────
   // useLayoutEffect applies the position before paint — no flash of the wrong
@@ -358,8 +284,7 @@ export function useChatScroll({
     if (groupCount === 0 && isLoadingMessages) return
     scrollRestoredSessionRef.current = sessionId
 
-    clearProgrammatic()
-    pinnedRef.current = true
+    setPinned(true)
 
     let savedMeta = queryClient.getQueryData<ScrollMeta>(
       chatKeys.scroll(sessionId)
@@ -371,7 +296,7 @@ export function useChatScroll({
 
     if (savedMeta?.visited) {
       el.scrollTop = savedMeta.scrollTop
-      pinnedRef.current = savedMeta.isPinned
+      setPinned(savedMeta.isPinned)
     } else {
       el.scrollTop = el.scrollHeight
       const visitedMeta: ScrollMeta = {
@@ -383,6 +308,7 @@ export function useChatScroll({
       syncEngine.saveScrollMeta(sessionId, visitedMeta)
     }
 
+    lastScrollTopRef.current = el.scrollTop
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     setButtonVisible(distanceFromBottom >= SHOW_BUTTON_THRESHOLD)
   }, [
@@ -392,53 +318,29 @@ export function useChatScroll({
     syncEngine,
     groupCount,
     isLoadingMessages,
-    clearProgrammatic,
     setButtonVisible,
+    setPinned,
   ])
 
   // ── Auto-follow new content while pinned ──────────────────────────────────
-  // Coarse events (turn state changes, new groups). Instant snap — matches the
-  // ResizeObserver below so the two never produce competing animations (the
-  // source of scroll jitter), and reads as snappy.
+  // Coarse events (turn state changes, new groups) — e.g. the user's just-sent
+  // message. Instant snap — matches the ResizeObserver below so the two never
+  // produce competing animations (the source of scroll jitter), and reads as
+  // snappy. Anchoring is OFF while pinned, so this snap to the latest row wins.
   useLayoutEffect(() => {
-    // A prepend also grows groupCount and fires this; the prepend-restore effect
-    // below keeps the user's place, so never snap to bottom there.
-    if (isLoadingOlderRef.current) return
     if (!pinnedRef.current || groupCount === 0) return
     const el = scrollContainerRef.current
     if (!el) return
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     if (distanceFromBottom < 5) return
-    armProgrammatic()
     el.scrollTop = el.scrollHeight
-  }, [isLoading, groupCount, armProgrammatic])
-
-  // After older pages prepend, restore the pinned anchor group to the exact
-  // viewport offset it held before loading, so the view stays put. Measuring the
-  // real element (vs. a scrollHeight delta) stays correct even when
-  // content-visibility size estimates for the newly prepended off-screen groups
-  // differ from their eventual real heights.
-  useLayoutEffect(() => {
-    const prevCount = prevGroupCountRef.current
-    if (isLoadingOlderRef.current && groupCount > prevCount) {
-      isLoadingOlderRef.current = false
-      const el = scrollContainerRef.current
-      const anchor = prependAnchorRef.current
-      prependAnchorRef.current = null
-      if (el && anchor) {
-        const node = findGroupByKey(el, anchor.key)
-        if (node) {
-          const delta = node.getBoundingClientRect().top - anchor.top
-          if (delta !== 0) el.scrollTop += delta
-        }
-      }
-    }
-    prevGroupCountRef.current = groupCount
-  }, [groupCount])
+  }, [isLoading, groupCount])
 
   // Keep the view glued to the bottom as content grows (word-reveal, streaming
   // text deltas). Instant snap only — incremental deltas are small enough to be
-  // imperceptible, and stacking smooth scrolls causes jitter.
+  // imperceptible, and stacking smooth scrolls causes jitter. Gated on `pinned`
+  // so an older-history prepend (growth above the viewport, user scrolled up) is
+  // left to native scroll anchoring instead.
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
@@ -449,12 +351,11 @@ export function useChatScroll({
       const distanceFromBottom =
         el.scrollHeight - el.scrollTop - el.clientHeight
       if (distanceFromBottom < 1) return
-      armProgrammatic()
       el.scrollTop = el.scrollHeight
     })
     ro.observe(container)
     return () => ro.disconnect()
-  }, [armProgrammatic])
+  }, [])
 
   // When the bottom bar grows/shrinks (multi-line input, todo panel) keep the
   // bottom pinned so the latest message stays glued to the top of the bar.
@@ -472,6 +373,5 @@ export function useChatScroll({
     onScroll,
     scrollToBottom,
     pinToBottom,
-    loadOlder,
   }
 }

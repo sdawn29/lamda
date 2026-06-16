@@ -485,7 +485,6 @@ export function ChatView({
     onScroll,
     scrollToBottom,
     pinToBottom,
-    loadOlder,
   } = useChatScroll({
     sessionId,
     threadId,
@@ -863,22 +862,11 @@ export function ChatView({
         <div
           ref={scrollContainerRef}
           onScroll={onScroll}
-          className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pt-4 pb-8 [overflow-anchor:none]"
+          className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pt-4 pb-8"
         >
           <div ref={messagesContainerRef}>
-            {/* Load earlier messages button — visible when older history exists and isn't loading */}
-            {hasPreviousPage && !isFetchingPreviousPage && (
-              <div className="flex justify-center py-3">
-                <button
-                  type="button"
-                  onClick={loadOlder}
-                  className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  Load earlier messages
-                </button>
-              </div>
-            )}
-            {/* Spinner while loading older history */}
+            {/* Older history loads automatically as the user scrolls near the
+                top (see useChatScroll); this spinner shows while a page fetches. */}
             {isFetchingPreviousPage && (
               <div className="flex justify-center py-3">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
@@ -973,7 +961,10 @@ export function ChatView({
               // Browser-native windowing: skip layout/paint for groups that are
               // off-screen so resizing the window no longer reflows the entire
               // thread at once. The last group is left un-contained since it's
-              // the actively streaming turn (always on-screen, growing rapidly).
+              // the actively streaming turn (always on-screen, growing rapidly),
+              // and is excluded as a scroll-anchor candidate so its bottom-growth
+              // never gets anchored — the pin logic owns the bottom, native
+              // anchoring owns above-viewport corrections (see useChatScroll).
               const isLastGroup = groupIndex === groupedMessages.length - 1
 
               return (
@@ -982,7 +973,7 @@ export function ChatView({
                   data-group-key={String(itemKey)}
                   style={
                     isLastGroup
-                      ? undefined
+                      ? { overflowAnchor: "none" }
                       : {
                           contentVisibility: "auto",
                           containIntrinsicSize: `auto ${estimateGroupSize(group)}px`,
@@ -1018,24 +1009,31 @@ export function ChatView({
                 </div>
               )
             })}
-          </div>
-          <div className="mx-auto w-full max-w-3xl px-3">
-            {isCompacting ? (
-              <CompactingIndicator reason={compactionReason} />
-            ) : pendingApproval ? (
-              <div
-                aria-live="polite"
-                className="flex animate-in items-center gap-2 py-0.5 text-sm font-medium text-amber-600 duration-200 fade-in-0 dark:text-amber-400"
-              >
-                <span className="relative flex size-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500/60" />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-amber-500" />
-                </span>
-                Waiting for approval
-              </div>
-            ) : (
-              showThinkingIndicator && <ThinkingIndicator className="py-0.5" />
-            )}
+            {/* The trailing status row (thinking / compacting / approval) is part
+                of the scrollable transcript, so it must live inside
+                messagesContainerRef — the single content wrapper useChatScroll's
+                ResizeObserver watches for growth. Keeping it here (not a sibling)
+                is what lets its appearance grow the observed content and the
+                auto-follow snap the view onto it, so sending a message lands on
+                the thinking indicator rather than just the latest message row. */}
+            <div className="mx-auto w-full max-w-3xl px-3">
+              {isCompacting ? (
+                <CompactingIndicator reason={compactionReason} />
+              ) : pendingApproval ? (
+                <div
+                  aria-live="polite"
+                  className="flex animate-in items-center gap-2 py-0.5 text-sm font-medium text-amber-600 duration-200 fade-in-0 dark:text-amber-400"
+                >
+                  <span className="relative flex size-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500/60" />
+                    <span className="relative inline-flex size-1.5 rounded-full bg-amber-500" />
+                  </span>
+                  Waiting for approval
+                </div>
+              ) : (
+                showThinkingIndicator && <ThinkingIndicator className="py-0.5" />
+              )}
+            </div>
           </div>
         </div>
 
