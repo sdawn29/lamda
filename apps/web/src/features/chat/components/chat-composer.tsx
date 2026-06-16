@@ -9,19 +9,26 @@ export interface ChatComposerHandle {
 import {
   ArrowUpIcon,
   BotIcon,
+  BrainIcon,
   ChartColumnIcon,
   EraserIcon,
   FileTextIcon,
+  FolderPlusIcon,
+  FolderTreeIcon,
   HelpCircleIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
   MinimizeIcon,
   MoonIcon,
   PaperclipIcon,
+  PanelRightIcon,
+  PlugIcon,
   PlusIcon,
   SettingsIcon,
   StopCircleIcon,
   SunIcon,
+  TerminalSquareIcon,
+  VariableIcon,
   XIcon,
 } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
@@ -32,7 +39,10 @@ import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import { ShortcutKbd } from "@/shared/ui/kbd"
-import { useShortcutBinding } from "@/shared/components/keyboard-shortcuts-provider"
+import {
+  useShortcutBinding,
+  useRunShortcutAction,
+} from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import {
   useModels,
@@ -43,6 +53,7 @@ import {
   type WorkspaceEntry,
 } from "../queries"
 import { useWorkspaceIndex } from "@/features/workspace/queries"
+import { useEnvDialog } from "@/features/workspace"
 import { BranchSelector } from "@/features/git"
 import { ModelCombobox } from "./model-combobox"
 import { ModeCombobox, getModeOption } from "./mode-combobox"
@@ -209,6 +220,14 @@ export const ChatComposer = memo(
         params: { section: "usage" },
       })
     }, [navigate])
+    const openMemory = React.useCallback(() => {
+      navigate({ to: "/settings/$section", params: { section: "memory" } })
+    }, [navigate])
+    const openMcp = React.useCallback(() => {
+      navigate({ to: "/settings/$section", params: { section: "mcp" } })
+    }, [navigate])
+    const openEnvDialog = useEnvDialog((s) => s.openEnvDialog)
+    const runAction = useRunShortcutAction()
     const { resolvedTheme, setTheme } = useTheme()
     const selectedModelId = isControlled ? controlledModelId : internalModelId
     const selectedThinkingLevel = isThinkingControlled
@@ -396,6 +415,14 @@ export const ChatComposer = memo(
         })
       }
 
+      list.push({
+        kind: "action",
+        name: "new-workspace",
+        description: "Add a new workspace",
+        icon: FolderPlusIcon,
+        onSelect: () => runAction(SHORTCUT_ACTIONS.NEW_WORKSPACE),
+      })
+
       if (sessionId && !isLoading) {
         list.push({
           kind: "action",
@@ -450,6 +477,30 @@ export const ChatComposer = memo(
 
       list.push({
         kind: "action",
+        name: "terminal",
+        description: "Toggle the terminal panel",
+        icon: TerminalSquareIcon,
+        onSelect: () => runAction(SHORTCUT_ACTIONS.TOGGLE_TERMINAL),
+      })
+
+      list.push({
+        kind: "action",
+        name: "files",
+        description: "Toggle the file tree panel",
+        icon: FolderTreeIcon,
+        onSelect: () => runAction(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE),
+      })
+
+      list.push({
+        kind: "action",
+        name: "review",
+        description: "Toggle the review panel",
+        icon: PanelRightIcon,
+        onSelect: () => runAction(SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL),
+      })
+
+      list.push({
+        kind: "action",
         name: "help",
         description: "Open command palette",
         icon: HelpCircleIcon,
@@ -471,6 +522,32 @@ export const ChatComposer = memo(
         icon: ChartColumnIcon,
         onSelect: openUsage,
       })
+
+      list.push({
+        kind: "action",
+        name: "memory",
+        description: "Open the memory page",
+        icon: BrainIcon,
+        onSelect: openMemory,
+      })
+
+      list.push({
+        kind: "action",
+        name: "mcp",
+        description: "Open the MCP servers page",
+        icon: PlugIcon,
+        onSelect: openMcp,
+      })
+
+      if (workspaceId) {
+        list.push({
+          kind: "action",
+          name: "env",
+          description: "Edit workspace environment variables",
+          icon: VariableIcon,
+          onSelect: () => openEnvDialog(workspaceId),
+        })
+      }
 
       list.push({
         kind: "action",
@@ -499,8 +576,12 @@ export const ChatComposer = memo(
       openPalette,
       openSettings,
       openUsage,
+      openMemory,
+      openMcp,
+      openEnvDialog,
       resolvedTheme,
       setTheme,
+      runAction,
     ])
 
     const slashFilter = slashMention?.filter.toLowerCase() ?? ""

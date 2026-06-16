@@ -8,8 +8,15 @@
  * in memory and is keyed by tool-call id (globally unique per agent run).
  */
 
-/** The user's choice for a single tool-approval prompt. */
-export type ApprovalDecision = "once" | "always" | "never";
+/**
+ * The user's choice for a single tool-approval prompt.
+ *
+ * `once`/`always` allow (the latter remembers a workspace rule); `never` denies
+ * and remembers; `reject` denies just this one call without remembering. Both
+ * deny choices block the tool but let the agent keep going — neither aborts the
+ * turn.
+ */
+export type ApprovalDecision = "once" | "always" | "never" | "reject";
 
 interface PendingApproval {
   resolve: (decision: ApprovalDecision) => void;
@@ -17,8 +24,11 @@ interface PendingApproval {
 
 const pending = new Map<string, PendingApproval>();
 
-/** Treated as a block when the turn is aborted before the user responds. */
-const ABORTED_DECISION: ApprovalDecision = "never";
+/**
+ * Treated as a one-time block when the turn is aborted before the user
+ * responds — aborting shouldn't leave behind a permanent "never allow" rule.
+ */
+const ABORTED_DECISION: ApprovalDecision = "reject";
 
 /**
  * Register a pending approval and resolve once the user responds (or the agent

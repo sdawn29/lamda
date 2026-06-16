@@ -51,7 +51,7 @@ interface UseChatStreamOptions {
   initialPendingThinkingLevel?: string
   onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
   onToolApprovalRequest?: (event: { toolCallId: string; toolName: string; input: Record<string, unknown>; scopeLabel: string }) => void
-  onToolApprovalResolved?: (event: { toolCallId: string; decision: "once" | "always" | "never" }) => void
+  onToolApprovalResolved?: (event: { toolCallId: string; decision: "once" | "always" | "never" | "reject" }) => void
 }
 
 interface UseChatStreamResult {

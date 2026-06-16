@@ -679,9 +679,12 @@ export function ChatView({
   useShortcutHandler(SHORTCUT_ACTIONS.FOCUS_CHAT, () => {
     chatTextboxRef.current?.focus()
   })
+  // While a tool approval or question prompt is showing, Esc belongs to that
+  // prompt (reject / dismiss) — not to aborting the turn. Disarm the global
+  // stop shortcut so a single Esc doesn't both reject the tool and stop the run.
   useShortcutHandler(
     SHORTCUT_ACTIONS.STOP_GENERATION,
-    isLoading ? handleStop : null
+    isLoading && !pendingApproval && !activeQuestion ? handleStop : null
   )
   useShortcutHandler(SHORTCUT_ACTIONS.SCROLL_TO_BOTTOM, scrollToBottom)
   useShortcutHandler(SHORTCUT_ACTIONS.CYCLE_AGENT_MODE, cycleAgentMode)

@@ -90,6 +90,7 @@ export function createToolApprovalBridge(threadId: string): ToolApprovalBridge {
 
       const decision = await waitForApproval(req.toolCallId, signal);
 
+      // `always`/`never` persist a workspace rule; `once`/`reject` are one-offs.
       if (decision === "always") setToolDecision(req.cwd, storeKey, "allow");
       if (decision === "never") setToolDecision(req.cwd, storeKey, "deny");
 
@@ -98,7 +99,9 @@ export function createToolApprovalBridge(threadId: string): ToolApprovalBridge {
         decision,
       });
 
-      if (decision === "never") {
+      // Both deny choices block this call but let the agent continue; only
+      // `never` is remembered for the workspace.
+      if (decision === "never" || decision === "reject") {
         return { allow: false, reason: "Denied by user." };
       }
       return { allow: true };

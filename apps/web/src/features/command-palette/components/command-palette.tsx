@@ -5,12 +5,18 @@ import {
   PanelLeftIcon,
   PanelRightIcon,
   FolderTreeIcon,
+  FolderPlusIcon,
   SettingsIcon,
   PlusIcon,
   SunIcon,
   MoonIcon,
   MessageSquareIcon,
   RefreshCwIcon,
+  ChartColumnIcon,
+  Maximize2Icon,
+  BrainIcon,
+  PlugIcon,
+  VariableIcon,
   Loader2,
   PaletteIcon,
   CheckIcon,
@@ -30,12 +36,13 @@ import { useCommandPalette } from "../store"
 import {
   useShortcutHandler,
   useShortcutBinding,
+  useRunShortcutAction,
 } from "@/shared/components/keyboard-shortcuts-provider"
 import {
   SHORTCUT_ACTIONS,
   formatBindingParts,
 } from "@/shared/lib/keyboard-shortcuts"
-import { useWorkspace } from "@/features/workspace"
+import { useWorkspace, useEnvDialog } from "@/features/workspace"
 import { useWorkspaceIndex } from "@/features/workspace/queries"
 import { useTerminalForWorkspace } from "@/features/terminal"
 import { useMainTabs } from "@/features/main-tabs"
@@ -70,6 +77,17 @@ export function CommandPalette() {
       params: { section: DEFAULT_SETTINGS_SECTION },
     })
   }, [navigate])
+  const openUsage = useCallback(() => {
+    navigate({ to: "/settings/$section", params: { section: "usage" } })
+  }, [navigate])
+  const openMemory = useCallback(() => {
+    navigate({ to: "/settings/$section", params: { section: "memory" } })
+  }, [navigate])
+  const openMcp = useCallback(() => {
+    navigate({ to: "/settings/$section", params: { section: "mcp" } })
+  }, [navigate])
+  const openEnvDialog = useEnvDialog((s) => s.openEnvDialog)
+  const runAction = useRunShortcutAction()
   const { theme, setTheme, colorTheme, setColorTheme, colorThemes } = useTheme()
 
   const activeWorkspace =
@@ -99,7 +117,11 @@ export function CommandPalette() {
   const toggleDiffBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL)
   const toggleFileTreeBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE)
   const newThreadBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_THREAD)
+  const newWorkspaceBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_WORKSPACE)
   const openSettingsBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_SETTINGS)
+  const toggleFullscreenDiffBinding = useShortcutBinding(
+    SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF
+  )
 
   useShortcutHandler(SHORTCUT_ACTIONS.OPEN_COMMAND_PALETTE, openPalette)
 
@@ -253,6 +275,14 @@ export function CommandPalette() {
               {isFileTreeOpen ? "Close File Tree" : "Open File Tree"}
               <ShortcutHint binding={toggleFileTreeBinding} />
             </CommandItem>
+            <CommandItem
+              value="toggle fullscreen review diff expand"
+              onSelect={() => run(() => runAction(SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF))}
+            >
+              <Maximize2Icon />
+              Toggle Fullscreen Review
+              <ShortcutHint binding={toggleFullscreenDiffBinding} />
+            </CommandItem>
           </CommandGroup>
 
           <CommandSeparator />
@@ -265,6 +295,14 @@ export function CommandPalette() {
               <PlusIcon />
               New Thread
               <ShortcutHint binding={newThreadBinding} />
+            </CommandItem>
+            <CommandItem
+              value="new workspace add project folder"
+              onSelect={() => run(() => runAction(SHORTCUT_ACTIONS.NEW_WORKSPACE))}
+            >
+              <FolderPlusIcon />
+              New Workspace
+              <ShortcutHint binding={newWorkspaceBinding} />
             </CommandItem>
             <CommandItem
               value="open settings preferences"
@@ -288,6 +326,44 @@ export function CommandPalette() {
               <RefreshCwIcon />
               Reload Window
             </CommandItem>
+          </CommandGroup>
+
+          <CommandSeparator />
+
+          <CommandGroup heading="Settings">
+            <CommandItem
+              value="open ai usage tokens cost spend"
+              onSelect={() => run(openUsage)}
+            >
+              <ChartColumnIcon />
+              AI Usage
+            </CommandItem>
+            <CommandItem
+              value="open memory self-healing remember lessons"
+              onSelect={() => run(openMemory)}
+            >
+              <BrainIcon />
+              Memory
+            </CommandItem>
+            <CommandItem
+              value="open mcp servers model context protocol tools"
+              onSelect={() => run(openMcp)}
+            >
+              <PlugIcon />
+              MCP Servers
+            </CommandItem>
+            {activeWorkspace && (
+              <CommandItem
+                value="environment variables env secrets"
+                onSelect={() => run(() => openEnvDialog(activeWorkspace.id))}
+              >
+                <VariableIcon />
+                Environment Variables
+                {workspaces.length > 1 && (
+                  <CommandShortcut>{activeWorkspace.name}</CommandShortcut>
+                )}
+              </CommandItem>
+            )}
           </CommandGroup>
 
           <CommandSeparator />

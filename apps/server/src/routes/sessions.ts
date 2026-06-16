@@ -370,10 +370,14 @@ sessions.post("/session/:id/tool-approval", async (c) => {
     !body.toolCallId ||
     (body.decision !== "once" &&
       body.decision !== "always" &&
-      body.decision !== "never")
+      body.decision !== "never" &&
+      body.decision !== "reject")
   ) {
     return c.json(
-      { error: "toolCallId and decision ('once'|'always'|'never') are required" },
+      {
+        error:
+          "toolCallId and decision ('once'|'always'|'never'|'reject') are required",
+      },
       400,
     );
   }

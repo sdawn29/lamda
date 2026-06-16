@@ -234,7 +234,7 @@ export function submitQuestionAnswer(
 
 // ── Tool approvals ───────────────────────────────────────────────────────────
 
-export type ToolApprovalChoice = "once" | "always" | "never"
+export type ToolApprovalChoice = "once" | "always" | "never" | "reject"
 
 /**
  * Submit the user's decision for a paused tool call. The server resolves the

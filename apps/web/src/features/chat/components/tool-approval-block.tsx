@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
+  BanIcon,
   CheckIcon,
   FilePenLineIcon,
   PlugIcon,
@@ -113,7 +114,9 @@ export function ToolApprovalBlock({
   }, [])
 
   // Window-level shortcuts so they work wherever focus lands — but never while
-  // the user is typing in some other field: ⏎ allow · ⌘⏎ always · esc deny.
+  // the user is typing in some other field: ⏎ allow · ⌘⏎ always · esc reject.
+  // Esc rejects just this run (not the permanent "Don't allow"), so the safe,
+  // recoverable choice is the one a reflexive keypress lands on.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.isComposing) return
@@ -128,7 +131,7 @@ export function ToolApprovalBlock({
         void decide(e.metaKey || e.ctrlKey ? "always" : "once")
       } else if (e.key === "Escape") {
         e.preventDefault()
-        void decide("never")
+        void decide("reject")
       }
     }
     window.addEventListener("keydown", onKey)
@@ -180,27 +183,47 @@ export function ToolApprovalBlock({
         <span className="rounded bg-muted px-1 py-px font-mono text-foreground">
           {remembers}
         </span>{" "}
-        for this workspace.
+        for this workspace;{" "}
+        <span className="font-medium text-foreground">Allow once</span> /{" "}
+        <span className="font-medium text-foreground">Reject</span> apply only to
+        this run.
       </p>
 
       {/* Actions */}
-      <div className="flex items-center justify-between gap-2 border-t border-border/50 pt-3">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => decide("never")}
-          disabled={isSubmitting}
-          title="Don't allow — block and let the agent continue (Esc)"
-          className="h-6 gap-1 px-1.5 text-2xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-        >
-          {pending === "never" ? (
-            <LoadingSpinner size="sm" />
-          ) : (
-            <XIcon className="size-3" />
-          )}
-          Don&apos;t allow
-          <span className="ml-0.5 text-muted-foreground/70">esc</span>
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => decide("reject")}
+            disabled={isSubmitting}
+            title="Reject — skip just this run; the agent keeps going (Esc)"
+            className="h-6 gap-1 px-1.5 text-2xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          >
+            {pending === "reject" ? (
+              <LoadingSpinner size="sm" />
+            ) : (
+              <XIcon className="size-3" />
+            )}
+            Reject
+            <span className="ml-0.5 text-muted-foreground/70">esc</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => decide("never")}
+            disabled={isSubmitting}
+            title={`Don't allow — block now and always deny ${remembers} in this workspace`}
+            className="h-6 gap-1 px-1.5 text-2xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          >
+            {pending === "never" ? (
+              <LoadingSpinner size="sm" />
+            ) : (
+              <BanIcon className="size-3" />
+            )}
+            Don&apos;t allow
+          </Button>
+        </div>
 
         <div className="flex items-center gap-1">
           <Button

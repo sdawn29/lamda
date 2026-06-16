@@ -125,7 +125,7 @@ type ToolApprovalRequestEvent = {
 type ToolApprovalResolvedEvent = {
   type: "tool_approval_resolved";
   toolCallId: string;
-  decision: "once" | "always" | "never";
+  decision: "once" | "always" | "never" | "reject";
 };
 type HubEvent =
   | SessionEvent
@@ -664,16 +664,24 @@ class SessionEventHub {
     if (this.disposed) return;
     // Remember it so a thread re-mount can restore the prompt via /status.
     this.pendingApprovals.set(payload.toolCallId, payload);
+    // Surface in the sidebar: this thread is now paused waiting on the user.
+    threadStatusBroadcaster.broadcast(this.threadId, "awaiting");
     this.emit({ type: "tool_approval_request", ...payload });
   }
 
   /** Notify the client that a pending approval has been settled or cancelled. */
   emitToolApprovalResolved(payload: {
     toolCallId: string;
-    decision: "once" | "always" | "never";
+    decision: "once" | "always" | "never" | "reject";
   }): void {
     if (this.disposed) return;
     this.pendingApprovals.delete(payload.toolCallId);
+    // The user responded: the turn resumes. If other approvals are still
+    // pending, keep showing "awaiting"; otherwise the run is streaming again.
+    threadStatusBroadcaster.broadcast(
+      this.threadId,
+      this.pendingApprovals.size > 0 ? "awaiting" : "streaming",
+    );
     this.emit({ type: "tool_approval_resolved", ...payload });
   }
 
@@ -979,6 +987,12 @@ class SessionEventHub {
         args: msg.args,
       });
 
+      // The `question` tool blocks until the user answers — surface that pause
+      // in the sidebar the same way a gated tool's approval prompt does.
+      if (msg.toolName === "question") {
+        threadStatusBroadcaster.broadcast(this.threadId, "awaiting");
+      }
+
       // A duplicate start for a call we're already tracking would persist a
       // second block with the same toolCallId (duplicate React keys client-side)
       if (this.currentToolBlocks.has(msg.toolCallId)) return;
@@ -1009,6 +1023,14 @@ class SessionEventHub {
 
       const toolContext = this.currentToolBlocks.get(msg.toolCallId);
       this.currentToolBlocks.delete(msg.toolCallId);
+
+      // The question tool answered (or was aborted): the turn resumes, so clear
+      // the "awaiting" status. agent_end will set "idle" if it doesn't continue.
+      const toolName =
+        msg.toolName ?? this.toolMetaMap.get(msg.toolCallId)?.toolName;
+      if (toolName === "question" && this.runInProgress) {
+        threadStatusBroadcaster.broadcast(this.threadId, "streaming");
+      }
 
       if (toolContext) {
         const duration = Date.now() - toolContext.startTime;
@@ -1244,7 +1266,10 @@ class SessionEventRegistry {
 
   emitToolApprovalResolved(
     sessionId: string,
-    payload: { toolCallId: string; decision: "once" | "always" | "never" },
+    payload: {
+      toolCallId: string;
+      decision: "once" | "always" | "never" | "reject";
+    },
   ) {
     this.hubs.get(sessionId)?.emitToolApprovalResolved(payload);
   }

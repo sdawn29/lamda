@@ -63,7 +63,7 @@ import { ArchivedThreadsDialog } from "./archived-threads-dialog"
 import { FeedbackDialog } from "./feedback-dialog"
 import { CreateWorkspaceDialog } from "./create-workspace-dialog"
 import { WorkspaceEnvDialog } from "./workspace-env-dialog"
-import type { WorkspaceDto } from "../api"
+import { useEnvDialog } from "../env-dialog-store"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -252,7 +252,12 @@ const ThreadRow = memo(function ThreadRow({
         <SidebarMenuSubButton isActive={isActive} onClick={onClick}>
           <span className="flex h-4 w-4 shrink-0 items-center justify-center">
             <span className="flex h-4 w-4 items-center justify-center group-hover/thread:hidden">
-              {status === "streaming" ? (
+              {status === "awaiting" ? (
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500/70" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                </span>
+              ) : status === "streaming" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/60" />
               ) : status === "completed" ? (
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
@@ -328,7 +333,11 @@ export function AppSidebar() {
   const [deletingWorkspace, setDeletingWorkspace] = useState<
     (typeof workspaces)[0] | null
   >(null)
-  const [envWorkspace, setEnvWorkspace] = useState<WorkspaceDto | null>(null)
+  const envWorkspaceId = useEnvDialog((s) => s.workspaceId)
+  const openEnvDialog = useEnvDialog((s) => s.openEnvDialog)
+  const closeEnvDialog = useEnvDialog((s) => s.closeEnvDialog)
+  const envWorkspace =
+    workspaces.find((ws) => ws.id === envWorkspaceId) ?? null
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const navigate = useNavigate()
@@ -443,7 +452,7 @@ export function AppSidebar() {
             <ExternalLink className="mr-2 h-4 w-4" />
             Open in Editor
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setEnvWorkspace(ws)}>
+          <DropdownMenuItem onClick={() => openEnvDialog(ws.id)}>
             <KeyRound className="mr-2 h-4 w-4" />
             Environment Variables
           </DropdownMenuItem>
@@ -792,7 +801,7 @@ export function AppSidebar() {
         <WorkspaceEnvDialog
           workspace={envWorkspace}
           open={!!envWorkspace}
-          onOpenChange={(open) => { if (!open) setEnvWorkspace(null) }}
+          onOpenChange={(open) => { if (!open) closeEnvDialog() }}
         />
       )}
     </Sidebar>

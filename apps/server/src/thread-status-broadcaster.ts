@@ -3,8 +3,11 @@
  *
  * - "streaming": agent is actively processing (isStreaming: true)
  * - "idle": agent is not running (isStreaming: false)
+ * - "awaiting": agent is paused waiting for the user (a gated tool needs
+ *   approval, or a `question` tool is awaiting an answer). The turn is still
+ *   in progress; it resumes streaming once the user responds.
  */
-export type ThreadStatus = "streaming" | "idle";
+export type ThreadStatus = "streaming" | "idle" | "awaiting";
 
 export type ThreadStatusEvent = { threadId: string; status: ThreadStatus };
 

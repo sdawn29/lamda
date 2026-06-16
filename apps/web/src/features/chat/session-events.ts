@@ -91,7 +91,7 @@ export interface SessionToolApprovalRequestEvent {
 
 export interface SessionToolApprovalResolvedEvent {
   toolCallId: string;
-  decision: "once" | "always" | "never";
+  decision: "once" | "always" | "never" | "reject";
 }
 
 export interface SessionAutoRetryStartEvent {

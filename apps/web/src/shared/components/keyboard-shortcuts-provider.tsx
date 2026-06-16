@@ -17,6 +17,8 @@ type HandlerFn = () => void
 interface KbContextValue {
   shortcuts: Shortcuts
   registerHandler: (action: ShortcutAction, handler: HandlerFn) => () => void
+  /** Invoke a shortcut action's registered handler directly. Returns false if no handler is mounted. */
+  runAction: (action: ShortcutAction) => boolean
   updateShortcut: (action: ShortcutAction, binding: string) => void
   resetShortcuts: () => void
 }
@@ -65,6 +67,13 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
     },
     []
   )
+
+  const runAction = React.useCallback((action: ShortcutAction) => {
+    const handler = handlersRef.current.get(action)
+    if (!handler) return false
+    handler()
+    return true
+  }, [])
 
   const updateShortcut = React.useCallback(
     (action: ShortcutAction, binding: string) => {
@@ -116,8 +125,8 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
   }, [])
 
   const value = React.useMemo<KbContextValue>(
-    () => ({ shortcuts, registerHandler, updateShortcut, resetShortcuts }),
-    [shortcuts, registerHandler, updateShortcut, resetShortcuts]
+    () => ({ shortcuts, registerHandler, runAction, updateShortcut, resetShortcuts }),
+    [shortcuts, registerHandler, runAction, updateShortcut, resetShortcuts]
   )
 
   return (
@@ -148,6 +157,16 @@ export function useShortcutHandler(action: ShortcutAction, handler: HandlerFn | 
   React.useEffect(() => {
     return registerHandler(action, () => handlerRef.current?.())
   }, [action, registerHandler])
+}
+
+/**
+ * Returns a stable dispatcher that invokes a shortcut action's registered
+ * handler, letting non-keyboard surfaces (command palette, slash menu) reuse
+ * the same wiring as the keybinding without lifting the action's local state.
+ */
+export function useRunShortcutAction(): (action: ShortcutAction) => boolean {
+  const { runAction } = useKeyboardShortcuts()
+  return runAction
 }
 
 /** Returns the current formatted binding string for an action. */

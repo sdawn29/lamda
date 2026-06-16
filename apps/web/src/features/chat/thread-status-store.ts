@@ -3,7 +3,12 @@ import { persist, createJSONStorage } from "zustand/middleware"
 import { openGlobalWebSocket } from "./api"
 import { queryClient } from "@/shared/lib/query-client"
 
-export type ThreadStatus = "streaming" | "completed" | "idle" | "error"
+export type ThreadStatus =
+  | "streaming"
+  | "completed"
+  | "idle"
+  | "error"
+  | "awaiting"
 
 const STREAMED_THREADS_KEY = "lamda:streamed-threads"
 const COMPLETED_VIEW_TIMEOUT_MS = 5000
@@ -133,7 +138,7 @@ function handleGlobalMessage(e: MessageEvent): void {
     const data = JSON.parse(e.data as string) as {
       type: string
       threadId?: string
-      status?: "streaming" | "idle"
+      status?: "streaming" | "idle" | "awaiting"
       workspaceId?: string
       dir?: string
     }
@@ -142,6 +147,7 @@ function handleGlobalMessage(e: MessageEvent): void {
       if (data.status === "idle") {
         setStatus(data.threadId, isThreadStreamed(data.threadId) ? "completed" : "idle")
       } else {
+        // "streaming" and "awaiting" map through directly.
         setStatus(data.threadId, data.status)
       }
     }

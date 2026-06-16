@@ -326,7 +326,7 @@ export interface UseSessionStreamOptions {
   /** A gated tool is paused awaiting the user's approval. */
   onToolApprovalRequest?: (event: { toolCallId: string; toolName: string; input: Record<string, unknown>; scopeLabel: string }) => void
   /** A pending approval was settled or cancelled. */
-  onToolApprovalResolved?: (event: { toolCallId: string; decision: "once" | "always" | "never" }) => void
+  onToolApprovalResolved?: (event: { toolCallId: string; decision: "once" | "always" | "never" | "reject" }) => void
 }
 
 export function useSessionStream({
