@@ -32,6 +32,10 @@ export const threads = sqliteTable("threads", {
     .notNull()
     .default("ask"),
   lastAccessedAt: integer("last_accessed_at"),
+  // Epoch ms of the last memory-reflection pass over this thread. Reflection
+  // only mines message blocks created after this watermark, so frequent passes
+  // (per-N-turns, idle, shutdown) stay cheap and don't re-scan old transcript.
+  lastReflectedAt: integer("last_reflected_at"),
   createdAt: integer("created_at").notNull(),
   forkedFromId: text("forked_from_id"),
   // Durable checkpoint SHA capturing the working-tree state when this thread was

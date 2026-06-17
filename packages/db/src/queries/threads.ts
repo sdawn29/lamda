@@ -63,6 +63,11 @@ export function updateThreadLastAccessed(id: string) {
   db.update(threads).set({ lastAccessedAt: Date.now() }).where(eq(threads.id, id)).run()
 }
 
+/** Advance the memory-reflection watermark so future passes skip already-mined blocks. */
+export function updateThreadLastReflectedAt(id: string, at: number = Date.now()) {
+  db.update(threads).set({ lastReflectedAt: at }).where(eq(threads.id, id)).run()
+}
+
 export function archiveThread(id: string) {
   db.update(threads).set({ isArchived: true }).where(eq(threads.id, id)).run()
 }

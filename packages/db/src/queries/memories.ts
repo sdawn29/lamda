@@ -135,6 +135,11 @@ export function updateMemory(
     .set({ ...set, updatedAt: Date.now() })
     .where(eq(agentMemories.id, id))
     .run()
+  // The stored embedding reflects the old title/content; drop it when either
+  // changes so the background backfill re-embeds and semantic search stays accurate.
+  if (set.title !== undefined || set.content !== undefined) {
+    deleteMemoryVector(id)
+  }
 }
 
 export function deleteMemory(id: string): void {
@@ -202,6 +207,46 @@ function vecSearchIds(embedding: number[], limit: number): string[] {
       LIMIT ${limit}
     `)
     return rows.map((r) => r.id)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Nearest stored memories to an embedding that are visible to the workspace,
+ * each with its vec0 distance (smaller = more similar), nearest first. Used for
+ * semantic deduplication before inserting a new memory. Returns [] when
+ * sqlite-vec is unavailable or nothing is indexed yet. The unscoped KNN is
+ * over-fetched, then scope-filtered and re-ordered so visibility is honoured.
+ */
+export function nearestVisibleMemories(
+  embedding: number[],
+  workspaceId: string | undefined,
+  limit = 5,
+): { row: MemoryRow; distance: number }[] {
+  if (!isVecAvailable() || embedding.length === 0) return []
+  try {
+    const hits = db.all<{ id: string; distance: number }>(sql`
+      SELECT id, distance FROM agent_memories_vec
+      WHERE embedding MATCH ${JSON.stringify(embedding)}
+      ORDER BY distance
+      LIMIT ${limit * 4}
+    `)
+    if (hits.length === 0) return []
+    const ids = hits.map((h) => h.id)
+    const visible = db
+      .select()
+      .from(agentMemories)
+      .where(and(inArray(agentMemories.id, ids), visibleTo(workspaceId)))
+      .all() as MemoryRow[]
+    const byId = new Map(visible.map((r) => [r.id, r]))
+    const out: { row: MemoryRow; distance: number }[] = []
+    for (const h of hits) {
+      const row = byId.get(h.id)
+      if (row) out.push({ row, distance: h.distance })
+      if (out.length >= limit) break
+    }
+    return out
   } catch {
     return []
   }

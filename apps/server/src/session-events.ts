@@ -28,6 +28,11 @@ import { store } from "./store.js";
 
 const MAX_RECENT_EVENTS = 512;
 
+// Run a background memory-reflection pass every this-many completed turns, so
+// long-running threads consolidate learnings periodically instead of only at
+// compaction/archive. Reflection is watermarked + deduped, so this is cheap.
+const REFLECT_EVERY_N_TURNS = 6;
+
 // ── Session status types ──────────────────────────────────────────────────────
 
 export type SessionPendingError = {
@@ -87,11 +92,15 @@ export type HealingStatusEvent =
 let agentTurnObserver: ((info: AgentTurnEndInfo) => void) | null = null;
 let sessionCrashObserver: ((info: SessionCrashInfo) => void) | null = null;
 
-export function setAgentTurnObserver(cb: (info: AgentTurnEndInfo) => void): void {
+export function setAgentTurnObserver(
+  cb: (info: AgentTurnEndInfo) => void,
+): void {
   agentTurnObserver = cb;
 }
 
-export function setSessionCrashObserver(cb: (info: SessionCrashInfo) => void): void {
+export function setSessionCrashObserver(
+  cb: (info: SessionCrashInfo) => void,
+): void {
   sessionCrashObserver = cb;
 }
 
@@ -227,6 +236,7 @@ class SessionEventHub {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private onIdle: (() => void) | null = null;
   private cachedWorkspaceId: string | null = null;
+  private turnsSinceReflection = 0;
 
   constructor(
     private readonly sessionId: string,
@@ -342,7 +352,9 @@ class SessionEventHub {
     // Tool name may arrive on the event or only on the earlier _start.
     const meta = this.toolMetaMap.get(msg.toolCallId);
     const toolName = (msg.toolName ?? meta?.toolName ?? "").toLowerCase();
-    const args = meta?.args as { path?: unknown; operation?: unknown } | undefined;
+    const args = meta?.args as
+      | { path?: unknown; operation?: unknown }
+      | undefined;
     // A plan is saved by either the `plan` tool (operation "write") or a raw
     // `write` that happens to target the plan dir.
     const isPlanToolWrite = toolName === "plan" && args?.operation === "write";
@@ -803,6 +815,7 @@ class SessionEventHub {
 
         if (event.type === "agent_end") {
           this.notifyTurnEnd(event);
+          this.maybeReflectAfterTurn();
         }
       }
     } catch (error) {
@@ -831,6 +844,18 @@ class SessionEventHub {
     }
   }
 
+  /**
+   * Periodically consolidate durable memories from a long-running thread. Fires
+   * a background reflection pass once every REFLECT_EVERY_N_TURNS completed turns
+   * so learnings aren't lost on threads that never compact or get archived.
+   * Watermarked + deduped downstream, so over-firing is harmless.
+   */
+  private maybeReflectAfterTurn(): void {
+    if (++this.turnsSinceReflection < REFLECT_EVERY_N_TURNS) return;
+    this.turnsSinceReflection = 0;
+    scheduleReflection(this.threadId);
+  }
+
   /** Derive a turn outcome from agent_end and notify the healing observer. */
   private notifyTurnEnd(event: SessionEvent): void {
     if (!agentTurnObserver) return;
@@ -845,7 +870,10 @@ class SessionEventHub {
     let errorMessage: string | undefined;
     if (lastAssistant?.stopReason === "aborted") {
       outcome = "aborted";
-    } else if (lastAssistant?.stopReason === "error" && lastAssistant.errorMessage) {
+    } else if (
+      lastAssistant?.stopReason === "error" &&
+      lastAssistant.errorMessage
+    ) {
       outcome = "error";
       errorMessage = lastAssistant.errorMessage;
     }
@@ -1233,6 +1261,9 @@ class SessionEventRegistry {
       cwd ?? null,
       () => {
         this.hubs.delete(sessionId);
+        // Going idle (no subscribers) is the natural "thread is dormant" signal:
+        // consolidate durable memories from it before it's torn down.
+        scheduleReflection(threadId);
       },
     );
     this.hubs.set(sessionId, hub);

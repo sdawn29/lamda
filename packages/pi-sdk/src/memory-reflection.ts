@@ -78,8 +78,12 @@ function coerceProposals(raw: unknown): MemoryProposal[] {
 /**
  * Run a single tool-free model pass over a thread transcript and return the
  * memories worth persisting. Mirrors generateThreadTitle's session setup so auth
- * and model resolution behave identically. Returns [] on any failure — reflection
- * is best-effort and must never throw into the caller's teardown path.
+ * and model resolution behave identically. Never throws — reflection is
+ * best-effort and must not break the caller's teardown path.
+ *
+ * Returns `null` when the model call itself failed (so the caller can leave its
+ * reflection watermark unchanged and retry the same transcript later), versus an
+ * array (possibly empty) when the model responded but nothing qualified.
  *
  * @param transcript  Rendered conversation text (user/assistant/tool turns).
  * @param existingTitles  Titles of memories already stored for this workspace,
@@ -89,7 +93,7 @@ export async function generateMemoryProposals(
   transcript: string,
   existingTitles: string[],
   config: SdkConfig = {},
-): Promise<MemoryProposal[]> {
+): Promise<MemoryProposal[] | null> {
   if (!transcript.trim()) return []
 
   const authStorage = buildAuthStorage(config)
@@ -125,12 +129,16 @@ export async function generateMemoryProposals(
       session.dispose()
     }
   } catch {
-    return []
+    // The model call failed — signal that so the caller doesn't advance its
+    // watermark past a transcript it never actually got to analyse.
+    return null
   }
 
   try {
     return coerceProposals(JSON.parse(stripFences(answer)))
   } catch {
+    // The model responded but produced unparseable output — treat as "nothing
+    // worth keeping" rather than a failure; the window has been considered.
     return []
   }
 }

@@ -55,6 +55,11 @@ export function createAssistantMessage(
     role: "assistant",
     content: value.content ?? "",
     thinking: value.thinking ?? "",
+    // Stamp creation time so a live-streamed reply shows its timestamp in the
+    // metadata row immediately, matching what the persisted DB block records
+    // (createdAt is set when the assistant block starts). Without this, the
+    // timestamp only appeared after the message was reloaded from the DB.
+    createdAt: Date.now(),
     ...(value.model !== undefined ? { model: value.model } : {}),
     ...(value.provider !== undefined ? { provider: value.provider } : {}),
     ...(value.thinkingLevel !== undefined

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   BanIcon,
+  BrainIcon,
   CheckIcon,
   FilePenLineIcon,
   PlugIcon,
@@ -38,7 +39,10 @@ const str = (v: unknown): string | undefined =>
   typeof v === "string" ? v : undefined
 
 /** Describe what a tool call is about to do, for the header + target display. */
-function describeTool(toolName: string, input: Record<string, unknown>): ToolMeta {
+function describeTool(
+  toolName: string,
+  input: Record<string, unknown>
+): ToolMeta {
   switch (toolName) {
     case "bash":
       return {
@@ -58,6 +62,12 @@ function describeTool(toolName: string, input: Record<string, unknown>): ToolMet
         icon: FilePenLineIcon,
         label: "Write file",
         target: str(input.path) ?? str(input.file_path),
+      }
+    case "memory":
+      return {
+        icon: BrainIcon,
+        label: "Update memory",
+        target: str(input.operation),
       }
     default:
       return {
@@ -147,7 +157,7 @@ export function ToolApprovalBlock({
     >
       {/* Header — icon + title/subtitle + tool name */}
       <div className="flex items-center gap-2.5">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 ring-1 ring-inset ring-amber-500/20 dark:text-amber-400">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20 ring-inset dark:text-amber-400">
           <Icon className="size-4" />
         </span>
         <div className="flex min-w-0 flex-col">
@@ -166,9 +176,11 @@ export function ToolApprovalBlock({
       {/* Target — the command / file / arg being acted on (focal) */}
       {meta.target && (
         <div className="max-h-32 overflow-auto rounded-lg border border-border/60 bg-muted/40 px-3 py-2">
-          <code className="block font-mono text-xs leading-relaxed whitespace-pre-wrap break-all text-foreground">
+          <code className="block font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-foreground">
             {meta.isCommand && (
-              <span className="mr-1.5 select-none text-muted-foreground">$</span>
+              <span className="mr-1.5 text-muted-foreground select-none">
+                $
+              </span>
             )}
             {meta.target}
           </code>
@@ -185,8 +197,8 @@ export function ToolApprovalBlock({
         </span>{" "}
         for this workspace;{" "}
         <span className="font-medium text-foreground">Allow once</span> /{" "}
-        <span className="font-medium text-foreground">Reject</span> apply only to
-        this run.
+        <span className="font-medium text-foreground">Reject</span> apply only
+        to this run.
       </p>
 
       {/* Actions */}

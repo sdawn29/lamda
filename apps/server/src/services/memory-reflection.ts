@@ -2,13 +2,11 @@ import {
   getThread,
   listMessageBlocks,
   listMemories,
-  insertMemory,
-  bumpConfidence,
-  findMemoryByTitle,
+  updateThreadLastReflectedAt,
   getAllSettings,
   type MessageBlock,
 } from "@lamda/db";
-import { generateMemoryProposals } from "@lamda/pi-sdk";
+import { generateMemoryProposals, persistMemory } from "@lamda/pi-sdk";
 import { scheduleEmbeddingBackfill } from "./memory-embeddings.js";
 
 /** Max transcript characters fed to the reflection model (keeps token cost bounded). */
@@ -20,7 +18,10 @@ const MIN_TRANSCRIPT_CHARS = 200;
 const inFlight = new Set<string>();
 
 /** Splits a stored `provider::model` settings key into its parts. */
-function parseModelKey(key: string | undefined): { provider?: string; model?: string } {
+function parseModelKey(key: string | undefined): {
+  provider?: string;
+  model?: string;
+} {
   if (!key) return {};
   const idx = key.indexOf("::");
   if (idx === -1) return {};
@@ -65,8 +66,14 @@ export async function reflectOnThread(threadId: string): Promise<void> {
     if (!thread) return;
     const workspaceId = thread.workspaceId;
 
+    // Only mine blocks added since the last reflection pass, so the frequent
+    // triggers (per-N-turns, idle, shutdown) re-analyse just the new transcript
+    // rather than re-scanning the whole thread each time.
+    const since = thread.lastReflectedAt ?? 0;
     const blocks = listMessageBlocks(threadId);
-    const transcript = renderTranscript(blocks);
+    const newBlocks =
+      since > 0 ? blocks.filter((b) => b.createdAt > since) : blocks;
+    const transcript = renderTranscript(newBlocks);
     if (transcript.length < MIN_TRANSCRIPT_CHARS) return;
 
     // Titles already known for this workspace (+ user scope), so the model can dedup.
@@ -78,10 +85,18 @@ export async function reflectOnThread(threadId: string): Promise<void> {
     const all = getAllSettings();
     const { provider, model } = parseModelKey(all["title_generation_model"]);
 
-    const proposals = await generateMemoryProposals(transcript, existingTitles, {
-      provider,
-      model,
-    });
+    const proposals = await generateMemoryProposals(
+      transcript,
+      existingTitles,
+      {
+        provider,
+        model,
+      },
+    );
+
+    // The model call failed — leave the watermark untouched so this same window
+    // gets retried on the next trigger rather than being silently dropped.
+    if (proposals === null) return;
 
     let inserted = 0;
     for (const p of proposals) {
@@ -89,20 +104,11 @@ export async function reflectOnThread(threadId: string): Promise<void> {
       // this thread somehow has none, rather than dropping the learning.
       const scope = p.scope === "workspace" && !workspaceId ? "user" : p.scope;
 
-      // Re-observing an existing memory reinforces it (higher confidence) rather
-      // than stacking a duplicate.
-      const existingMatch = findMemoryByTitle(
-        p.title,
-        scope === "workspace" ? workspaceId : undefined,
-      );
-      if (existingMatch) {
-        bumpConfidence(existingMatch.id);
-        continue;
-      }
-
-      insertMemory({
+      // persistMemory applies secret-scanning, dedup (exact title + semantic) and
+      // supersession, so re-observed facts reinforce rather than stack duplicates.
+      const result = await persistMemory({
         scope,
-        workspaceId: scope === "workspace" ? workspaceId : null,
+        workspaceId,
         title: p.title,
         content: p.content,
         kind: p.kind,
@@ -111,9 +117,16 @@ export async function reflectOnThread(threadId: string): Promise<void> {
         filePaths: p.filePaths ?? null,
         confidence: p.confidence ?? 0.6,
       });
-      inserted++;
+      if (result.outcome === "created" || result.outcome === "superseded")
+        inserted++;
     }
-    // Embed the newly-saved memories so semantic retrieval can find them.
+
+    // This window has now been analysed — advance the watermark so it isn't
+    // re-mined, regardless of whether anything new was extracted.
+    updateThreadLastReflectedAt(threadId);
+
+    // Catch any memories left unembedded (e.g. provider briefly unavailable at
+    // persist time) so semantic retrieval can find them later.
     if (inserted > 0) scheduleEmbeddingBackfill();
   } catch {
     // Reflection is best-effort — swallow everything so teardown is never blocked.

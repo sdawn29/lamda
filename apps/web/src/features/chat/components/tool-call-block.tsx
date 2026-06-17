@@ -2,6 +2,7 @@ import { lazy, memo, Suspense, useEffect, useRef, useState } from "react"
 import {
   AlertCircleIcon,
   ArrowRightIcon,
+  BrainIcon,
   CheckIcon,
   CircleDotIcon,
   CopyIcon,
@@ -167,20 +168,22 @@ export function ToolGlyph({
   const Icon =
     name === "bash" || name.includes("terminal") || name.includes("command")
       ? SquareTerminalIcon
-      : name.includes("edit")
-        ? FilePenLineIcon
-        : name === "write"
-          ? FilePlus2Icon
-          : name === "read" || name === "plan"
-            ? FileTextIcon
-            : name.includes("fetch") || name.includes("web")
-              ? GlobeIcon
-              : name.includes("grep") ||
-                  name.includes("glob") ||
-                  name.includes("search") ||
-                  name === "find"
-                ? SearchIcon
-                : WrenchIcon
+      : name === "memory"
+        ? BrainIcon
+        : name.includes("edit")
+          ? FilePenLineIcon
+          : name === "write"
+            ? FilePlus2Icon
+            : name === "read" || name === "plan"
+              ? FileTextIcon
+              : name.includes("fetch") || name.includes("web")
+                ? GlobeIcon
+                : name.includes("grep") ||
+                    name.includes("glob") ||
+                    name.includes("search") ||
+                    name === "find"
+                  ? SearchIcon
+                  : WrenchIcon
   return <Icon className={className} />
 }
 

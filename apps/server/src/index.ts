@@ -5,8 +5,10 @@ import { URL } from "node:url";
 import { resolvePort } from "./port.js";
 import app from "./app.js";
 import { bootstrapSessions } from "./bootstrap.js";
+import { store } from "./store.js";
 import { registerHealingHooks } from "./services/healing-service.js";
 import { scheduleEmbeddingBackfill } from "./services/memory-embeddings.js";
+import { reflectOnThread } from "./services/memory-reflection.js";
 import { handleTerminalConnection } from "./services/terminal-service.js";
 import { handleSessionEventsWs } from "./routes/sessions.js";
 import { handleGlobalEventsWs } from "./routes/health.js";
@@ -157,5 +159,36 @@ bootstrapSessions()
     process.exit(1);
   });
 
-process.on("SIGTERM", () => process.exit(0));
-process.on("SIGINT", () => process.exit(0));
+// On graceful shutdown, give every live thread a final memory-reflection pass so
+// learnings from an active session aren't lost when the process exits. Bounded by
+// a short budget — reflection is a model call, and quitting must stay snappy.
+let shuttingDown = false;
+const SHUTDOWN_REFLECT_BUDGET_MS = 2500;
+
+async function reflectThenExit(): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    const threadIds = new Set<string>();
+    for (const { sessionId } of store.getAll()) {
+      const threadId = store.getThreadId(sessionId);
+      if (threadId) threadIds.add(threadId);
+    }
+    if (threadIds.size > 0) {
+      const work = Promise.allSettled(
+        [...threadIds].map((id) => reflectOnThread(id)),
+      );
+      const budget = new Promise<void>((resolve) =>
+        setTimeout(resolve, SHUTDOWN_REFLECT_BUDGET_MS).unref?.(),
+      );
+      await Promise.race([work, budget]);
+    }
+  } catch {
+    // Best-effort — never block shutdown on reflection.
+  } finally {
+    process.exit(0);
+  }
+}
+
+process.on("SIGTERM", () => void reflectThenExit());
+process.on("SIGINT", () => void reflectThenExit());

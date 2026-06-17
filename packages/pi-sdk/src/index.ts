@@ -16,6 +16,12 @@ export { createMemoryTool, MEMORY_TOOL_NAME } from "./memory-tool.js";
 export type { MemoryItem, MemoryToolResult, MemoryScope } from "./memory-tool.js";
 export { generateMemoryProposals } from "./memory-reflection.js";
 export type { MemoryProposal } from "./memory-reflection.js";
+export { persistMemory, looksLikeSecret } from "./memory-persist.js";
+export type {
+  PersistMemoryInput,
+  PersistResult,
+  PersistOutcome,
+} from "./memory-persist.js";
 export { embeddingsEnabled, embedDocuments, embedQuery } from "./embeddings.js";
 export {
   renderMemoryBlock,

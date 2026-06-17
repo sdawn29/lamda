@@ -350,6 +350,16 @@ function createDb() {
     // Safe to ignore — column may already exist.
   }
 
+  // Migration: Add last_reflected_at column to threads (memory-reflection watermark).
+  try {
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!threadCols.some((col) => col.name === "last_reflected_at")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN last_reflected_at INTEGER`);
+    }
+  } catch {
+    // Safe to ignore — column may already exist.
+  }
+
   // Migration: Update message_blocks CHECK constraint to include 'abort' and 'compaction' roles.
   // SQLite doesn't support ALTER TABLE for CHECK constraints, so we recreate the table when needed.
   try {

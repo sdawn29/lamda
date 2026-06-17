@@ -1,6 +1,5 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent"
 import {
-  insertMemory,
   getMemory,
   listMemories,
   searchMemories,
@@ -11,6 +10,7 @@ import {
   type MemoryScope,
   type MemoryKind,
 } from "@lamda/db"
+import { persistMemory, type PersistOutcome } from "./memory-persist.js"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -204,9 +204,9 @@ Never save: secrets, credentials, API keys, tokens, or anything derivable by rea
             }
             const category =
               typeof p.category === "string" && p.category.trim() ? p.category.trim() : null
-            const id = insertMemory({
+            const result = await persistMemory({
               scope,
-              workspaceId: scope === "workspace" ? workspaceId : null,
+              workspaceId,
               title,
               content,
               category,
@@ -215,8 +215,17 @@ Never save: secrets, credentials, API keys, tokens, or anything derivable by rea
               pinned: p.pinned === true,
               source: "agent",
             })
-            const row = getMemory(id)
-            return ok("save", row ? [row] : [], `Memory saved (scope: ${scope}).`)
+            if (result.outcome === "rejected") {
+              return err(result.message ?? "Memory rejected.")
+            }
+            const savedMessage: Record<Exclude<PersistOutcome, "rejected">, string> = {
+              created: `Memory saved (scope: ${scope}).`,
+              reinforced:
+                "A matching memory already existed — reinforced it instead of saving a duplicate.",
+              superseded:
+                "Replaced an existing memory with the same title; the prior version was superseded.",
+            }
+            return ok("save", result.row ? [result.row] : [], savedMessage[result.outcome])
           }
 
           // ── list ────────────────────────────────────────────────────────────
