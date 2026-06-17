@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.26.0](../../releases/tag/v0.26.0) — 2026-06-17
+
+### Features
+
+* **memory:** implement memory reflection and persistence enhancements
+
 ## [0.25.1](../../releases/tag/v0.25.1) — 2026-06-16
 
 ### Other Changes
