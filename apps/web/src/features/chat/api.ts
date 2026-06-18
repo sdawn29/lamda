@@ -334,6 +334,20 @@ export function listBranches(sessionId: string): Promise<BranchesResponse> {
   return apiFetch<BranchesResponse>(`/session/${sessionId}/branches`)
 }
 
+export interface SessionWorktree {
+  path: string
+  branch: string
+}
+
+/** Branches checked out in a secondary worktree for this session's repo. */
+export function listSessionWorktrees(
+  sessionId: string
+): Promise<{ worktrees: SessionWorktree[] }> {
+  return apiFetch<{ worktrees: SessionWorktree[] }>(
+    `/session/${sessionId}/worktrees`
+  )
+}
+
 export function checkoutBranch(
   sessionId: string,
   branch: string

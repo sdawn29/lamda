@@ -29,6 +29,10 @@ export interface ThreadDto {
   sessionId: string | null
   isPinned?: boolean
   forkedFromId?: string | null
+  /** Absolute worktree path when this thread runs inside a git worktree; null = local. */
+  worktreePath?: string | null
+  /** Branch checked out in the thread's worktree; null when local. */
+  worktreeBranch?: string | null
 }
 
 export interface WorkspaceDto {
@@ -74,6 +78,89 @@ export async function createWorkspace(
 
 export function deleteWorkspace(id: string): Promise<void> {
   return apiFetch<void>(`/workspace/${id}`, { method: "DELETE" })
+}
+
+// ── Thread worktrees ──────────────────────────────────────────────────────────
+
+export interface CreateThreadWorktreeBody {
+  /** Name of the new branch to create for the worktree. */
+  newBranch: string
+  /** Base ref to fork from; defaults to the workspace's current branch when omitted. */
+  baseRef?: string
+}
+
+/** Moves a thread into a freshly created worktree on a new branch. */
+export function createThreadWorktree(
+  threadId: string,
+  body: CreateThreadWorktreeBody
+): Promise<{ worktreePath: string; worktreeBranch: string }> {
+  return apiFetch<{ worktreePath: string; worktreeBranch: string }>(
+    `/thread/${threadId}/worktree`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  )
+}
+
+/** Moves a thread into an existing worktree identified by its branch. */
+export function enterThreadWorktree(
+  threadId: string,
+  branch: string
+): Promise<{ worktreePath: string; worktreeBranch: string }> {
+  return apiFetch<{ worktreePath: string; worktreeBranch: string }>(
+    `/thread/${threadId}/worktree/enter`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ branch }),
+    }
+  )
+}
+
+/** Moves a thread back to the workspace directory, leaving the worktree on disk. */
+export function switchThreadToLocal(threadId: string): Promise<void> {
+  return apiFetch<void>(`/thread/${threadId}/worktree/local`, { method: "POST" })
+}
+
+/** Result of a merge attempt. `uncommitted` asks the caller to confirm forcing. */
+export type MergeWorktreeResult =
+  | { ok: true; branch: string }
+  | { ok: false; uncommitted: true; error: string }
+  | { ok: false; uncommitted: false; error: string }
+
+/**
+ * Merges a thread's worktree branch back into the workspace, then removes the
+ * worktree and returns the thread to the workspace directory. A 409 with
+ * `uncommitted` means the worktree has un-mergeable changes — re-call with
+ * `force` to proceed. Other 409s (e.g. merge conflicts) surface as errors.
+ */
+export async function mergeThreadWorktree(
+  threadId: string,
+  force = false
+): Promise<MergeWorktreeResult> {
+  const base = await getServerUrl()
+  const token = getResolvedServerToken()
+  const res = await fetch(
+    `${base}/thread/${threadId}/worktree/merge?force=${force}`,
+    {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  )
+  if (res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { branch?: string }
+    return { ok: true, branch: data.branch ?? "" }
+  }
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string
+    uncommitted?: boolean
+  }
+  if (res.status === 409 && data.uncommitted) {
+    return { ok: false, uncommitted: true, error: data.error ?? "Worktree has uncommitted changes" }
+  }
+  return { ok: false, uncommitted: false, error: data.error ?? `Merge failed (${res.status})` }
 }
 
 export function updateWorkspaceOpenWithApp(
@@ -235,12 +322,20 @@ export function listWorkspaceIndexFiles(
   return apiFetch<{ files: WorkspaceFileEntry[] }>(`/workspace/${workspaceId}/files`)
 }
 
-/** Lists the immediate children of one directory (lazy file tree). `relPath` "" = root. */
+/**
+ * Lists the immediate children of one directory (lazy file tree). `relPath` ""
+ * = root. When `threadId` names a thread running in a worktree, the listing is
+ * read from that worktree's directory instead of the workspace path.
+ */
 export function listWorkspaceDir(
   workspaceId: string,
-  relPath: string
+  relPath: string,
+  threadId?: string | null
 ): Promise<{ entries: WorkspaceFileEntry[] }> {
-  const query = relPath ? `?path=${encodeURIComponent(relPath)}` : ""
+  const params = new URLSearchParams()
+  if (relPath) params.set("path", relPath)
+  if (threadId) params.set("threadId", threadId)
+  const query = params.toString() ? `?${params.toString()}` : ""
   return apiFetch<{ entries: WorkspaceFileEntry[] }>(
     `/workspace/${workspaceId}/dir${query}`
   )

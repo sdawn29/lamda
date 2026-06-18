@@ -134,6 +134,61 @@ export function gitCwd(id: string): string | null {
 }
 
 /**
+ * The directory a thread's session runs in: its git worktree when one is
+ * attached, otherwise the workspace's own path.
+ */
+export function resolveThreadCwd(
+  thread: { worktreePath?: string | null } | null | undefined,
+  workspacePath: string,
+): string {
+  return thread?.worktreePath || workspacePath;
+}
+
+/**
+ * Reopens a thread's live session in `newCwd`, preserving its conversation by
+ * reusing the same session file, so the same thread keeps running in the new
+ * directory (used when a thread moves into or out of a worktree). No-op when
+ * the thread has no live session — the next open derives cwd from the DB.
+ * Returns true when a live session was relocated.
+ */
+export async function relocateThreadSession(
+  threadId: string,
+  newCwd: string,
+): Promise<boolean> {
+  const existing = store.getByThreadId(threadId);
+  if (!existing) return false;
+  const entry = store.get(existing.sessionId);
+  if (!entry) return false;
+
+  const sessionFile =
+    entry.handle.sessionFile ?? getThread(threadId)?.sessionFile ?? null;
+
+  // Pre-create the plan dir in the new cwd so plan-mode writes don't fail.
+  await mkdir(join(newCwd, PLAN_DIR), { recursive: true }).catch(() => {});
+
+  if (sessionFile) {
+    const newHandle = await openSessionForThread(
+      threadId,
+      sessionFile,
+      newCwd,
+      entry.workspaceId,
+    );
+    store.replaceHandle(existing.sessionId, newHandle);
+  }
+  // Keep the recorded cwd in sync even if there was no file to reopen, so git
+  // routes (which read store.getCwd) target the new directory.
+  store.updateCwd(existing.sessionId, newCwd);
+
+  // Re-attach the event hub to the (possibly new) handle in the new cwd.
+  await sessionEvents.dispose(existing.sessionId);
+  const refreshed = store.get(existing.sessionId);
+  if (refreshed) {
+    sessionEvents.ensure(existing.sessionId, threadId, refreshed.handle, newCwd);
+  }
+  return true;
+}
+
+/**
  * Merge MCP- and LSP-derived tools for a workspace. Both are loaded in
  * parallel; failures in either don't block the other.
  */

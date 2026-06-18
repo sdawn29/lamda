@@ -1,4 +1,5 @@
 import { createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent"
+import { lamdaPromptTemplatePaths } from "./lamda-paths.js"
 import type { SlashCommand } from "./types.js"
 
 // Duck-typed shape for the parts of the SDK resource loader we read. Avoids a
@@ -40,6 +41,9 @@ export async function getWorkspaceCommands(cwd: string): Promise<SlashCommand[]>
   const services = await createAgentSessionServices({
     cwd,
     agentDir: getAgentDir(),
+    resourceLoaderOptions: {
+      additionalPromptTemplatePaths: lamdaPromptTemplatePaths(cwd),
+    },
   })
   return mapResourceCommands(services.resourceLoader as ResourceLoaderLike)
 }

@@ -10,8 +10,12 @@ import {
 export const workspaceKeys = {
   all: ["workspaces"] as const,
   files: (workspaceId: string) => ["workspace-files", workspaceId] as const,
-  dir: (workspaceId: string, relPath: string) =>
-    ["workspace-dir", workspaceId, relPath] as const,
+  // Keyed by the effective root directory (workspace path, or a worktree path
+  // when the active thread runs in one) rather than the workspace id, so the
+  // tree's worktree and workspace views of the same relative path stay distinct
+  // and the `workspace_dir_changed` event (which carries `root`) matches.
+  dir: (root: string, relPath: string) =>
+    ["workspace-dir", root, relPath] as const,
 }
 
 export const workspacesQueryKey = workspaceKeys.all

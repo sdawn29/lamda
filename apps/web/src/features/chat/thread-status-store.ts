@@ -140,6 +140,7 @@ function handleGlobalMessage(e: MessageEvent): void {
       threadId?: string
       status?: "streaming" | "idle" | "awaiting"
       workspaceId?: string
+      root?: string
       dir?: string
     }
     if (data.type === "thread_status" && data.threadId && data.status) {
@@ -153,12 +154,13 @@ function handleGlobalMessage(e: MessageEvent): void {
     }
     if (
       data.type === "workspace_dir_changed" &&
-      data.workspaceId &&
+      data.root &&
       data.dir !== undefined
     ) {
       // Scoped delta: re-read just the one directory whose children changed.
+      // Keyed by `root` (workspace or worktree path) to match the tree query.
       queryClient.invalidateQueries({
-        queryKey: ["workspace-dir", data.workspaceId, data.dir],
+        queryKey: ["workspace-dir", data.root, data.dir],
       })
     }
     if (data.type === "workspace_files_updated" && data.workspaceId) {

@@ -42,6 +42,11 @@ export const threads = sqliteTable("threads", {
   // forked, so the branch's divergence point survives independently of the
   // parent's turn checkpoints. Null for non-forked threads.
   baseCheckpointSha: text("base_checkpoint_sha"),
+  // When set, this thread runs inside a git worktree at this absolute path
+  // (under ~/.lamda/worktrees) on branch `worktreeBranch`, instead of the
+  // workspace's own directory. Null = runs in the workspace path ("local").
+  worktreePath: text("worktree_path"),
+  worktreeBranch: text("worktree_branch"),
 })
 
 /**

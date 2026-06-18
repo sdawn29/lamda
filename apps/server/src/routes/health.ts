@@ -26,10 +26,10 @@ export function handleGlobalEventsWs(ws: WebSocket) {
   );
 
   const unsubscribeDir = workspaceDirBroadcaster.subscribe(
-    ({ workspaceId, dir }) => {
+    ({ workspaceId, root, dir }) => {
       if (ws.readyState !== 1 /* OPEN */) return;
       ws.send(
-        JSON.stringify({ type: "workspace_dir_changed", workspaceId, dir }),
+        JSON.stringify({ type: "workspace_dir_changed", workspaceId, root, dir }),
       );
     },
   );

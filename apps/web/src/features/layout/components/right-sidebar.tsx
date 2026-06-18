@@ -37,6 +37,8 @@ interface RightSidebarProps {
   openWithAppId?: string | null
   workspaceId?: string | null
   workspacePath?: string | null
+  /** Active thread id — lets the file tree read the thread's worktree dir. */
+  treeThreadId?: string | null
 }
 
 export function RightSidebarContent({
@@ -45,6 +47,7 @@ export function RightSidebarContent({
   openWithAppId,
   workspaceId,
   workspacePath,
+  treeThreadId,
 }: RightSidebarProps) {
   const { isFileTreeOpen, toggleFileTree, isOpen, close } = useRightSidebar()
   const { isFullscreen, toggleFullscreen } = useReviewPanel()
@@ -208,7 +211,11 @@ export function RightSidebarContent({
           {isFileTreeOpen && workspaceId && workspacePath && (
             <div className="w-52 shrink-0 overflow-hidden p-1 pl-0">
               <Suspense fallback={<div className="h-full bg-sidebar" />}>
-                <FileTree workspaceId={workspaceId} workspacePath={workspacePath} />
+                <FileTree
+                  workspaceId={workspaceId}
+                  workspacePath={workspacePath}
+                  threadId={treeThreadId}
+                />
               </Suspense>
             </div>
           )}

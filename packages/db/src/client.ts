@@ -289,6 +289,19 @@ function createDb() {
     // Safe to ignore — column may already exist.
   }
 
+  // Migration: Add worktree columns to threads table.
+  try {
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!threadCols.some((col) => col.name === "worktree_path")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_path TEXT`);
+    }
+    if (!threadCols.some((col) => col.name === "worktree_branch")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_branch TEXT`);
+    }
+  } catch {
+    // Safe to ignore — columns may already exist.
+  }
+
   // Migration: Add checkpoint_sha column to agent_turns table.
   try {
     const turnCols = sqlite.prepare("PRAGMA table_info(agent_turns)").all() as { name: string }[];

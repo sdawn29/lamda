@@ -3,6 +3,8 @@ import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import {
   getCurrentBranch,
+  getRepoRoot,
+  listWorktrees,
   initGitRepo,
   gitClone,
   listBranches,
@@ -88,6 +90,20 @@ git.get("/session/:id/branches", async (c) => {
   const cwd = store.getCwd(c.req.param("id"));
   if (!cwd) return c.json({ branches: [] });
   return c.json({ branches: await listBranches(cwd) });
+});
+
+// Branches checked out in a secondary worktree (under ~/.lamda/worktrees). The
+// main working tree is excluded — these are the branches that can't be checked
+// out in place and must instead be opened by switching the thread's cwd.
+git.get("/session/:id/worktrees", async (c) => {
+  const cwd = store.getCwd(c.req.param("id"));
+  if (!cwd) return c.json({ worktrees: [] });
+  const repoRoot = await getRepoRoot(cwd);
+  if (!repoRoot) return c.json({ worktrees: [] });
+  const worktrees = (await listWorktrees(repoRoot))
+    .filter((w) => w.branch && w.path !== repoRoot)
+    .map((w) => ({ path: w.path, branch: w.branch }));
+  return c.json({ worktrees });
 });
 
 git.get("/workspace/:id/branch", async (c) => {

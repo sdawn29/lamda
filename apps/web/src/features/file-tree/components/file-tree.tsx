@@ -39,7 +39,15 @@ import { useFileTree } from "../store"
 
 interface FileTreeProps {
   workspaceId: string
+  /**
+   * Effective root directory of the tree: the workspace path, or the active
+   * thread's worktree path when it runs in one. File reads, the open-file path,
+   * and the dir cache key all derive from this so the tree follows the thread
+   * into its worktree.
+   */
   workspacePath: string
+  /** Active thread id — sent so the server reads the thread's worktree dir. */
+  threadId?: string | null
 }
 
 const ROW_HEIGHT = 24
@@ -178,7 +186,7 @@ function FileTreeSkeleton() {
   )
 }
 
-export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
+export function FileTree({ workspaceId, workspacePath, threadId }: FileTreeProps) {
   const { addFileTab } = useMainTabs()
   const expanded = useFileTree((s) => s.expanded)
   const toggleDir = useFileTree((s) => s.toggleDir)
@@ -193,19 +201,23 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
 
   const scrollParentRef = useRef<HTMLDivElement>(null)
 
-  // Reset expansion when switching workspaces (paths are workspace-relative).
+  // Reset expansion when the tree root changes — switching workspaces or moving
+  // the active thread between its worktree and the workspace (paths are relative
+  // to the root, so a stale expansion set would point at the wrong directories).
   useEffect(() => {
     collapseAll()
-  }, [workspaceId, collapseAll])
+  }, [workspacePath, collapseAll])
 
   // ── Lazy tree: one query per visible directory (root + expanded) ────────────
   const dirsToFetch = useMemo(() => ["", ...expanded], [expanded])
   const dirQueries = useQueries({
     queries: dirsToFetch.map((relPath) => ({
-      queryKey: workspaceKeys.dir(workspaceId, relPath),
+      // Keyed by the effective root path so worktree and workspace listings of
+      // the same relative directory don't share a cache entry.
+      queryKey: workspaceKeys.dir(workspacePath, relPath),
       queryFn: async () =>
-        (await listWorkspaceDir(workspaceId, relPath)).entries,
-      enabled: !!workspaceId,
+        (await listWorkspaceDir(workspaceId, relPath, threadId)).entries,
+      enabled: !!workspaceId && !!workspacePath,
       staleTime: 30_000,
       gcTime: 5 * 60 * 1000,
     })),

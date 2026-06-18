@@ -34,6 +34,7 @@ import {
 } from "../queries"
 import { useBranch } from "@/features/git/queries"
 import { useBranches } from "@/features/git/queries"
+import { useSessionWorktrees } from "@/features/git/queries"
 import { useCheckoutBranch } from "@/features/git/mutations"
 import {
   useAbortSession,
@@ -53,6 +54,7 @@ import {
   useUpdateThreadModel,
   useUpdateThreadStopped,
   useUpdateThreadTitle,
+  useEnterThreadWorktree,
 } from "@/features/workspace/mutations"
 import { useWorkspace } from "@/features/workspace"
 import { useChatStream } from "../use-chat-stream"
@@ -136,7 +138,12 @@ export function ChatView({
   const showThinkingSetting = useShowThinkingSetting()
   const { workspaces } = useWorkspace()
   const activeWorkspace = workspaces.find((w) => w.id === workspaceId)
-  const rootPath = activeWorkspace?.path
+  const activeThread = activeWorkspace?.threads.find((t) => t.id === threadId)
+  const worktreeBranch = activeThread?.worktreeBranch ?? null
+  // Files this thread touches live in its worktree when it runs in one, so
+  // opened file tabs, file links, and FileChangesCard must resolve against the
+  // worktree dir rather than the workspace path.
+  const rootPath = activeThread?.worktreePath ?? activeWorkspace?.path
   const openWithAppId = activeWorkspace?.openWithAppId
   const { data: models, isLoading: modelsLoading } = useModels()
   const noProvider = !modelsLoading && !models?.models?.length
@@ -435,11 +442,13 @@ export function ChatView({
   const { data: commandsData } = useSlashCommands(sessionId)
   const { data: branchData } = useBranch(sessionId)
   const { data: branchesData } = useBranches(sessionId)
+  const { data: sessionWorktrees } = useSessionWorktrees(sessionId)
   const branch = branchData?.branch ?? null
   const branches = branchesData?.branches ?? []
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
   const checkoutBranchMutation = useCheckoutBranch(sessionId)
+  const enterWorktreeMutation = useEnterThreadWorktree()
   const abortSessionMutation = useAbortSession(sessionId)
   const generateTitleMutation = useGenerateTitle()
   const sendPromptMutation = useSendPrompt(sessionId)
@@ -644,20 +653,38 @@ export function ChatView({
 
   const handleBranchSelect = useCallback(
     (selectedBranch: string) => {
-      checkoutBranchMutation.mutate(selectedBranch, {
-        onError: (err) => {
-          const msg = err instanceof Error ? err.message : String(err)
-          const stripped = msg.replace(/^API \d+:\s*/, "")
-          try {
-            const parsed = JSON.parse(stripped) as { error?: string }
-            handleGitError(parsed.error ?? stripped)
-          } catch {
-            handleGitError(stripped)
-          }
-        },
-      })
+      const onError = (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err)
+        const stripped = msg.replace(/^API \d+:\s*/, "")
+        try {
+          const parsed = JSON.parse(stripped) as { error?: string }
+          handleGitError(parsed.error ?? stripped)
+        } catch {
+          handleGitError(stripped)
+        }
+      }
+
+      // A branch checked out in a secondary worktree can't be checked out in
+      // place — open the thread in that worktree's directory instead.
+      const worktree = sessionWorktrees?.find((w) => w.branch === selectedBranch)
+      if (worktree) {
+        enterWorktreeMutation.mutate(
+          { threadId, sessionId, branch: selectedBranch },
+          { onError }
+        )
+        return
+      }
+
+      checkoutBranchMutation.mutate(selectedBranch, { onError })
     },
-    [checkoutBranchMutation, handleGitError]
+    [
+      checkoutBranchMutation,
+      enterWorktreeMutation,
+      sessionWorktrees,
+      threadId,
+      sessionId,
+      handleGitError,
+    ]
   )
 
   const handleStop = useCallback(() => {
@@ -1117,6 +1144,9 @@ export function ChatView({
                 onBranchError={handleGitError}
                 sessionId={sessionId}
                 workspaceId={workspaceId}
+                threadId={threadId}
+                threadTitle={activeThread?.title}
+                worktreeBranch={worktreeBranch}
                 selectedModelId={selectedModelId}
                 onModelChange={handleModelChange}
                 selectedThinkingLevel={selectedThinkingLevel}

@@ -749,3 +749,135 @@ export async function gitListCheckpointRefs(cwd: string): Promise<string[]> {
     return [];
   }
 }
+
+// ── Worktrees ─────────────────────────────────────────────────────────────────
+// Each worktree is an additional working directory linked to the same repo,
+// letting independent threads/agents edit in isolation without colliding. lamda
+// stores them under ~/.lamda/worktrees and models each as its own workspace.
+
+export interface WorktreeInfo {
+  /** Absolute path of the worktree's working directory. */
+  path: string;
+  /** Checked-out commit SHA, or "" for a bare entry. */
+  head: string;
+  /** Short branch name (e.g. "main"), or null when detached/bare. */
+  branch: string | null;
+  detached: boolean;
+  locked: boolean;
+}
+
+/**
+ * Creates a worktree at `worktreePath` checked out to a NEW branch `newBranch`
+ * forked from `baseRef`: `git worktree add -b <newBranch> <worktreePath> <baseRef>`.
+ * Creating a fresh branch sidesteps the "branch already checked out in another
+ * worktree" restriction. Throws on failure (e.g. branch exists, dirty base).
+ */
+export async function addWorktree(
+  repoCwd: string,
+  worktreePath: string,
+  newBranch: string,
+  baseRef: string,
+): Promise<void> {
+  assertNotOption(newBranch, "branch");
+  assertNotOption(baseRef, "base ref");
+  assertNotOption(worktreePath, "worktree path");
+  await execFileAsync(
+    "git",
+    ["worktree", "add", "-b", newBranch, "--", worktreePath, baseRef],
+    { cwd: repoCwd, timeout: 30000 },
+  );
+}
+
+/**
+ * Lists the worktrees registered for this repo via `git worktree list
+ * --porcelain`. Records are blank-line separated; each has `worktree <path>`,
+ * an optional `HEAD <sha>`, `branch <refname>` / `detached`, and `locked`.
+ * Returns [] if the command fails (e.g. not a repo).
+ */
+export async function listWorktrees(repoCwd: string): Promise<WorktreeInfo[]> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["worktree", "list", "--porcelain"],
+      { cwd: repoCwd, timeout: 5000 },
+    );
+    const worktrees: WorktreeInfo[] = [];
+    let current: WorktreeInfo | null = null;
+    for (const line of stdout.split("\n")) {
+      if (line.startsWith("worktree ")) {
+        if (current) worktrees.push(current);
+        current = {
+          path: line.slice("worktree ".length),
+          head: "",
+          branch: null,
+          detached: false,
+          locked: false,
+        };
+      } else if (!current) {
+        continue;
+      } else if (line.startsWith("HEAD ")) {
+        current.head = line.slice("HEAD ".length);
+      } else if (line.startsWith("branch ")) {
+        // e.g. "branch refs/heads/feat-x" → "feat-x"
+        current.branch = line.slice("branch ".length).replace(/^refs\/heads\//, "");
+      } else if (line === "detached") {
+        current.detached = true;
+      } else if (line === "locked" || line.startsWith("locked ")) {
+        current.locked = true;
+      }
+    }
+    if (current) worktrees.push(current);
+    return worktrees;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Removes a worktree: `git worktree remove [--force] -- <worktreePath>`.
+ * `--force` is required when the worktree has uncommitted changes; callers
+ * gate on that with a confirmation. Throws on failure.
+ */
+export async function removeWorktree(
+  repoCwd: string,
+  worktreePath: string,
+  force = true,
+): Promise<void> {
+  assertNotOption(worktreePath, "worktree path");
+  const args = ["worktree", "remove"];
+  if (force) args.push("--force");
+  args.push("--", worktreePath);
+  await execFileAsync("git", args, { cwd: repoCwd, timeout: 15000 });
+}
+
+/** Prunes worktree admin entries whose directories no longer exist. Best-effort. */
+export async function pruneWorktrees(repoCwd: string): Promise<void> {
+  await execFileAsync("git", ["worktree", "prune"], {
+    cwd: repoCwd,
+    timeout: 10000,
+  }).catch(() => {});
+}
+
+/**
+ * Merges `branch` into the branch currently checked out in `repoCwd`'s working
+ * tree: `git merge --no-edit -- <branch>`. Throws on merge conflicts or a dirty
+ * tree; the caller surfaces the error. On conflict git leaves the merge in
+ * progress, so this aborts it to restore a clean state before rethrowing.
+ */
+export async function mergeBranch(repoCwd: string, branch: string): Promise<void> {
+  assertNotOption(branch, "branch");
+  try {
+    await execFileAsync("git", ["merge", "--no-edit", "--", branch], {
+      cwd: repoCwd,
+      timeout: 30000,
+    });
+  } catch (err) {
+    // Roll back an in-progress (conflicted) merge so the working tree is left
+    // clean; ignore failure (e.g. nothing to abort).
+    await execFileAsync("git", ["merge", "--abort"], {
+      cwd: repoCwd,
+      timeout: 10000,
+    }).catch(() => {});
+    throw err;
+  }
+}

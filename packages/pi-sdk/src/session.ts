@@ -14,6 +14,7 @@ import { sessionEventGenerator } from "./stream.js"
 import { computeActiveToolsForMode, type Mode } from "./modes.js"
 import { createToolApprovalExtension } from "./tool-approval-extension.js"
 import { mapResourceCommands } from "./commands.js"
+import { lamdaPromptTemplatePaths } from "./lamda-paths.js"
 import { LAMDA_SYSTEM_CONTEXT } from "./system-prompt.js"
 import type { ContextBreakdown, HistoryBlock, ManagedSessionHandle, ManagedSessionStats, SdkConfig, SessionTokenStats } from "./types.js"
 
@@ -163,6 +164,7 @@ function buildRuntimeFactory(
       modelRegistry,
       resourceLoaderOptions: {
         appendSystemPromptOverride: (base) => [...base, LAMDA_SYSTEM_CONTEXT],
+        additionalPromptTemplatePaths: lamdaPromptTemplatePaths(effectiveCwd),
         extensionFactories: config.toolApproval
           ? [createToolApprovalExtension(config.toolApproval)]
           : [],

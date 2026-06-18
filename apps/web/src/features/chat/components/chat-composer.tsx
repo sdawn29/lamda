@@ -54,7 +54,7 @@ import {
 } from "../queries"
 import { useWorkspaceIndex } from "@/features/workspace/queries"
 import { useEnvDialog } from "@/features/workspace"
-import { BranchSelector } from "@/features/git"
+import { BranchSelector, WorktreeSelector } from "@/features/git"
 import { ModelCombobox } from "./model-combobox"
 import { ModeCombobox, getModeOption } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
@@ -131,6 +131,13 @@ interface ChatComposerProps {
   onBranchError?: (message: string) => void
   sessionId?: string
   workspaceId?: string
+  /** The active thread, when this composer drives an existing thread. Enables the
+   *  worktree selector (Local / New worktree / Merge) beside the branch selector. */
+  threadId?: string
+  /** The active thread's title — used to derive the default worktree branch name. */
+  threadTitle?: string
+  /** Branch of the thread's active worktree, or null when running locally. */
+  worktreeBranch?: string | null
   selectedModelId?: string | null
   onModelChange?: (modelId: string) => void
   selectedThinkingLevel?: ThinkingLevel
@@ -163,6 +170,9 @@ export const ChatComposer = memo(
       onBranchError,
       sessionId,
       workspaceId,
+      threadId,
+      threadTitle,
+      worktreeBranch,
       selectedModelId: controlledModelId,
       onModelChange,
       selectedThinkingLevel: controlledThinkingLevel,
@@ -1204,6 +1214,17 @@ export const ChatComposer = memo(
                     onBranchSelect={onBranchSelect}
                     onGitError={onBranchError}
                     sessionId={sessionId}
+                  />
+                )}
+                {showBranch && threadId && (
+                  <WorktreeSelector
+                    threadId={threadId}
+                    sessionId={sessionId}
+                    threadTitle={threadTitle}
+                    branches={branches}
+                    currentBranch={branch ?? null}
+                    worktreeBranch={worktreeBranch}
+                    onError={onBranchError}
                   />
                 )}
               </div>

@@ -5,6 +5,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  GitBranch,
   KeyRound,
   Loader2,
   MessageSquarePlus,
@@ -275,6 +276,14 @@ const ThreadRow = memo(function ThreadRow({
             />
           </span>
           <span className="min-w-0 truncate">{thread.title}</span>
+          {thread.worktreeBranch && (
+            <span
+              className="flex shrink-0 items-center text-muted-foreground/60"
+              title={`Worktree: ${thread.worktreeBranch}`}
+            >
+              <GitBranch className="size-3" />
+            </span>
+          )}
           <div className="ml-auto grid shrink-0 items-center justify-items-end">
             <span className="col-start-1 row-start-1 text-xs text-muted-foreground/50 group-hover/thread:invisible">
               {relativeTime(thread.updatedAt, now)}
@@ -349,7 +358,6 @@ export function AppSidebar() {
   }, [navigate])
   const openPalette = useCommandPalette((state) => state.openPalette)
   const { pendingThreadIds } = useMainTabs()
-
 
   async function handleConfirmDelete() {
     if (!deletingWorkspace) return

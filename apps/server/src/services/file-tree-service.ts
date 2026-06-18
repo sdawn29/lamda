@@ -12,6 +12,9 @@ interface DirWatch {
   watcher: FSWatcher;
   timer: ReturnType<typeof setTimeout> | null;
   lastAccessedAt: number;
+  // Owning workspace, so a workspace teardown can close its watchers even when
+  // the watch is keyed by a worktree directory rather than the workspace path.
+  workspaceId: string;
 }
 
 /**
@@ -22,7 +25,9 @@ interface DirWatch {
  * an idle TTL, so `node_modules` is only ever read or watched if the user opens it.
  */
 class FileTreeService {
-  // key: `${workspaceId}\0${relPath}`
+  // key: `${rootDir}\0${relPath}` — `rootDir` is the absolute base directory
+  // (workspace path or a worktree path), so watching the same relative path in
+  // a worktree and in the workspace don't collide on one shared watcher.
   private watches = new Map<string, DirWatch>();
 
   constructor() {
@@ -63,16 +68,25 @@ class FileTreeService {
     return entries;
   }
 
-  /** Ensures a non-recursive watcher exists for a directory; refreshes its TTL. */
-  watchDir(workspaceId: string, workspacePath: string, relPath: string): void {
-    const key = `${workspaceId}\0${relPath}`;
+  /**
+   * Ensures a non-recursive watcher exists for a directory; refreshes its TTL.
+   * `rootDir` is the absolute base directory the tree is rooted at (the
+   * workspace path, or a worktree path when the active thread runs in one), and
+   * is broadcast so the renderer invalidates the matching root-scoped query.
+   */
+  watchDir(
+    workspaceId: string,
+    rootDir: string,
+    relPath: string,
+  ): void {
+    const key = `${rootDir}\0${relPath}`;
     const existing = this.watches.get(key);
     if (existing) {
       existing.lastAccessedAt = Date.now();
       return;
     }
 
-    const abs = relPath ? join(workspacePath, relPath) : workspacePath;
+    const abs = relPath ? join(rootDir, relPath) : rootDir;
     let watcher: FSWatcher;
     try {
       watcher = watch(abs, { recursive: false, persistent: false }, () => {
@@ -80,7 +94,7 @@ class FileTreeService {
         if (!w || w.timer) return;
         w.timer = setTimeout(() => {
           w.timer = null;
-          workspaceDirBroadcaster.broadcast(workspaceId, relPath);
+          workspaceDirBroadcaster.broadcast(workspaceId, rootDir, relPath);
         }, DEBOUNCE_MS);
       });
     } catch {
@@ -92,14 +106,14 @@ class FileTreeService {
       watcher,
       timer: null,
       lastAccessedAt: Date.now(),
+      workspaceId,
     });
   }
 
   /** Tears down every watcher for a workspace (called when it closes). */
   stopWorkspace(workspaceId: string): void {
-    const prefix = `${workspaceId}\0`;
     for (const [key, w] of this.watches) {
-      if (key.startsWith(prefix)) this.closeWatch(key, w);
+      if (w.workspaceId === workspaceId) this.closeWatch(key, w);
     }
   }
 

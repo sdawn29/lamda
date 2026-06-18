@@ -339,12 +339,17 @@ export function WorkspaceLayout() {
   const activeThread = activeWorkspace?.threads.find(
     (t) => t.id === activeThreadId
   )
+  // When the active thread runs in a git worktree, the review panel and file
+  // tree must follow it into that worktree rather than showing the workspace.
+  const activeWorktreePath = activeThread?.worktreePath ?? null
   const rsSessionId =
     activeThread?.sessionId ??
     rsWorkspace?.threads.find((t) => t.sessionId)?.sessionId ??
     null
   const rsWorkspaceId = rsWorkspace?.id
-  const rsWorkspacePath = rsWorkspace?.path
+  // Effective tree/file root — the worktree dir for a worktree thread, else the
+  // workspace path.
+  const rsWorkspacePath = activeWorktreePath ?? rsWorkspace?.path
   const rsOpenWithAppId = rsWorkspace?.openWithAppId ?? null
   const rsReady = !!rsSessionId || !!rsWorkspace
 
@@ -364,6 +369,14 @@ export function WorkspaceLayout() {
     setRsWorkspaceSessionId(rsSessionId)
   }
   const stableRsWorkspaceSessionId = rsWorkspaceSessionId ?? rsSessionId
+
+  // Git state is workspace-level only for *local* threads — hence the stable
+  // workspace session above. A thread in a worktree has its own, thread-specific
+  // git state (the server resolves that session's cwd to the worktree), so the
+  // review panel must query through the active thread's own session instead.
+  const rsGitSessionId = activeWorktreePath
+    ? (activeThread?.sessionId ?? stableRsWorkspaceSessionId)
+    : stableRsWorkspaceSessionId
 
   useShortcutHandler(
     SHORTCUT_ACTIONS.TOGGLE_FILE_TREE,
@@ -468,10 +481,11 @@ export function WorkspaceLayout() {
               >
                 <RightSidebarContent
                   sessionId={rsSessionId}
-                  workspaceSessionId={stableRsWorkspaceSessionId}
+                  workspaceSessionId={rsGitSessionId}
                   openWithAppId={rsOpenWithAppId}
                   workspaceId={rsWorkspaceId}
                   workspacePath={rsWorkspacePath}
+                  treeThreadId={activeThread?.id}
                 />
               </SidebarProvider>
             </>

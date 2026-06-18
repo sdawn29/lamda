@@ -47,6 +47,22 @@ export function updateThreadModel(id: string, modelId: string | null) {
   db.update(threads).set({ modelId }).where(eq(threads.id, id)).run()
 }
 
+/** Marks the thread as running inside a git worktree at `path` on `branch`. */
+export function setThreadWorktree(id: string, path: string, branch: string) {
+  db.update(threads)
+    .set({ worktreePath: path, worktreeBranch: branch })
+    .where(eq(threads.id, id))
+    .run()
+}
+
+/** Clears a thread's worktree association so it runs in the workspace path again. */
+export function clearThreadWorktree(id: string) {
+  db.update(threads)
+    .set({ worktreePath: null, worktreeBranch: null })
+    .where(eq(threads.id, id))
+    .run()
+}
+
 export function updateThreadMode(id: string, mode: "ask" | "plan" | "agent") {
   db.update(threads).set({ mode }).where(eq(threads.id, id)).run()
 }

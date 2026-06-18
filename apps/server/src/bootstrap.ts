@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { listWorkspacesWithThreads } from "@lamda/db";
 import { store } from "./store.js";
 import { workspaceIndexer } from "./services/workspace-indexer.js";
@@ -17,15 +18,22 @@ export async function bootstrapSessions(): Promise<void> {
 
   const tasks = workspaceList.flatMap((ws) =>
     ws.threads.map(async (thread) => {
+      // Run the thread in its worktree when one is attached and still on disk;
+      // a worktree removed out-of-band falls back to the workspace path.
+      const cwd =
+        thread.worktreePath && existsSync(thread.worktreePath)
+          ? thread.worktreePath
+          : ws.path;
+
       if (thread.sessionFile) {
         try {
           const handle = await openSessionForThread(
             thread.id,
             thread.sessionFile,
-            ws.path,
+            cwd,
             ws.id,
           );
-          store.create(handle, ws.path, thread.id, ws.id);
+          store.create(handle, cwd, thread.id, ws.id);
           return;
         } catch (err) {
           // A corrupt/unreadable session file must not leave a dead thread —
@@ -37,7 +45,7 @@ export async function bootstrapSessions(): Promise<void> {
         }
       }
 
-      await createSessionForThread(thread.id, ws.path, ws.id);
+      await createSessionForThread(thread.id, cwd, ws.id);
     }),
   );
 

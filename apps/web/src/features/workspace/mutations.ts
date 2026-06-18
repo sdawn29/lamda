@@ -6,6 +6,11 @@ import {
 import {
   createWorkspace as apiCreateWorkspace,
   type CreateWorkspaceBody,
+  createThreadWorktree as apiCreateThreadWorktree,
+  type CreateThreadWorktreeBody,
+  enterThreadWorktree as apiEnterThreadWorktree,
+  switchThreadToLocal as apiSwitchThreadToLocal,
+  mergeThreadWorktree as apiMergeThreadWorktree,
   deleteWorkspace as apiDeleteWorkspace,
   updateWorkspaceOpenWithApp as apiUpdateWorkspaceOpenWithApp,
   updateWorkspaceEnv as apiUpdateWorkspaceEnv,
@@ -83,6 +88,84 @@ export function useCreateWorkspace() {
         upsertWorkspace(current, workspace)
       )
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
+/**
+ * Invalidates the per-session git/branch/status queries for a thread so the git
+ * panel, branch indicator, and file tree re-read after the thread's cwd moves
+ * into or out of a worktree.
+ */
+function invalidateThreadGit(queryClient: QueryClient, sessionId: string | null | undefined) {
+  if (!sessionId) return
+  queryClient.invalidateQueries({ queryKey: gitKeys.session(sessionId) })
+}
+
+export function useCreateThreadWorktree() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      threadId,
+      body,
+    }: {
+      threadId: string
+      body: CreateThreadWorktreeBody
+      sessionId?: string | null
+    }) => apiCreateThreadWorktree(threadId, body),
+    onSuccess: (_data, { sessionId }) => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+      invalidateThreadGit(queryClient, sessionId)
+    },
+  })
+}
+
+export function useEnterThreadWorktree() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      threadId,
+      branch,
+    }: {
+      threadId: string
+      branch: string
+      sessionId?: string | null
+    }) => apiEnterThreadWorktree(threadId, branch),
+    onSuccess: (_data, { sessionId }) => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+      invalidateThreadGit(queryClient, sessionId)
+    },
+  })
+}
+
+export function useSwitchThreadToLocal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ threadId }: { threadId: string; sessionId?: string | null }) =>
+      apiSwitchThreadToLocal(threadId),
+    onSuccess: (_data, { sessionId }) => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+      invalidateThreadGit(queryClient, sessionId)
+    },
+  })
+}
+
+export function useMergeThreadWorktree() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      threadId,
+      force,
+    }: {
+      threadId: string
+      force?: boolean
+      sessionId?: string | null
+    }) => apiMergeThreadWorktree(threadId, force),
+    onSuccess: (result, { sessionId }) => {
+      // A 409 (uncommitted) isn't a completed merge — leave state for the retry.
+      if (!result.ok) return
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+      invalidateThreadGit(queryClient, sessionId)
     },
   })
 }

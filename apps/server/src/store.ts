@@ -130,6 +130,15 @@ class SessionStore {
     return true;
   }
 
+  /** Updates the working directory recorded for a live session (e.g. when a
+   *  thread moves into or out of a git worktree). */
+  updateCwd(id: string, cwd: string): boolean {
+    const entry = this.sessions.get(id);
+    if (!entry) return false;
+    entry.cwd = cwd;
+    return true;
+  }
+
   delete(id: string): boolean {
     const entry = this.sessions.get(id);
     if (!entry) return false;

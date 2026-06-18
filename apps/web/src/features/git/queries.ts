@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFileDiff, getTurnDiffStat, getWorkspaceBranch, listWorkspaceBranches, workspaceGitLog, workspaceGitShowFiles, workspaceGitShowFileDiff, type TurnDiffStat } from "./api"
-import { getBranch, listBranches } from "@/features/chat/api"
+import { getBranch, listBranches, listSessionWorktrees } from "@/features/chat/api"
 
 const gitRootKey = ["git"] as const
 const gitSessionKey = (sessionId: string) =>
@@ -164,6 +164,20 @@ export function useBranches(sessionId: string) {
   return useQuery({
     queryKey: branchesKey(sessionId),
     queryFn: () => listBranches(sessionId),
+    enabled: !!sessionId,
+    staleTime: 30_000,
+  })
+}
+
+export const worktreesKey = (sessionId: string) =>
+  [...gitKeys.session(sessionId), "worktrees"] as const
+
+/** Branches checked out in a secondary worktree — selecting one switches the
+ *  thread's cwd into that worktree instead of checking the branch out in place. */
+export function useSessionWorktrees(sessionId: string) {
+  return useQuery({
+    queryKey: worktreesKey(sessionId),
+    queryFn: async () => (await listSessionWorktrees(sessionId)).worktrees,
     enabled: !!sessionId,
     staleTime: 30_000,
   })
