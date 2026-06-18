@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { listWorkspacesWithThreads } from "@lamda/db";
+import { clearThreadWorktree, listWorkspacesWithThreads } from "@lamda/db";
 import { store } from "./store.js";
 import { workspaceIndexer } from "./services/workspace-indexer.js";
 import {
@@ -19,11 +19,18 @@ export async function bootstrapSessions(): Promise<void> {
   const tasks = workspaceList.flatMap((ws) =>
     ws.threads.map(async (thread) => {
       // Run the thread in its worktree when one is attached and still on disk;
-      // a worktree removed out-of-band falls back to the workspace path.
-      const cwd =
-        thread.worktreePath && existsSync(thread.worktreePath)
-          ? thread.worktreePath
-          : ws.path;
+      // a worktree removed out-of-band is detached persistently so the renderer,
+      // terminal, and next restart all agree on the same cwd.
+      if (thread.worktreePath && !existsSync(thread.worktreePath)) {
+        clearThreadWorktree(thread.id);
+        thread.worktreePath = null;
+        thread.worktreeBranch = null;
+        thread.worktreeBaseBranch = null;
+        thread.ownsWorktreeBranch = false;
+        thread.worktreeMergeInProgress = false;
+        thread.worktreeMergeHeadSha = null;
+      }
+      const cwd = thread.worktreePath ? thread.worktreePath : ws.path;
 
       if (thread.sessionFile) {
         try {

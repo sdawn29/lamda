@@ -6,6 +6,7 @@ import {
   getWorkspace,
   getWorkspaceByPath,
   getThread,
+  listThreadsForWorkspace,
   insertWorkspace,
   deleteWorkspace,
   deleteAllWorkspaces,
@@ -17,11 +18,13 @@ import {
   createWorkspaceTask,
 } from "@lamda/db";
 import { getWorkspaceCommands } from "@lamda/pi-sdk";
+import { abortMerge, isMergeInProgress } from "@lamda/git";
 import { existsSync } from "node:fs";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { workspaceIndexer } from "../services/workspace-indexer.js";
 import { fileTreeService } from "../services/file-tree-service.js";
+import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
 
 /**
  * Resolves the directory a file-tree request should read from: a thread's git
@@ -42,6 +45,32 @@ function resolveTreeRoot(
 }
 
 const workspaces = new Hono();
+
+async function teardownWorkspaceThreads(
+  workspaceId: string,
+  workspacePath: string,
+): Promise<void> {
+  const threads = listThreadsForWorkspace(workspaceId);
+  if (threads.some((thread) => thread.worktreeMergeInProgress)) {
+    await abortMerge(workspacePath);
+    if (await isMergeInProgress(workspacePath)) {
+      throw new Error("Git could not abort the workspace's active merge");
+    }
+  }
+
+  // Clean every managed worktree, including worktrees belonging to archived
+  // threads (which are intentionally absent from listWorkspacesWithThreads).
+  for (const thread of threads) {
+    await removeOwnedThreadWorktree(workspacePath, thread);
+  }
+
+  for (const thread of threads) {
+    const session = store.getByThreadId(thread.id);
+    if (!session) continue;
+    await sessionEvents.dispose(session.sessionId);
+    store.delete(session.sessionId);
+  }
+}
 
 function mapThread(
   t: {
@@ -122,7 +151,9 @@ const ICON_CANDIDATES = [
   "src/assets/favicon.png",
 ];
 
-async function detectWorkspaceIcon(workspacePath: string): Promise<string | null> {
+async function detectWorkspaceIcon(
+  workspacePath: string,
+): Promise<string | null> {
   for (const candidate of ICON_CANDIDATES) {
     try {
       await access(join(workspacePath, candidate));
@@ -262,11 +293,18 @@ workspaces.post("/workspace", async (c) => {
 
 workspaces.delete("/reset", async (_c) => {
   for (const ws of listWorkspacesWithThreads()) {
-    for (const thread of ws.threads) {
-      const session = store.getByThreadId(thread.id);
-      if (!session) continue;
-      await sessionEvents.dispose(session.sessionId);
-      store.delete(session.sessionId);
+    try {
+      await teardownWorkspaceThreads(ws.id, ws.path);
+    } catch (error) {
+      return _c.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to clean up a managed worktree",
+        },
+        409,
+      );
     }
   }
   deleteAllWorkspaces();
@@ -313,7 +351,10 @@ workspaces.get("/workspace/:id/dir", async (c) => {
 
   // When the active thread runs in a worktree, the tree reads (and watches) that
   // worktree's directory instead of the workspace path.
-  const rootDir = resolveTreeRoot(ws.path, c.req.query("threadId") ?? undefined);
+  const rootDir = resolveTreeRoot(
+    ws.path,
+    c.req.query("threadId") ?? undefined,
+  );
 
   try {
     const entries = await fileTreeService.readDir(rootDir, relPath);
@@ -339,17 +380,24 @@ workspaces.post("/workspace/:id/reindex", async (c) => {
 
 workspaces.delete("/workspace/:id", async (c) => {
   const workspaceId = c.req.param("id");
-  workspaceIndexer.stopIndexing(workspaceId);
-  fileTreeService.stopWorkspace(workspaceId);
   const ws = listWorkspacesWithThreads().find((w) => w.id === workspaceId);
   if (ws) {
-    for (const thread of ws.threads) {
-      const session = store.getByThreadId(thread.id);
-      if (!session) continue;
-      await sessionEvents.dispose(session.sessionId);
-      store.delete(session.sessionId);
+    try {
+      await teardownWorkspaceThreads(ws.id, ws.path);
+    } catch (error) {
+      return c.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to clean up a managed worktree",
+        },
+        409,
+      );
     }
   }
+  workspaceIndexer.stopIndexing(workspaceId);
+  fileTreeService.stopWorkspace(workspaceId);
   deleteWorkspace(workspaceId);
   return new Response(null, { status: 204 });
 });

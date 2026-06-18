@@ -117,6 +117,7 @@ function createDb() {
       mode             TEXT NOT NULL DEFAULT 'agent',
       last_accessed_at INTEGER,
       owns_worktree_branch INTEGER NOT NULL DEFAULT 0,
+      worktree_merge_in_progress INTEGER NOT NULL DEFAULT 0,
       created_at       INTEGER NOT NULL
     );
 
@@ -311,6 +312,17 @@ function createDb() {
       sqlite.exec(
         `ALTER TABLE threads ADD COLUMN owns_worktree_branch INTEGER NOT NULL DEFAULT 0`,
       );
+    }
+    if (!threadCols.some((col) => col.name === "worktree_base_branch")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_base_branch TEXT`);
+    }
+    if (!threadCols.some((col) => col.name === "worktree_merge_in_progress")) {
+      sqlite.exec(
+        `ALTER TABLE threads ADD COLUMN worktree_merge_in_progress INTEGER NOT NULL DEFAULT 0`,
+      );
+    }
+    if (!threadCols.some((col) => col.name === "worktree_merge_head_sha")) {
+      sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_merge_head_sha TEXT`);
     }
   } catch {
     // Safe to ignore — columns may already exist.

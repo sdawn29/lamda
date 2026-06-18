@@ -672,10 +672,19 @@ export function ChatView({
         (w) => w.branch === selectedBranch
       )
       if (worktree) {
-        enterWorktreeMutation.mutate(
-          { threadId, sessionId, branch: selectedBranch },
-          { onError }
-        )
+        if (worktreeBranch === selectedBranch) return
+        try {
+          if (worktreeBranch) {
+            await switchToLocalMutation.mutateAsync({ threadId, sessionId })
+          }
+          await enterWorktreeMutation.mutateAsync({
+            threadId,
+            sessionId,
+            branch: selectedBranch,
+          })
+        } catch (error) {
+          onError(error)
+        }
         return
       }
 

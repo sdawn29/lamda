@@ -35,6 +35,60 @@ export function getThread(id: string) {
   return db.select().from(threads).where(eq(threads.id, id)).get();
 }
 
+export function listThreadsForWorkspace(workspaceId: string) {
+  return db
+    .select()
+    .from(threads)
+    .where(eq(threads.workspaceId, workspaceId))
+    .all();
+}
+
+export function getActiveWorktreeMerge(workspaceId: string) {
+  return db
+    .select()
+    .from(threads)
+    .where(
+      and(
+        eq(threads.workspaceId, workspaceId),
+        eq(threads.worktreeMergeInProgress, true),
+      ),
+    )
+    .get();
+}
+
+/**
+ * Atomically claims the workspace checkout's merge slot for one thread.
+ * SQLite serializes this transaction, preventing two concurrent HTTP requests
+ * from both starting a merge after observing an empty slot.
+ */
+export function claimThreadWorktreeMerge(
+  id: string,
+  workspaceId: string,
+): boolean {
+  return db.transaction((tx) => {
+    const active = tx
+      .select({ id: threads.id })
+      .from(threads)
+      .where(
+        and(
+          eq(threads.workspaceId, workspaceId),
+          eq(threads.worktreeMergeInProgress, true),
+        ),
+      )
+      .get();
+    if (active && active.id !== id) return false;
+
+    tx.update(threads)
+      .set({
+        worktreeMergeInProgress: true,
+        worktreeMergeHeadSha: null,
+      })
+      .where(eq(threads.id, id))
+      .run();
+    return true;
+  });
+}
+
 export function updateThreadTitle(id: string, title: string) {
   db.update(threads).set({ title }).where(eq(threads.id, id)).run();
 }
@@ -53,12 +107,16 @@ export function setThreadWorktree(
   path: string,
   branch: string,
   ownsBranch = false,
+  baseBranch: string | null = null,
 ) {
   db.update(threads)
     .set({
       worktreePath: path,
       worktreeBranch: branch,
+      worktreeBaseBranch: baseBranch,
       ownsWorktreeBranch: ownsBranch,
+      worktreeMergeInProgress: false,
+      worktreeMergeHeadSha: null,
     })
     .where(eq(threads.id, id))
     .run();
@@ -70,8 +128,38 @@ export function clearThreadWorktree(id: string) {
     .set({
       worktreePath: null,
       worktreeBranch: null,
+      worktreeBaseBranch: null,
       ownsWorktreeBranch: false,
+      worktreeMergeInProgress: false,
+      worktreeMergeHeadSha: null,
     })
+    .where(eq(threads.id, id))
+    .run();
+}
+
+export function setThreadWorktreeMergeInProgress(
+  id: string,
+  inProgress: boolean,
+) {
+  db.update(threads)
+    .set({
+      worktreeMergeInProgress: inProgress,
+      ...(inProgress ? {} : { worktreeMergeHeadSha: null }),
+    })
+    .where(eq(threads.id, id))
+    .run();
+}
+
+export function setThreadWorktreeMergeHeadSha(id: string, sha: string) {
+  db.update(threads)
+    .set({ worktreeMergeHeadSha: sha })
+    .where(eq(threads.id, id))
+    .run();
+}
+
+export function setThreadWorktreeBaseBranch(id: string, branch: string) {
+  db.update(threads)
+    .set({ worktreeBaseBranch: branch })
     .where(eq(threads.id, id))
     .run();
 }

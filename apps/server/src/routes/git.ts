@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import {
   getCurrentBranch,
+  getRefSha,
   getRepoRoot,
   listWorktrees,
   initGitRepo,
@@ -115,14 +116,34 @@ git.get("/session/:id/worktrees", async (c) => {
 
 git.get("/workspace/:id/branch", async (c) => {
   const ws = getWorkspace(c.req.param("id"));
-  if (!ws) return c.json({ branch: null });
-  return c.json({ branch: await getCurrentBranch(ws.path) });
+  if (!ws) return c.json({ branch: null, hasCommits: false });
+  // `hasCommits` is false for a freshly-initialized repo (unborn HEAD); the UI
+  // uses it to hide worktree creation, which can't fork from a commitless base.
+  return c.json({
+    branch: await getCurrentBranch(ws.path),
+    hasCommits: !!(await getRefSha(ws.path, "HEAD")),
+  });
 });
 
 git.get("/workspace/:id/branches", async (c) => {
   const ws = getWorkspace(c.req.param("id"));
   if (!ws) return c.json({ branches: [] });
   return c.json({ branches: await listBranches(ws.path) });
+});
+
+// Create (and check out) a branch in a workspace that has no live session yet
+// (e.g. the new-thread page).
+git.post("/workspace/:id/branch", async (c) => {
+  const ws = getWorkspace(c.req.param("id"));
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  const body = await c.req.json<{ branch: string }>();
+  if (!body.branch) return c.json({ error: "branch is required" }, 400);
+  try {
+    await createBranch(ws.path, body.branch);
+    return c.json({ branch: await getCurrentBranch(ws.path) });
+  } catch (err) {
+    return c.json({ error: parseGitError(err, "Branch creation failed") }, 500);
+  }
 });
 
 git.post("/session/:id/checkout", async (c) => {
@@ -161,6 +182,25 @@ git.post("/session/:id/git/init", async (c) => {
     return c.json({
       branch: await getCurrentBranch(cwd),
       branches: await listBranches(cwd),
+    });
+  } catch (err) {
+    return c.json(
+      { error: parseGitError(err, "Repository initialization failed") },
+      500,
+    );
+  }
+});
+
+// Initialize a git repo for a workspace that has no live session yet (e.g. the
+// new-thread page, before the first thread/session is created).
+git.post("/workspace/:id/git/init", async (c) => {
+  const ws = getWorkspace(c.req.param("id"));
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  try {
+    await initGitRepo(ws.path);
+    return c.json({
+      branch: await getCurrentBranch(ws.path),
+      branches: await listBranches(ws.path),
     });
   } catch (err) {
     return c.json(

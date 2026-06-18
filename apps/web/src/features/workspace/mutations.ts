@@ -11,6 +11,9 @@ import {
   enterThreadWorktree as apiEnterThreadWorktree,
   switchThreadToLocal as apiSwitchThreadToLocal,
   mergeThreadWorktree as apiMergeThreadWorktree,
+  resolveThreadWorktreeConflict as apiResolveThreadWorktreeConflict,
+  continueThreadWorktreeMerge as apiContinueThreadWorktreeMerge,
+  abortThreadWorktreeMerge as apiAbortThreadWorktreeMerge,
   deleteWorkspace as apiDeleteWorkspace,
   updateWorkspaceOpenWithApp as apiUpdateWorkspaceOpenWithApp,
   updateWorkspaceEnv as apiUpdateWorkspaceEnv,
@@ -97,7 +100,10 @@ export function useCreateWorkspace() {
  * panel, branch indicator, and file tree re-read after the thread's cwd moves
  * into or out of a worktree.
  */
-function invalidateThreadGit(queryClient: QueryClient, sessionId: string | null | undefined) {
+function invalidateThreadGit(
+  queryClient: QueryClient,
+  sessionId: string | null | undefined
+) {
   if (!sessionId) return
   queryClient.invalidateQueries({ queryKey: gitKeys.session(sessionId) })
 }
@@ -141,8 +147,12 @@ export function useEnterThreadWorktree() {
 export function useSwitchThreadToLocal() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ threadId }: { threadId: string; sessionId?: string | null }) =>
-      apiSwitchThreadToLocal(threadId),
+    mutationFn: ({
+      threadId,
+    }: {
+      threadId: string
+      sessionId?: string | null
+    }) => apiSwitchThreadToLocal(threadId),
     onSuccess: (_data, { sessionId }) => {
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
       invalidateThreadGit(queryClient, sessionId)
@@ -167,6 +177,42 @@ export function useMergeThreadWorktree() {
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
       invalidateThreadGit(queryClient, sessionId)
     },
+  })
+}
+
+export function useResolveThreadWorktreeConflict() {
+  return useMutation({
+    mutationFn: ({
+      threadId,
+      filePath,
+      strategy,
+    }: {
+      threadId: string
+      filePath: string
+      strategy: "ours" | "theirs"
+    }) => apiResolveThreadWorktreeConflict(threadId, filePath, strategy),
+  })
+}
+
+export function useContinueThreadWorktreeMerge() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      threadId,
+    }: {
+      threadId: string
+      sessionId?: string | null
+    }) => apiContinueThreadWorktreeMerge(threadId),
+    onSuccess: (_result, { sessionId }) => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+      invalidateThreadGit(queryClient, sessionId)
+    },
+  })
+}
+
+export function useAbortThreadWorktreeMerge() {
+  return useMutation({
+    mutationFn: (threadId: string) => apiAbortThreadWorktreeMerge(threadId),
   })
 }
 
@@ -330,8 +376,13 @@ export function useDeleteSession() {
 export function useUpdateWorkspaceOpenWithApp() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ workspaceId, appId }: { workspaceId: string; appId: string | null }) =>
-      apiUpdateWorkspaceOpenWithApp(workspaceId, appId),
+    mutationFn: ({
+      workspaceId,
+      appId,
+    }: {
+      workspaceId: string
+      appId: string | null
+    }) => apiUpdateWorkspaceOpenWithApp(workspaceId, appId),
     onMutate: ({ workspaceId, appId }) => {
       setWorkspacesData(queryClient, (workspaces) =>
         workspaces.map((ws) =>
@@ -348,13 +399,16 @@ export function useUpdateWorkspaceOpenWithApp() {
 export function useUpdateWorkspaceEnv() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ workspaceId, env }: { workspaceId: string; env: Record<string, string> }) =>
-      apiUpdateWorkspaceEnv(workspaceId, env),
+    mutationFn: ({
+      workspaceId,
+      env,
+    }: {
+      workspaceId: string
+      env: Record<string, string>
+    }) => apiUpdateWorkspaceEnv(workspaceId, env),
     onMutate: ({ workspaceId, env }) => {
       setWorkspacesData(queryClient, (workspaces) =>
-        workspaces.map((ws) =>
-          ws.id !== workspaceId ? ws : { ...ws, env }
-        )
+        workspaces.map((ws) => (ws.id !== workspaceId ? ws : { ...ws, env }))
       )
     },
     onSettled: () => {
@@ -400,8 +454,13 @@ export function useUnpinWorkspace() {
 export function useUpdateThreadModel() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ threadId, modelId }: { threadId: string; modelId: string | null }) =>
-      apiUpdateThreadModel(threadId, modelId),
+    mutationFn: ({
+      threadId,
+      modelId,
+    }: {
+      threadId: string
+      modelId: string | null
+    }) => apiUpdateThreadModel(threadId, modelId),
     onMutate: ({ threadId, modelId }) => {
       setWorkspacesData(queryClient, (workspaces) =>
         workspaces.map((ws) => ({
@@ -442,8 +501,13 @@ export function useUpdateThreadMode() {
 export function useUpdateThreadApprovalMode() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ threadId, approvalMode }: { threadId: string; approvalMode: ApprovalMode }) =>
-      apiUpdateThreadApprovalMode(threadId, approvalMode),
+    mutationFn: ({
+      threadId,
+      approvalMode,
+    }: {
+      threadId: string
+      approvalMode: ApprovalMode
+    }) => apiUpdateThreadApprovalMode(threadId, approvalMode),
     onMutate: ({ threadId, approvalMode }) => {
       setWorkspacesData(queryClient, (workspaces) =>
         workspaces.map((ws) => ({
@@ -463,8 +527,13 @@ export function useUpdateThreadApprovalMode() {
 export function useUpdateThreadStopped() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ threadId, stopped }: { threadId: string; stopped: boolean }) =>
-      apiUpdateThreadStopped(threadId, stopped),
+    mutationFn: ({
+      threadId,
+      stopped,
+    }: {
+      threadId: string
+      stopped: boolean
+    }) => apiUpdateThreadStopped(threadId, stopped),
     onMutate: ({ threadId, stopped }) => {
       setWorkspacesData(queryClient, (workspaces) =>
         workspaces.map((ws) => ({

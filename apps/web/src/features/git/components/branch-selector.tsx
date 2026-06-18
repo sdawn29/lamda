@@ -19,7 +19,11 @@ import {
 } from "@/shared/ui/dialog"
 import { Input } from "@/shared/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
-import { useCreateBranch, useInitializeGitRepository } from "../mutations"
+import {
+  useCreateBranch,
+  useCreateWorkspaceBranch,
+  useInitializeGitRepository,
+} from "../mutations"
 import { useAheadBehind } from "../queries"
 
 interface BranchSelectorProps {
@@ -28,6 +32,11 @@ interface BranchSelectorProps {
   onBranchSelect?: (branch: string) => void
   onGitError?: (message: string) => void
   sessionId?: string
+  /**
+   * Workspace this selector belongs to, used to create branches before any
+   * session exists (e.g. the new-thread page). Ignored when `sessionId` is set.
+   */
+  workspaceId?: string
 }
 
 function parseGitError(error: unknown): string {
@@ -48,28 +57,38 @@ export function BranchSelector({
   onBranchSelect,
   onGitError,
   sessionId,
+  workspaceId,
 }: BranchSelectorProps) {
   const [open, setOpen] = React.useState(false)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [newBranch, setNewBranch] = React.useState("")
 
   const createBranch = useCreateBranch(sessionId ?? "")
+  const createWorkspaceBranch = useCreateWorkspaceBranch(workspaceId ?? null)
   const initializeRepository = useInitializeGitRepository(sessionId ?? "")
   const hasRepository = branch !== null || branches.length > 0
   const { data: aheadBehind } = useAheadBehind(sessionId ?? "")
+  // Branch creation works against a session when one exists, otherwise against
+  // the workspace (the new-thread page, before the first session is created).
+  const canCreateBranch = !!sessionId || !!workspaceId
+  const createPending = sessionId
+    ? createBranch.isPending
+    : createWorkspaceBranch.isPending
 
   function handleCreate() {
-    if (!newBranch.trim() || !sessionId) return
-    createBranch.mutate(newBranch.trim(), {
-      onSuccess: (data) => {
-        onBranchSelect?.(data.branch ?? newBranch.trim())
-        setDialogOpen(false)
-        setNewBranch("")
-      },
-      onError: (error) => {
-        onGitError?.(parseGitError(error))
-      },
-    })
+    const name = newBranch.trim()
+    if (!name) return
+    const onSuccess = (data: { branch: string | null }) => {
+      onBranchSelect?.(data.branch ?? name)
+      setDialogOpen(false)
+      setNewBranch("")
+    }
+    const onError = (error: unknown) => onGitError?.(parseGitError(error))
+    if (sessionId) {
+      createBranch.mutate(name, { onSuccess, onError })
+    } else if (workspaceId) {
+      createWorkspaceBranch.mutate(name, { onSuccess, onError })
+    }
   }
 
   function handleInitializeRepository() {
@@ -136,7 +155,7 @@ export function BranchSelector({
                   </CommandItem>
                 ))}
               </CommandGroup>
-              {sessionId && (
+              {canCreateBranch && (
                 <>
                   <CommandSeparator />
                   <CommandGroup>
@@ -150,7 +169,7 @@ export function BranchSelector({
                         <PlusIcon />
                         Create new branch
                       </CommandItem>
-                    ) : (
+                    ) : sessionId ? (
                       <CommandItem
                         disabled={initializeRepository.isPending}
                         onSelect={handleInitializeRepository}
@@ -160,7 +179,7 @@ export function BranchSelector({
                           ? "Initializing repository…"
                           : "Initialize repository"}
                       </CommandItem>
-                    )}
+                    ) : null}
                   </CommandGroup>
                 </>
               )}
@@ -195,9 +214,9 @@ export function BranchSelector({
             </Button>
             <Button
               onClick={handleCreate}
-              disabled={!newBranch.trim() || createBranch.isPending}
+              disabled={!newBranch.trim() || createPending}
             >
-              {createBranch.isPending ? "Creating…" : "Create"}
+              {createPending ? "Creating…" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>

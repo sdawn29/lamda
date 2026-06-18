@@ -8,6 +8,7 @@ import {
   insertWorkspace,
   insertThread,
   getThread,
+  getWorkspace,
   insertUserBlock,
   insertAssistantStartBlock,
   insertToolBlock,
@@ -720,6 +721,7 @@ sessions.post("/session/:id/fork", async (c) => {
     baseCheckpointSha: baseCheckpointSha || undefined,
   });
   updateThreadSessionFile(newThreadId, newSessionFile);
+  const forkWorkspacePath = getWorkspace(entry.workspaceId)?.path ?? entry.cwd;
 
   // Seed message blocks from the branched JSONL so history appears immediately.
   // The last user message is intentionally skipped — it goes to the input field.
@@ -781,16 +783,21 @@ sessions.post("/session/:id/fork", async (c) => {
   const forkedHandle = await openSessionForThread(
     newThreadId,
     newSessionFile,
-    entry.cwd,
+    forkWorkspacePath,
     entry.workspaceId,
   );
   const newSessionId = store.create(
     forkedHandle,
-    entry.cwd,
+    forkWorkspacePath,
     newThreadId,
     entry.workspaceId,
   );
-  sessionEvents.ensure(newSessionId, newThreadId, forkedHandle, entry.cwd);
+  sessionEvents.ensure(
+    newSessionId,
+    newThreadId,
+    forkedHandle,
+    forkWorkspacePath,
+  );
 
   return c.json(
     { threadId: newThreadId, sessionId: newSessionId, initialInput },

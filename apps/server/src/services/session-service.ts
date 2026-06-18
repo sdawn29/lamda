@@ -12,7 +12,7 @@ import {
 } from "@lamda/pi-sdk";
 import { updateThreadSessionFile, getWorkspace, getThread } from "@lamda/db";
 import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { waitForAnswer } from "./question-registry.js";
@@ -168,10 +168,10 @@ export function resolveThreadCwd(
 }
 
 /**
- * Reopens a thread's live session in `newCwd`, preserving its conversation by
- * reusing the same session file, so the same thread keeps running in the new
- * directory (used when a thread moves into or out of a worktree). No-op when
- * the thread has no live session — the next open derives cwd from the DB.
+ * Moves a thread's live runtime to `newCwd`, preserving its conversation and
+ * stable handle so subsequent agent tools immediately run in the new directory
+ * (used when a thread moves into or out of a worktree). No-op when the thread
+ * has no live session — the next open derives cwd from the DB.
  * Returns true when a live session was relocated.
  */
 export async function relocateThreadSession(
@@ -189,33 +189,63 @@ export async function relocateThreadSession(
   // Pre-create the plan dir in the new cwd so plan-mode writes don't fail.
   await mkdir(join(newCwd, PLAN_DIR), { recursive: true }).catch(() => {});
 
-  const newHandle = sessionFile
-    ? await openSessionForThread(
-        threadId,
-        sessionFile,
-        newCwd,
-        entry.workspaceId,
-      )
-    : await createHandleForThread(threadId, newCwd, entry.workspaceId);
-  store.replaceHandle(existing.sessionId, newHandle);
-  if (newHandle.sessionFile) {
-    updateThreadSessionFile(threadId, newHandle.sessionFile);
-  }
-  // Keep the recorded cwd in sync even if there was no file to reopen, so git
-  // routes (which read store.getCwd) target the new directory.
-  store.updateCwd(existing.sessionId, newCwd);
+  if (entry.handle.sessionFile) {
+    // Use the SDK's session replacement lifecycle. It rebuilds cwd-bound
+    // built-ins (bash/read/write/etc.) while retaining this host-owned handle.
+    await entry.handle.relocateCwd(newCwd);
 
-  // Re-attach the event hub to the (possibly new) handle in the new cwd.
-  await sessionEvents.dispose(existing.sessionId);
-  const refreshed = store.get(existing.sessionId);
-  if (refreshed) {
-    sessionEvents.ensure(
-      existing.sessionId,
+    // Workspace tools are also constructed with cwd-specific paths, so refresh
+    // them after the runtime has moved.
+    const { customTools, mode } = await buildSessionCustomTools(
       threadId,
-      refreshed.handle,
       newCwd,
+      entry.workspaceId,
     );
+    entry.handle.setCustomTools(customTools);
+    if (mode) entry.handle.setMode(mode);
+
+    if (resolve(entry.handle.getCwd()) !== resolve(newCwd)) {
+      throw new Error(
+        `Agent runtime remained in ${entry.handle.getCwd()} after relocating to ${newCwd}`,
+      );
+    }
+
+    store.updateCwd(existing.sessionId, newCwd);
+    sessionEvents.reattach(existing.sessionId, entry.handle);
+    return true;
   }
+
+  if (sessionFile) {
+    // Defensive recovery for an inconsistent live entry whose persisted file
+    // is known by the thread but not by its current handle.
+    const restoredHandle = await openSessionForThread(
+      threadId,
+      sessionFile,
+      newCwd,
+      entry.workspaceId,
+    );
+    if (resolve(restoredHandle.getCwd()) !== resolve(newCwd)) {
+      restoredHandle.dispose();
+      throw new Error(
+        `Restored agent runtime remained in ${restoredHandle.getCwd()} after relocating to ${newCwd}`,
+      );
+    }
+    store.replaceHandle(existing.sessionId, restoredHandle);
+    store.updateCwd(existing.sessionId, newCwd);
+    sessionEvents.reattach(existing.sessionId, restoredHandle);
+    return true;
+  }
+
+  // An in-memory session cannot be switched by the SDK. Recreate it as a
+  // fallback; this path has no persisted conversation to preserve.
+  const newHandle = await createHandleForThread(
+    threadId,
+    newCwd,
+    entry.workspaceId,
+  );
+  store.replaceHandle(existing.sessionId, newHandle);
+  store.updateCwd(existing.sessionId, newCwd);
+  sessionEvents.reattach(existing.sessionId, newHandle);
   return true;
 }
 

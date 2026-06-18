@@ -817,7 +817,7 @@ export async function gitListCheckpointRefs(cwd: string): Promise<string[]> {
 // ── Worktrees ─────────────────────────────────────────────────────────────────
 // Each worktree is an additional working directory linked to the same repo,
 // letting independent threads/agents edit in isolation without colliding. lamda
-// stores them under ~/.lamda/<workspace-name>/<worktree-name>.
+// stores them under ~/.lamda/worktrees/<workspace-name>/<worktree-name>.
 
 export interface WorktreeInfo {
   /** Absolute path of the worktree's working directory. */
@@ -925,28 +925,155 @@ export async function pruneWorktrees(repoCwd: string): Promise<void> {
 }
 
 /**
- * Merges `branch` into the branch currently checked out in `repoCwd`'s working
- * tree: `git merge --no-edit -- <branch>`. Throws on merge conflicts or a dirty
- * tree; the caller surfaces the error. On conflict git leaves the merge in
- * progress, so this aborts it to restore a clean state before rethrowing.
+ * Starts a non-committing merge of `branch` into the branch currently checked
+ * out in `repoCwd`. This first lets Git populate the index and report conflicts;
+ * callers commit only after the conflict check passes. Returns true when a
+ * merge commit is pending, or false when Git reports "already up to date".
  */
 export async function mergeBranch(
   repoCwd: string,
   branch: string,
-): Promise<void> {
+): Promise<boolean> {
   assertNotOption(branch, "branch");
-  try {
-    await execFileAsync("git", ["merge", "--no-edit", "--", branch], {
+  await execFileAsync(
+    "git",
+    ["merge", "--no-commit", "--no-ff", "--", branch],
+    {
       cwd: repoCwd,
       timeout: 30000,
+    },
+  );
+  return isMergeInProgress(repoCwd);
+}
+
+/** Whether Git currently has a merge commit waiting to be completed. */
+export async function isMergeInProgress(repoCwd: string): Promise<boolean> {
+  try {
+    await execFileAsync("git", ["rev-parse", "--verify", "-q", "MERGE_HEAD"], {
+      cwd: repoCwd,
+      timeout: 5000,
     });
-  } catch (err) {
-    // Roll back an in-progress (conflicted) merge so the working tree is left
-    // clean; ignore failure (e.g. nothing to abort).
-    await execFileAsync("git", ["merge", "--abort"], {
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Resolves a ref to its commit SHA, returning null when it does not exist. */
+export async function getRefSha(
+  repoCwd: string,
+  ref: string,
+): Promise<string | null> {
+  assertNotOption(ref, "ref");
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["rev-parse", "--verify", ref],
+      { cwd: repoCwd, timeout: 5000 },
+    );
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether `ancestorRef` is already contained in `descendantRef`. */
+export async function isRefAncestor(
+  repoCwd: string,
+  ancestorRef: string,
+  descendantRef = "HEAD",
+): Promise<boolean> {
+  assertNotOption(ancestorRef, "ancestor ref");
+  assertNotOption(descendantRef, "descendant ref");
+  try {
+    await execFileAsync(
+      "git",
+      ["merge-base", "--is-ancestor", ancestorRef, descendantRef],
+      { cwd: repoCwd, timeout: 10000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Returns repository-relative paths that are still unmerged. */
+export async function listMergeConflicts(repoCwd: string): Promise<string[]> {
+  const { stdout } = await execFileAsync(
+    "git",
+    ["ls-files", "--unmerged", "-z"],
+    { cwd: repoCwd, timeout: 10000 },
+  );
+  const conflicts = new Set<string>();
+  for (const record of stdout.split("\0")) {
+    if (!record) continue;
+    // `git ls-files -u` records are:
+    // <mode> <object> <stage>\t<path>
+    const separator = record.indexOf("\t");
+    if (separator !== -1) conflicts.add(record.slice(separator + 1));
+  }
+  return [...conflicts];
+}
+
+/**
+ * Resolves one conflicted path with the destination branch's version (`ours`)
+ * or the incoming worktree branch's version (`theirs`), then stages it.
+ */
+export async function resolveMergeConflict(
+  repoCwd: string,
+  filePath: string,
+  strategy: "ours" | "theirs",
+): Promise<void> {
+  let acceptedDeletion = false;
+  try {
+    await execFileAsync("git", ["checkout", `--${strategy}`, "--", filePath], {
       cwd: repoCwd,
       timeout: 10000,
-    }).catch(() => {});
-    throw err;
+    });
+  } catch (error) {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["ls-files", "--unmerged", "--", filePath],
+      { cwd: repoCwd, timeout: 10000 },
+    );
+    const requiredStage = strategy === "ours" ? "2" : "3";
+    const selectedSideExists = stdout
+      .split("\n")
+      .filter(Boolean)
+      .some((line) => line.split(/\s+/, 4)[2] === requiredStage);
+    if (selectedSideExists) throw error;
+
+    // Modify/delete conflicts have no entry for the deleted side. Choosing that
+    // side means accepting the deletion; other checkout failures are rethrown.
+    await execFileAsync("git", ["rm", "-f", "--", filePath], {
+      cwd: repoCwd,
+      timeout: 10000,
+    });
+    acceptedDeletion = true;
   }
+  if (acceptedDeletion) return;
+  await execFileAsync("git", ["add", "-A", "--", filePath], {
+    cwd: repoCwd,
+    timeout: 10000,
+  });
+}
+
+/** Completes an in-progress merge after every conflict has been staged. */
+export async function continueMerge(repoCwd: string): Promise<void> {
+  const conflicts = await listMergeConflicts(repoCwd);
+  if (conflicts.length > 0) {
+    throw new Error("Resolve all merge conflicts before continuing");
+  }
+  await execFileAsync("git", ["commit", "--no-edit"], {
+    cwd: repoCwd,
+    timeout: 30000,
+  });
+}
+
+/** Aborts an in-progress merge. No-op when no merge is active. */
+export async function abortMerge(repoCwd: string): Promise<void> {
+  await execFileAsync("git", ["merge", "--abort"], {
+    cwd: repoCwd,
+    timeout: 10000,
+  }).catch(() => {});
 }

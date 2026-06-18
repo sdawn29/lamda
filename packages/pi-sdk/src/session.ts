@@ -120,6 +120,19 @@ function buildRuntimeHandle(
     get sessionFile() {
       return runtime.session.sessionFile;
     },
+    getCwd: () => runtime.session.sessionManager.getCwd(),
+    relocateCwd: async (cwd) => {
+      const sessionFile = runtime.session.sessionFile;
+      if (!sessionFile) {
+        throw new Error("Cannot relocate an in-memory session");
+      }
+      const result = await runtime.switchSession(sessionFile, {
+        cwdOverride: cwd,
+      });
+      if (result.cancelled) {
+        throw new Error("Session relocation was cancelled");
+      }
+    },
     setName: (name) => runtime.session.setSessionName(name),
     getName: () => runtime.session.sessionName,
     getContextUsage() {

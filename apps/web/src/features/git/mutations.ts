@@ -18,6 +18,8 @@ import {
   gitFetch,
   gitPull,
   gitGenerateCommitMessage,
+  createWorkspaceBranch,
+  initializeWorkspaceGitRepository,
 } from "./api"
 import {
   gitKeys,
@@ -192,6 +194,33 @@ export function useCreateBranch(sessionId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: branchKey(sessionId) })
       queryClient.invalidateQueries({ queryKey: branchesKey(sessionId) })
+    },
+  })
+}
+
+// Workspace-scoped variants for the new-thread page, where no session exists yet.
+export function useCreateWorkspaceBranch(workspaceId: string | null) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (branch: string) => createWorkspaceBranch(workspaceId!, branch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [...gitKeys.all, "workspace", workspaceId],
+      })
+    },
+  })
+}
+
+export function useInitializeWorkspaceGitRepository(
+  workspaceId: string | null
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => initializeWorkspaceGitRepository(workspaceId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [...gitKeys.all, "workspace", workspaceId],
+      })
     },
   })
 }

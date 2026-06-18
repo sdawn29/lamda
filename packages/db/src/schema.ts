@@ -55,10 +55,14 @@ export const threads = sqliteTable("threads", {
   // parent's turn checkpoints. Null for non-forked threads.
   baseCheckpointSha: text("base_checkpoint_sha"),
   // When set, this thread runs inside a git worktree at this absolute path
-  // (under ~/.lamda/<workspace-name>/<worktree-name>) on branch
+  // (under ~/.lamda/worktrees/<workspace-name>/<worktree-name>) on branch
   // `worktreeBranch`, instead of the workspace's own directory. Null = local.
   worktreePath: text("worktree_path"),
   worktreeBranch: text("worktree_branch"),
+  // Branch in the main workspace checkout that this worktree must merge into.
+  // Persisting it prevents a later local checkout from silently changing the
+  // merge destination.
+  worktreeBaseBranch: text("worktree_base_branch"),
   // True when lamda created the worktree branch and should delete it after a
   // successful merge. False for pre-existing worktrees entered by the thread.
   ownsWorktreeBranch: integer("owns_worktree_branch", {
@@ -66,6 +70,17 @@ export const threads = sqliteTable("threads", {
   })
     .notNull()
     .default(false),
+  // Only one thread per workspace may own the main checkout's active merge.
+  // This flag survives renderer/server reloads so conflict resolution cannot be
+  // continued or aborted through a different thread.
+  worktreeMergeInProgress: integer("worktree_merge_in_progress", {
+    mode: "boolean",
+  })
+    .notNull()
+    .default(false),
+  // Exact MERGE_HEAD claimed by this thread. This remains stable even if the
+  // worktree branch advances while conflicts are being resolved.
+  worktreeMergeHeadSha: text("worktree_merge_head_sha"),
 });
 
 /**
