@@ -43,6 +43,40 @@ async function buildSessionCustomTools(
   return { customTools, mode };
 }
 
+function modelConfigForThread(
+  threadId: string,
+): Pick<SdkConfig, "provider" | "model"> {
+  const modelId = getThread(threadId)?.modelId;
+  if (!modelId) return {};
+  const separator = modelId.indexOf("::");
+  if (separator <= 0 || separator === modelId.length - 2) return {};
+  return {
+    provider: modelId.slice(0, separator),
+    model: modelId.slice(separator + 2),
+  };
+}
+
+async function createHandleForThread(
+  threadId: string,
+  cwd: string,
+  workspaceId?: string,
+  opts: Omit<Partial<SdkConfig>, "cwd"> = {},
+): Promise<ManagedSessionHandle> {
+  const { customTools, mode } = await buildSessionCustomTools(
+    threadId,
+    cwd,
+    workspaceId,
+  );
+  return createManagedSession({
+    cwd,
+    customTools,
+    mode,
+    toolApproval: createToolApprovalBridge(threadId),
+    ...modelConfigForThread(threadId),
+    ...opts,
+  });
+}
+
 export async function createSessionForThread(
   threadId: string,
   cwd: string,
@@ -69,18 +103,7 @@ export async function createSessionForThread(
   // on a missing directory. Cheap and safe to run unconditionally.
   await mkdir(join(cwd, PLAN_DIR), { recursive: true }).catch(() => {});
 
-  const { customTools, mode } = await buildSessionCustomTools(
-    threadId,
-    cwd,
-    workspaceId,
-  );
-  const handle = await createManagedSession({
-    cwd,
-    customTools,
-    mode,
-    toolApproval: createToolApprovalBridge(threadId),
-    ...opts,
-  });
+  const handle = await createHandleForThread(threadId, cwd, workspaceId, opts);
   const sessionId = store.create(handle, cwd, threadId, workspaceId);
 
   if (handle.sessionFile) {
@@ -166,14 +189,17 @@ export async function relocateThreadSession(
   // Pre-create the plan dir in the new cwd so plan-mode writes don't fail.
   await mkdir(join(newCwd, PLAN_DIR), { recursive: true }).catch(() => {});
 
-  if (sessionFile) {
-    const newHandle = await openSessionForThread(
-      threadId,
-      sessionFile,
-      newCwd,
-      entry.workspaceId,
-    );
-    store.replaceHandle(existing.sessionId, newHandle);
+  const newHandle = sessionFile
+    ? await openSessionForThread(
+        threadId,
+        sessionFile,
+        newCwd,
+        entry.workspaceId,
+      )
+    : await createHandleForThread(threadId, newCwd, entry.workspaceId);
+  store.replaceHandle(existing.sessionId, newHandle);
+  if (newHandle.sessionFile) {
+    updateThreadSessionFile(threadId, newHandle.sessionFile);
   }
   // Keep the recorded cwd in sync even if there was no file to reopen, so git
   // routes (which read store.getCwd) target the new directory.
@@ -183,7 +209,12 @@ export async function relocateThreadSession(
   await sessionEvents.dispose(existing.sessionId);
   const refreshed = store.get(existing.sessionId);
   if (refreshed) {
-    sessionEvents.ensure(existing.sessionId, threadId, refreshed.handle, newCwd);
+    sessionEvents.ensure(
+      existing.sessionId,
+      threadId,
+      refreshed.handle,
+      newCwd,
+    );
   }
   return true;
 }
@@ -244,7 +275,12 @@ async function refreshSessionTools(
 
   const thread = getThread(threadId);
   const mode = normalizeMode(thread?.mode);
-  const tools = await collectCustomTools(workspaceId, workspacePath, mode, threadId);
+  const tools = await collectCustomTools(
+    workspaceId,
+    workspacePath,
+    mode,
+    threadId,
+  );
   handle.setCustomTools(tools);
 
   if (mode) {
@@ -256,8 +292,10 @@ export async function refreshWorkspaceSessionTools(workspaceId: string) {
   const ws = getWorkspace(workspaceId);
   if (!ws) return;
 
-  for (const { sessionId, handle } of store.getByWorkspaceId(workspaceId)) {
-    await refreshSessionTools(sessionId, handle, workspaceId, ws.path);
+  for (const { sessionId, handle, cwd } of store.getByWorkspaceId(
+    workspaceId,
+  )) {
+    await refreshSessionTools(sessionId, handle, workspaceId, cwd);
   }
 }
 
@@ -266,10 +304,10 @@ export async function refreshWorkspaceSessionTools(workspaceId: string) {
  * when application-wide configuration (e.g. MCP servers) changes.
  */
 export async function refreshAllSessionTools() {
-  for (const { sessionId, handle, workspaceId } of store.getAll()) {
+  for (const { sessionId, handle, workspaceId, cwd } of store.getAll()) {
     if (!workspaceId) continue;
     const ws = getWorkspace(workspaceId);
     if (!ws) continue;
-    await refreshSessionTools(sessionId, handle, workspaceId, ws.path);
+    await refreshSessionTools(sessionId, handle, workspaceId, cwd);
   }
 }

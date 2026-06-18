@@ -55,6 +55,7 @@ import {
   useUpdateThreadStopped,
   useUpdateThreadTitle,
   useEnterThreadWorktree,
+  useSwitchThreadToLocal,
 } from "@/features/workspace/mutations"
 import { useWorkspace } from "@/features/workspace"
 import { useChatStream } from "../use-chat-stream"
@@ -449,6 +450,7 @@ export function ChatView({
   // ── Mutations ─────────────────────────────────────────────────────────────────
   const checkoutBranchMutation = useCheckoutBranch(sessionId)
   const enterWorktreeMutation = useEnterThreadWorktree()
+  const switchToLocalMutation = useSwitchThreadToLocal()
   const abortSessionMutation = useAbortSession(sessionId)
   const generateTitleMutation = useGenerateTitle()
   const sendPromptMutation = useSendPrompt(sessionId)
@@ -652,7 +654,7 @@ export function ChatView({
   }, [])
 
   const handleBranchSelect = useCallback(
-    (selectedBranch: string) => {
+    async (selectedBranch: string) => {
       const onError = (err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err)
         const stripped = msg.replace(/^API \d+:\s*/, "")
@@ -666,7 +668,9 @@ export function ChatView({
 
       // A branch checked out in a secondary worktree can't be checked out in
       // place — open the thread in that worktree's directory instead.
-      const worktree = sessionWorktrees?.find((w) => w.branch === selectedBranch)
+      const worktree = sessionWorktrees?.find(
+        (w) => w.branch === selectedBranch
+      )
       if (worktree) {
         enterWorktreeMutation.mutate(
           { threadId, sessionId, branch: selectedBranch },
@@ -675,14 +679,23 @@ export function ChatView({
         return
       }
 
-      checkoutBranchMutation.mutate(selectedBranch, { onError })
+      try {
+        if (worktreeBranch) {
+          await switchToLocalMutation.mutateAsync({ threadId, sessionId })
+        }
+        await checkoutBranchMutation.mutateAsync(selectedBranch)
+      } catch (error) {
+        onError(error)
+      }
     },
     [
       checkoutBranchMutation,
       enterWorktreeMutation,
+      switchToLocalMutation,
       sessionWorktrees,
       threadId,
       sessionId,
+      worktreeBranch,
       handleGitError,
     ]
   )
@@ -1061,7 +1074,9 @@ export function ChatView({
                   Waiting for approval
                 </div>
               ) : (
-                showThinkingIndicator && <ThinkingIndicator className="py-0.5" />
+                showThinkingIndicator && (
+                  <ThinkingIndicator className="py-0.5" />
+                )
               )}
             </div>
           </div>

@@ -89,12 +89,15 @@ class SessionStore {
 
   getByWorkspaceId(
     workspaceId: string,
-  ): Array<{ sessionId: string; handle: ManagedSessionHandle }> {
-    const result: Array<{ sessionId: string; handle: ManagedSessionHandle }> =
-      [];
+  ): Array<{ sessionId: string; handle: ManagedSessionHandle; cwd: string }> {
+    const result: Array<{
+      sessionId: string;
+      handle: ManagedSessionHandle;
+      cwd: string;
+    }> = [];
     for (const [sessionId, entry] of this.sessions) {
       if (entry.workspaceId === workspaceId) {
-        result.push({ sessionId, handle: entry.handle });
+        result.push({ sessionId, handle: entry.handle, cwd: entry.cwd });
       }
     }
     return result;
@@ -104,17 +107,20 @@ class SessionStore {
     sessionId: string;
     handle: ManagedSessionHandle;
     workspaceId?: string;
+    cwd: string;
   }> {
     const result: Array<{
       sessionId: string;
       handle: ManagedSessionHandle;
       workspaceId?: string;
+      cwd: string;
     }> = [];
     for (const [sessionId, entry] of this.sessions) {
       result.push({
         sessionId,
         handle: entry.handle,
         workspaceId: entry.workspaceId,
+        cwd: entry.cwd,
       });
     }
     return result;

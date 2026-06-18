@@ -67,8 +67,7 @@ export const MODE_OPTIONS: ModeOption[] = [
     icon: <BotIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-emerald-600 dark:text-emerald-400",
     selectedBg: "data-[checked=true]:bg-emerald-500/10",
-    triggerBg:
-      "bg-emerald-500/10 hover:bg-emerald-500/15 aria-expanded:bg-emerald-500/20 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/20 dark:aria-expanded:bg-emerald-500/25",
+    triggerBg: "",
     focusRing:
       "focus-within:border-emerald-500/60 focus-within:ring-2 focus-within:ring-emerald-500/25",
     sendButton: PRIMARY_SEND_BUTTON,
@@ -107,12 +106,10 @@ export function ModeCombobox({
             <span className={selectedOption.iconAccent}>
               {selectedOption.icon}
             </span>
-            <span className={selectedOption.iconAccent}>
-              {selectedOption.label}
-            </span>
+            <span>{selectedOption.label}</span>
             <ChevronDownIcon
               data-icon="inline-end"
-              className={`opacity-60 transition-transform duration-200 ${open ? "rotate-180" : ""} ${selectedOption.iconAccent}`}
+              className={`opacity-60 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
             />
           </Button>
         }

@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { mkdir } from "node:fs/promises";
-import { basename } from "node:path";
 import {
   getWorkspace,
   getThread,
@@ -34,6 +33,7 @@ import {
   getRepoRoot,
   getCurrentBranch,
   addWorktree,
+  deleteBranch,
   listWorktrees,
   removeWorktree,
   pruneWorktrees,
@@ -55,7 +55,12 @@ function parseGitError(err: unknown, fallback: string): string {
   const line = raw
     .split("\n")
     .map((l) => l.trim())
-    .find((l) => l.startsWith("error:") || l.startsWith("fatal:") || l.startsWith("CONFLICT"));
+    .find(
+      (l) =>
+        l.startsWith("error:") ||
+        l.startsWith("fatal:") ||
+        l.startsWith("CONFLICT"),
+    );
   return line ?? raw.split("\n").find(Boolean) ?? fallback;
 }
 
@@ -222,7 +227,10 @@ threads.patch("/thread/:id/approval-mode", async (c) => {
     .json<{ approvalMode?: string }>()
     .catch((): { approvalMode?: string } => ({}));
   if (body.approvalMode !== "ask" && body.approvalMode !== "all_allowed") {
-    return c.json({ error: "approvalMode must be 'ask' or 'all_allowed'" }, 400);
+    return c.json(
+      { error: "approvalMode must be 'ask' or 'all_allowed'" },
+      400,
+    );
   }
   const thread = getThread(threadId);
   if (!thread) return c.json({ error: "Thread not found" }, 404);
@@ -291,9 +299,9 @@ threads.get("/threads/archived", (c) => {
 
 // ── Thread worktrees ──────────────────────────────────────────────────────────
 // A thread can run inside its own git worktree (an isolated checkout on a new
-// branch under ~/.lamda/worktrees) instead of the workspace directory. The same
-// thread continues — only its session cwd moves — so its chat, git panel, and
-// file tree follow into the worktree.
+// branch under ~/.lamda/<workspace-name>/<worktree-name>) instead of the
+// workspace directory. The same thread continues — only its session cwd moves
+// — so its chat, git panel, and file tree follow into the worktree.
 
 // Move a thread into a freshly created worktree on a new branch.
 threads.post("/thread/:id/worktree", async (c) => {
@@ -320,15 +328,18 @@ threads.post("/thread/:id/worktree", async (c) => {
   if (!baseRef)
     return c.json({ error: "Could not determine a base branch" }, 400);
 
-  const worktreePath = lamdaWorktreePath(basename(repoRoot), newBranch);
+  const worktreePath = lamdaWorktreePath(ws.name, newBranch);
   try {
-    await mkdir(lamdaWorktreesDir(), { recursive: true });
+    await mkdir(lamdaWorktreesDir(ws.name), { recursive: true });
     await addWorktree(repoRoot, worktreePath, newBranch, baseRef);
   } catch (err) {
-    return c.json({ error: parseGitError(err, "Failed to create worktree") }, 500);
+    return c.json(
+      { error: parseGitError(err, "Failed to create worktree") },
+      500,
+    );
   }
 
-  setThreadWorktree(threadId, worktreePath, newBranch);
+  setThreadWorktree(threadId, worktreePath, newBranch, true);
   await relocateThreadSession(threadId, worktreePath);
   return c.json({ worktreePath, worktreeBranch: newBranch });
 });
@@ -358,7 +369,7 @@ threads.post("/thread/:id/worktree/enter", async (c) => {
   );
   if (!wt) return c.json({ error: "No worktree exists for that branch" }, 404);
 
-  setThreadWorktree(threadId, wt.path, branch);
+  setThreadWorktree(threadId, wt.path, branch, false);
   await relocateThreadSession(threadId, wt.path);
   return c.json({ worktreePath: wt.path, worktreeBranch: branch });
 });
@@ -420,6 +431,9 @@ threads.post("/thread/:id/worktree/merge", async (c) => {
   try {
     await removeWorktree(repoRoot, thread.worktreePath, true);
     await pruneWorktrees(repoRoot);
+    if (thread.ownsWorktreeBranch) {
+      await deleteBranch(repoRoot, thread.worktreeBranch);
+    }
   } catch (err) {
     // The merge landed; surface the cleanup failure but don't pretend it failed.
     console.error("[worktree-merge] cleanup failed:", err);

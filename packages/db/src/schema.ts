@@ -1,9 +1,15 @@
-import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core"
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  primaryKey,
+} from "drizzle-orm/sqlite-core";
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
-})
+});
 
 export const workspaces = sqliteTable("workspaces", {
   id: text("id").primaryKey(),
@@ -14,7 +20,7 @@ export const workspaces = sqliteTable("workspaces", {
   env: text("env"), // JSON object: { KEY: "value" }
   icon: text("icon"), // relative path to detected icon file (e.g. "public/favicon.ico")
   createdAt: integer("created_at").notNull(),
-})
+});
 
 export const threads = sqliteTable("threads", {
   id: text("id").primaryKey(),
@@ -24,10 +30,16 @@ export const threads = sqliteTable("threads", {
   title: text("title").notNull().default("New Thread"),
   sessionFile: text("session_file"),
   modelId: text("model_id"),
-  isStopped: integer("is_stopped", { mode: "boolean" }).notNull().default(false),
-  isArchived: integer("is_archived", { mode: "boolean" }).notNull().default(false),
+  isStopped: integer("is_stopped", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  isArchived: integer("is_archived", { mode: "boolean" })
+    .notNull()
+    .default(false),
   isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
-  mode: text("mode", { enum: ["ask", "plan", "agent"] }).notNull().default("agent"),
+  mode: text("mode", { enum: ["ask", "plan", "agent"] })
+    .notNull()
+    .default("agent"),
   approvalMode: text("approval_mode", { enum: ["ask", "all_allowed"] })
     .notNull()
     .default("ask"),
@@ -43,11 +55,18 @@ export const threads = sqliteTable("threads", {
   // parent's turn checkpoints. Null for non-forked threads.
   baseCheckpointSha: text("base_checkpoint_sha"),
   // When set, this thread runs inside a git worktree at this absolute path
-  // (under ~/.lamda/worktrees) on branch `worktreeBranch`, instead of the
-  // workspace's own directory. Null = runs in the workspace path ("local").
+  // (under ~/.lamda/<workspace-name>/<worktree-name>) on branch
+  // `worktreeBranch`, instead of the workspace's own directory. Null = local.
   worktreePath: text("worktree_path"),
   worktreeBranch: text("worktree_branch"),
-})
+  // True when lamda created the worktree branch and should delete it after a
+  // successful merge. False for pre-existing worktrees entered by the thread.
+  ownsWorktreeBranch: integer("owns_worktree_branch", {
+    mode: "boolean",
+  })
+    .notNull()
+    .default(false),
+});
 
 /**
  * Message blocks - stores each message as a complete block with all data.
@@ -59,7 +78,9 @@ export const messageBlocks = sqliteTable("message_blocks", {
     .notNull()
     .references(() => threads.id, { onDelete: "cascade" }),
   blockIndex: integer("block_index").notNull(),
-  role: text("role", { enum: ["user", "assistant", "tool", "abort", "compaction"] }).notNull(),
+  role: text("role", {
+    enum: ["user", "assistant", "tool", "abort", "compaction"],
+  }).notNull(),
   content: text("content"),
   thinking: text("thinking"),
   model: text("model"),
@@ -76,7 +97,7 @@ export const messageBlocks = sqliteTable("message_blocks", {
   toolStartTime: integer("tool_start_time"),
   attachments: text("attachments"), // JSON array of attachment metadata
   createdAt: integer("created_at").notNull(),
-})
+});
 
 export const workspaceFiles = sqliteTable(
   "workspace_files",
@@ -86,10 +107,12 @@ export const workspaceFiles = sqliteTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     relativePath: text("relative_path").notNull(),
     name: text("name").notNull(),
-    isDirectory: integer("is_directory", { mode: "boolean" }).notNull().default(false),
+    isDirectory: integer("is_directory", { mode: "boolean" })
+      .notNull()
+      .default(false),
   },
-  (table) => [primaryKey({ columns: [table.workspaceId, table.relativePath] })]
-)
+  (table) => [primaryKey({ columns: [table.workspaceId, table.relativePath] })],
+);
 
 /**
  * @deprecated Legacy messages table - kept for migration reference
@@ -102,7 +125,7 @@ export const messages = sqliteTable("messages", {
   role: text("role", { enum: ["user", "assistant", "tool"] }).notNull(),
   content: text("content").notNull(),
   createdAt: integer("created_at").notNull(),
-})
+});
 
 // ── Agent Turns ───────────────────────────────────────────────────────────────
 
@@ -113,7 +136,7 @@ export const agentTurns = sqliteTable("agent_turns", {
   startedAt: integer("started_at").notNull(),
   endedAt: integer("ended_at").notNull(),
   checkpointSha: text("checkpoint_sha").notNull().default(""),
-})
+});
 
 export const agentTurnFiles = sqliteTable("agent_turn_files", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -122,8 +145,10 @@ export const agentTurnFiles = sqliteTable("agent_turn_files", {
   postStatusCode: text("post_status_code").notNull(),
   preStatusCode: text("pre_status_code").notNull().default(""),
   preContent: text("pre_content"),
-  wasCreatedByTurn: integer("was_created_by_turn", { mode: "boolean" }).notNull().default(false),
-})
+  wasCreatedByTurn: integer("was_created_by_turn", { mode: "boolean" })
+    .notNull()
+    .default(false),
+});
 
 // ── Thread Todo Goals ─────────────────────────────────────────────────────────
 
@@ -138,7 +163,7 @@ export const threadTodoGoals = sqliteTable("thread_todo_goals", {
     .default("active"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at").notNull(),
-})
+});
 
 // ── Thread Todos ──────────────────────────────────────────────────────────────
 
@@ -155,7 +180,7 @@ export const threadTodos = sqliteTable("thread_todos", {
     .default("pending"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at").notNull(),
-})
+});
 
 // ── AI Usage ──────────────────────────────────────────────────────────────────
 
@@ -177,7 +202,7 @@ export const aiUsage = sqliteTable("ai_usage", {
   totalTokens: integer("total_tokens").notNull().default(0),
   cost: real("cost").notNull().default(0),
   createdAt: integer("created_at").notNull(),
-})
+});
 
 // ── Agent Memories ────────────────────────────────────────────────────────────
 
@@ -188,7 +213,9 @@ export const aiUsage = sqliteTable("ai_usage", {
 export const agentMemories = sqliteTable("agent_memories", {
   id: text("id").primaryKey(),
   scope: text("scope", { enum: ["user", "workspace"] }).notNull(),
-  workspaceId: text("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceId: text("workspace_id").references(() => workspaces.id, {
+    onDelete: "cascade",
+  }),
   title: text("title").notNull(),
   content: text("content").notNull(),
   category: text("category"),
@@ -205,7 +232,9 @@ export const agentMemories = sqliteTable("agent_memories", {
     .default("agent"),
   // Provenance + episodic link: the thread this memory was learned from. Nulled
   // (not cascaded) when the thread is deleted, so the learning survives.
-  threadId: text("thread_id").references(() => threads.id, { onDelete: "set null" }),
+  threadId: text("thread_id").references(() => threads.id, {
+    onDelete: "set null",
+  }),
   // JSON array of file paths this memory concerns (touched/affected), enabling
   // file-association retrieval when the agent re-enters that area of the code.
   filePaths: text("file_paths"),
@@ -222,7 +251,7 @@ export const agentMemories = sqliteTable("agent_memories", {
   updatedAt: integer("updated_at").notNull(),
   lastUsedAt: integer("last_used_at"),
   useCount: integer("use_count").notNull().default(0),
-})
+});
 
 // ── MCP Servers ───────────────────────────────────────────────────────────────
 
@@ -235,7 +264,7 @@ export const workspaceTasks = sqliteTable("workspace_tasks", {
   icon: text("icon"),
   command: text("command").notNull(),
   createdAt: integer("created_at").notNull(),
-})
+});
 
 export const mcpServers = sqliteTable("mcp_servers", {
   id: text("id").primaryKey(),
@@ -253,4 +282,4 @@ export const mcpServers = sqliteTable("mcp_servers", {
   description: text("description"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at").notNull(),
-})
+});

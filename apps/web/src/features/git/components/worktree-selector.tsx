@@ -44,7 +44,6 @@ import {
 } from "@/shared/ui/select"
 import {
   useCreateThreadWorktree,
-  useSwitchThreadToLocal,
   useMergeThreadWorktree,
 } from "@/features/workspace/mutations"
 
@@ -102,7 +101,6 @@ export function WorktreeSelector({
   const [mergeConfirmOpen, setMergeConfirmOpen] = React.useState(false)
 
   const createWorktree = useCreateThreadWorktree()
-  const switchToLocal = useSwitchThreadToLocal()
   const mergeWorktree = useMergeThreadWorktree()
 
   const inWorktree = !!worktreeBranch
@@ -120,7 +118,11 @@ export function WorktreeSelector({
     const branch = newBranch.trim()
     if (!branch) return
     createWorktree.mutate(
-      { threadId, sessionId, body: { newBranch: branch, baseRef: baseRef || undefined } },
+      {
+        threadId,
+        sessionId,
+        body: { newBranch: branch, baseRef: baseRef || undefined },
+      },
       {
         onSuccess: () => {
           setDialogOpen(false)
@@ -128,15 +130,6 @@ export function WorktreeSelector({
         },
         onError: (error) => reportError(parseError(error)),
       }
-    )
-  }
-
-  function handleSwitchLocal() {
-    setOpen(false)
-    if (!inWorktree) return
-    switchToLocal.mutate(
-      { threadId, sessionId },
-      { onError: (error) => reportError(parseError(error)) }
     )
   }
 
@@ -196,25 +189,30 @@ export function WorktreeSelector({
             </Button>
           }
         />
-        <PopoverContent className="w-60 p-0" side="top" align="start" sideOffset={6}>
+        <PopoverContent
+          className="w-60 p-0"
+          side="top"
+          align="start"
+          sideOffset={6}
+        >
           <Command>
             <CommandList>
               <CommandGroup className="p-1">
-                <CommandItem
-                  className="items-start gap-2 rounded-md px-2 py-1.5"
-                  onSelect={handleSwitchLocal}
-                >
-                  <MonitorIcon className="mt-0.5 size-3.5 shrink-0" />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="text-xs font-medium">Local</span>
-                    <span className="text-3xs text-muted-foreground">
-                      Run this thread in the workspace directory
+                {!inWorktree && (
+                  <CommandItem
+                    className="items-start gap-2 rounded-md px-2 py-1.5"
+                    onSelect={() => setOpen(false)}
+                  >
+                    <MonitorIcon className="mt-0.5 size-3.5 shrink-0" />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-xs font-medium">Local</span>
+                      <span className="text-3xs text-muted-foreground">
+                        Run this thread in the workspace directory
+                      </span>
                     </span>
-                  </span>
-                  {!inWorktree && (
-                    <CheckIcon className="ml-auto mt-0.5 size-3.5 shrink-0" />
-                  )}
-                </CommandItem>
+                    <CheckIcon className="mt-0.5 ml-auto size-3.5 shrink-0" />
+                  </CommandItem>
+                )}
                 <CommandItem
                   disabled={inWorktree || createWorktree.isPending}
                   className="items-start gap-2 rounded-md px-2 py-1.5"
@@ -232,7 +230,7 @@ export function WorktreeSelector({
                     </span>
                   </span>
                   {inWorktree && (
-                    <CheckIcon className="ml-auto mt-0.5 size-3.5 shrink-0" />
+                    <CheckIcon className="mt-0.5 ml-auto size-3.5 shrink-0" />
                   )}
                 </CommandItem>
                 {inWorktree && (
@@ -244,7 +242,9 @@ export function WorktreeSelector({
                     <GitMergeIcon className="mt-0.5 size-3.5 shrink-0" />
                     <span className="flex min-w-0 flex-col">
                       <span className="text-xs font-medium">
-                        {mergeWorktree.isPending ? "Merging…" : "Merge to workspace"}
+                        {mergeWorktree.isPending
+                          ? "Merging…"
+                          : "Merge to workspace"}
                       </span>
                       <span className="text-3xs text-muted-foreground">
                         Merge {worktreeBranch}, remove the worktree, go local
@@ -283,7 +283,10 @@ export function WorktreeSelector({
                 <span className="text-xs font-medium text-muted-foreground">
                   Base branch
                 </span>
-                <Select value={baseRef} onValueChange={(value) => setBaseRef(value ?? "")}>
+                <Select
+                  value={baseRef}
+                  onValueChange={(value) => setBaseRef(value ?? "")}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select base branch" />
                   </SelectTrigger>

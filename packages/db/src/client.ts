@@ -116,6 +116,7 @@ function createDb() {
       is_pinned        INTEGER NOT NULL DEFAULT 0,
       mode             TEXT NOT NULL DEFAULT 'agent',
       last_accessed_at INTEGER,
+      owns_worktree_branch INTEGER NOT NULL DEFAULT 0,
       created_at       INTEGER NOT NULL
     );
 
@@ -271,7 +272,9 @@ function createDb() {
 
   // Migration: Add env column to workspaces table.
   try {
-    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as {
+      name: string;
+    }[];
     if (!wsCols.some((col) => col.name === "env")) {
       sqlite.exec(`ALTER TABLE workspaces ADD COLUMN env TEXT`);
     }
@@ -281,9 +284,13 @@ function createDb() {
 
   // Migration: Add is_pinned column to workspaces table.
   try {
-    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as {
+      name: string;
+    }[];
     if (!wsCols.some((col) => col.name === "is_pinned")) {
-      sqlite.exec(`ALTER TABLE workspaces ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0`);
+      sqlite.exec(
+        `ALTER TABLE workspaces ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0`,
+      );
     }
   } catch {
     // Safe to ignore — column may already exist.
@@ -291,12 +298,19 @@ function createDb() {
 
   // Migration: Add worktree columns to threads table.
   try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
+      name: string;
+    }[];
     if (!threadCols.some((col) => col.name === "worktree_path")) {
       sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_path TEXT`);
     }
     if (!threadCols.some((col) => col.name === "worktree_branch")) {
       sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_branch TEXT`);
+    }
+    if (!threadCols.some((col) => col.name === "owns_worktree_branch")) {
+      sqlite.exec(
+        `ALTER TABLE threads ADD COLUMN owns_worktree_branch INTEGER NOT NULL DEFAULT 0`,
+      );
     }
   } catch {
     // Safe to ignore — columns may already exist.
@@ -304,9 +318,13 @@ function createDb() {
 
   // Migration: Add checkpoint_sha column to agent_turns table.
   try {
-    const turnCols = sqlite.prepare("PRAGMA table_info(agent_turns)").all() as { name: string }[];
+    const turnCols = sqlite.prepare("PRAGMA table_info(agent_turns)").all() as {
+      name: string;
+    }[];
     if (!turnCols.some((col) => col.name === "checkpoint_sha")) {
-      sqlite.exec(`ALTER TABLE agent_turns ADD COLUMN checkpoint_sha TEXT NOT NULL DEFAULT ''`);
+      sqlite.exec(
+        `ALTER TABLE agent_turns ADD COLUMN checkpoint_sha TEXT NOT NULL DEFAULT ''`,
+      );
     }
   } catch {
     // Safe to ignore — column may already exist.
@@ -314,7 +332,9 @@ function createDb() {
 
   // Migration: Add name column to workspace_tasks table.
   try {
-    const taskCols = sqlite.prepare("PRAGMA table_info(workspace_tasks)").all() as { name: string }[];
+    const taskCols = sqlite
+      .prepare("PRAGMA table_info(workspace_tasks)")
+      .all() as { name: string }[];
     if (!taskCols.some((col) => col.name === "name")) {
       sqlite.exec(`ALTER TABLE workspace_tasks ADD COLUMN name TEXT`);
     }
@@ -324,7 +344,9 @@ function createDb() {
 
   // Migration: Add forked_from_id column to threads table.
   try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
+      name: string;
+    }[];
     if (!threadCols.some((col) => col.name === "forked_from_id")) {
       sqlite.exec(`ALTER TABLE threads ADD COLUMN forked_from_id TEXT`);
     }
@@ -334,7 +356,9 @@ function createDb() {
 
   // Migration: Add base_checkpoint_sha column to threads table (fork snapshot).
   try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
+      name: string;
+    }[];
     if (!threadCols.some((col) => col.name === "base_checkpoint_sha")) {
       sqlite.exec(`ALTER TABLE threads ADD COLUMN base_checkpoint_sha TEXT`);
     }
@@ -344,9 +368,13 @@ function createDb() {
 
   // Migration: Add mode column to threads table.
   try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
+      name: string;
+    }[];
     if (!threadCols.some((col) => col.name === "mode")) {
-      sqlite.exec(`ALTER TABLE threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'agent'`);
+      sqlite.exec(
+        `ALTER TABLE threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'agent'`,
+      );
     }
     sqlite.exec(`UPDATE threads SET mode = 'agent' WHERE mode = 'code'`);
   } catch {
@@ -355,9 +383,13 @@ function createDb() {
 
   // Migration: Add approval_mode column to threads table (tool-approval gating).
   try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
+      name: string;
+    }[];
     if (!threadCols.some((col) => col.name === "approval_mode")) {
-      sqlite.exec(`ALTER TABLE threads ADD COLUMN approval_mode TEXT NOT NULL DEFAULT 'ask'`);
+      sqlite.exec(
+        `ALTER TABLE threads ADD COLUMN approval_mode TEXT NOT NULL DEFAULT 'ask'`,
+      );
     }
   } catch {
     // Safe to ignore — column may already exist.
@@ -365,7 +397,9 @@ function createDb() {
 
   // Migration: Add last_reflected_at column to threads (memory-reflection watermark).
   try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
+      name: string;
+    }[];
     if (!threadCols.some((col) => col.name === "last_reflected_at")) {
       sqlite.exec(`ALTER TABLE threads ADD COLUMN last_reflected_at INTEGER`);
     }
@@ -376,15 +410,34 @@ function createDb() {
   // Migration: Update message_blocks CHECK constraint to include 'abort' and 'compaction' roles.
   // SQLite doesn't support ALTER TABLE for CHECK constraints, so we recreate the table when needed.
   try {
-    const result = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='message_blocks'").get() as { sql: string } | undefined;
+    const result = sqlite
+      .prepare(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='message_blocks'",
+      )
+      .get() as { sql: string } | undefined;
     if (result && !result.sql.includes("'compaction'")) {
       const columns = [
-        'id', 'thread_id', 'block_index', 'role', 'content', 'thinking',
-        'model', 'provider', 'thinking_level', 'response_time', 'error_message',
-        'tool_call_id', 'tool_name', 'tool_args', 'tool_result', 'tool_status',
-        'tool_duration', 'tool_start_time', 'created_at'
+        "id",
+        "thread_id",
+        "block_index",
+        "role",
+        "content",
+        "thinking",
+        "model",
+        "provider",
+        "thinking_level",
+        "response_time",
+        "error_message",
+        "tool_call_id",
+        "tool_name",
+        "tool_args",
+        "tool_result",
+        "tool_status",
+        "tool_duration",
+        "tool_start_time",
+        "created_at",
       ];
-      const colList = columns.join(', ');
+      const colList = columns.join(", ");
       sqlite.exec(`
         CREATE TABLE IF NOT EXISTS message_blocks_new (
           id              TEXT PRIMARY KEY,
@@ -418,7 +471,9 @@ function createDb() {
 
   // Migration: Add goal_id column to thread_todos table.
   try {
-    const todoCols = sqlite.prepare("PRAGMA table_info(thread_todos)").all() as { name: string }[];
+    const todoCols = sqlite
+      .prepare("PRAGMA table_info(thread_todos)")
+      .all() as { name: string }[];
     if (!todoCols.some((col) => col.name === "goal_id")) {
       sqlite.exec(`ALTER TABLE thread_todos ADD COLUMN goal_id TEXT`);
     }
@@ -428,7 +483,9 @@ function createDb() {
 
   // Migration: Add icon column to workspaces table.
   try {
-    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as { name: string }[];
+    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as {
+      name: string;
+    }[];
     if (!wsCols.some((col) => col.name === "icon")) {
       sqlite.exec(`ALTER TABLE workspaces ADD COLUMN icon TEXT`);
     }
@@ -440,7 +497,9 @@ function createDb() {
   // per-workspace. Drop the workspace_id column and deduplicate by name,
   // keeping the most recently created server for any duplicated name.
   try {
-    const mcpCols = sqlite.prepare("PRAGMA table_info(mcp_servers)").all() as { name: string }[];
+    const mcpCols = sqlite.prepare("PRAGMA table_info(mcp_servers)").all() as {
+      name: string;
+    }[];
     if (mcpCols.some((col) => col.name === "workspace_id")) {
       sqlite.exec(`
         DROP INDEX IF EXISTS mcp_servers_workspace_idx;
@@ -480,8 +539,13 @@ function createDb() {
   // `transport` column is absent we recreate the table preserving existing rows
   // (all pre-existing rows are stdio servers with a command).
   try {
-    const mcpCols = sqlite.prepare("PRAGMA table_info(mcp_servers)").all() as { name: string }[];
-    if (mcpCols.length > 0 && !mcpCols.some((col) => col.name === "transport")) {
+    const mcpCols = sqlite.prepare("PRAGMA table_info(mcp_servers)").all() as {
+      name: string;
+    }[];
+    if (
+      mcpCols.length > 0 &&
+      !mcpCols.some((col) => col.name === "transport")
+    ) {
       sqlite.exec(`
         CREATE TABLE mcp_servers_new (
           id           TEXT PRIMARY KEY,
@@ -512,9 +576,13 @@ function createDb() {
 
   // Migration: Add pinned column to agent_memories table (always-on core set).
   try {
-    const memCols = sqlite.prepare("PRAGMA table_info(agent_memories)").all() as { name: string }[];
+    const memCols = sqlite
+      .prepare("PRAGMA table_info(agent_memories)")
+      .all() as { name: string }[];
     if (!memCols.some((col) => col.name === "pinned")) {
-      sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`);
+      sqlite.exec(
+        `ALTER TABLE agent_memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`,
+      );
     }
   } catch {
     // Safe to ignore — column may already exist.
@@ -524,7 +592,9 @@ function createDb() {
   // agent_memories (taxonomy + episodic links + reinforcement). Each guarded so a
   // partially-migrated DB still converges.
   try {
-    const memCols = sqlite.prepare("PRAGMA table_info(agent_memories)").all() as { name: string }[];
+    const memCols = sqlite
+      .prepare("PRAGMA table_info(agent_memories)")
+      .all() as { name: string }[];
     const has = (name: string) => memCols.some((col) => col.name === name);
     if (!has("kind")) {
       sqlite.exec(
@@ -538,7 +608,9 @@ function createDb() {
       sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN file_paths TEXT`);
     }
     if (!has("confidence")) {
-      sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN confidence REAL NOT NULL DEFAULT 1`);
+      sqlite.exec(
+        `ALTER TABLE agent_memories ADD COLUMN confidence REAL NOT NULL DEFAULT 1`,
+      );
     }
     if (!has("superseded_by")) {
       sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN superseded_by TEXT`);
@@ -549,7 +621,9 @@ function createDb() {
 
   // Migration: Add attachments column to message_blocks table for persisting file attachments.
   try {
-    const msgBlockCols = sqlite.prepare("PRAGMA table_info(message_blocks)").all() as { name: string }[];
+    const msgBlockCols = sqlite
+      .prepare("PRAGMA table_info(message_blocks)")
+      .all() as { name: string }[];
     if (!msgBlockCols.some((col) => col.name === "attachments")) {
       sqlite.exec(`ALTER TABLE message_blocks ADD COLUMN attachments TEXT`);
     }

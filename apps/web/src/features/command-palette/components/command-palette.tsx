@@ -56,19 +56,21 @@ import { getIconName } from "@/shared/ui/file-icon"
 function ShortcutHint({ binding }: { binding: string }) {
   const parts = formatBindingParts(binding)
   if (parts.length === 0) return null
-  return (
-    <CommandShortcut>
-      {parts.join("")}
-    </CommandShortcut>
-  )
+  return <CommandShortcut>{parts.join("")}</CommandShortcut>
 }
 
 export function CommandPalette() {
   const { open, openPalette, closePalette } = useCommandPalette()
   const navigate = useNavigate()
-  const { threadId: activeThreadId } = useParams({ strict: false }) as { threadId?: string }
+  const { threadId: activeThreadId } = useParams({ strict: false }) as {
+    threadId?: string
+  }
   const { workspaces } = useWorkspace()
-  const { isOpen: rightSidebarOpen, isFileTreeOpen, togglePanel } = useRightSidebar()
+  const {
+    isOpen: rightSidebarOpen,
+    isFileTreeOpen,
+    togglePanel,
+  } = useRightSidebar()
   const { addFileTab } = useMainTabs()
   const { toggleSidebar } = useSidebar()
   const openSettings = useCallback(() => {
@@ -93,10 +95,14 @@ export function CommandPalette() {
   const activeWorkspace =
     workspaces.find((ws) => ws.threads.some((t) => t.id === activeThreadId)) ??
     workspaces[0]
+  const activeThread = activeWorkspace?.threads.find(
+    (thread) => thread.id === activeThreadId
+  )
+  const terminalCwd = activeThread?.worktreePath ?? activeWorkspace?.path ?? ""
 
   const terminal = useTerminalForWorkspace(
     activeWorkspace?.id ?? "",
-    activeWorkspace?.path ?? ""
+    terminalCwd
   )
 
   const { data: fileEntries = [], isLoading: filesLoading } = useWorkspaceIndex(
@@ -108,14 +114,24 @@ export function CommandPalette() {
   const searchLower = search.toLowerCase()
   const files = (
     searchLower
-      ? allFiles.filter((f) => f.relativePath.toLowerCase().includes(searchLower))
+      ? allFiles.filter((f) =>
+          f.relativePath.toLowerCase().includes(searchLower)
+        )
       : allFiles
   ).slice(0, 5)
 
-  const toggleSidebarBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_SIDEBAR)
-  const toggleTerminalBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_TERMINAL)
-  const toggleDiffBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL)
-  const toggleFileTreeBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE)
+  const toggleSidebarBinding = useShortcutBinding(
+    SHORTCUT_ACTIONS.TOGGLE_SIDEBAR
+  )
+  const toggleTerminalBinding = useShortcutBinding(
+    SHORTCUT_ACTIONS.TOGGLE_TERMINAL
+  )
+  const toggleDiffBinding = useShortcutBinding(
+    SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL
+  )
+  const toggleFileTreeBinding = useShortcutBinding(
+    SHORTCUT_ACTIONS.TOGGLE_FILE_TREE
+  )
   const newThreadBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_THREAD)
   const newWorkspaceBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_WORKSPACE)
   const openSettingsBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_SETTINGS)
@@ -135,9 +151,7 @@ export function CommandPalette() {
 
   const handleNavigateToThread = useCallback(
     (threadId: string) => {
-      run(() =>
-        navigate({ to: "/workspace/$threadId", params: { threadId } })
-      )
+      run(() => navigate({ to: "/workspace/$threadId", params: { threadId } }))
     },
     [run, navigate]
   )
@@ -173,20 +187,31 @@ export function CommandPalette() {
     <CommandDialog
       open={open}
       onOpenChange={(o) => {
-        if (!o) { closePalette(); setSearch("") }
+        if (!o) {
+          closePalette()
+          setSearch("")
+        }
       }}
       title="Command Palette"
       description="Search commands and navigate"
       className="sm:max-w-lg"
     >
       <Command>
-        <CommandInput placeholder="Search commands…" autoFocus onValueChange={setSearch} />
+        <CommandInput
+          placeholder="Search commands…"
+          autoFocus
+          onValueChange={setSearch}
+        />
         <CommandList className="max-h-[22rem]">
           <CommandEmpty>No results found.</CommandEmpty>
 
           {files.length > 0 && (
             <>
-              <CommandGroup heading={activeWorkspace ? `Files — ${activeWorkspace.name}` : "Files"}>
+              <CommandGroup
+                heading={
+                  activeWorkspace ? `Files — ${activeWorkspace.name}` : "Files"
+                }
+              >
                 {filesLoading ? (
                   <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
                     <Loader2 className="size-3 animate-spin" />
@@ -194,18 +219,25 @@ export function CommandPalette() {
                   </div>
                 ) : (
                   files.map((file) => {
-                    const dir = file.relativePath.split(/[/\\]/).slice(0, -1).join("/")
+                    const dir = file.relativePath
+                      .split(/[/\\]/)
+                      .slice(0, -1)
+                      .join("/")
                     return (
                       <CommandItem
                         key={file.relativePath}
                         value={`file ${file.relativePath}`}
                         onSelect={() => handleOpenFile(file.relativePath)}
                       >
-                        <Icon icon={`catppuccin:${getIconName(file.name)}`} className="size-3.5 shrink-0" aria-hidden />
+                        <Icon
+                          icon={`catppuccin:${getIconName(file.name)}`}
+                          className="size-3.5 shrink-0"
+                          aria-hidden
+                        />
                         <span className="min-w-0 flex-1 truncate">
                           <span>{file.name}</span>
                           {dir && (
-                            <span className="ml-1 text-muted-foreground/50 text-[0.7rem]">
+                            <span className="ml-1 text-[0.7rem] text-muted-foreground/50">
                               {dir}
                             </span>
                           )}
@@ -277,7 +309,9 @@ export function CommandPalette() {
             </CommandItem>
             <CommandItem
               value="toggle fullscreen review diff expand"
-              onSelect={() => run(() => runAction(SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF))}
+              onSelect={() =>
+                run(() => runAction(SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF))
+              }
             >
               <Maximize2Icon />
               Toggle Fullscreen Review
@@ -298,7 +332,9 @@ export function CommandPalette() {
             </CommandItem>
             <CommandItem
               value="new workspace add project folder"
-              onSelect={() => run(() => runAction(SHORTCUT_ACTIONS.NEW_WORKSPACE))}
+              onSelect={() =>
+                run(() => runAction(SHORTCUT_ACTIONS.NEW_WORKSPACE))
+              }
             >
               <FolderPlusIcon />
               New Workspace
@@ -317,7 +353,9 @@ export function CommandPalette() {
               onSelect={handleToggleTheme}
             >
               {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-              {theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              {theme === "dark"
+                ? "Switch to Light Mode"
+                : "Switch to Dark Mode"}
             </CommandItem>
             <CommandItem
               value="reload window refresh"

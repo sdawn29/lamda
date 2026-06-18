@@ -49,7 +49,14 @@ async function getTrackedNumstat(cwd: string): Promise<string> {
     try {
       const { stdout } = await execFileAsync(
         "git",
-        ["--no-optional-locks", "diff", "--cached", "--numstat", "--root", EMPTY_TREE_HASH],
+        [
+          "--no-optional-locks",
+          "diff",
+          "--cached",
+          "--numstat",
+          "--root",
+          EMPTY_TREE_HASH,
+        ],
         { cwd, timeout: 5000 },
       );
       return stdout;
@@ -157,7 +164,10 @@ export async function listWorkspaceFiles(cwd: string): Promise<string[]> {
 
 /** Derives a repository folder name from a clone URL (e.g. ".../foo.git" -> "foo"). */
 export function repoNameFromUrl(url: string): string {
-  const trimmed = url.trim().replace(/\/+$/, "").replace(/\.git$/i, "");
+  const trimmed = url
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/\.git$/i, "");
   const lastSegment = trimmed.split(/[/:]/).filter(Boolean).pop();
   return lastSegment || "repository";
 }
@@ -229,6 +239,15 @@ export async function checkoutBranch(
 export async function createBranch(cwd: string, branch: string): Promise<void> {
   assertNotOption(branch, "branch");
   await execFileAsync("git", ["checkout", "-b", branch], {
+    cwd,
+    timeout: 10000,
+  });
+}
+
+/** Deletes a local branch after it has been merged. */
+export async function deleteBranch(cwd: string, branch: string): Promise<void> {
+  assertNotOption(branch, "branch");
+  await execFileAsync("git", ["branch", "--delete", "--", branch], {
     cwd,
     timeout: 10000,
   });
@@ -443,7 +462,11 @@ export async function gitLog(cwd: string, maxCount = 50): Promise<string> {
   try {
     const { stdout } = await execFileAsync(
       "git",
-      ["log", "--pretty=format:%H%x1f%h%x1f%an%x1f%ai%x1f%s%x1f%b%x1e", `-${maxCount}`],
+      [
+        "log",
+        "--pretty=format:%H%x1f%h%x1f%an%x1f%ai%x1f%s%x1f%b%x1e",
+        `-${maxCount}`,
+      ],
       { cwd, timeout: 10000 },
     );
     return stdout;
@@ -459,25 +482,40 @@ export async function gitShowFiles(
 ): Promise<{ path: string; status: string; added: number; removed: number }[]> {
   try {
     const [nameStatusResult, numstatResult] = await Promise.all([
-      execFileAsync("git", ["diff-tree", "--no-commit-id", "-r", "--name-status", sha], {
-        cwd,
-        timeout: 10000,
-      }),
-      execFileAsync("git", ["diff-tree", "--no-commit-id", "-r", "--numstat", sha], {
-        cwd,
-        timeout: 10000,
-      }),
-    ])
+      execFileAsync(
+        "git",
+        ["diff-tree", "--no-commit-id", "-r", "--name-status", sha],
+        {
+          cwd,
+          timeout: 10000,
+        },
+      ),
+      execFileAsync(
+        "git",
+        ["diff-tree", "--no-commit-id", "-r", "--numstat", sha],
+        {
+          cwd,
+          timeout: 10000,
+        },
+      ),
+    ]);
 
-    const statMap = new Map<string, { added: number; removed: number }>()
-    for (const line of numstatResult.stdout.trim().split("\n").filter(Boolean)) {
-      const parts = line.split("\t")
-      const added = parseInt(parts[0] ?? "0", 10)
-      const removed = parseInt(parts[1] ?? "0", 10)
+    const statMap = new Map<string, { added: number; removed: number }>();
+    for (const line of numstatResult.stdout
+      .trim()
+      .split("\n")
+      .filter(Boolean)) {
+      const parts = line.split("\t");
+      const added = parseInt(parts[0] ?? "0", 10);
+      const removed = parseInt(parts[1] ?? "0", 10);
       // for renamed files numstat uses the new path as the last tab-separated field
-      const path = parts.length > 2 ? (parts[parts.length - 1] ?? "") : (parts[1] ?? "")
+      const path =
+        parts.length > 2 ? (parts[parts.length - 1] ?? "") : (parts[1] ?? "");
       if (path) {
-        statMap.set(path, { added: isNaN(added) ? 0 : added, removed: isNaN(removed) ? 0 : removed })
+        statMap.set(path, {
+          added: isNaN(added) ? 0 : added,
+          removed: isNaN(removed) ? 0 : removed,
+        });
       }
     }
 
@@ -486,16 +524,17 @@ export async function gitShowFiles(
       .split("\n")
       .filter(Boolean)
       .map((line) => {
-        const parts = line.split("\t")
-        const rawStatus = parts[0] ?? "M"
+        const parts = line.split("\t");
+        const rawStatus = parts[0] ?? "M";
         // Normalize R100/C100 → R/C; use the new (last) path for renames/copies
-        const status = rawStatus[0] ?? "M"
-        const path = parts.length > 2 ? (parts[parts.length - 1] ?? "") : (parts[1] ?? "")
-        const stat = statMap.get(path) ?? { added: 0, removed: 0 }
-        return { status, path, ...stat }
-      })
+        const status = rawStatus[0] ?? "M";
+        const path =
+          parts.length > 2 ? (parts[parts.length - 1] ?? "") : (parts[1] ?? "");
+        const stat = statMap.get(path) ?? { added: 0, removed: 0 };
+        return { status, path, ...stat };
+      });
   } catch {
-    return []
+    return [];
   }
 }
 
@@ -510,8 +549,8 @@ export async function gitShowFileDiff(
       "git",
       ["diff-tree", "-p", "--no-commit-id", "-U3", sha, "--", filePath],
       { cwd, timeout: 10000 },
-    )
-    return stdout
+    );
+    return stdout;
   } catch (err: unknown) {
     if (
       err &&
@@ -519,9 +558,9 @@ export async function gitShowFileDiff(
       "stdout" in err &&
       typeof (err as { stdout?: unknown }).stdout === "string"
     ) {
-      return (err as { stdout: string }).stdout
+      return (err as { stdout: string }).stdout;
     }
-    return ""
+    return "";
   }
 }
 
@@ -563,7 +602,10 @@ export async function getAheadBehind(
     const parts = stdout.trim().split("\t");
     const behind = parseInt(parts[0] ?? "0", 10);
     const ahead = parseInt(parts[1] ?? "0", 10);
-    return { ahead: isNaN(ahead) ? 0 : ahead, behind: isNaN(behind) ? 0 : behind };
+    return {
+      ahead: isNaN(ahead) ? 0 : ahead,
+      behind: isNaN(behind) ? 0 : behind,
+    };
   } catch {
     return null;
   }
@@ -681,7 +723,11 @@ export async function gitStashCreate(cwd: string): Promise<string> {
  * Registers a stash object (from gitStashCreate) into the stash list with a
  * given message. No-op if sha is empty.
  */
-export async function gitStashStore(cwd: string, sha: string, message: string): Promise<void> {
+export async function gitStashStore(
+  cwd: string,
+  sha: string,
+  message: string,
+): Promise<void> {
   if (!sha) return;
   await execFileAsync("git", ["stash", "store", "-m", message, sha], {
     cwd,
@@ -694,7 +740,11 @@ export async function gitStashStore(cwd: string, sha: string, message: string): 
  * tree state. The stash commit's own tree holds the working-tree snapshot;
  * stash^2 is the index snapshot and would miss unstaged changes for " M" files.
  */
-export async function gitRestoreFileFromRef(cwd: string, ref: string, filePath: string): Promise<void> {
+export async function gitRestoreFileFromRef(
+  cwd: string,
+  ref: string,
+  filePath: string,
+): Promise<void> {
   assertNotOption(ref, "ref");
   await execFileAsync("git", ["checkout", ref, "--", filePath], {
     cwd,
@@ -715,21 +765,35 @@ const CHECKPOINT_REF_PREFIX = "refs/lamda/checkpoints/";
  * Anchor a checkpoint commit object under `refs/lamda/checkpoints/<sha>` so it
  * survives `git gc` and app restarts. No-op if sha is empty.
  */
-export async function gitWriteCheckpointRef(cwd: string, sha: string): Promise<void> {
+export async function gitWriteCheckpointRef(
+  cwd: string,
+  sha: string,
+): Promise<void> {
   if (!sha) return;
-  await execFileAsync("git", ["update-ref", `${CHECKPOINT_REF_PREFIX}${sha}`, sha], {
-    cwd,
-    timeout: 10000,
-  });
+  await execFileAsync(
+    "git",
+    ["update-ref", `${CHECKPOINT_REF_PREFIX}${sha}`, sha],
+    {
+      cwd,
+      timeout: 10000,
+    },
+  );
 }
 
 /** Remove a checkpoint ref so its object becomes eligible for GC. Best-effort. */
-export async function gitDeleteCheckpointRef(cwd: string, sha: string): Promise<void> {
+export async function gitDeleteCheckpointRef(
+  cwd: string,
+  sha: string,
+): Promise<void> {
   if (!sha) return;
-  await execFileAsync("git", ["update-ref", "-d", `${CHECKPOINT_REF_PREFIX}${sha}`], {
-    cwd,
-    timeout: 10000,
-  }).catch(() => {});
+  await execFileAsync(
+    "git",
+    ["update-ref", "-d", `${CHECKPOINT_REF_PREFIX}${sha}`],
+    {
+      cwd,
+      timeout: 10000,
+    },
+  ).catch(() => {});
 }
 
 /** List the checkpoint SHAs currently anchored in this repo. */
@@ -753,7 +817,7 @@ export async function gitListCheckpointRefs(cwd: string): Promise<string[]> {
 // ── Worktrees ─────────────────────────────────────────────────────────────────
 // Each worktree is an additional working directory linked to the same repo,
 // letting independent threads/agents edit in isolation without colliding. lamda
-// stores them under ~/.lamda/worktrees and models each as its own workspace.
+// stores them under ~/.lamda/<workspace-name>/<worktree-name>.
 
 export interface WorktreeInfo {
   /** Absolute path of the worktree's working directory. */
@@ -819,7 +883,9 @@ export async function listWorktrees(repoCwd: string): Promise<WorktreeInfo[]> {
         current.head = line.slice("HEAD ".length);
       } else if (line.startsWith("branch ")) {
         // e.g. "branch refs/heads/feat-x" → "feat-x"
-        current.branch = line.slice("branch ".length).replace(/^refs\/heads\//, "");
+        current.branch = line
+          .slice("branch ".length)
+          .replace(/^refs\/heads\//, "");
       } else if (line === "detached") {
         current.detached = true;
       } else if (line === "locked" || line.startsWith("locked ")) {
@@ -864,7 +930,10 @@ export async function pruneWorktrees(repoCwd: string): Promise<void> {
  * tree; the caller surfaces the error. On conflict git leaves the merge in
  * progress, so this aborts it to restore a clean state before rethrowing.
  */
-export async function mergeBranch(repoCwd: string, branch: string): Promise<void> {
+export async function mergeBranch(
+  repoCwd: string,
+  branch: string,
+): Promise<void> {
   assertNotOption(branch, "branch");
   try {
     await execFileAsync("git", ["merge", "--no-edit", "--", branch], {

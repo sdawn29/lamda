@@ -122,17 +122,17 @@ export function BranchSelector({
             <CommandList>
               <CommandEmpty>No branches found</CommandEmpty>
               <CommandGroup>
-                {branches.map((b) => (
+                {branches.map((item) => (
                   <CommandItem
-                    key={b}
-                    value={b}
-                    data-checked={b === branch}
+                    key={item}
+                    value={item}
+                    data-checked={item === branch}
                     onSelect={() => {
-                      onBranchSelect?.(b)
+                      onBranchSelect?.(item)
                       setOpen(false)
                     }}
                   >
-                    {b}
+                    {item}
                   </CommandItem>
                 ))}
               </CommandGroup>

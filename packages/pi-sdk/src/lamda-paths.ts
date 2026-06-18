@@ -8,14 +8,6 @@ export const LAMDA_DIR_NAME = ".lamda"
 /** Subdirectory (under a `.lamda` dir) that holds prompt template markdown files. */
 const PROMPTS_SUBDIR = "prompts"
 
-/** Subdirectory (under the global `~/.lamda` dir) that holds git worktrees. */
-const WORKTREES_SUBDIR = "worktrees"
-
-/** Absolute path of the global worktrees directory: `~/.lamda/worktrees`. */
-export function lamdaWorktreesDir(): string {
-  return join(homedir(), LAMDA_DIR_NAME, WORKTREES_SUBDIR)
-}
-
 /** Lowercases and collapses non-alphanumeric runs to single dashes for use in a path segment. */
 function slugify(value: string): string {
   return (
@@ -26,15 +18,24 @@ function slugify(value: string): string {
   )
 }
 
+/** Absolute directory for a workspace's worktrees: `~/.lamda/<workspace-name>`. */
+export function lamdaWorktreesDir(workspaceName: string): string {
+  return join(homedir(), LAMDA_DIR_NAME, slugify(workspaceName))
+}
+
 /**
- * Computes a unique absolute worktree path under `~/.lamda/worktrees` for the
- * given repo name and branch, e.g. `~/.lamda/worktrees/my-repo-feat-x`. If that
- * path already exists on disk, a numeric suffix is appended (`-2`, `-3`, …) so
- * each worktree gets its own directory.
+ * Computes a unique absolute worktree path under
+ * `~/.lamda/<workspace-name>/<worktree-name>`, using the branch as the worktree
+ * name. For example, workspace `my-repo` and branch `feat/x` produce
+ * `~/.lamda/my-repo/feat-x`. If that path already exists on disk, a numeric
+ * suffix is appended (`-2`, `-3`, …).
  */
-export function lamdaWorktreePath(repoName: string, branch: string): string {
-  const base = `${slugify(repoName)}-${slugify(branch)}`
-  const dir = lamdaWorktreesDir()
+export function lamdaWorktreePath(
+  workspaceName: string,
+  branch: string,
+): string {
+  const base = slugify(branch)
+  const dir = lamdaWorktreesDir(workspaceName)
   let candidate = join(dir, base)
   let counter = 2
   while (existsSync(candidate)) {

@@ -92,16 +92,23 @@ git.get("/session/:id/branches", async (c) => {
   return c.json({ branches: await listBranches(cwd) });
 });
 
-// Branches checked out in a secondary worktree (under ~/.lamda/worktrees). The
-// main working tree is excluded — these are the branches that can't be checked
-// out in place and must instead be opened by switching the thread's cwd.
+// Branches checked out in a secondary worktree. The main working tree is
+// excluded — these are the branches that can't be checked out in place and
+// must instead be opened by switching the thread's cwd.
 git.get("/session/:id/worktrees", async (c) => {
-  const cwd = store.getCwd(c.req.param("id"));
-  if (!cwd) return c.json({ worktrees: [] });
-  const repoRoot = await getRepoRoot(cwd);
+  const entry = store.get(c.req.param("id"));
+  if (!entry) return c.json({ worktrees: [] });
+
+  const repoRoot = await getRepoRoot(entry.cwd);
   if (!repoRoot) return c.json({ worktrees: [] });
+
+  const workspace = entry.workspaceId
+    ? getWorkspace(entry.workspaceId)
+    : undefined;
+  const mainWorktreePath = workspace ? await getRepoRoot(workspace.path) : null;
+
   const worktrees = (await listWorktrees(repoRoot))
-    .filter((w) => w.branch && w.path !== repoRoot)
+    .filter((w) => w.branch && w.path !== mainWorktreePath)
     .map((w) => ({ path: w.path, branch: w.branch }));
   return c.json({ worktrees });
 });
@@ -299,7 +306,14 @@ async function readLogEntries(cwd: string, limitParam: string | undefined) {
     .filter(Boolean)
     .map((record) => {
       const [sha, shortSha, author, date, subject, body] = record.split("\x1f");
-      return { sha, shortSha, author, date, subject, body: (body ?? "").trim() };
+      return {
+        sha,
+        shortSha,
+        author,
+        date,
+        subject,
+        body: (body ?? "").trim(),
+      };
     });
 }
 
@@ -572,9 +586,10 @@ async function resolveTurnFileContents(
     }
   };
 
-  const preContentFor = async (
-    file: { wasCreatedByTurn: boolean; preContent: string | null },
-  ): Promise<string> => {
+  const preContentFor = async (file: {
+    wasCreatedByTurn: boolean;
+    preContent: string | null;
+  }): Promise<string> => {
     if (file.wasCreatedByTurn) return ""; // didn't exist before the turn
     if (file.preContent !== null) return file.preContent;
     // Existed but no snapshot stored (was unmodified at HEAD before the turn).
@@ -607,9 +622,7 @@ async function resolveTurnFileContents(
   // snapshot; that snapshot is this file's content immediately after the current
   // turn. Skip later turns that recorded it as newly-created (no snapshot, e.g.
   // the file was committed in between) and fall through to the working tree.
-  const laterTurns = threadId
-    ? getAgentTurnsFromId(threadId, turnId + 1)
-    : [];
+  const laterTurns = threadId ? getAgentTurnsFromId(threadId, turnId + 1) : [];
   for (const turn of laterTurns) {
     const next = getAgentTurnFiles(turn.id).find(
       (f) => f.filePath === filePath,
@@ -651,7 +664,9 @@ git.get("/session/:id/git/turns/:turnId/file-diff", async (c) => {
     file,
   );
   if (!pair) return c.json({ diff: "" });
-  return c.json({ diff: await gitDiffContents(pair.preText, pair.postText, file) });
+  return c.json({
+    diff: await gitDiffContents(pair.preText, pair.postText, file),
+  });
 });
 
 // Aggregate additions/deletions for everything a turn changed.
@@ -664,14 +679,22 @@ git.get("/session/:id/git/turns/:turnId/diff-stat", async (c) => {
 
   const files =
     turnIdParam === "0"
-      ? sessionEvents.getLastTurnFiles(id).map((f) => ({ filePath: f.filePath }))
+      ? sessionEvents
+          .getLastTurnFiles(id)
+          .map((f) => ({ filePath: f.filePath }))
       : getAgentTurnFiles(parseInt(turnIdParam, 10) || -1).map((f) => ({
           filePath: f.filePath,
         }));
 
   const perFile = await Promise.all(
     files.slice(0, 100).map(async (f) => {
-      const pair = await resolveTurnFileContents(id, threadId, cwd, turnIdParam, f.filePath);
+      const pair = await resolveTurnFileContents(
+        id,
+        threadId,
+        cwd,
+        turnIdParam,
+        f.filePath,
+      );
       if (!pair) return { filePath: f.filePath, additions: 0, deletions: 0 };
       return {
         filePath: f.filePath,
@@ -830,7 +853,9 @@ git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
   // Remove this turn and all subsequent turns from the DB so they disappear from the sidebar.
   const orphanedShas = deleteAgentTurnsFrom(threadId, turnId);
   // Drop the now-unreferenced checkpoint refs so they don't accumulate.
-  await Promise.all(orphanedShas.map((sha) => gitDeleteCheckpointRef(cwd, sha)));
+  await Promise.all(
+    orphanedShas.map((sha) => gitDeleteCheckpointRef(cwd, sha)),
+  );
 
   return new Response(null, { status: 204 });
 });
