@@ -79,7 +79,7 @@ function relativeTime(ts: number, now = Date.now()): string {
   // `now` only ticks every 60s, so a just-created timestamp can be slightly
   // ahead of it — clamp to 0 instead of rendering a negative age.
   const diff = Math.max(0, Math.floor((now - ts) / 1000))
-  if (diff < 60) return `${diff}s`
+  if (diff < 60) return "just now"
   if (diff < 3600) return `${Math.floor(diff / 60)}m`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`
   return `${Math.floor(diff / 86400)}d`
