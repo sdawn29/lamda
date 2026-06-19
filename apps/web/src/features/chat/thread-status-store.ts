@@ -60,10 +60,16 @@ export const useThreadStatusStore = create<ThreadStatusStore>()(
 
       setStatus: (threadId, status) => {
         // Error state persists until a new stream starts — ignore other overrides.
-        if (status !== "streaming" && (get().statuses[threadId] ?? "idle") === "error") return
+        if (
+          status !== "streaming" &&
+          (get().statuses[threadId] ?? "idle") === "error"
+        )
+          return
 
         if (status === "streaming" && !get().streamedThreads[threadId]) {
-          set((s) => ({ streamedThreads: { ...s.streamedThreads, [threadId]: true } }))
+          set((s) => ({
+            streamedThreads: { ...s.streamedThreads, [threadId]: true },
+          }))
         }
 
         set((s) => ({ statuses: { ...s.statuses, [threadId]: status } }))
@@ -121,7 +127,9 @@ export function useSetActiveThreadId() {
 type WorkspaceFileUpdateListener = (workspaceId: string) => void
 const workspaceFileUpdateListeners = new Set<WorkspaceFileUpdateListener>()
 
-export function subscribeToWorkspaceFileUpdates(fn: WorkspaceFileUpdateListener): () => void {
+export function subscribeToWorkspaceFileUpdates(
+  fn: WorkspaceFileUpdateListener
+): () => void {
   workspaceFileUpdateListeners.add(fn)
   return () => workspaceFileUpdateListeners.delete(fn)
 }
@@ -140,12 +148,29 @@ function handleGlobalMessage(e: MessageEvent): void {
       threadId?: string
       status?: "streaming" | "idle" | "awaiting"
       workspaceId?: string
+      root?: string
       dir?: string
+    }
+    if (data.type === "worktree_detached") {
+      // The server auto-detached a thread from a worktree that was removed
+      // out-of-band; refresh the thread list (holds worktreePath for the
+      // selector) and all git/file views so cwd-scoped data re-reads.
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
+      void queryClient.invalidateQueries({ queryKey: ["git"] })
+      if (data.workspaceId) {
+        queryClient.invalidateQueries({
+          queryKey: ["workspace-files", data.workspaceId],
+        })
+        for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
+      }
     }
     if (data.type === "thread_status" && data.threadId && data.status) {
       const { setStatus, isThreadStreamed } = useThreadStatusStore.getState()
       if (data.status === "idle") {
-        setStatus(data.threadId, isThreadStreamed(data.threadId) ? "completed" : "idle")
+        setStatus(
+          data.threadId,
+          isThreadStreamed(data.threadId) ? "completed" : "idle"
+        )
       } else {
         // "streaming" and "awaiting" map through directly.
         setStatus(data.threadId, data.status)
@@ -153,16 +178,19 @@ function handleGlobalMessage(e: MessageEvent): void {
     }
     if (
       data.type === "workspace_dir_changed" &&
-      data.workspaceId &&
+      data.root &&
       data.dir !== undefined
     ) {
       // Scoped delta: re-read just the one directory whose children changed.
+      // Keyed by `root` (workspace or worktree path) to match the tree query.
       queryClient.invalidateQueries({
-        queryKey: ["workspace-dir", data.workspaceId, data.dir],
+        queryKey: ["workspace-dir", data.root, data.dir],
       })
     }
     if (data.type === "workspace_files_updated" && data.workspaceId) {
-      queryClient.invalidateQueries({ queryKey: ["workspace-files", data.workspaceId] })
+      queryClient.invalidateQueries({
+        queryKey: ["workspace-files", data.workspaceId],
+      })
       for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
     }
     if (data.type === "git_status_changed") {
@@ -203,7 +231,10 @@ function scheduleGlobalReconnect(): void {
     globalReconnectTimer = null
     connectGlobalSocket()
   }, globalReconnectDelay)
-  globalReconnectDelay = Math.min(globalReconnectDelay * 2, GLOBAL_MAX_RECONNECT_DELAY)
+  globalReconnectDelay = Math.min(
+    globalReconnectDelay * 2,
+    GLOBAL_MAX_RECONNECT_DELAY
+  )
 }
 
 function connectGlobalSocket(): void {

@@ -242,7 +242,7 @@ class SessionEventHub {
     private readonly sessionId: string,
     private readonly threadId: string,
     private handle: ManagedSessionHandle,
-    private readonly cwd: string | null = null,
+    private cwd: string | null = null,
     onIdle?: () => void,
   ) {
     this.onIdle = onIdle ?? null;
@@ -702,9 +702,15 @@ class SessionEventHub {
    * and therefore every WS/SSE subscriber, the sessionId, and the event-id
    * sequence — intact. The old event generator is returned and a new consume
    * loop starts once it settles.
+   *
+   * `newCwd` relocates the hub's working directory (used when a thread moves
+   * into or out of a worktree). Without it, per-turn git tracking would keep
+   * inspecting the old directory and miss every change the agent makes in the
+   * new one — so the "Files changed" card would have no files and not render.
    */
-  reattach(newHandle: ManagedSessionHandle): void {
+  reattach(newHandle: ManagedSessionHandle, newCwd?: string | null): void {
     if (this.disposed) return;
+    if (newCwd !== undefined) this.cwd = newCwd;
     const previous = this.consumeTask;
     this.generator?.return(undefined).catch(() => undefined);
     this.generator = null;
@@ -1305,8 +1311,12 @@ class SessionEventRegistry {
     this.hubs.get(sessionId)?.emitToolApprovalResolved(payload);
   }
 
-  reattach(sessionId: string, handle: ManagedSessionHandle) {
-    this.hubs.get(sessionId)?.reattach(handle);
+  reattach(
+    sessionId: string,
+    handle: ManagedSessionHandle,
+    cwd?: string | null,
+  ) {
+    this.hubs.get(sessionId)?.reattach(handle, cwd);
   }
 
   dismissPendingErrors(sessionId: string): void {

@@ -20,7 +20,7 @@ import { subscribeToWorkspaceFileUpdates } from "@/features/chat/thread-status-s
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { Plugin } from "unified"
-import type { Element, Root } from "hast"
+import type { Element as HastElement, Root } from "hast"
 
 const MIN_SCALE = 1
 const MAX_SCALE = 8
@@ -79,7 +79,7 @@ const rehypeSourcePositions: Plugin<[], Root> = () => {
   return (tree) => {
     const visit = (node: Root | Root["children"][number]) => {
       if (node.type === "element" && node.position) {
-        const element = node as Element
+        const element = node as HastElement
         element.properties ??= {}
         element.properties.dataSourceStartLine = String(node.position.start.line)
         element.properties.dataSourceStartColumn = String(
@@ -492,6 +492,69 @@ function resolveFilePath(currentFilePath: string, href: string): string {
   return resolved.join("/")
 }
 
+const EXTERNAL_URL_PATTERN = /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i
+
+function resolveHtmlAssetPath(
+  currentFilePath: string,
+  workspacePath: string | undefined,
+  url: string
+): string | null {
+  if (!url || EXTERNAL_URL_PATTERN.test(url)) return null
+
+  const suffixIndex = url.search(/[?#]/)
+  const path = suffixIndex === -1 ? url : url.slice(0, suffixIndex)
+  if (!path) return null
+
+  if (path.startsWith("/")) {
+    if (!workspacePath) return null
+    return resolveFilePath(`${workspacePath}/index.html`, path.slice(1))
+  }
+  return resolveFilePath(currentFilePath, path)
+}
+
+function buildHtmlPreviewDocument({
+  content,
+  currentFilePath,
+  workspacePath,
+  serverUrl,
+}: {
+  content: string
+  currentFilePath: string
+  workspacePath?: string
+  serverUrl: string
+}): string {
+  if (!serverUrl) return content
+
+  const document = new DOMParser().parseFromString(content, "text/html")
+  const rewriteAttribute = (
+    element: globalThis.Element,
+    attribute: "src" | "href"
+  ) => {
+    const value = element.getAttribute(attribute)
+    if (!value) return
+    const resolvedPath = resolveHtmlAssetPath(
+      currentFilePath,
+      workspacePath,
+      value
+    )
+    if (!resolvedPath) return
+
+    element.setAttribute(
+      attribute,
+      appendToken(`${serverUrl}/file?path=${encodeURIComponent(resolvedPath)}`)
+    )
+  }
+
+  document.querySelectorAll("[src]").forEach((element) => {
+    rewriteAttribute(element, "src")
+  })
+  document.querySelectorAll("link[href]").forEach((element) => {
+    rewriteAttribute(element, "href")
+  })
+
+  return `<!doctype html>\n${document.documentElement.outerHTML}`
+}
+
 interface FileContentViewProps {
   filePath: string
   openWithAppId?: string | null
@@ -571,6 +634,18 @@ export const FileContentView = memo(function FileContentView({
   )
   const isHtml = fileExtension === "html" || fileExtension === "htm"
   const isPdf = fileExtension === "pdf"
+  const htmlPreviewDocument = useMemo(
+    () =>
+      isHtml && content !== null
+        ? buildHtmlPreviewDocument({
+            content,
+            currentFilePath: filePath,
+            workspacePath,
+            serverUrl,
+          })
+        : "",
+    [content, filePath, isHtml, serverUrl, workspacePath]
+  )
 
   // Only open in LSP when we're rendering source code (not markdown preview, not image, etc.)
   const isCodeView =
@@ -851,15 +926,10 @@ export const FileContentView = memo(function FileContentView({
             />
           ) : isHtml && htmlPreview ? (
             <iframe
-              src={
-                sourceUrl ??
-                appendToken(
-                  `${serverUrl}/file?path=${encodeURIComponent(filePath)}`
-                )
-              }
+              srcDoc={htmlPreviewDocument}
               title={fileName}
               className="h-full w-full border-0"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              sandbox="allow-scripts allow-forms allow-popups"
             />
           ) : markdownPreview ? (
             <MarkdownSelectionActions

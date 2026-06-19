@@ -54,13 +54,16 @@ import {
 } from "../queries"
 import { useWorkspaceIndex } from "@/features/workspace/queries"
 import { useEnvDialog } from "@/features/workspace"
-import { BranchSelector } from "@/features/git"
+import { BranchSelector, WorktreeSelector } from "@/features/git"
 import { ModelCombobox } from "./model-combobox"
 import { ModeCombobox, getModeOption } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
 import { ThinkingCombobox, type ThinkingLevel } from "./thinking-combobox"
 export type { ThinkingLevel } from "./thinking-combobox"
-import { useComposerPrefsStore, MAX_MESSAGE_HISTORY } from "../composer-prefs-store"
+import {
+  useComposerPrefsStore,
+  MAX_MESSAGE_HISTORY,
+} from "../composer-prefs-store"
 import type { Mode, ApprovalMode } from "@/features/workspace/api"
 import {
   RichInput,
@@ -131,6 +134,13 @@ interface ChatComposerProps {
   onBranchError?: (message: string) => void
   sessionId?: string
   workspaceId?: string
+  /** The active thread, when this composer drives an existing thread. Enables the
+   *  worktree selector (Local / New worktree / Merge) beside the branch selector. */
+  threadId?: string
+  /** The active thread's title — used to derive the default worktree branch name. */
+  threadTitle?: string
+  /** Branch of the thread's active worktree, or null when running locally. */
+  worktreeBranch?: string | null
   selectedModelId?: string | null
   onModelChange?: (modelId: string) => void
   selectedThinkingLevel?: ThinkingLevel
@@ -163,6 +173,9 @@ export const ChatComposer = memo(
       onBranchError,
       sessionId,
       workspaceId,
+      threadId,
+      threadTitle,
+      worktreeBranch,
       selectedModelId: controlledModelId,
       onModelChange,
       selectedThinkingLevel: controlledThinkingLevel,
@@ -198,7 +211,9 @@ export const ChatComposer = memo(
     const [slashMention, setSlashMention] = React.useState<
       (SlashMention & { selectedIndex: number }) | null
     >(null)
-    const [attachments, setAttachments] = React.useState<PendingAttachment[]>([])
+    const [attachments, setAttachments] = React.useState<PendingAttachment[]>(
+      []
+    )
     const fileInputRef = React.useRef<HTMLInputElement>(null)
     const mentionEntries = React.useRef<WorkspaceEntry[]>([])
     const slashItemsRef = React.useRef<ChatSlashItem[]>([])
@@ -318,13 +333,11 @@ export const ChatComposer = memo(
       isLoading: sessionCommandsLoading,
       refetch: refetchSessionCommands,
     } = useSlashCommands(sessionId, slashCommandOpen && !useWorkspaceCommands)
-    const {
-      data: workspaceCommandsData,
-      isLoading: workspaceCommandsLoading,
-    } = useWorkspaceSlashCommands(
-      workspaceId,
-      slashCommandOpen && useWorkspaceCommands
-    )
+    const { data: workspaceCommandsData, isLoading: workspaceCommandsLoading } =
+      useWorkspaceSlashCommands(
+        workspaceId,
+        slashCommandOpen && useWorkspaceCommands
+      )
     const commandsData = useWorkspaceCommands
       ? workspaceCommandsData
       : sessionCommandsData
@@ -918,7 +931,8 @@ export const ChatComposer = memo(
 
     const showBranch = branch !== undefined
     const showApproval = Boolean(onApprovalModeChange)
-    const showContextStrip = showBranch || showApproval || Boolean(contextLeading)
+    const showContextStrip =
+      showBranch || showApproval || Boolean(contextLeading)
 
     return (
       <div className={cn("w-full", className)}>
@@ -962,235 +976,237 @@ export const ChatComposer = memo(
 
           <div className="mx-2 mt-2 mb-2 rounded-xl bg-muted/60">
             <div className="px-2.5 pt-3 pb-1.5">
-            <RichInput
-              ref={richInputRef}
-              placeholder={
-                isLoading ? "Steer the agent — your message joins this run…" : placeholder
-              }
-              mentionActive={atMention !== null && mentionEntries2.length > 0}
-              slashActive={
-                slashMention !== null &&
-                (slashItems.length > 0 || commandsLoading)
-              }
-              onAtMentionChange={handleAtMentionChange}
-              onSlashMentionChange={handleSlashMentionChange}
-              onSend={handleSend}
-              onInput={handleInput}
-              onPasteFiles={(files) => void handleAddFiles(files)}
-              onMentionEnter={() => {
-                const idx = atMention?.selectedIndex ?? 0
-                const entry = mentionEntries2[idx]
-                if (entry) handleSelectFile(entry)
-              }}
-              onSlashEnter={() => {
-                const idx = slashMention?.selectedIndex ?? 0
-                const item = slashItemsRef.current[idx]
-                if (item) handleSelectItem(item)
-              }}
-              onArrowUp={() => {
-                if (slashMention !== null) {
-                  setSlashMention((prev) => {
-                    if (!prev) return prev
-                    const n = slashItemsRef.current.length
-                    if (n === 0) return prev
-                    return {
-                      ...prev,
-                      selectedIndex: (prev.selectedIndex - 1 + n) % n,
-                    }
-                  })
-                } else {
-                  setAtMention((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          selectedIndex:
-                            (prev.selectedIndex -
-                              1 +
-                              mentionEntries.current.length) %
-                            mentionEntries.current.length,
-                        }
-                      : prev
-                  )
+              <RichInput
+                ref={richInputRef}
+                placeholder={
+                  isLoading
+                    ? "Steer the agent — your message joins this run…"
+                    : placeholder
                 }
-              }}
-              onArrowDown={() => {
-                if (slashMention !== null) {
-                  setSlashMention((prev) => {
-                    if (!prev) return prev
-                    const n = slashItemsRef.current.length
-                    if (n === 0) return prev
-                    return {
-                      ...prev,
-                      selectedIndex: (prev.selectedIndex + 1) % n,
-                    }
-                  })
-                } else {
-                  setAtMention((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          selectedIndex:
-                            (prev.selectedIndex + 1) %
-                            mentionEntries.current.length,
-                        }
-                      : prev
-                  )
+                mentionActive={atMention !== null && mentionEntries2.length > 0}
+                slashActive={
+                  slashMention !== null &&
+                  (slashItems.length > 0 || commandsLoading)
                 }
-              }}
-              onEscape={() => {
-                setAtMention(null)
-                setSlashMention(null)
-              }}
-              onHistoryPrev={(atStart) => navigateHistory("prev", atStart)}
-              onHistoryNext={() => navigateHistory("next", false)}
-            />
-          </div>
-
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-2.5 pb-1.5">
-              {attachments.map((attachment) => (
-                <AttachmentPreview
-                  key={attachment.id}
-                  attachment={attachment}
-                  onRemove={() => handleRemoveAttachment(attachment.id)}
-                />
-              ))}
-            </div>
-          )}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              const files = Array.from(e.target.files ?? [])
-              if (files.length > 0) void handleAddFiles(files)
-              // Reset so selecting the same file again re-triggers onChange.
-              e.target.value = ""
-            }}
-          />
-
-          <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-2">
-            <div className="flex items-center gap-0.5">
-              {onModeChange && (
-                <ModeCombobox selected={mode} onSelect={onModeChange} />
-              )}
-              <ModelCombobox
-                groups={grouped}
-                selected={selectedModel}
-                onSelect={(compositeKey) => {
-                  if (!isControlled) setInternalModelId(compositeKey)
-                  onModelChange?.(compositeKey)
+                onAtMentionChange={handleAtMentionChange}
+                onSlashMentionChange={handleSlashMentionChange}
+                onSend={handleSend}
+                onInput={handleInput}
+                onPasteFiles={(files) => void handleAddFiles(files)}
+                onMentionEnter={() => {
+                  const idx = atMention?.selectedIndex ?? 0
+                  const entry = mentionEntries2[idx]
+                  if (entry) handleSelectFile(entry)
                 }}
-                disabled={models.length === 0}
-              />
-
-              {selectedModel?.reasoning && (
-                <ThinkingCombobox
-                  selected={selectedThinkingLevel}
-                  onSelect={setThinkingLevel}
-                  availableLevels={availableLevels}
-                />
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <ContextChart
-                contextUsage={contextUsage}
-                sessionId={sessionId}
-                sessionStats={sessionStats}
-              />
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      aria-label="Attach files"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="size-7 text-muted-foreground hover:text-foreground"
-                    >
-                      <PaperclipIcon className="size-4" />
-                    </Button>
+                onSlashEnter={() => {
+                  const idx = slashMention?.selectedIndex ?? 0
+                  const item = slashItemsRef.current[idx]
+                  if (item) handleSelectItem(item)
+                }}
+                onArrowUp={() => {
+                  if (slashMention !== null) {
+                    setSlashMention((prev) => {
+                      if (!prev) return prev
+                      const n = slashItemsRef.current.length
+                      if (n === 0) return prev
+                      return {
+                        ...prev,
+                        selectedIndex: (prev.selectedIndex - 1 + n) % n,
+                      }
+                    })
+                  } else {
+                    setAtMention((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            selectedIndex:
+                              (prev.selectedIndex -
+                                1 +
+                                mentionEntries.current.length) %
+                              mentionEntries.current.length,
+                          }
+                        : prev
+                    )
                   }
-                />
-                <TooltipContent>Attach files</TooltipContent>
-              </Tooltip>
-              {isLoading && !isEmpty ? (
-                // While the agent runs, a non-empty submit steers the live turn.
-                // The steer button replaces Stop so there's a single primary
-                // action — Stop returns the moment the input is cleared.
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        size="icon-lg"
-                        onClick={handleSend}
-                        aria-label="Send to running agent"
-                        className={cn(
-                          "aspect-square animate-in rounded-lg transition-colors duration-150 fade-in-0 zoom-in-90",
-                          modeSendButton
-                        )}
-                      >
-                        <ArrowUpIcon />
-                      </Button>
-                    }
-                  />
-                  <TooltipContent>
-                    Send — steers the running agent
-                    <ShortcutKbd binding="enter" className="ml-1" />
-                  </TooltipContent>
-                </Tooltip>
-              ) : isLoading ? (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        size="icon-lg"
-                        onClick={onStop}
-                        disabled={isAborting}
-                        aria-label="Stop generation"
-                        className="aspect-square animate-in rounded-lg bg-destructive duration-150 fade-in-0 zoom-in-90 hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <div className="h-3 w-3 rounded-sm bg-white" />
-                      </Button>
-                    }
-                  />
-                  <TooltipContent>
-                    {isAborting ? "Stopping…" : "Stop"}
-                    {!isAborting && (
-                      <ShortcutKbd binding={stopBinding} className="ml-1" />
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        size="icon-lg"
-                        onClick={handleSend}
-                        disabled={!canSend}
-                        aria-label="Send message"
-                        className={cn(
-                          "aspect-square animate-in rounded-lg transition-colors duration-150 fade-in-0 zoom-in-90",
-                          modeSendButton
-                        )}
-                      >
-                        <ArrowUpIcon />
-                      </Button>
-                    }
-                  />
-                  <TooltipContent>
-                    Send
-                    <ShortcutKbd binding="enter" className="ml-1" />
-                  </TooltipContent>
-                </Tooltip>
-              )}
+                }}
+                onArrowDown={() => {
+                  if (slashMention !== null) {
+                    setSlashMention((prev) => {
+                      if (!prev) return prev
+                      const n = slashItemsRef.current.length
+                      if (n === 0) return prev
+                      return {
+                        ...prev,
+                        selectedIndex: (prev.selectedIndex + 1) % n,
+                      }
+                    })
+                  } else {
+                    setAtMention((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            selectedIndex:
+                              (prev.selectedIndex + 1) %
+                              mentionEntries.current.length,
+                          }
+                        : prev
+                    )
+                  }
+                }}
+                onEscape={() => {
+                  setAtMention(null)
+                  setSlashMention(null)
+                }}
+                onHistoryPrev={(atStart) => navigateHistory("prev", atStart)}
+                onHistoryNext={() => navigateHistory("next", false)}
+              />
             </div>
-          </div>
+
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-2.5 pb-1.5">
+                {attachments.map((attachment) => (
+                  <AttachmentPreview
+                    key={attachment.id}
+                    attachment={attachment}
+                    onRemove={() => handleRemoveAttachment(attachment.id)}
+                  />
+                ))}
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? [])
+                if (files.length > 0) void handleAddFiles(files)
+                // Reset so selecting the same file again re-triggers onChange.
+                e.target.value = ""
+              }}
+            />
+
+            <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-2">
+              <div className="flex items-center gap-0.5">
+                <ModelCombobox
+                  groups={grouped}
+                  selected={selectedModel}
+                  onSelect={(compositeKey) => {
+                    if (!isControlled) setInternalModelId(compositeKey)
+                    onModelChange?.(compositeKey)
+                  }}
+                  disabled={models.length === 0}
+                />
+
+                {selectedModel?.reasoning && (
+                  <ThinkingCombobox
+                    selected={selectedThinkingLevel}
+                    onSelect={setThinkingLevel}
+                    availableLevels={availableLevels}
+                  />
+                )}
+                {onModeChange && (
+                  <ModeCombobox selected={mode} onSelect={onModeChange} />
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <ContextChart
+                  contextUsage={contextUsage}
+                  sessionId={sessionId}
+                  sessionStats={sessionStats}
+                />
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Attach files"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="size-7 text-muted-foreground hover:text-foreground"
+                      >
+                        <PaperclipIcon className="size-4" />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>Attach files</TooltipContent>
+                </Tooltip>
+                {isLoading && !isEmpty ? (
+                  // While the agent runs, a non-empty submit steers the live turn.
+                  // The steer button replaces Stop so there's a single primary
+                  // action — Stop returns the moment the input is cleared.
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          size="icon-lg"
+                          onClick={handleSend}
+                          aria-label="Send to running agent"
+                          className={cn(
+                            "aspect-square animate-in rounded-lg transition-colors duration-150 fade-in-0 zoom-in-90",
+                            modeSendButton
+                          )}
+                        >
+                          <ArrowUpIcon />
+                        </Button>
+                      }
+                    />
+                    <TooltipContent>
+                      Send — steers the running agent
+                      <ShortcutKbd binding="enter" className="ml-1" />
+                    </TooltipContent>
+                  </Tooltip>
+                ) : isLoading ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          size="icon-lg"
+                          onClick={onStop}
+                          disabled={isAborting}
+                          aria-label="Stop generation"
+                          className="aspect-square animate-in rounded-lg bg-destructive duration-150 fade-in-0 zoom-in-90 hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <div className="h-3 w-3 rounded-sm bg-white" />
+                        </Button>
+                      }
+                    />
+                    <TooltipContent>
+                      {isAborting ? "Stopping…" : "Stop"}
+                      {!isAborting && (
+                        <ShortcutKbd binding={stopBinding} className="ml-1" />
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          size="icon-lg"
+                          onClick={handleSend}
+                          disabled={!canSend}
+                          aria-label="Send message"
+                          className={cn(
+                            "aspect-square animate-in rounded-lg transition-colors duration-150 fade-in-0 zoom-in-90",
+                            modeSendButton
+                          )}
+                        >
+                          <ArrowUpIcon />
+                        </Button>
+                      }
+                    />
+                    <TooltipContent>
+                      Send
+                      <ShortcutKbd binding="enter" className="ml-1" />
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </div>
           </div>
 
           {showContextStrip && (
@@ -1204,6 +1220,17 @@ export const ChatComposer = memo(
                     onBranchSelect={onBranchSelect}
                     onGitError={onBranchError}
                     sessionId={sessionId}
+                  />
+                )}
+                {showBranch && threadId && (
+                  <WorktreeSelector
+                    threadId={threadId}
+                    sessionId={sessionId}
+                    threadTitle={threadTitle}
+                    branches={branches}
+                    currentBranch={branch ?? null}
+                    worktreeBranch={worktreeBranch}
+                    onError={onBranchError}
                   />
                 )}
               </div>
@@ -1259,7 +1286,7 @@ function AttachmentPreview({
         type="button"
         aria-label={`Remove ${attachment.filename}`}
         onClick={onRemove}
-        className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full border border-border bg-background text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+        className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full border border-border bg-background text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
       >
         <XIcon className="size-2.5" />
       </button>

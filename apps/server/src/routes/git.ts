@@ -3,6 +3,9 @@ import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import {
   getCurrentBranch,
+  getRefSha,
+  getRepoRoot,
+  listWorktrees,
   initGitRepo,
   gitClone,
   listBranches,
@@ -52,14 +55,18 @@ import { parseModelKey } from "./settings.js";
 
 const git = new Hono();
 
-function parseGitError(err: unknown, fallback: string): string {
+export function parseGitError(err: unknown, fallback: string): string {
   const raw = err instanceof Error ? err.message : String(err);
-  const lines = raw.split("\n").filter(Boolean);
-  return (
-    lines.find((l) => l.startsWith("error:") || l.startsWith("fatal:")) ??
-    lines[0] ??
-    fallback
-  );
+  const line = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .find(
+      (l) =>
+        l.startsWith("error:") ||
+        l.startsWith("fatal:") ||
+        l.startsWith("CONFLICT"),
+    );
+  return line ?? raw.split("\n").find(Boolean) ?? fallback;
 }
 
 // ── Clone repository ────────────────────────────────────────────────────────────
@@ -90,16 +97,58 @@ git.get("/session/:id/branches", async (c) => {
   return c.json({ branches: await listBranches(cwd) });
 });
 
+// Branches checked out in a secondary worktree. The main working tree is
+// excluded — these are the branches that can't be checked out in place and
+// must instead be opened by switching the thread's cwd.
+git.get("/session/:id/worktrees", async (c) => {
+  const entry = store.get(c.req.param("id"));
+  if (!entry) return c.json({ worktrees: [] });
+
+  const repoRoot = await getRepoRoot(entry.cwd);
+  if (!repoRoot) return c.json({ worktrees: [] });
+
+  const workspace = entry.workspaceId
+    ? getWorkspace(entry.workspaceId)
+    : undefined;
+  const mainWorktreePath = workspace ? await getRepoRoot(workspace.path) : null;
+
+  const worktrees = (await listWorktrees(repoRoot))
+    .filter((w) => w.branch && w.path !== mainWorktreePath)
+    .map((w) => ({ path: w.path, branch: w.branch }));
+  return c.json({ worktrees });
+});
+
 git.get("/workspace/:id/branch", async (c) => {
   const ws = getWorkspace(c.req.param("id"));
-  if (!ws) return c.json({ branch: null });
-  return c.json({ branch: await getCurrentBranch(ws.path) });
+  if (!ws) return c.json({ branch: null, hasCommits: false });
+  // `hasCommits` is false for a freshly-initialized repo (unborn HEAD); the UI
+  // uses it to hide worktree creation, which can't fork from a commitless base.
+  const [branch, headSha] = await Promise.all([
+    getCurrentBranch(ws.path),
+    getRefSha(ws.path, "HEAD"),
+  ]);
+  return c.json({ branch, hasCommits: !!headSha });
 });
 
 git.get("/workspace/:id/branches", async (c) => {
   const ws = getWorkspace(c.req.param("id"));
   if (!ws) return c.json({ branches: [] });
   return c.json({ branches: await listBranches(ws.path) });
+});
+
+// Create (and check out) a branch in a workspace that has no live session yet
+// (e.g. the new-thread page).
+git.post("/workspace/:id/branch", async (c) => {
+  const ws = getWorkspace(c.req.param("id"));
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  const body = await c.req.json<{ branch: string }>();
+  if (!body.branch) return c.json({ error: "branch is required" }, 400);
+  try {
+    await createBranch(ws.path, body.branch);
+    return c.json({ branch: await getCurrentBranch(ws.path) });
+  } catch (err) {
+    return c.json({ error: parseGitError(err, "Branch creation failed") }, 500);
+  }
 });
 
 git.post("/session/:id/checkout", async (c) => {
@@ -135,10 +184,31 @@ git.post("/session/:id/git/init", async (c) => {
   if (!cwd) return c.json({ error: "Session not found" }, 404);
   try {
     await initGitRepo(cwd);
-    return c.json({
-      branch: await getCurrentBranch(cwd),
-      branches: await listBranches(cwd),
-    });
+    const [branch, branches] = await Promise.all([
+      getCurrentBranch(cwd),
+      listBranches(cwd),
+    ]);
+    return c.json({ branch, branches });
+  } catch (err) {
+    return c.json(
+      { error: parseGitError(err, "Repository initialization failed") },
+      500,
+    );
+  }
+});
+
+// Initialize a git repo for a workspace that has no live session yet (e.g. the
+// new-thread page, before the first thread/session is created).
+git.post("/workspace/:id/git/init", async (c) => {
+  const ws = getWorkspace(c.req.param("id"));
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  try {
+    await initGitRepo(ws.path);
+    const [branch, branches] = await Promise.all([
+      getCurrentBranch(ws.path),
+      listBranches(ws.path),
+    ]);
+    return c.json({ branch, branches });
   } catch (err) {
     return c.json(
       { error: parseGitError(err, "Repository initialization failed") },
@@ -283,7 +353,14 @@ async function readLogEntries(cwd: string, limitParam: string | undefined) {
     .filter(Boolean)
     .map((record) => {
       const [sha, shortSha, author, date, subject, body] = record.split("\x1f");
-      return { sha, shortSha, author, date, subject, body: (body ?? "").trim() };
+      return {
+        sha,
+        shortSha,
+        author,
+        date,
+        subject,
+        body: (body ?? "").trim(),
+      };
     });
 }
 
@@ -556,9 +633,10 @@ async function resolveTurnFileContents(
     }
   };
 
-  const preContentFor = async (
-    file: { wasCreatedByTurn: boolean; preContent: string | null },
-  ): Promise<string> => {
+  const preContentFor = async (file: {
+    wasCreatedByTurn: boolean;
+    preContent: string | null;
+  }): Promise<string> => {
     if (file.wasCreatedByTurn) return ""; // didn't exist before the turn
     if (file.preContent !== null) return file.preContent;
     // Existed but no snapshot stored (was unmodified at HEAD before the turn).
@@ -591,9 +669,7 @@ async function resolveTurnFileContents(
   // snapshot; that snapshot is this file's content immediately after the current
   // turn. Skip later turns that recorded it as newly-created (no snapshot, e.g.
   // the file was committed in between) and fall through to the working tree.
-  const laterTurns = threadId
-    ? getAgentTurnsFromId(threadId, turnId + 1)
-    : [];
+  const laterTurns = threadId ? getAgentTurnsFromId(threadId, turnId + 1) : [];
   for (const turn of laterTurns) {
     const next = getAgentTurnFiles(turn.id).find(
       (f) => f.filePath === filePath,
@@ -635,7 +711,9 @@ git.get("/session/:id/git/turns/:turnId/file-diff", async (c) => {
     file,
   );
   if (!pair) return c.json({ diff: "" });
-  return c.json({ diff: await gitDiffContents(pair.preText, pair.postText, file) });
+  return c.json({
+    diff: await gitDiffContents(pair.preText, pair.postText, file),
+  });
 });
 
 // Aggregate additions/deletions for everything a turn changed.
@@ -648,14 +726,22 @@ git.get("/session/:id/git/turns/:turnId/diff-stat", async (c) => {
 
   const files =
     turnIdParam === "0"
-      ? sessionEvents.getLastTurnFiles(id).map((f) => ({ filePath: f.filePath }))
+      ? sessionEvents
+          .getLastTurnFiles(id)
+          .map((f) => ({ filePath: f.filePath }))
       : getAgentTurnFiles(parseInt(turnIdParam, 10) || -1).map((f) => ({
           filePath: f.filePath,
         }));
 
   const perFile = await Promise.all(
     files.slice(0, 100).map(async (f) => {
-      const pair = await resolveTurnFileContents(id, threadId, cwd, turnIdParam, f.filePath);
+      const pair = await resolveTurnFileContents(
+        id,
+        threadId,
+        cwd,
+        turnIdParam,
+        f.filePath,
+      );
       if (!pair) return { filePath: f.filePath, additions: 0, deletions: 0 };
       return {
         filePath: f.filePath,
@@ -814,7 +900,9 @@ git.post("/session/:id/git/turns/:turnId/revert", async (c) => {
   // Remove this turn and all subsequent turns from the DB so they disappear from the sidebar.
   const orphanedShas = deleteAgentTurnsFrom(threadId, turnId);
   // Drop the now-unreferenced checkpoint refs so they don't accumulate.
-  await Promise.all(orphanedShas.map((sha) => gitDeleteCheckpointRef(cwd, sha)));
+  await Promise.all(
+    orphanedShas.map((sha) => gitDeleteCheckpointRef(cwd, sha)),
+  );
 
   return new Response(null, { status: 204 });
 });

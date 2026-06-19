@@ -46,6 +46,7 @@ import {
   useTurns,
   useTurnDiffStat,
   useRevertToTurn,
+  useLastCommitAt,
   type TurnSummary,
 } from "../queries"
 import {
@@ -243,8 +244,13 @@ const TurnHistoryView = memo(function TurnHistoryView({
   isLoading: boolean
   clearedAt?: number
 }) {
-  const turns = clearedAt
-    ? allTurns.filter((t) => t.inProgress || t.startedAt > clearedAt)
+  // Reset the history at whichever is later: a manual clear (the commit button
+  // here) or the latest commit on HEAD — so agent-driven commits also clear
+  // banked turns, and the boundary survives a remount (the manual flag doesn't).
+  const lastCommitAt = useLastCommitAt(sessionId)
+  const cutoff = Math.max(clearedAt ?? 0, lastCommitAt)
+  const turns = cutoff
+    ? allTurns.filter((t) => t.inProgress || t.startedAt > cutoff)
     : allTurns
 
   const [expandedIds, setExpandedIds] = useState<Set<number>>(

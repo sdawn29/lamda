@@ -20,13 +20,20 @@ const BINARY_MIME_TYPES: Record<string, string> = {
 };
 
 const TEXT_MIME_TYPES: Record<string, string> = {
+  ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".htm": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
 };
 
 function contentTypeFor(ext: string): string {
   return (
-    BINARY_MIME_TYPES[ext] ?? TEXT_MIME_TYPES[ext] ?? "text/plain; charset=utf-8"
+    BINARY_MIME_TYPES[ext] ??
+    TEXT_MIME_TYPES[ext] ??
+    "text/plain; charset=utf-8"
   );
 }
 
@@ -40,16 +47,19 @@ async function canonicalize(path: string): Promise<string> {
 }
 
 /**
- * Confines `/file` reads to the directories of registered workspaces. Without
- * this, the `path` query param is an arbitrary-file-read primitive (e.g.
- * `/file?path=/Users/you/.ssh/id_rsa`). Symlinks are resolved before the
- * containment check so they can't be used to escape a workspace root.
+ * Confines `/file` reads to registered workspace directories and worktrees
+ * attached to their threads. Without this, the `path` query param is an
+ * arbitrary-file-read primitive (e.g. `/file?path=/Users/you/.ssh/id_rsa`).
+ * Symlinks are resolved before the containment check so they can't be used to
+ * escape an allowed root.
  */
 async function isWithinWorkspace(target: string): Promise<boolean> {
   const real = await canonicalize(target);
-  const roots = listWorkspacesWithThreads()
-    .map((w) => w.path)
-    .filter((p): p is string => typeof p === "string" && p.length > 0);
+  const roots = listWorkspacesWithThreads().flatMap((workspace) =>
+    [workspace.path, ...workspace.threads.map((t) => t.worktreePath)].filter(
+      (p): p is string => typeof p === "string" && p.length > 0,
+    ),
+  );
 
   for (const root of roots) {
     const realRoot = await canonicalize(root);
@@ -143,7 +153,9 @@ file.get("/file", async (c) => {
 
   // Empty files have no satisfiable byte range; stream the whole (empty) file.
   const nodeStream =
-    size === 0 ? createReadStream(path) : createReadStream(path, { start, end });
+    size === 0
+      ? createReadStream(path)
+      : createReadStream(path, { start, end });
   const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
 
   const headers: Record<string, string> = {

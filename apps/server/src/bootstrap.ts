@@ -1,9 +1,12 @@
-import { listWorkspacesWithThreads } from "@lamda/db";
+import { existsSync } from "node:fs";
+import { clearThreadWorktree, listWorkspacesWithThreads } from "@lamda/db";
 import { store } from "./store.js";
 import { workspaceIndexer } from "./services/workspace-indexer.js";
 import {
   createSessionForThread,
   openSessionForThread,
+  refreshWorktreeWatch,
+  resolveThreadCwd,
 } from "./services/session-service.js";
 
 /**
@@ -17,15 +20,25 @@ export async function bootstrapSessions(): Promise<void> {
 
   const tasks = workspaceList.flatMap((ws) =>
     ws.threads.map(async (thread) => {
+      // Run the thread in its worktree when one is attached and still on disk;
+      // a worktree removed out-of-band is detached persistently so the renderer,
+      // terminal, and next restart all agree on the same cwd.
+      if (thread.worktreePath && !existsSync(thread.worktreePath)) {
+        clearThreadWorktree(thread.id);
+        thread.worktreePath = null;
+      }
+      const cwd = resolveThreadCwd(thread, ws.path);
+
       if (thread.sessionFile) {
         try {
           const handle = await openSessionForThread(
             thread.id,
             thread.sessionFile,
-            ws.path,
+            cwd,
             ws.id,
           );
-          store.create(handle, ws.path, thread.id, ws.id);
+          const sessionId = store.create(handle, cwd, thread.id, ws.id);
+          refreshWorktreeWatch(sessionId);
           return;
         } catch (err) {
           // A corrupt/unreadable session file must not leave a dead thread —
@@ -37,7 +50,7 @@ export async function bootstrapSessions(): Promise<void> {
         }
       }
 
-      await createSessionForThread(thread.id, ws.path, ws.id);
+      await createSessionForThread(thread.id, cwd, ws.id);
     }),
   );
 

@@ -2,9 +2,32 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { ChevronDownIcon, FolderIcon, FolderPlusIcon } from "lucide-react"
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  FolderGit2Icon,
+  FolderIcon,
+  FolderPlusIcon,
+  GitBranchIcon,
+  GitBranchPlusIcon,
+  MonitorIcon,
+} from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/ui/dialog"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/shared/ui/field"
+import { Input } from "@/shared/ui/input"
 import { LambdaMark } from "@/shared/components/lambda-mark"
 import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
@@ -17,12 +40,21 @@ import {
   CommandItem,
   CommandList,
 } from "@/shared/ui/command"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 import { useWorkspace, useCreateWorkspaceAction } from "@/features/workspace"
 import { CreateWorkspaceDialog } from "@/features/workspace/components/create-workspace-dialog"
 import {
   deleteThread,
   updateThreadTitle,
+  enterThreadWorktree,
 } from "@/features/workspace/api"
 import { workspacesQueryKey } from "@/features/workspace/queries"
 import type { ApprovalMode, Mode, WorkspaceDto } from "@/features/workspace/api"
@@ -30,12 +62,18 @@ import { useAppSettings } from "@/features/settings/queries"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
 import {
   BranchSelector,
-  useBranch,
-  useBranches,
+  branchNameFromTitle,
+  gitKeys,
   useWorkspaceBranch,
   useWorkspaceBranches,
+  useInitializeWorkspaceGitRepository,
 } from "@/features/git"
-import { checkoutBranch, sendPrompt, generateTitle } from "../api"
+import {
+  checkoutBranch,
+  listSessionWorktrees,
+  sendPrompt,
+  generateTitle,
+} from "../api"
 import {
   ChatComposer,
   type ChatComposerHandle,
@@ -64,7 +102,9 @@ interface NewThreadViewProps {
 function deriveTitleFromMessage(text: string): string {
   const firstLine = text.trim().split("\n")[0]?.trim() ?? ""
   if (!firstLine) return "New Thread"
-  return firstLine.length > 80 ? `${firstLine.slice(0, 80).trimEnd()}…` : firstLine
+  return firstLine.length > 80
+    ? `${firstLine.slice(0, 80).trimEnd()}…`
+    : firstLine
 }
 
 export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
@@ -77,7 +117,9 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
 
   // The user's explicit pick; until they pick, the workspace is derived below
   // from the ?ws= param, then the last-used workspace, then the first one.
-  const [pickedWorkspaceId, setPickedWorkspaceId] = useState<string | null>(null)
+  const [pickedWorkspaceId, setPickedWorkspaceId] = useState<string | null>(
+    null
+  )
   const [wsPickerOpen, setWsPickerOpen] = useState(false)
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
@@ -88,6 +130,14 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
   const [selectedApprovalMode, setSelectedApprovalMode] =
     useState<ApprovalMode>("ask")
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
+  const [createInWorktree, setCreateInWorktree] = useState(false)
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false)
+  const [worktreeDialogOpen, setWorktreeDialogOpen] = useState(false)
+  // The committed worktree branch name (used at send). `worktreeBranchDraft` is
+  // the in-dialog edit buffer, only promoted to the committed value on confirm
+  // so cancelling/dismissing the dialog discards the edit.
+  const [worktreeBranchName, setWorktreeBranchName] = useState("")
+  const [worktreeBranchDraft, setWorktreeBranchDraft] = useState("")
   const [isSending, setIsSending] = useState(false)
   // The just-submitted message. Set the instant the user hits enter so the view
   // flips straight to the working/conversation state — we don't wait for the
@@ -121,28 +171,37 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
     ? pickedWorkspaceId
     : defaultWorkspaceId
 
-  // Use the first available session from the selected workspace to query branch
-  // data — git state is workspace-level, so any session is a valid proxy.
-  // Fall back to workspace-level endpoints when no session exists yet.
   const selectedWorkspace = workspaces.find((w) => w.id === workspaceId)
-  const refSessionId =
-    selectedWorkspace?.threads.find((t) => t.sessionId)?.sessionId ?? ""
-  const hasSession = !!refSessionId
-
-  const { data: sessionBranchData } = useBranch(refSessionId)
-  const { data: sessionBranchesData } = useBranches(refSessionId)
-  const { data: wsBranchData } = useWorkspaceBranch(hasSession ? null : workspaceId)
-  const { data: wsBranchesData } = useWorkspaceBranches(hasSession ? null : workspaceId)
-
-  const currentBranch = (hasSession ? sessionBranchData?.branch : wsBranchData?.branch) ?? null
-  const branches = (hasSession ? sessionBranchesData?.branches : wsBranchesData?.branches) ?? []
-  const hasBranchInfo = currentBranch !== null
+  // New-thread branch selection is workspace-scoped. Never proxy through an
+  // arbitrary existing session: it may be stale or attached to another
+  // worktree, which would hide or misreport the workspace's base branch.
+  const { data: wsBranchData, isFetched: branchFetched } =
+    useWorkspaceBranch(workspaceId)
+  const { data: wsBranchesData, isFetched: branchesFetched } =
+    useWorkspaceBranches(workspaceId)
+  const currentBranch = wsBranchData?.branch ?? null
+  const branches = wsBranchesData?.branches ?? []
+  const hasBranchInfo = currentBranch !== null || branches.length > 0
+  const selectedBaseBranch = selectedBranch ?? currentBranch
+  // A worktree must fork from an existing commit. A freshly-initialized repo has
+  // an unborn branch (no commits), so worktree creation is offered only once the
+  // workspace has at least one commit.
+  const canUseWorktree =
+    !!selectedBaseBranch && (wsBranchData?.hasCommits ?? true)
+  const initWorkspaceRepo = useInitializeWorkspaceGitRepository(workspaceId)
+  // Distinguish "not a git repo" from "still loading branch info": only once both
+  // workspace git queries have resolved with no branch can we offer to init.
+  const isNonGitWorkspace =
+    !!workspaceId && branchFetched && branchesFetched && !hasBranchInfo
 
   // Reset branch selection when the workspace changes.
   const [prevWorkspaceId, setPrevWorkspaceId] = useState(workspaceId)
   if (prevWorkspaceId !== workspaceId) {
     setPrevWorkspaceId(workspaceId)
     setSelectedBranch(null)
+    setCreateInWorktree(false)
+    setWorktreeBranchName("")
+    setWorktreeBranchDraft("")
   }
 
   // Reflect the effective workspace in ?ws= so the surrounding layout (right
@@ -187,6 +246,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
       const provisionalTitle = deriveTitleFromMessage(text)
       const threadModelId =
         provider && modelId ? `${provider}::${modelId}` : selectedModelId
+      const baseBranch = selectedBaseBranch
 
       // Create the thread with its title, mode, and model in one call — the
       // server persists them before building the session, so the session gets
@@ -199,6 +259,14 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           mode: selectedMode,
           approvalMode: selectedApprovalMode,
           modelId: threadModelId,
+          worktree: createInWorktree
+            ? {
+                newBranch:
+                  worktreeBranchName.trim() ||
+                  branchNameFromTitle(provisionalTitle),
+                baseRef: baseBranch ?? undefined,
+              }
+            : undefined,
         })
       } catch (err) {
         setIsSending(false)
@@ -256,7 +324,11 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           prev
             ? updateLastPageMessages(prev, (msgs) => [
                 ...msgs,
-                { role: "user", content: text, attachments: displayAttachments },
+                {
+                  role: "user",
+                  content: text,
+                  attachments: displayAttachments,
+                },
               ])!
             : seed
       )
@@ -276,18 +348,35 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
 
       const capturedWsId = workspaceId
       const capturedThreadId = thread.id
-      const capturedBranch = selectedBranch
+      const capturedBranch = createInWorktree ? null : selectedBranch
       const model = modelId && provider ? { provider, modelId } : undefined
       void (async () => {
         try {
-          // Checkout the user-selected branch before the prompt runs. Always
-          // honor an explicit pick — the branch shown in the selector comes
-          // from a *reference* session, so the new session isn't guaranteed
-          // to already be on it.
+          // Put the new (local) session on the user-selected branch before the
+          // prompt runs. A branch checked out in a secondary worktree can't be
+          // checked out in place — git would reject it and the prompt would
+          // fail — so move the thread into that worktree instead (mirrors
+          // ChatView's branch handling).
           if (capturedBranch) {
-            await checkoutBranch(sessionId, capturedBranch)
+            const { worktrees } = await listSessionWorktrees(sessionId).catch(
+              () => ({ worktrees: [] as { path: string; branch: string }[] })
+            )
+            if (worktrees.some((w) => w.branch === capturedBranch)) {
+              await enterThreadWorktree(capturedThreadId, capturedBranch)
+              queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+              queryClient.invalidateQueries({
+                queryKey: gitKeys.session(sessionId),
+              })
+            } else {
+              await checkoutBranch(sessionId, capturedBranch)
+            }
           }
-          await sendPrompt(sessionId, { text, model, thinkingLevel, attachments: uploads })
+          await sendPrompt(sessionId, {
+            text,
+            model,
+            thinkingLevel,
+            attachments: uploads,
+          })
         } catch (err) {
           // The prompt never reached the agent — drop the optimistic message
           // by refetching server truth, clear the optimistic working hint, and
@@ -327,6 +416,9 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
       workspaceId,
       isSending,
       selectedBranch,
+      selectedBaseBranch,
+      createInWorktree,
+      worktreeBranchName,
       selectedMode,
       selectedApprovalMode,
       selectedModelId,
@@ -339,11 +431,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
 
   const noWorkspaces = workspaces.length === 0
 
-  // The workspace picker + branch selector live inside the composer's context
-  // strip so workspace, branch, and approval read as one connected bar — the
-  // Cursor-style composer header. Branch creation still works because the
-  // selector keeps the reference session.
-  const contextLeading = noWorkspaces ? (
+  const workspaceSelector = noWorkspaces ? (
     <Button
       variant="ghost"
       size="sm"
@@ -354,69 +442,192 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
       <span className="whitespace-nowrap">Add workspace</span>
     </Button>
   ) : (
+    <Popover open={wsPickerOpen} onOpenChange={setWsPickerOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={wsPickerOpen}
+            className="h-7 gap-1.5 px-2 text-xs"
+          >
+            <FolderIcon data-icon="inline-start" />
+            <span className="max-w-[12rem] truncate">
+              {selectedWorkspace?.name ?? "Select workspace"}
+            </span>
+            <ChevronDownIcon
+              data-icon="inline-end"
+              className={`opacity-50 transition-transform duration-200 ${wsPickerOpen ? "rotate-180" : ""}`}
+            />
+          </Button>
+        }
+      />
+      <PopoverContent
+        className="w-auto min-w-40 p-0"
+        side="top"
+        align="start"
+        sideOffset={6}
+      >
+        <Command>
+          <CommandInput placeholder="Search workspaces…" />
+          <CommandList>
+            <CommandEmpty>No workspaces found</CommandEmpty>
+            <CommandGroup>
+              {workspaces.map((ws) => (
+                <CommandItem
+                  key={ws.id}
+                  value={ws.name}
+                  data-checked={ws.id === workspaceId}
+                  className="whitespace-nowrap"
+                  onSelect={() => {
+                    setPickedWorkspaceId(ws.id)
+                    setWsPickerOpen(false)
+                  }}
+                >
+                  <FolderIcon />
+                  {ws.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+
+  const handleInitWorkspaceRepo = useCallback(() => {
+    if (!workspaceId || initWorkspaceRepo.isPending) return
+    initWorkspaceRepo.mutate(undefined, {
+      onSuccess: () => toast.success("Initialized git repository"),
+      onError: (err) =>
+        toast.error("Couldn't initialize repository", {
+          description: err instanceof Error ? err.message : String(err),
+        }),
+    })
+  }, [workspaceId, initWorkspaceRepo])
+
+  // Branch selection and the Local/Worktree location picker only make sense for
+  // a git workspace. For a non-git folder, offer to initialize a repo instead;
+  // while branch info is still loading, show nothing.
+  const contextLeading = noWorkspaces ? null : isNonGitWorkspace ? (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleInitWorkspaceRepo}
+      disabled={initWorkspaceRepo.isPending}
+      title="Initialize a git repository in this workspace"
+    >
+      <GitBranchPlusIcon data-icon="inline-start" />
+      <span>
+        {initWorkspaceRepo.isPending
+          ? "Initializing…"
+          : "Initialize git repository"}
+      </span>
+    </Button>
+  ) : !hasBranchInfo ? null : (
     <div className="flex min-w-0 items-center">
-      <Popover open={wsPickerOpen} onOpenChange={setWsPickerOpen}>
+      {createInWorktree ? (
+        // In worktree mode the thread runs on the new branch, not the base —
+        // show it here (mirrors ChatView). Click to rename; the base branch is
+        // chosen inside the worktree dialog.
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setWorktreeBranchDraft(worktreeBranchName)
+            setWorktreeDialogOpen(true)
+          }}
+          title="Worktree branch — click to edit"
+        >
+          <GitBranchIcon data-icon="inline-start" />
+          <span className="max-w-[12rem] truncate">
+            {worktreeBranchName.trim() || "lamda/… (from prompt)"}
+          </span>
+        </Button>
+      ) : (
+        <BranchSelector
+          branch={selectedBranch ?? currentBranch}
+          branches={branches}
+          onBranchSelect={setSelectedBranch}
+          workspaceId={workspaceId ?? undefined}
+        />
+      )}
+      <Popover open={locationPickerOpen} onOpenChange={setLocationPickerOpen}>
         <PopoverTrigger
           render={
             <Button
               variant="ghost"
               size="sm"
-              aria-expanded={wsPickerOpen}
-              className="h-7 gap-1.5 px-2 text-xs"
+              aria-expanded={locationPickerOpen}
+              title="Choose where the new thread runs"
             >
-              <FolderIcon data-icon="inline-start" />
-              <span className="max-w-[12rem] truncate">
-                {selectedWorkspace?.name ?? "Select workspace"}
-              </span>
+              {createInWorktree ? (
+                <FolderGit2Icon data-icon="inline-start" />
+              ) : (
+                <MonitorIcon data-icon="inline-start" />
+              )}
+              <span>{createInWorktree ? "Worktree" : "Local"}</span>
               <ChevronDownIcon
                 data-icon="inline-end"
-                className={`opacity-50 transition-transform duration-200 ${wsPickerOpen ? "rotate-180" : ""}`}
+                className={`opacity-50 transition-transform duration-200 ${locationPickerOpen ? "rotate-180" : ""}`}
               />
             </Button>
           }
         />
         <PopoverContent
-          className="w-auto min-w-40 p-0"
+          className="w-64 p-0"
           side="top"
           align="start"
           sideOffset={6}
         >
           <Command>
-            <CommandInput placeholder="Search workspaces…" />
             <CommandList>
-              <CommandEmpty>No workspaces found</CommandEmpty>
-              <CommandGroup>
-                {workspaces.map((ws) => (
-                  <CommandItem
-                    key={ws.id}
-                    value={ws.name}
-                    data-checked={ws.id === workspaceId}
-                    className="whitespace-nowrap"
-                    onSelect={() => {
-                      setPickedWorkspaceId(ws.id)
-                      setWsPickerOpen(false)
-                    }}
-                  >
-                    <FolderIcon />
-                    {ws.name}
-                  </CommandItem>
-                ))}
+              <CommandGroup className="p-1">
+                <CommandItem
+                  className="items-start gap-2 rounded-md px-2 py-1.5"
+                  onSelect={() => {
+                    setCreateInWorktree(false)
+                    setLocationPickerOpen(false)
+                  }}
+                >
+                  <MonitorIcon />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-xs font-medium">Local</span>
+                    <span className="text-3xs text-muted-foreground">
+                      Checkout the selected branch in the workspace
+                    </span>
+                  </span>
+                  {!createInWorktree && (
+                    <CheckIcon className="ml-auto shrink-0" />
+                  )}
+                </CommandItem>
+                <CommandItem
+                  disabled={!canUseWorktree}
+                  className="items-start gap-2 rounded-md px-2 py-1.5"
+                  onSelect={() => {
+                    setLocationPickerOpen(false)
+                    setWorktreeBranchDraft(worktreeBranchName)
+                    setWorktreeDialogOpen(true)
+                  }}
+                >
+                  <FolderGit2Icon />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-xs font-medium">New worktree</span>
+                    <span className="text-3xs text-muted-foreground">
+                      {canUseWorktree
+                        ? "Branch from the selected branch in isolation"
+                        : "Needs an initial commit first"}
+                    </span>
+                  </span>
+                  {createInWorktree && (
+                    <CheckIcon className="ml-auto shrink-0" />
+                  )}
+                </CommandItem>
               </CommandGroup>
             </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
-      {hasBranchInfo && (
-        <>
-          <span className="px-0.5 text-muted-foreground/50">/</span>
-          <BranchSelector
-            branch={selectedBranch ?? currentBranch}
-            branches={branches}
-            onBranchSelect={setSelectedBranch}
-            sessionId={refSessionId}
-          />
-        </>
-      )}
     </div>
   )
 
@@ -427,7 +638,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         // thread view (which mounts with this same message already cached) is
         // seamless. Shown the instant the user sends, before the session exists.
         <>
-          <div className="flex w-full min-h-0 flex-1 flex-col overflow-y-auto pt-4 pb-8 [overflow-anchor:none]">
+          <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pt-4 pb-8 [overflow-anchor:none]">
             <div className="mx-auto w-full max-w-3xl px-6 pb-3">
               <div className="flex flex-col items-end gap-1.5 self-end">
                 <div
@@ -481,6 +692,10 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               </div>
             </div>
 
+            <div className="mb-1 flex items-center px-1">
+              {workspaceSelector}
+            </div>
+
             <ChatComposer
               ref={chatTextboxRef}
               onSend={handleSend}
@@ -520,6 +735,86 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         onCreateLocal={handleCreateLocal}
         onCreateRemote={handleCreateRemote}
       />
+
+      <Dialog open={worktreeDialogOpen} onOpenChange={setWorktreeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set up worktree</DialogTitle>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="new-thread-worktree-branch">
+                New branch
+              </FieldLabel>
+              <Input
+                id="new-thread-worktree-branch"
+                value={worktreeBranchDraft}
+                placeholder="Generated from your first message"
+                onChange={(event) => setWorktreeBranchDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return
+                  setWorktreeBranchName(worktreeBranchDraft)
+                  setCreateInWorktree(true)
+                  setWorktreeDialogOpen(false)
+                }}
+                autoFocus
+              />
+              <FieldDescription>
+                Leave blank to generate a{" "}
+                <span className="font-mono">lamda/…</span> branch from your
+                first prompt.
+              </FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel>Base branch</FieldLabel>
+              {branches.length > 0 ? (
+                <Select
+                  value={selectedBaseBranch ?? ""}
+                  onValueChange={(value) => setSelectedBranch(value ?? null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select base branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {branches.map((b) => (
+                        <SelectItem key={b} value={b}>
+                          {b}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="rounded-md border px-3 py-2 font-mono text-sm">
+                  {selectedBaseBranch ?? "Current branch"}
+                </div>
+              )}
+              <FieldDescription>
+                The worktree is created from this branch without changing the
+                workspace checkout.
+              </FieldDescription>
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setWorktreeDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setWorktreeBranchName(worktreeBranchDraft)
+                setCreateInWorktree(true)
+                setWorktreeDialogOpen(false)
+              }}
+            >
+              Use worktree
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -530,7 +825,10 @@ function HintItem({ keys, label }: { keys: string | string[]; label: string }) {
     <span className="flex items-center gap-1.5">
       <span className="flex items-center gap-0.5">
         {keyList.map((k, i) => (
-          <kbd key={i} className="flex h-4 min-w-4 items-center justify-center rounded border border-border/60 bg-muted px-1 font-mono text-[10px] text-muted-foreground">
+          <kbd
+            key={i}
+            className="flex h-4 min-w-4 items-center justify-center rounded border border-border/60 bg-muted px-1 font-mono text-[10px] text-muted-foreground"
+          >
             {k}
           </kbd>
         ))}

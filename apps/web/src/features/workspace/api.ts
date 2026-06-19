@@ -29,6 +29,10 @@ export interface ThreadDto {
   sessionId: string | null
   isPinned?: boolean
   forkedFromId?: string | null
+  /** Absolute worktree path when this thread runs inside a git worktree; null = local. */
+  worktreePath?: string | null
+  /** Branch checked out in the thread's worktree; null when local. */
+  worktreeBranch?: string | null
 }
 
 export interface WorkspaceDto {
@@ -76,6 +80,185 @@ export function deleteWorkspace(id: string): Promise<void> {
   return apiFetch<void>(`/workspace/${id}`, { method: "DELETE" })
 }
 
+// ── Thread worktrees ──────────────────────────────────────────────────────────
+
+export interface CreateThreadWorktreeBody {
+  /** Name of the new branch to create for the worktree. */
+  newBranch: string
+  /** Base ref to fork from; defaults to the workspace's current branch when omitted. */
+  baseRef?: string
+}
+
+/** Moves a thread into a freshly created worktree on a new branch. */
+export function createThreadWorktree(
+  threadId: string,
+  body: CreateThreadWorktreeBody
+): Promise<{ worktreePath: string; worktreeBranch: string }> {
+  return apiFetch<{ worktreePath: string; worktreeBranch: string }>(
+    `/thread/${threadId}/worktree`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  )
+}
+
+/** Moves a thread into an existing worktree identified by its branch. */
+export function enterThreadWorktree(
+  threadId: string,
+  branch: string
+): Promise<{ worktreePath: string; worktreeBranch: string }> {
+  return apiFetch<{ worktreePath: string; worktreeBranch: string }>(
+    `/thread/${threadId}/worktree/enter`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ branch }),
+    }
+  )
+}
+
+/** Moves a thread back to the workspace directory. */
+export function switchThreadToLocal(
+  threadId: string
+): Promise<{ ok: true; cleanupWarning?: string }> {
+  return apiFetch<{ ok: true; cleanupWarning?: string }>(
+    `/thread/${threadId}/worktree/local`,
+    {
+      method: "POST",
+    }
+  )
+}
+
+/** Result of a merge attempt. `uncommitted` asks the caller to confirm forcing. */
+export type MergeWorktreeResult =
+  | { ok: true; branch: string; cleanupWarning?: string }
+  | { ok: false; uncommitted: true; error: string }
+  | {
+      ok: false
+      uncommitted: false
+      error: string
+      conflicts: string[]
+      readyToContinue: boolean
+    }
+  | { ok: false; uncommitted: false; error: string }
+
+/**
+ * Merges a thread's worktree branch back into the workspace, then removes the
+ * worktree and returns the thread to the workspace directory. A 409 with
+ * `uncommitted` means the worktree has un-mergeable changes — re-call with
+ * `force` to proceed. Other 409s (e.g. merge conflicts) surface as errors.
+ */
+export async function mergeThreadWorktree(
+  threadId: string,
+  force = false
+): Promise<MergeWorktreeResult> {
+  const base = await getServerUrl()
+  const token = getResolvedServerToken()
+  const res = await fetch(
+    `${base}/thread/${threadId}/worktree/merge?force=${force}`,
+    {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  )
+  if (res.ok) {
+    const data = (await res.json().catch(() => ({}))) as {
+      branch?: string
+      cleanupWarning?: string
+    }
+    return {
+      ok: true,
+      branch: data.branch ?? "",
+      cleanupWarning: data.cleanupWarning,
+    }
+  }
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string
+    uncommitted?: boolean
+    conflicts?: string[]
+    conflictState?: boolean
+    readyToContinue?: boolean
+  }
+  if (res.status === 409 && data.uncommitted) {
+    return {
+      ok: false,
+      uncommitted: true,
+      error: data.error ?? "Worktree has uncommitted changes",
+    }
+  }
+  if (res.status === 409 && (data.conflictState || data.conflicts?.length)) {
+    return {
+      ok: false,
+      uncommitted: false,
+      error: data.error ?? "Merge conflicts need resolution",
+      conflicts: data.conflicts ?? [],
+      readyToContinue: data.readyToContinue ?? false,
+    }
+  }
+  return {
+    ok: false,
+    uncommitted: false,
+    error: data.error ?? `Merge failed (${res.status})`,
+  }
+}
+
+export function resolveThreadWorktreeConflict(
+  threadId: string,
+  filePath: string,
+  strategy: "ours" | "theirs"
+): Promise<{ conflicts: string[] }> {
+  return apiFetch<{ conflicts: string[] }>(
+    `/thread/${threadId}/worktree/merge/resolve`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath, strategy }),
+    }
+  )
+}
+
+export function getThreadWorktreeConflictFile(
+  threadId: string,
+  filePath: string
+): Promise<{ content: string }> {
+  return apiFetch<{ content: string }>(
+    `/thread/${threadId}/worktree/merge/conflict?file=${encodeURIComponent(filePath)}`
+  )
+}
+
+export function resolveThreadWorktreeConflictContent(
+  threadId: string,
+  filePath: string,
+  content: string
+): Promise<{ conflicts: string[] }> {
+  return apiFetch<{ conflicts: string[] }>(
+    `/thread/${threadId}/worktree/merge/resolve-content`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath, content }),
+    }
+  )
+}
+
+export function continueThreadWorktreeMerge(
+  threadId: string
+): Promise<{ merged: true; branch: string; cleanupWarning?: string }> {
+  return apiFetch<{
+    merged: true
+    branch: string
+    cleanupWarning?: string
+  }>(`/thread/${threadId}/worktree/merge/continue`, { method: "POST" })
+}
+
+export function abortThreadWorktreeMerge(threadId: string): Promise<void> {
+  return apiFetch<void>(`/thread/${threadId}/worktree/merge/abort`, {
+    method: "POST",
+  })
+}
+
 export function updateWorkspaceOpenWithApp(
   id: string,
   appId: string | null
@@ -111,6 +294,10 @@ export interface CreateThreadOptions {
   mode?: Mode
   approvalMode?: ApprovalMode
   modelId?: string | null
+  worktree?: {
+    newBranch: string
+    baseRef?: string
+  }
 }
 
 export function createThread(
@@ -150,10 +337,7 @@ export function updateThreadModel(
   })
 }
 
-export function updateThreadMode(
-  threadId: string,
-  mode: Mode
-): Promise<void> {
+export function updateThreadMode(threadId: string, mode: Mode): Promise<void> {
   return apiFetch<void>(`/thread/${threadId}/mode`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -215,7 +399,9 @@ export interface ArchivedThreadDto {
   createdAt: number
 }
 
-export function listArchivedThreads(): Promise<{ threads: ArchivedThreadDto[] }> {
+export function listArchivedThreads(): Promise<{
+  threads: ArchivedThreadDto[]
+}> {
   return apiFetch<{ threads: ArchivedThreadDto[] }>("/threads/archived")
 }
 
@@ -232,15 +418,25 @@ export interface WorkspaceFileEntry {
 export function listWorkspaceIndexFiles(
   workspaceId: string
 ): Promise<{ files: WorkspaceFileEntry[] }> {
-  return apiFetch<{ files: WorkspaceFileEntry[] }>(`/workspace/${workspaceId}/files`)
+  return apiFetch<{ files: WorkspaceFileEntry[] }>(
+    `/workspace/${workspaceId}/files`
+  )
 }
 
-/** Lists the immediate children of one directory (lazy file tree). `relPath` "" = root. */
+/**
+ * Lists the immediate children of one directory (lazy file tree). `relPath` ""
+ * = root. When `threadId` names a thread running in a worktree, the listing is
+ * read from that worktree's directory instead of the workspace path.
+ */
 export function listWorkspaceDir(
   workspaceId: string,
-  relPath: string
+  relPath: string,
+  threadId?: string | null
 ): Promise<{ entries: WorkspaceFileEntry[] }> {
-  const query = relPath ? `?path=${encodeURIComponent(relPath)}` : ""
+  const params = new URLSearchParams()
+  if (relPath) params.set("path", relPath)
+  if (threadId) params.set("threadId", threadId)
+  const query = params.toString() ? `?${params.toString()}` : ""
   return apiFetch<{ entries: WorkspaceFileEntry[] }>(
     `/workspace/${workspaceId}/dir${query}`
   )

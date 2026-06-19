@@ -214,7 +214,7 @@ export function DiffLineContent({
               key={i}
               className={cn(
                 "rounded-sm",
-                isAdded ? "bg-diff-add/30" : "bg-diff-remove/30"
+                isAdded ? "bg-diff-add/45" : "bg-diff-remove/45"
               )}
             >
               {part.text}

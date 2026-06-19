@@ -5,6 +5,8 @@ import {
   listWorkspacesWithThreads,
   getWorkspace,
   getWorkspaceByPath,
+  getThread,
+  listThreadsForWorkspace,
   insertWorkspace,
   deleteWorkspace,
   deleteAllWorkspaces,
@@ -16,12 +18,59 @@ import {
   createWorkspaceTask,
 } from "@lamda/db";
 import { getWorkspaceCommands } from "@lamda/pi-sdk";
+import { abortMerge, isMergeInProgress } from "@lamda/git";
+import { existsSync } from "node:fs";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { workspaceIndexer } from "../services/workspace-indexer.js";
 import { fileTreeService } from "../services/file-tree-service.js";
+import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
+
+/**
+ * Resolves the directory a file-tree request should read from: a thread's git
+ * worktree when `threadId` names a thread that's running in one (and it still
+ * exists on disk), otherwise the workspace path. Lets the tree follow the
+ * active thread into its worktree without exposing arbitrary paths — the caller
+ * only ever names a thread, never a directory.
+ */
+function resolveTreeRoot(
+  workspacePath: string,
+  threadId: string | undefined,
+): string {
+  if (!threadId) return workspacePath;
+  const thread = getThread(threadId);
+  const worktreePath = thread?.worktreePath;
+  if (worktreePath && existsSync(worktreePath)) return worktreePath;
+  return workspacePath;
+}
 
 const workspaces = new Hono();
+
+async function teardownWorkspaceThreads(
+  workspaceId: string,
+  workspacePath: string,
+): Promise<void> {
+  const threads = listThreadsForWorkspace(workspaceId);
+  if (threads.some((thread) => thread.worktreeMergeInProgress)) {
+    await abortMerge(workspacePath);
+    if (await isMergeInProgress(workspacePath)) {
+      throw new Error("Git could not abort the workspace's active merge");
+    }
+  }
+
+  // Clean every managed worktree, including worktrees belonging to archived
+  // threads (which are intentionally absent from listWorkspacesWithThreads).
+  await Promise.all(
+    threads.map((thread) => removeOwnedThreadWorktree(workspacePath, thread)),
+  );
+
+  for (const thread of threads) {
+    const session = store.getByThreadId(thread.id);
+    if (!session) continue;
+    await sessionEvents.dispose(session.sessionId);
+    store.delete(session.sessionId);
+  }
+}
 
 function mapThread(
   t: {
@@ -35,6 +84,8 @@ function mapThread(
     updatedAt: number;
     isPinned: boolean;
     forkedFromId?: string | null;
+    worktreePath?: string | null;
+    worktreeBranch?: string | null;
   },
   workspaceId: string,
 ) {
@@ -49,6 +100,8 @@ function mapThread(
     isStopped: t.isStopped,
     isPinned: t.isPinned,
     forkedFromId: t.forkedFromId ?? null,
+    worktreePath: t.worktreePath ?? null,
+    worktreeBranch: t.worktreeBranch ?? null,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
     sessionId: session?.sessionId ?? null,
@@ -98,7 +151,9 @@ const ICON_CANDIDATES = [
   "src/assets/favicon.png",
 ];
 
-async function detectWorkspaceIcon(workspacePath: string): Promise<string | null> {
+async function detectWorkspaceIcon(
+  workspacePath: string,
+): Promise<string | null> {
   for (const candidate of ICON_CANDIDATES) {
     try {
       await access(join(workspacePath, candidate));
@@ -164,6 +219,22 @@ workspaces.get("/workspaces", (c) => {
   return c.json({ workspaces: result });
 });
 
+/**
+ * Runs the post-insert side effects shared by ordinary workspace creation and
+ * worktree creation: kick off background indexing, auto-create npm-script tasks,
+ * and detect + persist a project icon. Returns the detected icon (or null).
+ */
+async function finalizeWorkspaceCreation(
+  workspaceId: string,
+  path: string,
+): Promise<string | null> {
+  await createTasksFromPackageScripts(workspaceId, path);
+  workspaceIndexer.startIndexing(workspaceId, path);
+  const detectedIcon = await detectWorkspaceIcon(path).catch(() => null);
+  if (detectedIcon) updateWorkspaceIcon(workspaceId, detectedIcon);
+  return detectedIcon;
+}
+
 workspaces.post("/workspace", async (c) => {
   const body = await c.req
     .json<{ name?: string; path?: string; provider?: string; model?: string }>()
@@ -201,13 +272,7 @@ workspaces.post("/workspace", async (c) => {
   }
 
   const workspaceId = insertWorkspace(body.name, body.path);
-  await createTasksFromPackageScripts(workspaceId, body.path);
-
-  workspaceIndexer.startIndexing(workspaceId, body.path);
-
-  // Detect icon and persist it; best-effort — don't fail workspace creation.
-  const detectedIcon = await detectWorkspaceIcon(body.path).catch(() => null);
-  if (detectedIcon) updateWorkspaceIcon(workspaceId, detectedIcon);
+  const detectedIcon = await finalizeWorkspaceCreation(workspaceId, body.path);
 
   return c.json(
     {
@@ -228,11 +293,18 @@ workspaces.post("/workspace", async (c) => {
 
 workspaces.delete("/reset", async (_c) => {
   for (const ws of listWorkspacesWithThreads()) {
-    for (const thread of ws.threads) {
-      const session = store.getByThreadId(thread.id);
-      if (!session) continue;
-      await sessionEvents.dispose(session.sessionId);
-      store.delete(session.sessionId);
+    try {
+      await teardownWorkspaceThreads(ws.id, ws.path);
+    } catch (error) {
+      return _c.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to clean up a managed worktree",
+        },
+        409,
+      );
     }
   }
   deleteAllWorkspaces();
@@ -277,9 +349,16 @@ workspaces.get("/workspace/:id/dir", async (c) => {
     return c.json({ error: "Invalid path" }, 400);
   }
 
+  // When the active thread runs in a worktree, the tree reads (and watches) that
+  // worktree's directory instead of the workspace path.
+  const rootDir = resolveTreeRoot(
+    ws.path,
+    c.req.query("threadId") ?? undefined,
+  );
+
   try {
-    const entries = await fileTreeService.readDir(ws.path, relPath);
-    fileTreeService.watchDir(workspaceId, ws.path, relPath);
+    const entries = await fileTreeService.readDir(rootDir, relPath);
+    fileTreeService.watchDir(workspaceId, rootDir, relPath);
     return c.json({ entries });
   } catch (err) {
     return c.json(
@@ -301,17 +380,24 @@ workspaces.post("/workspace/:id/reindex", async (c) => {
 
 workspaces.delete("/workspace/:id", async (c) => {
   const workspaceId = c.req.param("id");
-  workspaceIndexer.stopIndexing(workspaceId);
-  fileTreeService.stopWorkspace(workspaceId);
   const ws = listWorkspacesWithThreads().find((w) => w.id === workspaceId);
   if (ws) {
-    for (const thread of ws.threads) {
-      const session = store.getByThreadId(thread.id);
-      if (!session) continue;
-      await sessionEvents.dispose(session.sessionId);
-      store.delete(session.sessionId);
+    try {
+      await teardownWorkspaceThreads(ws.id, ws.path);
+    } catch (error) {
+      return c.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to clean up a managed worktree",
+        },
+        409,
+      );
     }
   }
+  workspaceIndexer.stopIndexing(workspaceId);
+  fileTreeService.stopWorkspace(workspaceId);
   deleteWorkspace(workspaceId);
   return new Response(null, { status: 204 });
 });

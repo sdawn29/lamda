@@ -168,7 +168,10 @@ export interface LogEntry {
   body: string
 }
 
-export async function gitLog(sessionId: string, limit = 50): Promise<LogEntry[]> {
+export async function gitLog(
+  sessionId: string,
+  limit = 50
+): Promise<LogEntry[]> {
   const { entries } = await apiFetch<{ entries: LogEntry[] }>(
     `${base(sessionId)}/log?limit=${limit}`
   )
@@ -189,14 +192,21 @@ export interface CommitFile {
   removed: number
 }
 
-export async function gitShowFiles(sessionId: string, sha: string): Promise<CommitFile[]> {
+export async function gitShowFiles(
+  sessionId: string,
+  sha: string
+): Promise<CommitFile[]> {
   const { files } = await apiFetch<{ files: CommitFile[] }>(
     `${base(sessionId)}/show-files?sha=${encodeURIComponent(sha)}`
   )
   return files
 }
 
-export async function gitShowFileDiff(sessionId: string, sha: string, filePath: string): Promise<string> {
+export async function gitShowFileDiff(
+  sessionId: string,
+  sha: string,
+  filePath: string
+): Promise<string> {
   const params = new URLSearchParams({ sha, file: filePath })
   const { diff } = await apiFetch<{ diff: string }>(
     `${base(sessionId)}/show-file-diff?${params}`
@@ -246,7 +256,10 @@ export async function listTurns(sessionId: string): Promise<TurnSummary[]> {
   return turns
 }
 
-export async function getTurnFiles(sessionId: string, turnId: number): Promise<TurnFileDetail[]> {
+export async function getTurnFiles(
+  sessionId: string,
+  turnId: number
+): Promise<TurnFileDetail[]> {
   const { files } = await apiFetch<{ files: TurnFileDetail[] }>(
     `${base(sessionId)}/turns/${turnId}/files`
   )
@@ -285,19 +298,46 @@ export async function getTurnDiffStat(
 }
 
 export function revertToTurn(sessionId: string, turnId: number): Promise<void> {
-  return apiFetch<void>(`${base(sessionId)}/turns/${turnId}/revert`, { method: "POST" })
+  return apiFetch<void>(`${base(sessionId)}/turns/${turnId}/revert`, {
+    method: "POST",
+  })
 }
 
 export function getWorkspaceBranch(
   workspaceId: string
-): Promise<{ branch: string | null }> {
-  return apiFetch<{ branch: string | null }>(`/workspace/${workspaceId}/branch`)
+): Promise<{ branch: string | null; hasCommits: boolean }> {
+  return apiFetch<{ branch: string | null; hasCommits: boolean }>(
+    `/workspace/${workspaceId}/branch`
+  )
 }
 
 export function listWorkspaceBranches(
   workspaceId: string
 ): Promise<{ branches: string[] }> {
   return apiFetch<{ branches: string[] }>(`/workspace/${workspaceId}/branches`)
+}
+
+export function createWorkspaceBranch(
+  workspaceId: string,
+  branch: string
+): Promise<{ branch: string | null }> {
+  return apiFetch<{ branch: string | null }>(
+    `/workspace/${workspaceId}/branch`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ branch }),
+    }
+  )
+}
+
+export function initializeWorkspaceGitRepository(
+  workspaceId: string
+): Promise<{ branch: string | null; branches: string[] }> {
+  return apiFetch<{ branch: string | null; branches: string[] }>(
+    `/workspace/${workspaceId}/git/init`,
+    { method: "POST" }
+  )
 }
 
 // ── Workspace-level history (no session required) ─────────────────────────────
@@ -333,5 +373,3 @@ export async function workspaceGitShowFileDiff(
   )
   return diff
 }
-
-

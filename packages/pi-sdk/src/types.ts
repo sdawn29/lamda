@@ -193,6 +193,13 @@ export interface ManagedSessionHandle {
   setThinkingLevel(level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh"): void
   /** Path to the persisted session file, or undefined for in-memory sessions. */
   readonly sessionFile: string | undefined
+  /** Working directory currently used by the agent runtime and its built-in tools. */
+  getCwd(): string
+  /**
+   * Rebuild cwd-bound runtime services around the persisted conversation.
+   * This keeps the managed handle stable while moving subsequent agent work.
+   */
+  relocateCwd(cwd: string): Promise<void>
   /**
    * Set a user-defined display name for the session. Persisted to the session
    * file (via a `session_info` entry) so resumed/listed sessions show the name.

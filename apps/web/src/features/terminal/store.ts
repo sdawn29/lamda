@@ -27,7 +27,11 @@ export interface WorkspaceTerminalState {
 
 // Stable singleton — used as the selector fallback so Zustand's === check
 // never sees a "new" object when a workspace has no state yet.
-const DEFAULT_STATE: WorkspaceTerminalState = { isOpen: false, tabs: [], activeTabId: null }
+const DEFAULT_STATE: WorkspaceTerminalState = {
+  isOpen: false,
+  tabs: [],
+  activeTabId: null,
+}
 
 function makeDefaultState(): WorkspaceTerminalState {
   return { isOpen: false, tabs: [], activeTabId: null }
@@ -36,10 +40,38 @@ function makeDefaultState(): WorkspaceTerminalState {
 // Module-level counters — never drive re-renders
 const tabCounters: Record<string, number> = {}
 
-function makeTab(workspaceId: string, cwd: string, initialCommand?: string): TerminalTab {
+function makeTab(
+  workspaceId: string,
+  cwd: string,
+  initialCommand?: string
+): TerminalTab {
   const counter = (tabCounters[workspaceId] ?? 0) + 1
   tabCounters[workspaceId] = counter
-  return { id: crypto.randomUUID(), title: `Terminal ${counter}`, cwd, initialCommand }
+  return {
+    id: crypto.randomUUID(),
+    title: `Terminal ${counter}`,
+    cwd,
+    initialCommand,
+  }
+}
+
+function openAtCwd(
+  workspaceId: string,
+  cwd: string,
+  current: WorkspaceTerminalState
+): WorkspaceTerminalState {
+  const existing = current.tabs.find((tab) => tab.cwd === cwd)
+  if (existing) {
+    return { ...current, isOpen: true, activeTabId: existing.id }
+  }
+
+  const tab = makeTab(workspaceId, cwd)
+  return {
+    ...current,
+    isOpen: true,
+    tabs: [...current.tabs, tab],
+    activeTabId: tab.id,
+  }
 }
 
 interface TerminalStore {
@@ -47,6 +79,7 @@ interface TerminalStore {
   getState: (workspaceId: string) => WorkspaceTerminalState
   toggle: (workspaceId: string, cwd: string) => void
   open: (workspaceId: string, cwd: string) => void
+  syncCwd: (workspaceId: string, cwd: string) => void
   close: (workspaceId: string) => void
   addTab: (workspaceId: string, cwd: string) => string
   runCommand: (workspaceId: string, cwd: string, command: string) => string
@@ -70,43 +103,49 @@ export const useTerminalStore = create<TerminalStore>()((set, get) => ({
 
   getState: (workspaceId) => get().states[workspaceId] ?? makeDefaultState(),
 
-  open: (workspaceId, cwd) => {
-    const current = get().states[workspaceId] ?? makeDefaultState()
-    if (current.tabs.length > 0) {
-      set((s) => ({ states: updateWorkspace(s.states, workspaceId, (p) => ({ ...p, isOpen: true })) }))
-    } else {
-      const tab = makeTab(workspaceId, cwd)
-      set((s) => ({
-        states: updateWorkspace(s.states, workspaceId, () => ({
-          isOpen: true,
-          tabs: [tab],
-          activeTabId: tab.id,
-        })),
-      }))
-    }
-  },
+  open: (workspaceId, cwd) =>
+    set((s) => ({
+      states: updateWorkspace(s.states, workspaceId, (current) =>
+        openAtCwd(workspaceId, cwd, current)
+      ),
+    })),
 
   toggle: (workspaceId, cwd) => {
     const current = get().states[workspaceId] ?? makeDefaultState()
     if (current.isOpen) {
-      set((s) => ({ states: updateWorkspace(s.states, workspaceId, (p) => ({ ...p, isOpen: false })) }))
-    } else if (current.tabs.length > 0) {
-      set((s) => ({ states: updateWorkspace(s.states, workspaceId, (p) => ({ ...p, isOpen: true })) }))
-    } else {
-      const tab = makeTab(workspaceId, cwd)
       set((s) => ({
-        states: updateWorkspace(s.states, workspaceId, () => ({
-          isOpen: true,
-          tabs: [tab],
-          activeTabId: tab.id,
+        states: updateWorkspace(s.states, workspaceId, (p) => ({
+          ...p,
+          isOpen: false,
         })),
+      }))
+    } else {
+      set((s) => ({
+        states: updateWorkspace(s.states, workspaceId, (p) =>
+          openAtCwd(workspaceId, cwd, p)
+        ),
       }))
     }
   },
 
+  syncCwd: (workspaceId, cwd) =>
+    set((s) => ({
+      states: updateWorkspace(s.states, workspaceId, (current) => {
+        if (!current.isOpen) return current
+        const activeTab = current.tabs.find(
+          (tab) => tab.id === current.activeTabId
+        )
+        if (activeTab?.cwd === cwd) return current
+        return openAtCwd(workspaceId, cwd, current)
+      }),
+    })),
+
   close: (workspaceId) =>
     set((s) => ({
-      states: updateWorkspace(s.states, workspaceId, (p) => ({ ...p, isOpen: false })),
+      states: updateWorkspace(s.states, workspaceId, (p) => ({
+        ...p,
+        isOpen: false,
+      })),
     })),
 
   addTab: (workspaceId, cwd) => {
@@ -141,16 +180,22 @@ export const useTerminalStore = create<TerminalStore>()((set, get) => ({
         if (idx === -1) return p
         killServerTerminal(tabId)
         const next = p.tabs.filter((t) => t.id !== tabId)
-        if (next.length === 0) return { ...p, tabs: [], isOpen: false, activeTabId: null }
+        if (next.length === 0)
+          return { ...p, tabs: [], isOpen: false, activeTabId: null }
         const newActive =
-          p.activeTabId === tabId ? next[idx > 0 ? idx - 1 : 0].id : p.activeTabId
+          p.activeTabId === tabId
+            ? next[idx > 0 ? idx - 1 : 0].id
+            : p.activeTabId
         return { ...p, tabs: next, activeTabId: newActive }
       }),
     })),
 
   setActiveTab: (workspaceId, tabId) =>
     set((s) => ({
-      states: updateWorkspace(s.states, workspaceId, (p) => ({ ...p, activeTabId: tabId })),
+      states: updateWorkspace(s.states, workspaceId, (p) => ({
+        ...p,
+        activeTabId: tabId,
+      })),
     })),
 
   renameTab: (workspaceId, tabId, title) =>
@@ -186,10 +231,12 @@ export function useTerminalForWorkspace(workspaceId: string, cwd: string) {
     open: () => store().open(workspaceId, cwd),
     close: () => store().close(workspaceId),
     addTab: () => store().addTab(workspaceId, cwd),
-    runCommand: (command: string) => store().runCommand(workspaceId, cwd, command),
+    runCommand: (command: string) =>
+      store().runCommand(workspaceId, cwd, command),
     closeTab: (tabId: string) => store().closeTab(workspaceId, tabId),
     setActiveTab: (tabId: string) => store().setActiveTab(workspaceId, tabId),
-    renameTab: (tabId: string, title: string) => store().renameTab(workspaceId, tabId, title),
+    renameTab: (tabId: string, title: string) =>
+      store().renameTab(workspaceId, tabId, title),
     killAll: () => store().killAll(workspaceId),
   }
 }

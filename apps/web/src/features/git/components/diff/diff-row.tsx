@@ -27,8 +27,8 @@ export const DiffRow = memo(function DiffRow({
     <div
       className={cn(
         "group/diff-row flex min-w-full leading-5",
-        isAdded && "bg-diff-add/8 hover:bg-diff-add/12",
-        isRemoved && "bg-diff-remove/8 hover:bg-diff-remove/12"
+        isAdded && "bg-diff-add/14 hover:bg-diff-add/20",
+        isRemoved && "bg-diff-remove/14 hover:bg-diff-remove/20"
       )}
     >
       {/* Gutter */}
@@ -36,9 +36,9 @@ export const DiffRow = memo(function DiffRow({
         className={cn(
           "sticky left-0 z-10 flex shrink-0 select-none",
           isAdded &&
-            "bg-[color-mix(in_srgb,var(--diff-add)_12%,var(--background))] group-hover/diff-row:bg-[color-mix(in_srgb,var(--diff-add)_22%,var(--background))]",
+            "bg-[color-mix(in_srgb,var(--diff-add)_18%,var(--background))] group-hover/diff-row:bg-[color-mix(in_srgb,var(--diff-add)_30%,var(--background))]",
           isRemoved &&
-            "bg-[color-mix(in_srgb,var(--diff-remove)_12%,var(--background))] group-hover/diff-row:bg-[color-mix(in_srgb,var(--diff-remove)_22%,var(--background))]",
+            "bg-[color-mix(in_srgb,var(--diff-remove)_18%,var(--background))] group-hover/diff-row:bg-[color-mix(in_srgb,var(--diff-remove)_30%,var(--background))]",
           isNeutral && "bg-background"
         )}
       >

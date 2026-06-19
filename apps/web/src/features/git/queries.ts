@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFileDiff, getTurnDiffStat, getWorkspaceBranch, listWorkspaceBranches, workspaceGitLog, workspaceGitShowFiles, workspaceGitShowFileDiff, type TurnDiffStat } from "./api"
-import { getBranch, listBranches } from "@/features/chat/api"
+import { getBranch, listBranches, listSessionWorktrees } from "@/features/chat/api"
 
 const gitRootKey = ["git"] as const
 const gitSessionKey = (sessionId: string) =>
@@ -169,6 +169,20 @@ export function useBranches(sessionId: string) {
   })
 }
 
+export const worktreesKey = (sessionId: string) =>
+  [...gitKeys.session(sessionId), "worktrees"] as const
+
+/** Branches checked out in a secondary worktree — selecting one switches the
+ *  thread's cwd into that worktree instead of checking the branch out in place. */
+export function useSessionWorktrees(sessionId: string) {
+  return useQuery({
+    queryKey: worktreesKey(sessionId),
+    queryFn: async () => (await listSessionWorktrees(sessionId)).worktrees,
+    enabled: !!sessionId,
+    staleTime: 30_000,
+  })
+}
+
 export function useWorkspaceBranch(workspaceId: string | null) {
   return useQuery({
     queryKey: [...gitRootKey, "workspace", workspaceId, "branch"] as const,
@@ -196,6 +210,20 @@ export function useGitLog(sessionId: string) {
     enabled: !!sessionId,
     staleTime: 10_000,
   })
+}
+
+// Timestamp (ms) of the most recent commit on HEAD, or 0 when the repo has no
+// commits yet. Turn cards use this as a "reset boundary": once a commit lands
+// after a turn ended, that turn's working-tree changes have been banked into
+// history, so its inline/sidebar card should disappear. Derived from the same
+// log query the history view already reads — no extra fetch, and it reflects
+// both user commits and agent-driven (`git commit`) ones.
+export function useLastCommitAt(sessionId: string): number {
+  const { data: entries } = useGitLog(sessionId)
+  const headDate = entries?.[0]?.date
+  if (!headDate) return 0
+  const parsed = Date.parse(headDate)
+  return Number.isNaN(parsed) ? 0 : parsed
 }
 
 export function useGitShow(sessionId: string, sha: string, enabled: boolean) {

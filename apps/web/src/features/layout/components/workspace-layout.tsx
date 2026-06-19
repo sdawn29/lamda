@@ -2,6 +2,7 @@ import React, {
   lazy,
   Suspense,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -35,10 +36,7 @@ import { useTerminal } from "@/features/terminal"
 import { useReviewPanel } from "@/features/git"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
 import { usePrefetchThreadsMessages } from "@/features/chat/hooks"
-import {
-  useElectronFullscreen,
-  useElectronPlatform,
-} from "@/features/electron"
+import { useElectronFullscreen, useElectronPlatform } from "@/features/electron"
 import { CommandPalette } from "@/features/command-palette"
 import { SplashScreen } from "@/shared/components/splash-screen"
 import { cn } from "@/shared/lib/utils"
@@ -203,7 +201,7 @@ export function WorkspaceLayout() {
   const { threadId: activeThreadId } = useParams({ strict: false }) as {
     threadId?: string
   }
-  const { states: terminalStates } = useTerminal()
+  const { states: terminalStates, syncCwd: syncTerminalCwd } = useTerminal()
   const { isFullscreen: diffFullscreen } = useReviewPanel()
   const {
     isOpen: rightSidebarOpen,
@@ -339,12 +337,38 @@ export function WorkspaceLayout() {
   const activeThread = activeWorkspace?.threads.find(
     (t) => t.id === activeThreadId
   )
+  const activeWorkspaceId = activeWorkspace?.id
+  // When the active thread runs in a git worktree, the review panel and file
+  // tree must follow it into that worktree rather than showing the workspace.
+  const activeWorktreePath = activeThread?.worktreePath ?? null
+  const activeTerminalCwd = activeWorktreePath ?? activeWorkspace?.path
+  const activeWorkspaceTerminalOpen = activeWorkspaceId
+    ? (terminalStates[activeWorkspaceId]?.isOpen ?? false)
+    : false
+
+  useEffect(() => {
+    if (
+      !activeWorkspaceId ||
+      !activeTerminalCwd ||
+      !activeWorkspaceTerminalOpen
+    ) {
+      return
+    }
+    syncTerminalCwd(activeWorkspaceId, activeTerminalCwd)
+  }, [
+    activeWorkspaceId,
+    activeTerminalCwd,
+    activeWorkspaceTerminalOpen,
+    syncTerminalCwd,
+  ])
   const rsSessionId =
     activeThread?.sessionId ??
     rsWorkspace?.threads.find((t) => t.sessionId)?.sessionId ??
     null
   const rsWorkspaceId = rsWorkspace?.id
-  const rsWorkspacePath = rsWorkspace?.path
+  // Effective tree/file root — the worktree dir for a worktree thread, else the
+  // workspace path.
+  const rsWorkspacePath = activeWorktreePath ?? rsWorkspace?.path
   const rsOpenWithAppId = rsWorkspace?.openWithAppId ?? null
   const rsReady = !!rsSessionId || !!rsWorkspace
 
@@ -364,6 +388,14 @@ export function WorkspaceLayout() {
     setRsWorkspaceSessionId(rsSessionId)
   }
   const stableRsWorkspaceSessionId = rsWorkspaceSessionId ?? rsSessionId
+
+  // Git state is workspace-level only for *local* threads — hence the stable
+  // workspace session above. A thread in a worktree has its own, thread-specific
+  // git state (the server resolves that session's cwd to the worktree), so the
+  // review panel must query through the active thread's own session instead.
+  const rsGitSessionId = activeWorktreePath
+    ? (activeThread?.sessionId ?? stableRsWorkspaceSessionId)
+    : stableRsWorkspaceSessionId
 
   useShortcutHandler(
     SHORTCUT_ACTIONS.TOGGLE_FILE_TREE,
@@ -428,7 +460,11 @@ export function WorkspaceLayout() {
                     >
                       <TerminalPanel
                         activeWorkspaceId={terminalHost.id}
-                        cwd={terminalHost.path}
+                        cwd={
+                          terminalHost.id === activeWorkspaceId
+                            ? (activeTerminalCwd ?? terminalHost.path)
+                            : terminalHost.path
+                        }
                       />
                     </Suspense>
                   </div>
@@ -468,10 +504,11 @@ export function WorkspaceLayout() {
               >
                 <RightSidebarContent
                   sessionId={rsSessionId}
-                  workspaceSessionId={stableRsWorkspaceSessionId}
+                  workspaceSessionId={rsGitSessionId}
                   openWithAppId={rsOpenWithAppId}
                   workspaceId={rsWorkspaceId}
                   workspacePath={rsWorkspacePath}
+                  treeThreadId={activeThread?.id}
                 />
               </SidebarProvider>
             </>

@@ -63,7 +63,7 @@ function UpdateButton({ status }: { status: ElectronUpdateStatus }) {
             <Button
               variant="outline"
               size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs text-destructive border-destructive/40 hover:bg-destructive/10"
+              className="h-7 gap-1.5 border-destructive/40 px-2.5 text-xs text-destructive hover:bg-destructive/10"
               onClick={() =>
                 navigate({
                   to: "/settings/$section",
@@ -75,7 +75,9 @@ function UpdateButton({ status }: { status: ElectronUpdateStatus }) {
             </Button>
           }
         />
-        <TooltipContent>{status.message ?? "Update failed — click for details"}</TooltipContent>
+        <TooltipContent>
+          {status.message ?? "Update failed — click for details"}
+        </TooltipContent>
       </Tooltip>
     )
   }
@@ -192,7 +194,9 @@ export function TitleBar() {
     (newThreadWsId ? workspaces.find((w) => w.id === newThreadWsId) : undefined)
 
   const effectiveWorkspacePath =
-    actionWorkspace?.path ?? fileWorkspace?.path
+    urlActiveThread?.worktreePath ??
+    actionWorkspace?.path ??
+    fileWorkspace?.path
 
   const {
     isOpen: terminalOpen,
@@ -200,7 +204,7 @@ export function TitleBar() {
     runCommand: runTerminalCommand,
   } = useTerminalForWorkspace(
     actionWorkspace?.id ?? "",
-    actionWorkspace?.path ?? ""
+    effectiveWorkspacePath ?? ""
   )
   const { data: platform } = useElectronPlatform()
   const { data: isFullscreen = false } = useElectronFullscreen()
@@ -327,111 +331,108 @@ export function TitleBar() {
         />
         {/* Draggable area — begins after the reserved left strip, so no drag
             region ever sits under the floating controls. */}
-        <div
-          className="flex min-w-0 flex-1 items-center gap-1"
-          style={drag}
-        >
+        <div className="flex min-w-0 flex-1 items-center gap-1" style={drag}>
           {urlActiveThread && (
             <>
               {urlActiveWorkspace && (
                 <>
-                <span className="shrink truncate text-2xs font-medium text-muted-foreground/70">
-                  {urlActiveWorkspace.name}
-                </span>
-                <span className="mx-0.5 shrink-0 text-2xs text-muted-foreground/40 select-none">
-                  /
-                </span>
-              </>
-            )}
-            {isRenaming ? (
-              <span className="inline-grid min-w-0 flex-1">
-                <span
-                  aria-hidden
-                  className="invisible col-start-1 row-start-1 text-sm font-semibold whitespace-pre"
-                >
-                  {renameValue || " "}
-                </span>
-                <input
-                  ref={renameInputRef}
-                  autoFocus
-                  size={1}
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onBlur={commitRename}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitRename()
-                    if (e.key === "Escape") setIsRenaming(false)
-                  }}
-                  style={noDrag}
-                  className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
-                />
-              </span>
-            ) : (
-              <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-                {urlActiveThread.title}
-              </span>
-            )}
-            <Tooltip>
-              <DropdownMenu>
-                <TooltipTrigger
-                  render={
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          style={noDrag}
-                          className="ml-0.5 shrink-0 text-muted-foreground/50"
-                        />
-                      }
-                    >
-                      <MoreHorizontal className="size-3.5" />
-                      <span className="sr-only">Thread options</span>
-                    </DropdownMenuTrigger>
-                  }
-                />
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={startRename}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Rename
-                    <ShortcutKbd
-                      binding={renameBinding}
-                      className="ml-auto pl-2"
-                    />
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleTogglePin}>
-                    {urlActiveThread.isPinned ? (
-                      <>
-                        <PinOff className="mr-2 h-4 w-4" />
-                        Unpin
-                      </>
-                    ) : (
-                      <>
-                        <Pin className="mr-2 h-4 w-4" />
-                        Pin
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleCopyThreadId}>
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy Thread ID
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleArchiveThread}>
-                    <Archive className="mr-2 h-4 w-4" />
-                    Archive
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={handleDeleteThread}
+                  <span className="shrink truncate text-2xs font-medium text-muted-foreground/70">
+                    {urlActiveWorkspace.name}
+                  </span>
+                  <span className="mx-0.5 shrink-0 text-2xs text-muted-foreground/40 select-none">
+                    /
+                  </span>
+                </>
+              )}
+              {isRenaming ? (
+                <span className="inline-grid min-w-0 flex-1">
+                  <span
+                    aria-hidden
+                    className="invisible col-start-1 row-start-1 text-sm font-semibold whitespace-pre"
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Thread
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <TooltipContent>Thread options</TooltipContent>
-            </Tooltip>
+                    {renameValue || " "}
+                  </span>
+                  <input
+                    ref={renameInputRef}
+                    autoFocus
+                    size={1}
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename()
+                      if (e.key === "Escape") setIsRenaming(false)
+                    }}
+                    style={noDrag}
+                    className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
+                  />
+                </span>
+              ) : (
+                <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                  {urlActiveThread.title}
+                </span>
+              )}
+              <Tooltip>
+                <DropdownMenu>
+                  <TooltipTrigger
+                    render={
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            style={noDrag}
+                            className="ml-0.5 shrink-0 text-muted-foreground/50"
+                          />
+                        }
+                      >
+                        <MoreHorizontal className="size-3.5" />
+                        <span className="sr-only">Thread options</span>
+                      </DropdownMenuTrigger>
+                    }
+                  />
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={startRename}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Rename
+                      <ShortcutKbd
+                        binding={renameBinding}
+                        className="ml-auto pl-2"
+                      />
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleTogglePin}>
+                      {urlActiveThread.isPinned ? (
+                        <>
+                          <PinOff className="mr-2 h-4 w-4" />
+                          Unpin
+                        </>
+                      ) : (
+                        <>
+                          <Pin className="mr-2 h-4 w-4" />
+                          Pin
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleCopyThreadId}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy Thread ID
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleArchiveThread}>
+                      <Archive className="mr-2 h-4 w-4" />
+                      Archive
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={handleDeleteThread}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Thread
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <TooltipContent>Thread options</TooltipContent>
+              </Tooltip>
             </>
           )}
         </div>
@@ -445,9 +446,11 @@ export function TitleBar() {
         )}
         style={noDrag}
       >
-        {updateStatus && updateStatus.phase !== "idle" && updateStatus.phase !== "checking" && (
-          <UpdateButton status={updateStatus} />
-        )}
+        {updateStatus &&
+          updateStatus.phase !== "idle" &&
+          updateStatus.phase !== "checking" && (
+            <UpdateButton status={updateStatus} />
+          )}
 
         <TasksDropdown
           workspaceId={actionWorkspace?.id ?? ""}
@@ -479,9 +482,7 @@ export function TitleBar() {
             <ShortcutKbd binding={terminalBinding} className="ml-1" />
           </TooltipContent>
         </Tooltip>
-
       </div>
-
     </div>
   )
 }
