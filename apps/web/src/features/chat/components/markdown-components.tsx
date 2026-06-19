@@ -116,8 +116,10 @@ function CodeBlock({
 const FILE_EXT_RE =
   /\.(tsx?|jsx?|mjs|cjs|json|md|mdx|css|scss|less|html?|py|go|rs|rb|java|kt|swift|c|h|cpp|hpp|cs|php|sh|bash|zsh|sql|ya?ml|toml|ini|env|lock|txt|svg|vue|astro)$/i
 
-// Trailing `:line` or `:line:col` location suffix.
-const LINE_SUFFIX_RE = /:(\d+)(?::\d+)?$/
+// Trailing location suffix: `:line`, `:line:col`, or a range like `:8-9` /
+// `:8:1-9:5`. The first capture group is the start line (used to scroll), while
+// the whole match preserves the original text (range included) for display.
+const LINE_SUFFIX_RE = /:(\d+)(?::\d+)?(?:-\d+(?::\d+)?)?$/
 
 // API/web routes masquerade as folder paths: they have slashes and no file
 // extension, so the directory heuristic happily turns `/api/users` into a
@@ -148,7 +150,10 @@ function looksLikeApiRoute(path: string): boolean {
 
 interface FileReference {
   path: string
+  /** Start line, used to scroll the opened file into view. */
   line?: number
+  /** Full location suffix without the leading colon (e.g. `8`, `8:3`, `8-9`). */
+  location?: string
 }
 
 /**
@@ -177,6 +182,7 @@ function parseFileReference(text: string): FileReference | null {
 
   const lineMatch = trimmed.match(LINE_SUFFIX_RE)
   const line = lineMatch ? Number(lineMatch[1]) : undefined
+  const location = lineMatch ? lineMatch[0].slice(1) : undefined
   const path = lineMatch ? trimmed.slice(0, lineMatch.index) : trimmed
   if (!path) return null
 
@@ -192,7 +198,7 @@ function parseFileReference(text: string): FileReference | null {
   // Folders aren't openable, so they stay as plain inline code (no chip).
   if (looksLikeDirectory(path)) return null
 
-  return { path, line }
+  return { path, line, location }
 }
 
 function resolveAbsolutePath(path: string, rootPath?: string): string {
@@ -231,13 +237,13 @@ function FileReferenceLink({
         />
       }
       label={basename}
-      meta={reference.line != null ? `:${reference.line}` : undefined}
+      meta={reference.location != null ? `:${reference.location}` : undefined}
       detail={
         <div className="flex flex-col gap-1">
           <SectionLabel>Open in review panel</SectionLabel>
           <span className="font-mono text-xs break-all">
             {reference.path}
-            {reference.line != null ? `:${reference.line}` : ""}
+            {reference.location != null ? `:${reference.location}` : ""}
           </span>
         </div>
       }
