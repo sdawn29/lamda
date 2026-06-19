@@ -1,14 +1,17 @@
 import { lazy, Suspense } from "react"
-import { FileDiff, FolderTree, History, Maximize2, Minimize2, X } from "lucide-react"
+import {
+  FileDiff,
+  FolderTree,
+  History,
+  Maximize2,
+  Minimize2,
+  X,
+} from "lucide-react"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-} from "@/shared/ui/sidebar"
+import { Sidebar, SidebarContent, SidebarHeader } from "@/shared/ui/sidebar"
 import { Sheet, SheetContent } from "@/shared/ui/sheet"
 import { useRightSidebar } from "../store/right-sidebar"
 import { useReviewPanel } from "@/features/git"
@@ -52,34 +55,43 @@ export function RightSidebarContent({
   const { isFileTreeOpen, toggleFileTree, isOpen, close } = useRightSidebar()
   const { isFullscreen, toggleFullscreen } = useReviewPanel()
   const isMobile = useIsMobile(900)
-  const fullscreenBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF)
+  const fullscreenBinding = useShortcutBinding(
+    SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF
+  )
   const fileTreeBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE)
-  const { tabs, activeTabId, activeTab, setActiveTab, closeTab, clearActiveTab } = useMainTabs()
+  const { tabs, activeTabId, activeTab, setActiveTab, closeTab, clearActiveTab } =
+    useMainTabs()
   const fileTabs = tabs.filter((t) => t.type === "file")
   const isChangesActive = !fileTabs.some((t) => t.id === activeTabId)
   const hasActiveFileTab = activeTab?.type === "file"
 
   const sidebarEl = (
-    <Sidebar side="right" collapsible="none" className="h-full w-full">
-      <SidebarHeader className="h-11 flex-row items-center gap-1 overflow-hidden pl-2 pr-11 py-0">
-        {/* Changes tab */}
+    <Sidebar
+      side="right"
+      collapsible="none"
+      className="h-full w-full overflow-hidden rounded-2xl border border-border bg-background shadow-md"
+    >
+      <SidebarHeader className="h-11 flex-row items-center gap-1 overflow-hidden px-2 py-0">
+        {/* Review (changes) tab */}
         <button
           type="button"
           onClick={clearActiveTab}
           className={cn(
             "flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium select-none transition-all duration-150",
             isChangesActive
-              ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-border/60"
-              : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+              ? "bg-accent text-accent-foreground shadow-sm ring-1 ring-border/60"
+              : "text-muted-foreground/70 hover:bg-accent/60 hover:text-foreground"
           )}
         >
           <FileDiff className="size-3.5 shrink-0" aria-hidden />
           Review
         </button>
 
-        {fileTabs.length > 0 && <div className="mx-0.5 h-4 w-px shrink-0 bg-border/50" />}
+        {fileTabs.length > 0 && (
+          <div className="mx-0.5 h-4 w-px shrink-0 bg-border/50" />
+        )}
 
-        {/* File tabs */}
+        {/* Open file tabs */}
         <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {fileTabs.map((tab) => {
             const isActive = tab.id === activeTabId
@@ -92,8 +104,8 @@ export function RightSidebarContent({
                 className={cn(
                   "group flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md pl-2.5 pr-1.5 text-xs select-none transition-all duration-150",
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-border/60"
-                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                    ? "bg-accent text-accent-foreground shadow-sm ring-1 ring-border/60"
+                    : "text-muted-foreground/70 hover:bg-accent/60 hover:text-foreground"
                 )}
               >
                 <Icon
@@ -111,7 +123,7 @@ export function RightSidebarContent({
                     closeTab(tab.id)
                   }}
                   className={cn(
-                    "ml-auto shrink-0 text-sidebar-foreground/50",
+                    "ml-auto shrink-0 text-muted-foreground/50",
                     isActive
                       ? "opacity-60 hover:opacity-100"
                       : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100"
@@ -124,6 +136,7 @@ export function RightSidebarContent({
           })}
         </div>
 
+        {/* Panel controls */}
         <div className="flex shrink-0 items-center gap-0.5">
           {workspaceId && workspacePath && (
             <Tooltip>
@@ -133,8 +146,8 @@ export function RightSidebarContent({
                     variant="ghost"
                     size="icon-sm"
                     onClick={toggleFileTree}
-                    className="size-7 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground aria-pressed:bg-sidebar-accent aria-pressed:text-sidebar-foreground"
                     aria-pressed={isFileTreeOpen}
+                    className="size-7 text-muted-foreground/60 hover:bg-accent hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
                   >
                     <FolderTree className="size-3.5" />
                     <span className="sr-only">Toggle file tree</span>
@@ -155,7 +168,7 @@ export function RightSidebarContent({
                     variant="ghost"
                     size="icon-sm"
                     onClick={toggleFullscreen}
-                    className="size-7 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    className="size-7 text-muted-foreground/60 hover:bg-accent hover:text-foreground"
                   >
                     {isFullscreen ? (
                       <Minimize2 className="size-3.5" />
@@ -181,7 +194,7 @@ export function RightSidebarContent({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="min-w-0 flex-1 overflow-hidden">
             {(sessionId || hasActiveFileTab) ? (
-              <Suspense fallback={<div className="h-full bg-sidebar" />}>
+              <Suspense fallback={<div className="h-full bg-background" />}>
                 <ReviewPanel
                   sessionId={sessionId ?? ""}
                   workspaceSessionId={workspaceSessionId ?? sessionId ?? ""}
@@ -197,7 +210,7 @@ export function RightSidebarContent({
                   <History className="size-3.5" />
                   Commit history
                 </div>
-                <Suspense fallback={<div className="h-full bg-sidebar" />}>
+                <Suspense fallback={<div className="h-full bg-background" />}>
                   <HistoryView sessionId="" workspaceId={workspaceId} />
                 </Suspense>
               </div>
@@ -210,7 +223,7 @@ export function RightSidebarContent({
 
           {isFileTreeOpen && workspaceId && workspacePath && (
             <div className="w-52 shrink-0 overflow-hidden p-1 pl-0">
-              <Suspense fallback={<div className="h-full bg-sidebar" />}>
+              <Suspense fallback={<div className="h-full bg-background" />}>
                 <FileTree
                   workspaceId={workspaceId}
                   workspacePath={workspacePath}

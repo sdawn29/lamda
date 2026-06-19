@@ -155,8 +155,10 @@
   /* ── Radius (macOS-like 10px controls) ── */
   --radius: 0.625rem;
 
-  /* ── Sidebar: distinct panel, slightly darker than content area ── */
-  --sidebar: #ececf0;
+  /* ── Island base: the recessed backdrop the floating islands (sidebars +
+       editor) sit on. Kept a touch deeper than the island surface so the gaps
+       between islands read as clean separators. ── */
+  --sidebar: #e7e7ee;
   --sidebar-foreground: #1d1d1f;
   --sidebar-primary: #007aff;
   --sidebar-primary-foreground: #ffffff;
@@ -244,8 +246,8 @@
   --chart-4: #ff375f;
   --chart-5: #bf5af2;
 
-  /* ── Sidebar: darker than content area ── */
-  --sidebar: #111113;
+  /* ── Island base: recessed backdrop behind the floating islands ── */
+  --sidebar: #0c0c0e;
   --sidebar-foreground: #f5f5f7;
   --sidebar-primary: #0a84ff;
   --sidebar-primary-foreground: #ffffff;

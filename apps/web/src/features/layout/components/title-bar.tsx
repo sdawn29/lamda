@@ -10,6 +10,9 @@ import {
   PinOff,
   Archive,
   Copy,
+  ChevronLeft,
+  ChevronRight,
+  PanelRight,
 } from "lucide-react"
 import {
   useRouter,
@@ -20,7 +23,7 @@ import {
 } from "@tanstack/react-router"
 import { Button } from "@/shared/ui/button"
 import { Toggle } from "@/shared/ui/toggle"
-import { useSidebar } from "@/shared/ui/sidebar"
+import { useSidebar, SidebarTrigger } from "@/shared/ui/sidebar"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 import {
   DropdownMenu,
@@ -153,8 +156,12 @@ export function TitleBar() {
     pinThread,
     unpinThread,
   } = useWorkspace()
-  const { toggleSidebar, state: sidebarState, isMobile } = useSidebar()
-  const { isOpen: rightSidebarOpen, togglePanel } = useRightSidebar()
+  const { toggleSidebar } = useSidebar()
+  const {
+    isOpen: rightSidebarOpen,
+    togglePanel,
+    toggle: toggleRightSidebar,
+  } = useRightSidebar()
   const toggleDiff = () => togglePanel("changes")
   const { activeTab } = useMainTabs()
 
@@ -301,151 +308,198 @@ export function TitleBar() {
   )
   const terminalBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_TERMINAL)
   const renameBinding = useShortcutBinding(SHORTCUT_ACTIONS.RENAME_THREAD)
+  const sidebarBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_SIDEBAR)
+  const backBinding = useShortcutBinding(SHORTCUT_ACTIONS.NAVIGATE_BACK)
+  const forwardBinding = useShortcutBinding(SHORTCUT_ACTIONS.NAVIGATE_FORWARD)
+  const rightSidebarBinding = useShortcutBinding(
+    SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL
+  )
 
-  // Only the breadcrumb's empty space opts into dragging; the root and the
-  // edge control clusters stay non-draggable so the floating sidebar toggles
-  // (which overlay the title bar) reliably receive their clicks in Electron.
+  // The whole bar is a no-drag island so every control receives its clicks in
+  // Electron; only the flexible filler in the middle opts back into the window
+  // drag region so the frameless window can still be moved by the title strip.
   const drag = { WebkitAppRegion: "drag" } as React.CSSProperties
   const noDrag = { WebkitAppRegion: "no-drag" } as React.CSSProperties
 
   return (
-    <div className="sticky top-0 z-20 flex h-11 shrink-0 items-center bg-background pl-2">
-      {/* Breadcrumb — search + separator + context / primary */}
-      <div className="flex min-w-0 flex-1 items-center gap-0 px-1">
-        {/* Reserves space for the floating left controls (sidebar toggle, back/forward).
-            Stays out of the drag region so their clicks aren't swallowed. */}
-        <div
-          aria-hidden
-          className={cn(
-            "h-full shrink-0 transition-[width] duration-200 ease-linear",
-            // Below the sidebar's mobile breakpoint the desktop sidebar is
-            // replaced by an off-canvas sheet, so the floating controls (and the
-            // macOS traffic lights) overlay the title bar just like when the
-            // sidebar is collapsed — reserve the same left strip in both cases.
-            sidebarState === "collapsed" || isMobile
-              ? isMac && !isFullscreen
-                ? "w-48"
-                : "w-28"
-              : "w-0"
-          )}
-        />
-        {/* Draggable area — begins after the reserved left strip, so no drag
-            region ever sits under the floating controls. */}
-        <div className="flex min-w-0 flex-1 items-center gap-1" style={drag}>
-          {urlActiveThread && (
-            <>
-              {urlActiveWorkspace && (
-                <>
-                  <span className="shrink truncate text-2xs font-medium text-muted-foreground/70">
-                    {urlActiveWorkspace.name}
-                  </span>
-                  <span className="mx-0.5 shrink-0 text-2xs text-muted-foreground/40 select-none">
-                    /
-                  </span>
-                </>
-              )}
-              {isRenaming ? (
-                <span className="inline-grid min-w-0 flex-1">
-                  <span
-                    aria-hidden
-                    className="invisible col-start-1 row-start-1 text-sm font-semibold whitespace-pre"
-                  >
-                    {renameValue || " "}
-                  </span>
-                  <input
-                    ref={renameInputRef}
-                    autoFocus
-                    size={1}
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onBlur={commitRename}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitRename()
-                      if (e.key === "Escape") setIsRenaming(false)
-                    }}
-                    style={noDrag}
-                    className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
-                  />
-                </span>
-              ) : (
-                <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-                  {urlActiveThread.title}
-                </span>
-              )}
-              <Tooltip>
-                <DropdownMenu>
-                  <TooltipTrigger
-                    render={
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            style={noDrag}
-                            className="ml-0.5 shrink-0 text-muted-foreground/50"
-                          />
-                        }
-                      >
-                        <MoreHorizontal className="size-3.5" />
-                        <span className="sr-only">Thread options</span>
-                      </DropdownMenuTrigger>
-                    }
-                  />
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={startRename}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Rename
-                      <ShortcutKbd
-                        binding={renameBinding}
-                        className="ml-auto pl-2"
-                      />
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleTogglePin}>
-                      {urlActiveThread.isPinned ? (
-                        <>
-                          <PinOff className="mr-2 h-4 w-4" />
-                          Unpin
-                        </>
-                      ) : (
-                        <>
-                          <Pin className="mr-2 h-4 w-4" />
-                          Pin
-                        </>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleCopyThreadId}>
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy Thread ID
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleArchiveThread}>
-                      <Archive className="mr-2 h-4 w-4" />
-                      Archive
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={handleDeleteThread}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Thread
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <TooltipContent>Thread options</TooltipContent>
-              </Tooltip>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Right — session actions */}
+    <div
+      className="fixed inset-x-2 top-2 z-50 flex h-9 items-center gap-1 overflow-hidden rounded-2xl border border-border bg-background pr-1.5 shadow-md"
+      style={drag}
+    >
+      {/* ── Left: window / navigation controls ──────────────────────────── */}
       <div
         className={cn(
-          "flex shrink-0 items-center gap-0.5 px-2 transition-[padding-right] duration-200 ease-linear",
-          !rightSidebarOpen && "pr-9"
+          "flex h-full shrink-0 items-center gap-0.5",
+          isMac && !isFullscreen ? "pl-[4.75rem]" : "pl-1.5"
         )}
         style={noDrag}
       >
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <SidebarTrigger className="size-7 text-muted-foreground/70 hover:text-foreground" />
+            }
+          />
+          <TooltipContent>
+            Toggle sidebar{" "}
+            <ShortcutKbd binding={sidebarBinding} className="ml-1" />
+          </TooltipContent>
+        </Tooltip>
+        <div className="mx-0.5 h-3.5 w-px shrink-0 bg-border" />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => router.history.back()}
+                disabled={!canGoBack}
+                className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
+              >
+                <ChevronLeft className="size-4" />
+                <span className="sr-only">Go back</span>
+              </Button>
+            }
+          />
+          <TooltipContent>
+            Go back <ShortcutKbd binding={backBinding} className="ml-1" />
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => router.history.forward()}
+                disabled={!canGoForward}
+                className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
+              >
+                <ChevronRight className="size-4" />
+                <span className="sr-only">Go forward</span>
+              </Button>
+            }
+          />
+          <TooltipContent>
+            Go forward <ShortcutKbd binding={forwardBinding} className="ml-1" />
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
+      <div className="mx-0.5 h-4 w-px shrink-0 bg-border" />
+
+      {/* ── Middle: thread breadcrumb · right-panel tabs · drag filler ───── */}
+      <div className="flex min-w-0 flex-1 items-center gap-1">
+        {urlActiveThread && (
+          <div className="flex min-w-0 shrink items-center gap-1 pl-0.5">
+            {urlActiveWorkspace && (
+              <>
+                <span className="hidden shrink truncate text-2xs font-medium text-muted-foreground/70 sm:inline">
+                  {urlActiveWorkspace.name}
+                </span>
+                <span className="mx-0.5 hidden shrink-0 text-2xs text-muted-foreground/40 select-none sm:inline">
+                  /
+                </span>
+              </>
+            )}
+            {isRenaming ? (
+              <span className="inline-grid min-w-0">
+                <span
+                  aria-hidden
+                  className="invisible col-start-1 row-start-1 text-sm font-semibold whitespace-pre"
+                >
+                  {renameValue || " "}
+                </span>
+                <input
+                  ref={renameInputRef}
+                  autoFocus
+                  size={1}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitRename()
+                    if (e.key === "Escape") setIsRenaming(false)
+                  }}
+                  style={noDrag}
+                  className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
+                />
+              </span>
+            ) : (
+              <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                {urlActiveThread.title}
+              </span>
+            )}
+            <Tooltip>
+              <DropdownMenu>
+                <TooltipTrigger
+                  render={
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          style={noDrag}
+                          className="ml-0.5 shrink-0 text-muted-foreground/50"
+                        />
+                      }
+                    >
+                      <MoreHorizontal className="size-3.5" />
+                      <span className="sr-only">Thread options</span>
+                    </DropdownMenuTrigger>
+                  }
+                />
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={startRename}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Rename
+                    <ShortcutKbd
+                      binding={renameBinding}
+                      className="ml-auto pl-2"
+                    />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleTogglePin}>
+                    {urlActiveThread.isPinned ? (
+                      <>
+                        <PinOff className="mr-2 h-4 w-4" />
+                        Unpin
+                      </>
+                    ) : (
+                      <>
+                        <Pin className="mr-2 h-4 w-4" />
+                        Pin
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCopyThreadId}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Thread ID
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleArchiveThread}>
+                    <Archive className="mr-2 h-4 w-4" />
+                    Archive
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={handleDeleteThread}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Thread
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <TooltipContent>Thread options</TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+
+        {/* Flexible filler — extra drag surface in the middle of the bar. */}
+        <div className="h-full min-w-4 flex-1" />
+      </div>
+
+      {/* ── Right: session actions + panel toggles ───────────────────────── */}
+      <div className="flex shrink-0 items-center gap-0.5" style={noDrag}>
         {updateStatus &&
           updateStatus.phase !== "idle" &&
           updateStatus.phase !== "checking" && (
@@ -480,6 +534,29 @@ export function TitleBar() {
           <TooltipContent>
             Toggle terminal{" "}
             <ShortcutKbd binding={terminalBinding} className="ml-1" />
+          </TooltipContent>
+        </Tooltip>
+
+        <div className="mx-0.5 h-4 w-px shrink-0 bg-border" />
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={toggleRightSidebar}
+                aria-pressed={rightSidebarOpen}
+                className="size-7 text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+              >
+                <PanelRight className="size-4" />
+                <span className="sr-only">Toggle right sidebar</span>
+              </Button>
+            }
+          />
+          <TooltipContent>
+            Toggle right sidebar{" "}
+            <ShortcutKbd binding={rightSidebarBinding} className="ml-1" />
           </TooltipContent>
         </Tooltip>
       </div>

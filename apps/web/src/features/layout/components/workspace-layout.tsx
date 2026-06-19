@@ -3,177 +3,30 @@ import React, {
   Suspense,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react"
-import {
-  Outlet,
-  useParams,
-  useRouter,
-  useRouterState,
-  useSearch,
-} from "@tanstack/react-router"
-import { ChevronLeft, ChevronRight, PanelRight } from "lucide-react"
+import { Outlet, useParams, useRouterState, useSearch } from "@tanstack/react-router"
 
 import { AppSidebar, useWorkspace } from "@/features/workspace"
 import { TitleBar } from "./title-bar"
 import { RightSidebarContent } from "./right-sidebar"
 import { useRightSidebar } from "../store/right-sidebar"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/shared/ui/sidebar"
-import {
-  TooltipProvider,
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/shared/ui/tooltip"
+import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar"
+import { TooltipProvider } from "@/shared/ui/tooltip"
 import { useTerminal } from "@/features/terminal"
 import { useReviewPanel } from "@/features/git"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
 import { usePrefetchThreadsMessages } from "@/features/chat/hooks"
-import { useElectronFullscreen, useElectronPlatform } from "@/features/electron"
 import { CommandPalette } from "@/features/command-palette"
 import { SplashScreen } from "@/shared/components/splash-screen"
 import { cn } from "@/shared/lib/utils"
-import { Button } from "@/shared/ui/button"
-import {
-  useShortcutBinding,
-  useShortcutHandler,
-} from "@/shared/components/keyboard-shortcuts-provider"
+import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
-import { ShortcutKbd } from "@/shared/ui/kbd"
 
 const TerminalPanel = lazy(() =>
   import("@/features/terminal").then((m) => ({ default: m.TerminalPanel }))
 )
-
-function NavigationControls() {
-  const { data: platform } = useElectronPlatform()
-  const { data: isFullscreen = false } = useElectronFullscreen()
-  const isMac = platform === "darwin"
-
-  const router = useRouter()
-  const canGoBack = router.history.canGoBack()
-  const { subscribe, getSnapshot } = useMemo(() => {
-    let count = 0
-    return {
-      subscribe: (notify: () => void) =>
-        router.history.subscribe(({ action }) => {
-          if (action.type === "PUSH" || action.type === "REPLACE") count = 0
-          else if (action.type === "BACK") count++
-          else if (action.type === "FORWARD") count = Math.max(0, count - 1)
-          notify()
-        }),
-      getSnapshot: () => count > 0,
-    }
-  }, [router.history])
-  const canGoForward = useSyncExternalStore(subscribe, getSnapshot, () => false)
-
-  const sidebarBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_SIDEBAR)
-  const backBinding = useShortcutBinding(SHORTCUT_ACTIONS.NAVIGATE_BACK)
-  const forwardBinding = useShortcutBinding(SHORTCUT_ACTIONS.NAVIGATE_FORWARD)
-
-  return (
-    <div
-      className={cn(
-        "fixed top-0 z-50 flex h-11 items-center gap-0.5 pr-2",
-        isMac && !isFullscreen ? "pl-20" : "pl-2"
-      )}
-      style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-    >
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <SidebarTrigger className="size-7 text-muted-foreground/70 hover:text-foreground" />
-          }
-        />
-        <TooltipContent>
-          Toggle sidebar{" "}
-          <ShortcutKbd binding={sidebarBinding} className="ml-1" />
-        </TooltipContent>
-      </Tooltip>
-      <div className="mx-1 h-3.5 w-px shrink-0 bg-border" />
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => router.history.back()}
-              disabled={!canGoBack}
-              className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
-            >
-              <ChevronLeft className="size-4" />
-              <span className="sr-only">Go back</span>
-            </Button>
-          }
-        />
-        <TooltipContent>
-          Go back <ShortcutKbd binding={backBinding} className="ml-1" />
-        </TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => router.history.forward()}
-              disabled={!canGoForward}
-              className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
-            >
-              <ChevronRight className="size-4" />
-              <span className="sr-only">Go forward</span>
-            </Button>
-          }
-        />
-        <TooltipContent>
-          Go forward <ShortcutKbd binding={forwardBinding} className="ml-1" />
-        </TooltipContent>
-      </Tooltip>
-    </div>
-  )
-}
-
-function RightSidebarControls() {
-  const { isOpen, toggle } = useRightSidebar()
-  const diffBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL)
-
-  return (
-    <div
-      className="fixed top-px right-0 z-60 flex h-11 items-center gap-0.5 px-2"
-      style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-    >
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={toggle}
-              aria-pressed={isOpen}
-              className={cn(
-                "size-7 text-muted-foreground hover:text-foreground",
-                isOpen && "bg-accent text-accent-foreground"
-              )}
-            >
-              <PanelRight className="size-4" />
-              <span className="sr-only">Toggle right sidebar</span>
-            </Button>
-          }
-        />
-        <TooltipContent>
-          Toggle sidebar <ShortcutKbd binding={diffBinding} className="ml-1" />
-        </TooltipContent>
-      </Tooltip>
-    </div>
-  )
-}
 
 export function MainContentArea() {
   return (
@@ -430,18 +283,23 @@ export function WorkspaceLayout() {
   return (
     <TooltipProvider>
       <SidebarProvider className="h-svh bg-sidebar">
-        <NavigationControls />
-        <RightSidebarControls />
+        {/* Draggable window strip behind the titlebar island (frameless
+            window). The island's controls opt out with no-drag. */}
+        <div
+          className="fixed inset-x-0 top-0 z-0 h-13"
+          style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+        />
+        <TitleBar />
         <AppSidebar />
 
-        <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden">
+        <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-13 pr-2 pb-2 peer-data-[state=collapsed]:pl-2">
           <SidebarInset
-            className="h-full min-h-0 w-full overflow-hidden rounded-2xl border border-border shadow-sm"
+            className="h-full min-h-0 w-full overflow-hidden rounded-2xl border border-border shadow-md"
             style={{ display: diffFullscreen ? "none" : undefined }}
           >
-            {/* Left column: TitleBar + content + terminal */}
+            {/* Editor island: content + terminal (chrome lives in the
+                unified titlebar island above). */}
             <div className="flex h-full min-w-0 flex-col overflow-hidden">
-              <TitleBar />
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="min-h-0 flex-1 overflow-hidden">
                   <MainContentArea />
@@ -479,9 +337,9 @@ export function WorkspaceLayout() {
               {!isMobile && rightSidebarOpen && !diffFullscreen && (
                 <div
                   onMouseDown={handleResizeStart}
-                  className="group relative z-30 w-1 shrink-0 cursor-col-resize"
+                  className="group relative z-30 w-2 shrink-0 cursor-col-resize"
                 >
-                  <div className="absolute inset-y-0 left-0 w-px bg-transparent" />
+                  <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-border" />
                 </div>
               )}
               <SidebarProvider

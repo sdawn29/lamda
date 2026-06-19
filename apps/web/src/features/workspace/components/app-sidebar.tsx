@@ -601,8 +601,12 @@ export function AppSidebar() {
   )
 
   return (
-    <Sidebar collapsible="offcanvas">
-      <SidebarHeader className="h-11 shrink-0 p-0" />
+    <Sidebar
+      variant="floating"
+      collapsible="offcanvas"
+      className="top-11! h-[calc(100svh-2.75rem)]"
+    >
+      <SidebarHeader className="h-2 shrink-0 p-0" />
       <SidebarContent className="overflow-hidden">
         {workspaces.length > 0 && (
           <div className="px-2 pb-1">
