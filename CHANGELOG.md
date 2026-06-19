@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.27.0](../../releases/tag/v0.27.0) — 2026-06-19
+
+### Features
+
+* add conflict resolution editor and related functionality
+* implement worktree management and conflict resolution
+* add support for git worktrees in the application
+* **themes:** add Linear color theme with light and dark variants
+
+### Other Changes
+
+* Merge pull request #8 from sdawn29/feat/worktrees
+* Refactor database schema and improve code formatting
+
 ## [0.26.0](../../releases/tag/v0.26.0) — 2026-06-17
 
 ### Features
