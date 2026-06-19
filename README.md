@@ -1,52 +1,75 @@
-# ⚡ lamda
+<p align="center">
+  <img src="apps/desktop/assets/icon.png" alt="lamda icon" width="96" height="96" />
+</p>
 
-### Your AI coding agent, with a real workspace around it.
+<h1 align="center">lamda</h1>
 
-**lamda** is a desktop app that turns the [Pi coding agent](https://github.com/badlogic/pi-mono) into a full development environment — chat, git, terminal, memory, and editor tooling, all running against your real repositories. 🚀
+<p align="center">
+  <strong>Your AI coding agent, with a real workspace around it.</strong>
+</p>
 
-> 🍎 **macOS only** — distributed as a native app for Apple Silicon (`arm64`).
+<p align="center">
+  <a href="https://github.com/sdawn29/lamda/releases/latest"><img alt="Version" src="https://img.shields.io/badge/version-0.28.0-blue" /></a>
+  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%20(arm64)-lightgrey" />
+  <img alt="Node" src="https://img.shields.io/badge/node-18%2B-green" />
+</p>
 
-![Version](https://img.shields.io/badge/version-0.25.0-blue) ![Platform](https://img.shields.io/badge/platform-macOS%20(arm64)-lightgrey)
+<p align="center">
+  <a href="https://github.com/sdawn29/lamda/releases/latest"><strong>Download latest release</strong></a>
+  ·
+  <a href="docs/quick-start.md">Quick start</a>
+  ·
+  <a href="docs/index.md">Docs</a>
+</p>
 
-![lamda desktop app showing a chat session with live todo tracking, agent questions, and a side-by-side git diff review panel](image.png)
+<p align="center">
+  <img src="image-2.png" alt="lamda desktop app" />
+</p>
+
+**lamda** is a desktop app that turns the [Pi coding agent](https://github.com/badlogic/pi-mono) into a full development environment: chat, git, terminal, memory, and editor tooling, all running against your real repositories.
+
+> **macOS only** — distributed as a native app for Apple Silicon (`arm64`).
 
 ---
 
-## ⬇️ Download
+## Download
 
 lamda is a macOS application for Apple Silicon (`arm64`).
 
-- 📦 **[Download the latest release](https://github.com/sdawn29/lamda/releases/latest)** — always points to the newest version
-- 🔗 Direct download (v0.25.0): **[lamda-0.25.0-mac-arm64.dmg](https://github.com/sdawn29/lamda/releases/download/v0.25.0/lamda-0.25.0-mac-arm64.dmg)**
+| Option | Link |
+| --- | --- |
+| Latest release | **[Download from GitHub Releases](https://github.com/sdawn29/lamda/releases/latest)** |
+| Direct download | **[lamda-0.28.0-mac-arm64.dmg](https://github.com/sdawn29/lamda/releases/download/v0.28.0/lamda-0.28.0-mac-arm64.dmg)** |
 
-Open the `.dmg` and drag lamda into your Applications folder. That's it. ✨
-
----
-
-## 🎯 Why lamda?
-
-Most AI coding tools give you a chat box. lamda gives you a **workspace**. Diff review, hunk-level staging, a persistent terminal, language servers, and an agent that *remembers* — all in one window. 🔒
+Open the `.dmg` and drag lamda into your Applications folder.
 
 ---
 
-## ✨ Features
+## Why lamda?
 
-- 💬 **Chat** — real-time streaming conversations with the Pi coding agent. Switch between **Agent / Ask / Plan** modes per thread, answer inline agent questions, watch live todo tracking, and fork a thread from any earlier message.
-- 🧠 **Memory** — persistent agent memories that carry across sessions, scoped per-workspace or to all projects. Pin core memories, organize by category, and search them. Relevant memories are injected into prompts automatically, and the agent manages them through a built-in `memory` tool.
-- 🩹 **Self-healing** — when a turn ends in an error, lamda automatically re-prompts the agent to diagnose and fix it, then saves the lessons from successful recoveries as workspace memories. (Errors it can't fix — rate limits, auth — are left for you.)
-- 🌿 **Git** — view diffs, stage hunks, commit, manage branches and stashes, and review changes in a side-by-side panel with last-turn file change tracking.
-- 🖥️ **Terminal** — embedded multi-tab shell with persistent PTY sessions, auto-reconnect, and clickable links.
-- 🗂️ **Workspaces** — organize multiple repos and conversation threads, with workspace-level task shortcuts.
-- 🔌 **MCP** — connect Model Context Protocol servers to extend agent capabilities.
-- 🧩 **LSP** — language server integration with one-click installs.
-- 🎨 **Themes** — built-in color themes (including Catppuccin variants) with Google Fonts integration.
-- ⌨️ **Command palette** — `Cmd+K` access to commands and navigation.
-- ⚙️ **Settings** — configure the agent model, chat behavior, providers, and memory from an in-app panel.
-- 📊 **Usage tracking** — AI token usage stats with date-range filtering and context breakdowns.
+Most AI coding tools give you a chat box. lamda gives you a **workspace**. Diff review, hunk-level staging, a persistent terminal, language servers, and an agent that _remembers_ — all in one window.
 
 ---
 
-## 🚀 Getting Started (from source)
+## Features
+
+| Feature | What it does |
+| --- | --- |
+| **Chat** | Real-time streaming conversations with Agent, Ask, and Plan modes per thread. |
+| **Memory** | Workspace-scoped and global memories with pinning, categories, search, and automatic prompt injection. |
+| **Self-healing** | Automatically re-prompts the agent after recoverable turn errors and stores successful recovery lessons. |
+| **Git** | Diff review, hunk-level staging, commits, branches, stashes, and side-by-side change review. |
+| **Terminal** | Embedded multi-tab shell with persistent PTY sessions, reconnects, and clickable links. |
+| **Workspaces** | Organize multiple repos, conversation threads, and workspace-level tasks. |
+| **MCP** | Connect Model Context Protocol servers to extend agent capabilities. |
+| **LSP** | Language server integration with one-click installs. |
+| **Themes** | Built-in themes, Catppuccin variants, and Google Fonts integration. |
+| **Settings** | Configure the agent model, chat behavior, providers, and memory from the app. |
+| **Usage tracking** | Token usage stats with date-range filtering and context breakdowns. |
+
+---
+
+## Getting Started (from source)
 
 **Requirements:** Node.js 18+, npm 11+, Git
 
@@ -65,29 +88,29 @@ npm run dev -w @lamda/server    # Server only
 npm run dev -w desktop          # Desktop app
 ```
 
-👉 See the [Quick Start Guide](docs/quick-start.md) for a 5-minute walkthrough, or [Getting Started](docs/getting-started.md) for detailed setup.
+See the [Quick Start Guide](docs/quick-start.md) for a 5-minute walkthrough, or [Getting Started](docs/getting-started.md) for detailed setup.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-| Layer    | Technology                                                           |
-| -------- | -------------------------------------------------------------------- |
-| Desktop  | Electron 41                                                          |
-| UI       | React 19 + Vite + TanStack Router + Tailwind CSS 4                   |
-| Server   | Hono (Node.js)                                                       |
-| Database | Drizzle ORM + SQLite (better-sqlite3)                                |
-| Agent    | [@mariozechner/pi-coding-agent](https://github.com/badlogic/pi-mono) |
+| Layer | Technology |
+| --- | --- |
+| Desktop | Electron 41 |
+| UI | React 19 + Vite + TanStack Router + Tailwind CSS 4 |
+| Server | Hono (Node.js) |
+| Database | Drizzle ORM + SQLite (better-sqlite3) |
+| Agent | [@mariozechner/pi-coding-agent](https://github.com/badlogic/pi-mono) |
 
-## 📁 Project Structure
+## Project Structure
 
-```
+```text
 apps/
   desktop/   # Electron shell wrapping the web app
   server/    # Hono API server for agent sessions (port 3001)
   web/       # React frontend
 packages/
-  db/        # Drizzle schema & migrations
+  db/        # Drizzle schema and migrations
   git/       # Git CLI wrappers
   lsp/       # Language server protocol integration
   mcp/       # MCP client integration
@@ -95,41 +118,41 @@ packages/
   subagent/  # Subagent orchestration (planned)
 ```
 
-## 📜 Commands
+## Commands
 
-| Command               | Description            |
-| --------------------- | ---------------------- |
-| `npm run dev`         | Start all apps         |
-| `npm run build`       | Build everything       |
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start all apps |
+| `npm run build` | Build everything |
 | `npm run check-types` | TypeScript type checks |
-| `npm run lint`        | Lint all packages      |
-| `npm run format`      | Format with Prettier   |
+| `npm run lint` | Lint all packages |
+| `npm run format` | Format with Prettier |
 
-## 🔧 Configuration
+## Configuration
 
-| Variable          | Default                 | Description               |
-| ----------------- | ----------------------- | ------------------------- |
-| `PORT`            | `3001`                  | Server port               |
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `3001` | Server port |
 | `VITE_SERVER_URL` | `http://localhost:3001` | Server URL for the web UI |
 
 See [Providers](docs/providers.md) for AI provider and API key configuration.
 
 ---
 
-## 🚧 Status
+## Status
 
 Early release — functional but evolving. No automated tests yet. macOS `arm64` only.
 
-## 🤝 Contributing
+## Contributing
 
-Contributions are welcome! See the [Contributing Guide](docs/contributing.md) for setup, conventions, and workflow. In short:
+Contributions are welcome. See the [Contributing Guide](docs/contributing.md) for setup, conventions, and workflow. In short:
 
-1. 🍴 Fork the repo and create a branch
-2. ✏️ Make your changes
-3. ✅ Run checks: `npm run build && npm run check-types && npm run lint`
-4. 📬 Open a pull request
+1. Fork the repo and create a branch
+2. Make your changes
+3. Run checks: `npm run build && npm run check-types && npm run lint`
+4. Open a pull request
 
-## 📚 Docs
+## Docs
 
 Full documentation lives in [docs/](docs/index.md):
 
