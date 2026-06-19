@@ -1210,7 +1210,7 @@ export const ChatComposer = memo(
           </div>
 
           {showContextStrip && (
-            <div className="flex items-center justify-between gap-2 border-t border-border/50 px-2 py-1">
+            <div className="flex items-center justify-between gap-2 px-2 pb-1">
               <div className="flex min-w-0 items-center gap-1">
                 {contextLeading}
                 {showBranch && (

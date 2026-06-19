@@ -23,6 +23,8 @@ interface ModeOption {
   icon: React.ReactNode
   /** Color class applied to the icon, both in the trigger and the menu. */
   iconAccent: string
+  /** Color class applied to the trigger label text when this mode is selected. */
+  triggerText: string
   /** Accent tint applied to the selected row in the menu. */
   selectedBg: string
   /** Translucent background tint applied to the trigger button. */
@@ -42,6 +44,7 @@ export const MODE_OPTIONS: ModeOption[] = [
     label: "Ask",
     icon: <MessageCircleQuestionIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-sky-600 dark:text-sky-400",
+    triggerText: "text-sky-700 dark:text-sky-300",
     selectedBg: "data-[checked=true]:bg-sky-500/10",
     triggerBg:
       "bg-sky-500/10 hover:bg-sky-500/15 aria-expanded:bg-sky-500/20 dark:bg-sky-500/15 dark:hover:bg-sky-500/20 dark:aria-expanded:bg-sky-500/25",
@@ -54,6 +57,7 @@ export const MODE_OPTIONS: ModeOption[] = [
     label: "Plan",
     icon: <ListTodoIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-amber-600 dark:text-amber-400",
+    triggerText: "text-amber-700 dark:text-amber-300",
     selectedBg: "data-[checked=true]:bg-amber-500/10",
     triggerBg:
       "bg-amber-500/10 hover:bg-amber-500/15 aria-expanded:bg-amber-500/20 dark:bg-amber-500/15 dark:hover:bg-amber-500/20 dark:aria-expanded:bg-amber-500/25",
@@ -66,6 +70,7 @@ export const MODE_OPTIONS: ModeOption[] = [
     label: "Agent",
     icon: <BotIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-emerald-600 dark:text-emerald-400",
+    triggerText: "",
     selectedBg: "data-[checked=true]:bg-emerald-500/10",
     triggerBg: "",
     focusRing:
@@ -106,7 +111,9 @@ export function ModeCombobox({
             <span className={selectedOption.iconAccent}>
               {selectedOption.icon}
             </span>
-            <span>{selectedOption.label}</span>
+            <span className={selectedOption.triggerText}>
+              {selectedOption.label}
+            </span>
             <ChevronDownIcon
               data-icon="inline-end"
               className={`opacity-60 transition-transform duration-200 ${open ? "rotate-180" : ""}`}

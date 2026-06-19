@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { useNavigate, useParams } from "@tanstack/react-router"
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import {
   TerminalSquare,
   PanelLeftIcon,
@@ -65,6 +65,12 @@ export function CommandPalette() {
   const { threadId: activeThreadId } = useParams({ strict: false }) as {
     threadId?: string
   }
+  // On the new-thread route there is no threadId; the selected workspace lives
+  // in the ?ws= search param instead. Honor it so files/context resolve to the
+  // workspace the user actually has open rather than defaulting to the first.
+  const { ws: searchWorkspaceId } = useSearch({ strict: false }) as {
+    ws?: string
+  }
   const { workspaces } = useWorkspace()
   const {
     isOpen: rightSidebarOpen,
@@ -94,6 +100,7 @@ export function CommandPalette() {
 
   const activeWorkspace =
     workspaces.find((ws) => ws.threads.some((t) => t.id === activeThreadId)) ??
+    workspaces.find((ws) => ws.id === searchWorkspaceId) ??
     workspaces[0]
   const activeThread = activeWorkspace?.threads.find(
     (thread) => thread.id === activeThreadId
