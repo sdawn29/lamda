@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.29.0](../../releases/tag/v0.29.0) — 2026-06-19
+
+### Features
+
+* enhance ChatComposer and ModeCombobox with improved layout and styling options
+
+### Other Changes
+
+* Refactor code structure for improved readability and maintainability
+
 ## [0.28.0](../../releases/tag/v0.28.0) — 2026-06-19
 
 ### Features
