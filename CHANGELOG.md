@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.28.0](../../releases/tag/v0.28.0) — 2026-06-19
+
+### Features
+
+* implement left sidebar resizing functionality and update AppSidebar for resize events
+* enhance UI and functionality across various components
+* add initial workspace configuration file
+
+### Bug Fixes
+
+* adjust padding in ChatView and NewThreadView components for better layout
+* enhance line suffix regex and update file reference structure
+* add type annotations for CodeLens model in ConflictEditor
+
 ## [0.27.0](../../releases/tag/v0.27.0) — 2026-06-19
 
 ### Features
