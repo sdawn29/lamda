@@ -658,7 +658,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           </div>
 
           <div className="shrink-0 bg-background">
-            <div className="mx-auto w-full max-w-3xl px-3 pb-2">
+            <div className="mx-auto w-full max-w-3xl px-3 pb-3">
               <ChatComposer
                 onSend={() => {}}
                 isLoading

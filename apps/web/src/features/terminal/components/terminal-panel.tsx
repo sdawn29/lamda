@@ -298,7 +298,7 @@ export const TerminalPanel = memo(function TerminalPanel({
   return (
     <div className="flex h-full shrink-0 flex-col bg-background">
       {/* Tab bar — shows only the active workspace's tabs */}
-      <div className="flex h-10 shrink-0 items-center gap-1 bg-background px-2">
+      <div className="flex h-10 shrink-0 items-center gap-1 bg-background px-2 pt-1">
         {/* Scrollable tab list */}
         <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1">
           {tabs.map((tab) => {
