@@ -64,6 +64,11 @@ export function WorkspaceLayout() {
   } = useRightSidebar()
 
   const isMobile = useIsMobile(900)
+  const leftSidebarRef = useRef<HTMLDivElement>(null)
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(256)
+  const isLeftSidebarDragging = useRef(false)
+  const leftSidebarDragStartX = useRef(0)
+  const leftSidebarDragStartWidth = useRef(0)
   const isDragging = useRef(false)
   const dragStartX = useRef(0)
   const dragStartWidth = useRef(0)
@@ -73,6 +78,69 @@ export function WorkspaceLayout() {
   const isTerminalDragging = useRef(false)
   const terminalDragStartY = useRef(0)
   const terminalDragStartHeight = useRef(0)
+
+  const handleLeftSidebarResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      isLeftSidebarDragging.current = true
+      leftSidebarDragStartX.current = e.clientX
+      leftSidebarDragStartWidth.current = leftSidebarWidth
+
+      const sidebarGap =
+        leftSidebarRef.current?.querySelector<HTMLElement>(
+          '[data-slot="sidebar-gap"]'
+        ) ?? null
+      const sidebarContainer =
+        leftSidebarRef.current?.querySelector<HTMLElement>(
+          '[data-slot="sidebar-container"]'
+        ) ?? null
+      sidebarGap?.style.setProperty("transition", "none")
+      sidebarContainer?.style.setProperty("transition", "none")
+
+      const onMove = (ev: MouseEvent) => {
+        if (!isLeftSidebarDragging.current) return
+        const delta = ev.clientX - leftSidebarDragStartX.current
+        const next = Math.max(
+          200,
+          Math.min(480, leftSidebarDragStartWidth.current + delta)
+        )
+        // Update only the two elements whose geometry changes. Mutating the
+        // provider's CSS variable here would invalidate styles across the
+        // entire workspace (including Monaco and terminal descendants).
+        sidebarGap?.style.setProperty("width", `${next}px`)
+        sidebarContainer?.style.setProperty("width", `${next}px`)
+      }
+
+      const onUp = (ev: MouseEvent) => {
+        isLeftSidebarDragging.current = false
+        document.removeEventListener("mousemove", onMove)
+        document.removeEventListener("mouseup", onUp)
+        document.body.style.cursor = ""
+        document.body.style.userSelect = ""
+
+        const delta = ev.clientX - leftSidebarDragStartX.current
+        const finalWidth = Math.max(
+          200,
+          Math.min(480, leftSidebarDragStartWidth.current + delta)
+        )
+        leftSidebarRef.current?.style.setProperty(
+          "--sidebar-width",
+          `${finalWidth}px`
+        )
+        sidebarGap?.style.removeProperty("width")
+        sidebarContainer?.style.removeProperty("width")
+        sidebarGap?.style.removeProperty("transition")
+        sidebarContainer?.style.removeProperty("transition")
+        setLeftSidebarWidth(finalWidth)
+      }
+
+      document.body.style.cursor = "col-resize"
+      document.body.style.userSelect = "none"
+      document.addEventListener("mousemove", onMove)
+      document.addEventListener("mouseup", onUp)
+    },
+    [leftSidebarWidth]
+  )
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -282,7 +350,15 @@ export function WorkspaceLayout() {
 
   return (
     <TooltipProvider>
-      <SidebarProvider className="h-svh bg-sidebar">
+      <SidebarProvider
+        ref={leftSidebarRef}
+        style={
+          {
+            "--sidebar-width": `${leftSidebarWidth}px`,
+          } as React.CSSProperties
+        }
+        className="h-svh bg-sidebar"
+      >
         {/* Draggable window strip behind the titlebar island (frameless
             window). The island's controls opt out with no-drag. */}
         <div
@@ -290,46 +366,54 @@ export function WorkspaceLayout() {
           style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
         />
         <TitleBar />
-        <AppSidebar />
+        <AppSidebar onResizeStart={handleLeftSidebarResizeStart} />
 
         <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-13 pr-2 pb-2 peer-data-[state=collapsed]:pl-2">
-          <SidebarInset
-            className="h-full min-h-0 w-full overflow-hidden rounded-2xl border border-border shadow-md"
+          {/* Editor column: the editor island and (when open) a separate
+              terminal island stacked below it, with a resize gutter as the gap.
+              Chrome lives in the unified titlebar island above. */}
+          <div
+            className="flex h-full min-w-0 flex-1 flex-col overflow-hidden"
             style={{ display: diffFullscreen ? "none" : undefined }}
           >
-            {/* Editor island: content + terminal (chrome lives in the
-                unified titlebar island above). */}
-            <div className="flex h-full min-w-0 flex-col overflow-hidden">
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="min-h-0 flex-1 overflow-hidden">
-                  <MainContentArea />
-                </div>
-                {terminalHost && anyTerminalTabs && (
-                  <div
-                    onMouseDown={handleTerminalResizeStart}
-                    className="shrink-0 cursor-row-resize border-t"
-                    style={{
-                      height: terminalHeight,
-                      display: activeTerminalOpen ? undefined : "none",
-                    }}
-                  >
-                    <Suspense
-                      fallback={<div className="h-full bg-background" />}
-                    >
-                      <TerminalPanel
-                        activeWorkspaceId={terminalHost.id}
-                        cwd={
-                          terminalHost.id === activeWorkspaceId
-                            ? (activeTerminalCwd ?? terminalHost.path)
-                            : terminalHost.path
-                        }
-                      />
-                    </Suspense>
-                  </div>
-                )}
+            <SidebarInset className="min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-border shadow-md">
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <MainContentArea />
               </div>
-            </div>
-          </SidebarInset>
+            </SidebarInset>
+
+            {terminalHost && anyTerminalTabs && (
+              <>
+                {/* Resize gutter — doubles as the gap between the islands. */}
+                <div
+                  onMouseDown={handleTerminalResizeStart}
+                  className="group relative h-2 shrink-0 cursor-row-resize"
+                  style={{ display: activeTerminalOpen ? undefined : "none" }}
+                >
+                  <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-border" />
+                </div>
+                {/* Terminal island */}
+                <div
+                  className="shrink-0 overflow-hidden rounded-2xl border border-border bg-background shadow-md"
+                  style={{
+                    height: terminalHeight,
+                    display: activeTerminalOpen ? undefined : "none",
+                  }}
+                >
+                  <Suspense fallback={<div className="h-full bg-background" />}>
+                    <TerminalPanel
+                      activeWorkspaceId={terminalHost.id}
+                      cwd={
+                        terminalHost.id === activeWorkspaceId
+                          ? (activeTerminalCwd ?? terminalHost.path)
+                          : terminalHost.path
+                      }
+                    />
+                  </Suspense>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Right sidebar — outside the card, mirrors AppSidebar on the left */}
           {rsReady && (

@@ -61,8 +61,9 @@ export default function MonacoDiffViewer({
   // `automaticLayout`, so a window resize triggers a single batched pass
   // across all mounted diffs rather than N synchronous relayouts. Monaco
   // mounts asynchronously and gives no unmount hook, so we register inside
-  // onMount and keep the disposer in a ref. A mode change remounts the editor
-  // (keyed below) and re-fires onMount, which disposes the prior registration.
+  // onMount and keep the disposer in a ref. Diff mode is updated through
+  // Monaco's options instead of remounting the editor, preserving its models
+  // and avoiding cleanup races between the old and new editor instances.
   const disposeLayoutRef = useRef<(() => void) | null>(null)
   const disposeModelsRef = useRef<(() => void) | null>(null)
   const handleMount: DiffOnMount = useCallback((editor) => {
@@ -152,7 +153,6 @@ export default function MonacoDiffViewer({
       style={{ height }}
     >
       <DiffEditor
-        key={mode}
         language={monacoLanguage}
         original={original}
         modified={modified}

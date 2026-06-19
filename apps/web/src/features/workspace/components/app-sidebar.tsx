@@ -327,7 +327,11 @@ const ThreadRow = memo(function ThreadRow({
   )
 })
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  onResizeStart?: React.MouseEventHandler<HTMLDivElement>
+}
+
+export function AppSidebar({ onResizeStart }: AppSidebarProps) {
   const { workspaces, deleteWorkspace, pinWorkspace, unpinWorkspace } = useWorkspace()
   const { handleCreateLocal, handleCreateRemote } = useCreateWorkspaceAction()
   const openPathMutation = useOpenPath()
@@ -815,6 +819,17 @@ export function AppSidebar() {
           open={!!envWorkspace}
           onOpenChange={(open) => { if (!open) closeEnvDialog() }}
         />
+      )}
+      {onResizeStart && (
+        <div
+          role="separator"
+          aria-label="Resize left sidebar"
+          aria-orientation="vertical"
+          onMouseDown={onResizeStart}
+          className="group absolute inset-y-2 right-0 z-30 hidden w-2 cursor-col-resize group-data-[collapsible=offcanvas]:hidden md:block"
+        >
+          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-border" />
+        </div>
       )}
     </Sidebar>
   )
