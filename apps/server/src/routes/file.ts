@@ -55,13 +55,13 @@ async function canonicalize(path: string): Promise<string> {
  */
 async function isWithinWorkspace(target: string): Promise<boolean> {
   const real = await canonicalize(target);
-  const roots = listWorkspacesWithThreads().flatMap((workspace) => [
-    workspace.path,
-    ...workspace.threads.map((thread) => thread.worktreePath),
-  ]);
+  const roots = listWorkspacesWithThreads().flatMap((workspace) =>
+    [workspace.path, ...workspace.threads.map((t) => t.worktreePath)].filter(
+      (p): p is string => typeof p === "string" && p.length > 0,
+    ),
+  );
 
   for (const root of roots) {
-    if (typeof root !== "string" || root.length === 0) continue;
     const realRoot = await canonicalize(root);
     const rel = relative(realRoot, real);
     if (rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))) return true;

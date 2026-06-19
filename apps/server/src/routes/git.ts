@@ -55,14 +55,18 @@ import { parseModelKey } from "./settings.js";
 
 const git = new Hono();
 
-function parseGitError(err: unknown, fallback: string): string {
+export function parseGitError(err: unknown, fallback: string): string {
   const raw = err instanceof Error ? err.message : String(err);
-  const lines = raw.split("\n").filter(Boolean);
-  return (
-    lines.find((l) => l.startsWith("error:") || l.startsWith("fatal:")) ??
-    lines[0] ??
-    fallback
-  );
+  const line = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .find(
+      (l) =>
+        l.startsWith("error:") ||
+        l.startsWith("fatal:") ||
+        l.startsWith("CONFLICT"),
+    );
+  return line ?? raw.split("\n").find(Boolean) ?? fallback;
 }
 
 // ── Clone repository ────────────────────────────────────────────────────────────
@@ -119,10 +123,11 @@ git.get("/workspace/:id/branch", async (c) => {
   if (!ws) return c.json({ branch: null, hasCommits: false });
   // `hasCommits` is false for a freshly-initialized repo (unborn HEAD); the UI
   // uses it to hide worktree creation, which can't fork from a commitless base.
-  return c.json({
-    branch: await getCurrentBranch(ws.path),
-    hasCommits: !!(await getRefSha(ws.path, "HEAD")),
-  });
+  const [branch, headSha] = await Promise.all([
+    getCurrentBranch(ws.path),
+    getRefSha(ws.path, "HEAD"),
+  ]);
+  return c.json({ branch, hasCommits: !!headSha });
 });
 
 git.get("/workspace/:id/branches", async (c) => {
@@ -179,10 +184,11 @@ git.post("/session/:id/git/init", async (c) => {
   if (!cwd) return c.json({ error: "Session not found" }, 404);
   try {
     await initGitRepo(cwd);
-    return c.json({
-      branch: await getCurrentBranch(cwd),
-      branches: await listBranches(cwd),
-    });
+    const [branch, branches] = await Promise.all([
+      getCurrentBranch(cwd),
+      listBranches(cwd),
+    ]);
+    return c.json({ branch, branches });
   } catch (err) {
     return c.json(
       { error: parseGitError(err, "Repository initialization failed") },
@@ -198,10 +204,11 @@ git.post("/workspace/:id/git/init", async (c) => {
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
   try {
     await initGitRepo(ws.path);
-    return c.json({
-      branch: await getCurrentBranch(ws.path),
-      branches: await listBranches(ws.path),
-    });
+    const [branch, branches] = await Promise.all([
+      getCurrentBranch(ws.path),
+      listBranches(ws.path),
+    ]);
+    return c.json({ branch, branches });
   } catch (err) {
     return c.json(
       { error: parseGitError(err, "Repository initialization failed") },

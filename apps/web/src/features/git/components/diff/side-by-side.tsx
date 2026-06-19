@@ -71,8 +71,8 @@ const SideBySideCell = memo(function SideBySideCell({
     <div
       className={cn(
         "flex min-w-full leading-5",
-        isAdded && "bg-diff-add/8",
-        isRemoved && "bg-diff-remove/8"
+        isAdded && "bg-diff-add/14",
+        isRemoved && "bg-diff-remove/14"
       )}
     >
       {/* Gutter */}
@@ -80,9 +80,9 @@ const SideBySideCell = memo(function SideBySideCell({
         className={cn(
           "sticky left-0 z-10 flex shrink-0 select-none",
           isAdded &&
-            "bg-[color-mix(in_srgb,var(--diff-add)_12%,var(--background))]",
+            "bg-[color-mix(in_srgb,var(--diff-add)_18%,var(--background))]",
           isRemoved &&
-            "bg-[color-mix(in_srgb,var(--diff-remove)_12%,var(--background))]",
+            "bg-[color-mix(in_srgb,var(--diff-remove)_18%,var(--background))]",
           isNeutral && "bg-background"
         )}
       >

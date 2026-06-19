@@ -32,9 +32,8 @@ import {
   useSessionStatus,
   messagesQueryKey,
 } from "../queries"
-import { useBranch } from "@/features/git/queries"
-import { useBranches } from "@/features/git/queries"
-import { useSessionWorktrees } from "@/features/git/queries"
+import { useBranch, useBranches, useSessionWorktrees } from "@/features/git/queries"
+import { parseApiError } from "@/features/git"
 import { useCheckoutBranch } from "@/features/git/mutations"
 import {
   useAbortSession,
@@ -65,7 +64,7 @@ import {
   type ChatActions,
 } from "../contexts/chat-actions-context"
 import { formatFileCommentContext } from "../lib/file-context"
-import { useTurns } from "@/features/git"
+import { useTurns, useLastCommitAt } from "@/features/git"
 import { PlanChangesCard } from "./plan-changes-card"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
 import {
@@ -560,9 +559,13 @@ export function ChatView({
     [visibleMessages]
   )
 
+  // A commit (user- or agent-driven) banks every turn that ended before it, so
+  // those turns' inline "Files changed this turn" cards are hidden — the view
+  // resets to only the work done since the last commit.
+  const lastCommitAt = useLastCommitAt(sessionId)
   const turnCardsByGroup = useMemo(
-    () => buildTurnCardsByGroup(groupedMessages, turns),
-    [groupedMessages, turns]
+    () => buildTurnCardsByGroup(groupedMessages, turns, lastCommitAt),
+    [groupedMessages, turns, lastCommitAt]
   )
 
   const checkpointByUserBlock = useMemo(
@@ -655,16 +658,7 @@ export function ChatView({
 
   const handleBranchSelect = useCallback(
     async (selectedBranch: string) => {
-      const onError = (err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err)
-        const stripped = msg.replace(/^API \d+:\s*/, "")
-        try {
-          const parsed = JSON.parse(stripped) as { error?: string }
-          handleGitError(parsed.error ?? stripped)
-        } catch {
-          handleGitError(stripped)
-        }
-      }
+      const onError = (err: unknown) => handleGitError(parseApiError(err))
 
       // A branch checked out in a secondary worktree can't be checked out in
       // place — open the thread in that worktree's directory instead.

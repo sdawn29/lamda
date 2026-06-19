@@ -46,6 +46,8 @@ import {
   mergeBranch,
   listMergeConflicts,
   resolveMergeConflict,
+  readConflictedFile,
+  writeResolvedConflict,
   continueMerge,
   abortMerge,
   isMergeInProgress,
@@ -53,30 +55,17 @@ import {
   getRefSha,
   gitStatus,
 } from "@lamda/git";
+import { parseGitError } from "./git.js";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import {
   collectCustomTools,
   createSessionForThread,
-  resolveThreadCwd,
   relocateThreadSession,
 } from "../services/session-service.js";
 import { scheduleReflection } from "../services/memory-reflection.js";
 import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
 
-function parseGitError(err: unknown, fallback: string): string {
-  const raw = err instanceof Error ? err.message : String(err);
-  const line = raw
-    .split("\n")
-    .map((l) => l.trim())
-    .find(
-      (l) =>
-        l.startsWith("error:") ||
-        l.startsWith("fatal:") ||
-        l.startsWith("CONFLICT"),
-    );
-  return line ?? raw.split("\n").find(Boolean) ?? fallback;
-}
 
 async function threadOwnsActiveGitMerge(
   thread: NonNullable<ReturnType<typeof getThread>>,
@@ -252,7 +241,7 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
   try {
     sessionId = await createSessionForThread(
       threadId,
-      resolveThreadCwd(getThread(threadId), ws.path),
+      worktreePath ?? ws.path,
       workspaceId,
       {
         provider: body.provider,
@@ -764,7 +753,7 @@ threads.post("/thread/:id/worktree/merge", async (c) => {
     );
   }
   if (!force) {
-    if (worktreeStatus.trim().length > 0) {
+    if (worktreeStatus.trim()) {
       return c.json(
         {
           error:
@@ -922,6 +911,83 @@ threads.post("/thread/:id/worktree/merge/resolve", async (c) => {
     return c.json({ error: "File is not an active merge conflict" }, 400);
   }
   await resolveMergeConflict(ws.path, body.filePath, body.strategy!);
+  return c.json({ conflicts: await listMergeConflicts(ws.path) });
+});
+
+// Returns a conflicted file's working-tree contents (with `<<<<<<<` markers) so
+// it can be resolved by hand in the editor.
+threads.get("/thread/:id/worktree/merge/conflict", async (c) => {
+  const threadId = c.req.param("id");
+  const thread = getThread(threadId);
+  if (!thread?.worktreePath || !thread.worktreeBranch)
+    return c.json({ error: "Thread is not in a worktree" }, 400);
+  const ws = getWorkspace(thread.workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  const activeMergeOwner = getActiveWorktreeMerge(thread.workspaceId);
+  if (
+    activeMergeOwner?.id !== threadId ||
+    !(await threadOwnsActiveGitMerge(thread, ws.path))
+  ) {
+    return c.json(
+      { error: "This thread does not own an active workspace merge" },
+      409,
+    );
+  }
+
+  const filePath = c.req.query("file");
+  if (!filePath) return c.json({ error: "file is required" }, 400);
+  const conflicts = await listMergeConflicts(ws.path);
+  if (!conflicts.includes(filePath)) {
+    return c.json({ error: "File is not an active merge conflict" }, 400);
+  }
+  try {
+    return c.json({ content: await readConflictedFile(ws.path, filePath) });
+  } catch (err) {
+    return c.json(
+      { error: parseGitError(err, "Could not read conflicted file") },
+      500,
+    );
+  }
+});
+
+// Saves a hand-resolved version of a conflicted file and stages it.
+threads.post("/thread/:id/worktree/merge/resolve-content", async (c) => {
+  const threadId = c.req.param("id");
+  const thread = getThread(threadId);
+  if (!thread?.worktreePath || !thread.worktreeBranch)
+    return c.json({ error: "Thread is not in a worktree" }, 400);
+  const ws = getWorkspace(thread.workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  const activeMergeOwner = getActiveWorktreeMerge(thread.workspaceId);
+  if (
+    activeMergeOwner?.id !== threadId ||
+    !(await threadOwnsActiveGitMerge(thread, ws.path))
+  ) {
+    return c.json(
+      { error: "This thread does not own an active workspace merge" },
+      409,
+    );
+  }
+
+  type ResolveContentBody = { filePath?: string; content?: string };
+  const body = await c.req
+    .json<ResolveContentBody>()
+    .catch((): ResolveContentBody => ({}));
+  if (!body.filePath || typeof body.content !== "string") {
+    return c.json({ error: "filePath and content are required" }, 400);
+  }
+  const conflicts = await listMergeConflicts(ws.path);
+  if (!conflicts.includes(body.filePath)) {
+    return c.json({ error: "File is not an active merge conflict" }, 400);
+  }
+  try {
+    await writeResolvedConflict(ws.path, body.filePath, body.content);
+  } catch (err) {
+    return c.json(
+      { error: parseGitError(err, "Could not save resolution") },
+      500,
+    );
+  }
   return c.json({ conflicts: await listMergeConflicts(ws.path) });
 });
 

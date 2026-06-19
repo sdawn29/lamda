@@ -29,10 +29,12 @@ import {
 } from "@lamda/db";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
+import { worktreeWatcher } from "../services/worktree-watcher.js";
 import {
   createSessionForThread,
   ensureSessionEventHub,
   openSessionForThread,
+  healStaleWorktreeCwd,
 } from "../services/session-service.js";
 import { submitAnswer } from "../services/question-registry.js";
 import { submitApproval } from "../services/approval-registry.js";
@@ -98,6 +100,7 @@ sessions.post("/session", async (c) => {
 
 sessions.delete("/session/:id", async (c) => {
   const id = c.req.param("id");
+  worktreeWatcher.unwatch(id);
   await sessionEvents.dispose(id);
   if (!store.delete(id)) return c.json({ error: "Not found" }, 404);
   return new Response(null, { status: 204 });
@@ -169,6 +172,11 @@ sessions.post("/session/:id/prompt", async (c) => {
     return c.json({ error: "text or attachments required" }, 400);
   }
 
+  // Recover before running tools if this session's worktree was removed
+  // out-of-band — otherwise every tool call resolves against a missing cwd and
+  // fails with ENOENT. Heals in place (relocates to the workspace dir).
+  await healStaleWorktreeCwd(id);
+
   ensureSessionEventHub(id, entry);
 
   // Fire and forget — events arrive via GET /session/:id/events
@@ -187,7 +195,7 @@ sessions.post("/session/:id/prompt", async (c) => {
             attachment.mediaType,
             attachment.data,
             attachment.kind,
-            attachment.id
+            attachment.id,
           );
           // Persist metadata only (no absolute fs path) on the user message.
           attachmentMetadata.push(metadata);
@@ -203,7 +211,9 @@ sessions.post("/session/:id/prompt", async (c) => {
           }
           // Inject text file contents into agent-facing prompt.
           else if (attachment.kind === "text") {
-            const fileContent = Buffer.from(attachment.data, "base64").toString("utf-8");
+            const fileContent = Buffer.from(attachment.data, "base64").toString(
+              "utf-8",
+            );
             agentFacingText += `\n\nThe user attached "${attachment.filename}":\n\`\`\`\n${fileContent}\n\`\`\``;
           }
           // Other (binary) files can't be inlined — point the agent at the
@@ -212,7 +222,10 @@ sessions.post("/session/:id/prompt", async (c) => {
             agentFacingText += `\n\n[The user attached a file "${attachment.filename}" (${attachment.mediaType || "unknown type"}, ${metadata.size} bytes), saved at: ${path}]`;
           }
         } catch (err) {
-          console.error(`[prompt:${id}] Failed to process attachment ${attachment.filename}:`, err);
+          console.error(
+            `[prompt:${id}] Failed to process attachment ${attachment.filename}:`,
+            err,
+          );
           // Continue processing other attachments rather than failing the whole prompt
         }
       }
@@ -243,10 +256,7 @@ sessions.post("/session/:id/prompt", async (c) => {
     }
 
     // Combine images from attachments with legacy images field
-    const allImages = [
-      ...imageContents,
-      ...(body.images || []),
-    ];
+    const allImages = [...imageContents, ...(body.images || [])];
 
     const promptOptions: PromptOptions | undefined =
       allImages.length > 0 ||
@@ -839,7 +849,8 @@ sessions.get("/attachment/:threadId/:attachmentId", async (c) => {
   const ext = foundPath.split(".").pop()?.toLowerCase() || "";
   const contentType = ATTACHMENT_MIME_TYPES[ext] ?? "application/octet-stream";
   // Non-previewable types download with their original-ish name.
-  const isInline = contentType.startsWith("image/") || contentType.startsWith("text/");
+  const isInline =
+    contentType.startsWith("image/") || contentType.startsWith("text/");
 
   const size = fileStat.size;
   const nodeStream = createReadStream(foundPath);

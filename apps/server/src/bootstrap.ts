@@ -5,6 +5,8 @@ import { workspaceIndexer } from "./services/workspace-indexer.js";
 import {
   createSessionForThread,
   openSessionForThread,
+  refreshWorktreeWatch,
+  resolveThreadCwd,
 } from "./services/session-service.js";
 
 /**
@@ -24,13 +26,8 @@ export async function bootstrapSessions(): Promise<void> {
       if (thread.worktreePath && !existsSync(thread.worktreePath)) {
         clearThreadWorktree(thread.id);
         thread.worktreePath = null;
-        thread.worktreeBranch = null;
-        thread.worktreeBaseBranch = null;
-        thread.ownsWorktreeBranch = false;
-        thread.worktreeMergeInProgress = false;
-        thread.worktreeMergeHeadSha = null;
       }
-      const cwd = thread.worktreePath ? thread.worktreePath : ws.path;
+      const cwd = resolveThreadCwd(thread, ws.path);
 
       if (thread.sessionFile) {
         try {
@@ -40,7 +37,8 @@ export async function bootstrapSessions(): Promise<void> {
             cwd,
             ws.id,
           );
-          store.create(handle, cwd, thread.id, ws.id);
+          const sessionId = store.create(handle, cwd, thread.id, ws.id);
+          refreshWorktreeWatch(sessionId);
           return;
         } catch (err) {
           // A corrupt/unreadable session file must not leave a dead thread —

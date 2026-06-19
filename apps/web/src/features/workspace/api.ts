@@ -219,6 +219,30 @@ export function resolveThreadWorktreeConflict(
   )
 }
 
+export function getThreadWorktreeConflictFile(
+  threadId: string,
+  filePath: string
+): Promise<{ content: string }> {
+  return apiFetch<{ content: string }>(
+    `/thread/${threadId}/worktree/merge/conflict?file=${encodeURIComponent(filePath)}`
+  )
+}
+
+export function resolveThreadWorktreeConflictContent(
+  threadId: string,
+  filePath: string,
+  content: string
+): Promise<{ conflicts: string[] }> {
+  return apiFetch<{ conflicts: string[] }>(
+    `/thread/${threadId}/worktree/merge/resolve-content`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath, content }),
+    }
+  )
+}
+
 export function continueThreadWorktreeMerge(
   threadId: string
 ): Promise<{ merged: true; branch: string; cleanupWarning?: string }> {

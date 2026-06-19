@@ -12,6 +12,7 @@ import {
   switchThreadToLocal as apiSwitchThreadToLocal,
   mergeThreadWorktree as apiMergeThreadWorktree,
   resolveThreadWorktreeConflict as apiResolveThreadWorktreeConflict,
+  resolveThreadWorktreeConflictContent as apiResolveThreadWorktreeConflictContent,
   continueThreadWorktreeMerge as apiContinueThreadWorktreeMerge,
   abortThreadWorktreeMerge as apiAbortThreadWorktreeMerge,
   deleteWorkspace as apiDeleteWorkspace,
@@ -191,6 +192,20 @@ export function useResolveThreadWorktreeConflict() {
       filePath: string
       strategy: "ours" | "theirs"
     }) => apiResolveThreadWorktreeConflict(threadId, filePath, strategy),
+  })
+}
+
+export function useResolveThreadWorktreeConflictContent() {
+  return useMutation({
+    mutationFn: ({
+      threadId,
+      filePath,
+      content,
+    }: {
+      threadId: string
+      filePath: string
+      content: string
+    }) => apiResolveThreadWorktreeConflictContent(threadId, filePath, content),
   })
 }
 

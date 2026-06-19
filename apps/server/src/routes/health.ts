@@ -5,6 +5,7 @@ import { threadStatusBroadcaster } from "../thread-status-broadcaster.js";
 import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
 import { workspaceDirBroadcaster } from "../workspace-dir-broadcaster.js";
 import { gitStatusBroadcaster } from "../git-status-broadcaster.js";
+import { worktreeBroadcaster } from "../worktree-broadcaster.js";
 
 const health = new Hono();
 
@@ -29,7 +30,12 @@ export function handleGlobalEventsWs(ws: WebSocket) {
     ({ workspaceId, root, dir }) => {
       if (ws.readyState !== 1 /* OPEN */) return;
       ws.send(
-        JSON.stringify({ type: "workspace_dir_changed", workspaceId, root, dir }),
+        JSON.stringify({
+          type: "workspace_dir_changed",
+          workspaceId,
+          root,
+          dir,
+        }),
       );
     },
   );
@@ -39,11 +45,21 @@ export function handleGlobalEventsWs(ws: WebSocket) {
     ws.send(JSON.stringify({ type: "git_status_changed", workspaceId }));
   });
 
+  const unsubscribeWorktree = worktreeBroadcaster.subscribe(
+    ({ workspaceId, threadId }) => {
+      if (ws.readyState !== 1 /* OPEN */) return;
+      ws.send(
+        JSON.stringify({ type: "worktree_detached", workspaceId, threadId }),
+      );
+    },
+  );
+
   const cleanup = () => {
     unsubscribeThread();
     unsubscribeIndex();
     unsubscribeDir();
     unsubscribeGit();
+    unsubscribeWorktree();
   };
 
   ws.on("close", cleanup);

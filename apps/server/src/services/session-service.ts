@@ -10,13 +10,21 @@ import {
   type SdkConfig,
   type ManagedSessionHandle,
 } from "@lamda/pi-sdk";
-import { updateThreadSessionFile, getWorkspace, getThread } from "@lamda/db";
+import {
+  updateThreadSessionFile,
+  getWorkspace,
+  getThread,
+  clearThreadWorktree,
+} from "@lamda/db";
 import { mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { waitForAnswer } from "./question-registry.js";
 import { createToolApprovalBridge } from "./tool-approval-bridge.js";
+import { worktreeWatcher } from "./worktree-watcher.js";
+import { worktreeBroadcaster } from "../worktree-broadcaster.js";
 
 // The `question` tool is host-driven and stateless across sessions, so a
 // single instance can be shared by every session. It blocks on the question
@@ -116,6 +124,10 @@ export async function createSessionForThread(
     sessionEvents.ensure(sessionId, entry.threadId, entry.handle, entry.cwd);
   }
 
+  // Watch the worktree (if this session runs in one) so an out-of-band removal
+  // relocates the session instantly instead of failing a tool call.
+  refreshWorktreeWatch(sessionId);
+
   return sessionId;
 }
 
@@ -158,13 +170,76 @@ export function gitCwd(id: string): string | null {
 
 /**
  * The directory a thread's session runs in: its git worktree when one is
- * attached, otherwise the workspace's own path.
+ * attached AND still on disk, otherwise the workspace's own path.
+ *
+ * A worktree can disappear out-of-band (removed in a terminal, pruned, or a
+ * partially-failed merge/detach) while the DB still records its path. Running a
+ * session there makes every agent tool call resolve against a phantom directory
+ * and fail with ENOENT, so we treat a missing worktree as detached: clear the
+ * stale DB state and fall back to the workspace. Mirrors the startup guard in
+ * bootstrap.ts so the renderer, terminal, and next restart all agree.
  */
 export function resolveThreadCwd(
-  thread: { worktreePath?: string | null } | null | undefined,
+  thread: { id?: string; worktreePath?: string | null } | null | undefined,
   workspacePath: string,
 ): string {
-  return thread?.worktreePath || workspacePath;
+  if (thread?.worktreePath) {
+    if (existsSync(thread.worktreePath)) return thread.worktreePath;
+    if (thread.id) clearThreadWorktree(thread.id);
+  }
+  return workspacePath;
+}
+
+/**
+ * Self-heals a live session whose working directory has vanished from disk
+ * (e.g. its git worktree was removed after the session started). Moves the
+ * running runtime back to the workspace directory and persistently detaches the
+ * worktree, so subsequent tool calls stop failing with ENOENT. No-op when the
+ * cwd still exists or there's no safe fallback.
+ *
+ * Driven proactively by {@link worktreeWatcher} the instant the worktree dir
+ * disappears, and also called before each prompt as a backstop (e.g. when the
+ * removal happened while the server was down).
+ */
+export async function healStaleWorktreeCwd(sessionId: string): Promise<void> {
+  const entry = store.get(sessionId);
+  if (!entry || existsSync(entry.cwd)) return;
+
+  const ws = entry.workspaceId ? getWorkspace(entry.workspaceId) : null;
+  if (!ws?.path || !existsSync(ws.path)) return;
+
+  const { threadId, workspaceId } = entry;
+  // Detach in the DB first so any concurrent cwd lookup already sees the
+  // fallback, then move the live runtime to match.
+  clearThreadWorktree(threadId);
+  try {
+    await relocateThreadSession(threadId, ws.path);
+  } catch (err) {
+    console.error(
+      `[session-service] failed to heal stale cwd for session ${sessionId}:`,
+      err,
+    );
+  }
+  // Tell the renderer the thread is back on its workspace so the worktree
+  // selector and cwd-scoped views refresh without a reload.
+  if (workspaceId) worktreeBroadcaster.broadcast(workspaceId, threadId);
+}
+
+/**
+ * Starts (or stops) the out-of-band worktree watcher for a live session based
+ * on its current cwd: a session running inside a worktree is watched so its
+ * removal triggers {@link healStaleWorktreeCwd}; a session on the workspace
+ * path needs no watcher. Idempotent — safe to call after every create/relocate.
+ */
+export function refreshWorktreeWatch(sessionId: string): void {
+  const entry = store.get(sessionId);
+  if (!entry) return;
+  const ws = entry.workspaceId ? getWorkspace(entry.workspaceId) : null;
+  if (!ws?.path || resolve(entry.cwd) === resolve(ws.path)) {
+    worktreeWatcher.unwatch(sessionId);
+    return;
+  }
+  worktreeWatcher.watch(sessionId, entry.cwd, healStaleWorktreeCwd);
 }
 
 /**
@@ -211,7 +286,8 @@ export async function relocateThreadSession(
     }
 
     store.updateCwd(existing.sessionId, newCwd);
-    sessionEvents.reattach(existing.sessionId, entry.handle);
+    sessionEvents.reattach(existing.sessionId, entry.handle, newCwd);
+    refreshWorktreeWatch(existing.sessionId);
     return true;
   }
 
@@ -232,7 +308,8 @@ export async function relocateThreadSession(
     }
     store.replaceHandle(existing.sessionId, restoredHandle);
     store.updateCwd(existing.sessionId, newCwd);
-    sessionEvents.reattach(existing.sessionId, restoredHandle);
+    sessionEvents.reattach(existing.sessionId, restoredHandle, newCwd);
+    refreshWorktreeWatch(existing.sessionId);
     return true;
   }
 
@@ -245,7 +322,8 @@ export async function relocateThreadSession(
   );
   store.replaceHandle(existing.sessionId, newHandle);
   store.updateCwd(existing.sessionId, newCwd);
-  sessionEvents.reattach(existing.sessionId, newHandle);
+  sessionEvents.reattach(existing.sessionId, newHandle, newCwd);
+  refreshWorktreeWatch(existing.sessionId);
   return true;
 }
 

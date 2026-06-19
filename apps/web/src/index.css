@@ -134,8 +134,8 @@
        separate from --chart-2 / --destructive (which stay olive/brick for
        syntax + charts) and constant across themes so diffs always read as
        unambiguous green/red. ── */
-  --diff-add: #1a7f37;
-  --diff-remove: #cf222e;
+  --diff-add: #1f883d;
+  --diff-remove: #d1242f;
 
   /* ── Border: separator that reads against both bg and card. Sits just
        below the card/secondary level so card edges are legible and panel
@@ -396,6 +396,39 @@
     transition: background 0.7s ease-out;
   }
 
+  /* ── Merge conflict resolver ───────────────────────────────────────────
+     A VSCode-style inline merge UI over Monaco: the raw `<<<<<<<` markers are
+     hidden (rendered transparent) and replaced with labeled header bars, each
+     side's hunk is tinted, and Accept actions are CodeLens links above the
+     conflict. "Current" = local (workspace), "Incoming" = worktree branch. */
+  .lamda-conflict-current {
+    background: color-mix(in srgb, var(--diff-add) 14%, transparent);
+  }
+  .lamda-conflict-incoming {
+    background: rgba(59, 130, 246, 0.12);
+  }
+  .lamda-conflict-base {
+    background: color-mix(in srgb, var(--muted-foreground) 12%, transparent);
+  }
+  /* Marker lines: hide the raw `<<<<<<< HEAD` text, keep the row as a bar. */
+  .lamda-conflict-marker-hidden {
+    color: transparent !important;
+  }
+  .lamda-conflict-header-current {
+    background: color-mix(in srgb, var(--diff-add) 28%, transparent);
+  }
+  .lamda-conflict-header-incoming {
+    background: rgba(59, 130, 246, 0.26);
+  }
+  .lamda-conflict-header-divider {
+    background: color-mix(in srgb, var(--muted-foreground) 16%, transparent);
+  }
+  .lamda-conflict-header-label {
+    font-weight: 600;
+    font-size: 0.85em;
+    opacity: 0.85;
+  }
+
   /* ── Monaco diff viewer ────────────────────────────────────────────────
      A bespoke skin over Monaco's diff editor so it reads as a first-class
      surface in the app: changed rows carry a left accent bar plus a soft
@@ -406,7 +439,11 @@
        darker / richer rather than washed out. */
     --lamda-diff-added: color-mix(in srgb, var(--diff-add) 80%, black);
     --lamda-diff-removed: color-mix(in srgb, var(--diff-remove) 80%, black);
-    --lamda-diff-gutter-bg: color-mix(in srgb, var(--card) 60%, var(--background));
+    --lamda-diff-gutter-bg: color-mix(
+      in srgb,
+      var(--card) 60%,
+      var(--background)
+    );
     --lamda-diff-line-alpha: 18%;
     --lamda-diff-char-alpha: 38%;
     --lamda-diff-border-alpha: 50%;
@@ -433,11 +470,16 @@
   .lamda-monaco-diff-viewer .monaco-editor .margin,
   .lamda-monaco-diff-viewer .monaco-editor .glyph-margin {
     background: var(--lamda-diff-gutter-bg) !important;
-    box-shadow: inset -1px 0 0 color-mix(in srgb, var(--border) 70%, transparent);
+    box-shadow: inset -1px 0 0
+      color-mix(in srgb, var(--border) 70%, transparent);
   }
   .lamda-monaco-diff-viewer .monaco-editor .line-numbers {
     background: transparent !important;
-    color: color-mix(in srgb, var(--muted-foreground) 72%, transparent) !important;
+    color: color-mix(
+      in srgb,
+      var(--muted-foreground) 72%,
+      transparent
+    ) !important;
     font-variant-numeric: tabular-nums;
     transition: color 0.1s ease;
   }
@@ -451,7 +493,11 @@
     color: var(--muted-foreground) !important;
   }
   .lamda-monaco-diff-viewer .monaco-diff-editor .diff-review {
-    background: color-mix(in srgb, var(--secondary) 42%, transparent) !important;
+    background: color-mix(
+      in srgb,
+      var(--secondary) 42%,
+      transparent
+    ) !important;
   }
   /* Crisp divider between the two panes in side-by-side mode. */
   .lamda-monaco-diff-viewer .monaco-diff-editor .editor.modified {
@@ -741,12 +787,24 @@
     justify-content: center !important;
   }
   .monaco-editor .find-widget .monaco-custom-toggle:hover {
-    background-color: color-mix(in srgb, var(--muted) 70%, transparent) !important;
+    background-color: color-mix(
+      in srgb,
+      var(--muted) 70%,
+      transparent
+    ) !important;
     color: var(--foreground) !important;
   }
   .monaco-editor .find-widget .monaco-custom-toggle.checked {
-    border-color: color-mix(in srgb, var(--primary) 38%, transparent) !important;
-    background-color: color-mix(in srgb, var(--primary) 14%, transparent) !important;
+    border-color: color-mix(
+      in srgb,
+      var(--primary) 38%,
+      transparent
+    ) !important;
+    background-color: color-mix(
+      in srgb,
+      var(--primary) 14%,
+      transparent
+    ) !important;
     color: var(--primary) !important;
   }
 
@@ -797,7 +855,11 @@
     height: 20px !important;
   }
   .monaco-editor .find-widget .button:not(.toggle):not(.disabled):hover {
-    background-color: color-mix(in srgb, var(--muted) 70%, transparent) !important;
+    background-color: color-mix(
+      in srgb,
+      var(--muted) 70%,
+      transparent
+    ) !important;
     color: var(--foreground) !important;
   }
   .monaco-editor
@@ -1035,7 +1097,12 @@
   /* ── Global scrollbars — thin, themed, subtle ────────────────────────── */
   * {
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--muted-foreground) 22%, transparent) transparent;
+    scrollbar-color: color-mix(
+        in srgb,
+        var(--muted-foreground) 22%,
+        transparent
+      )
+      transparent;
   }
 
   *::-webkit-scrollbar {
@@ -1076,7 +1143,12 @@
   /* ── xterm.js terminal scrollbar — narrower than the global ──────────── */
   .xterm-viewport {
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent) transparent;
+    scrollbar-color: color-mix(
+        in srgb,
+        var(--muted-foreground) 30%,
+        transparent
+      )
+      transparent;
   }
 
   .xterm-viewport::-webkit-scrollbar {

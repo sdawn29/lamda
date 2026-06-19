@@ -25,6 +25,7 @@ import {
   useInitializeGitRepository,
 } from "../mutations"
 import { useAheadBehind } from "../queries"
+import { parseApiError } from "../parse-error"
 
 interface BranchSelectorProps {
   branch: string | null
@@ -39,17 +40,6 @@ interface BranchSelectorProps {
   workspaceId?: string
 }
 
-function parseGitError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error)
-  const stripped = message.replace(/^API \d+:\s*/, "")
-
-  try {
-    const parsed = JSON.parse(stripped) as { error?: string }
-    return parsed.error ?? stripped
-  } catch {
-    return stripped
-  }
-}
 
 export function BranchSelector({
   branch,
@@ -83,7 +73,7 @@ export function BranchSelector({
       setDialogOpen(false)
       setNewBranch("")
     }
-    const onError = (error: unknown) => onGitError?.(parseGitError(error))
+    const onError = (error: unknown) => onGitError?.(parseApiError(error))
     if (sessionId) {
       createBranch.mutate(name, { onSuccess, onError })
     } else if (workspaceId) {
@@ -98,7 +88,7 @@ export function BranchSelector({
         setOpen(false)
       },
       onError: (error) => {
-        onGitError?.(parseGitError(error))
+        onGitError?.(parseApiError(error))
       },
     })
   }

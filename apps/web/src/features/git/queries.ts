@@ -212,6 +212,20 @@ export function useGitLog(sessionId: string) {
   })
 }
 
+// Timestamp (ms) of the most recent commit on HEAD, or 0 when the repo has no
+// commits yet. Turn cards use this as a "reset boundary": once a commit lands
+// after a turn ended, that turn's working-tree changes have been banked into
+// history, so its inline/sidebar card should disappear. Derived from the same
+// log query the history view already reads — no extra fetch, and it reflects
+// both user commits and agent-driven (`git commit`) ones.
+export function useLastCommitAt(sessionId: string): number {
+  const { data: entries } = useGitLog(sessionId)
+  const headDate = entries?.[0]?.date
+  if (!headDate) return 0
+  const parsed = Date.parse(headDate)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
 export function useGitShow(sessionId: string, sha: string, enabled: boolean) {
   return useQuery({
     queryKey: gitKeys.show(sessionId, sha),

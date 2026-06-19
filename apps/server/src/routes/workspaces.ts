@@ -60,9 +60,9 @@ async function teardownWorkspaceThreads(
 
   // Clean every managed worktree, including worktrees belonging to archived
   // threads (which are intentionally absent from listWorkspacesWithThreads).
-  for (const thread of threads) {
-    await removeOwnedThreadWorktree(workspacePath, thread);
-  }
+  await Promise.all(
+    threads.map((thread) => removeOwnedThreadWorktree(workspacePath, thread)),
+  );
 
   for (const thread of threads) {
     const session = store.getByThreadId(thread.id);

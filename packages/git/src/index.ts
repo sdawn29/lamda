@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -1052,6 +1052,36 @@ export async function resolveMergeConflict(
     acceptedDeletion = true;
   }
   if (acceptedDeletion) return;
+  await execFileAsync("git", ["add", "-A", "--", filePath], {
+    cwd: repoCwd,
+    timeout: 10000,
+  });
+}
+
+/**
+ * Reads the working-tree contents of a conflicted file — i.e. the version git
+ * wrote with `<<<<<<<` / `=======` / `>>>>>>>` markers — so it can be edited by
+ * hand. Callers must validate `filePath` against {@link listMergeConflicts}.
+ */
+export async function readConflictedFile(
+  repoCwd: string,
+  filePath: string,
+): Promise<string> {
+  return readFile(join(repoCwd, filePath), "utf8");
+}
+
+/**
+ * Writes a hand-resolved version of a conflicted file and stages it, marking the
+ * conflict resolved. Callers must validate `filePath` against
+ * {@link listMergeConflicts} first. The content is expected to be free of
+ * conflict markers, but git does not enforce that here.
+ */
+export async function writeResolvedConflict(
+  repoCwd: string,
+  filePath: string,
+  content: string,
+): Promise<void> {
+  await writeFile(join(repoCwd, filePath), content, "utf8");
   await execFileAsync("git", ["add", "-A", "--", filePath], {
     cwd: repoCwd,
     timeout: 10000,

@@ -182,10 +182,20 @@ function getGroupCreatedAt(group: MessageGroup): number | null {
 
 export function buildTurnCardsByGroup(
   groups: MessageGroup[],
-  turns: TurnSummary[]
+  turns: TurnSummary[],
+  // Timestamp (ms) of the latest commit. A completed turn that ended at or
+  // before this has had its changes committed, so its "Files changed this turn"
+  // card is stale (the revert checkpoint predates the commit) and is hidden.
+  // 0 disables the cutoff (no commits, or the caller doesn't track it).
+  committedBefore = 0
 ): Map<number, TurnSummary[]> {
   const completedTurns = turns
-    .filter((turn) => !turn.inProgress && turn.files.length > 0)
+    .filter(
+      (turn) =>
+        !turn.inProgress &&
+        turn.files.length > 0 &&
+        !(committedBefore > 0 && turn.endedAt <= committedBefore)
+    )
     .sort((a, b) => a.startedAt - b.startedAt || a.id - b.id)
   const groupTimes = groups.map(getGroupCreatedAt)
   const cardsByGroup = new Map<number, TurnSummary[]>()

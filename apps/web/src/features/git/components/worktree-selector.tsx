@@ -6,8 +6,10 @@ import {
   FolderGit2Icon,
   GitMergeIcon,
   CheckIcon,
+  CircleCheckIcon,
   FileWarningIcon,
   Loader2Icon,
+  PencilIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -53,10 +55,14 @@ import {
   useCreateThreadWorktree,
   useMergeThreadWorktree,
   useResolveThreadWorktreeConflict,
+  useResolveThreadWorktreeConflictContent,
   useContinueThreadWorktreeMerge,
   useAbortThreadWorktreeMerge,
 } from "@/features/workspace/mutations"
+import { getThreadWorktreeConflictFile } from "@/features/workspace/api"
 import { branchNameFromTitle } from "../branch-name"
+import { parseApiError } from "../parse-error"
+import { ConflictEditor, detectLanguage } from "./diff"
 
 interface WorktreeSelectorProps {
   threadId: string
@@ -72,16 +78,6 @@ interface WorktreeSelectorProps {
   onError?: (message: string) => void
 }
 
-function parseError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error)
-  const stripped = message.replace(/^API \d+:\s*/, "")
-  try {
-    const parsed = JSON.parse(stripped) as { error?: string }
-    return parsed.error ?? stripped
-  } catch {
-    return stripped
-  }
-}
 
 /** Surfaces the outcome of a completed worktree merge as a toast. */
 function notifyMergeDone(result: {
@@ -117,18 +113,24 @@ export function WorktreeSelector({
   // Set when a merge reports uncommitted changes, to confirm a forced merge.
   const [mergeConfirmOpen, setMergeConfirmOpen] = React.useState(false)
   const [conflictDialogOpen, setConflictDialogOpen] = React.useState(false)
-  const [conflictFiles, setConflictFiles] = React.useState<string[]>([])
+  const conflictFiles = React.useRef<string[]>([])
   const [remainingConflicts, setRemainingConflicts] = React.useState<string[]>(
     []
   )
   const [resolutions, setResolutions] = React.useState<
-    Record<string, "ours" | "theirs">
+    Record<string, "ours" | "theirs" | "manual">
   >({})
   const [mergeReadyToContinue, setMergeReadyToContinue] = React.useState(false)
+  // The file currently open in the manual (Monaco) resolver, its loaded
+  // working-tree contents (with conflict markers), and the load state.
+  const [editingFile, setEditingFile] = React.useState<string | null>(null)
+  const [editorContent, setEditorContent] = React.useState("")
+  const [editorLoading, setEditorLoading] = React.useState(false)
 
   const createWorktree = useCreateThreadWorktree()
   const mergeWorktree = useMergeThreadWorktree()
   const resolveConflict = useResolveThreadWorktreeConflict()
+  const resolveConflictContent = useResolveThreadWorktreeConflictContent()
   const continueMerge = useContinueThreadWorktreeMerge()
   const abortMerge = useAbortThreadWorktreeMerge()
 
@@ -137,10 +139,49 @@ export function WorktreeSelector({
 
   function resetConflictState() {
     setConflictDialogOpen(false)
-    setConflictFiles([])
+    conflictFiles.current = []
     setRemainingConflicts([])
     setResolutions({})
     setMergeReadyToContinue(false)
+    setEditingFile(null)
+    setEditorContent("")
+    setEditorLoading(false)
+  }
+
+  async function openEditor(filePath: string) {
+    setEditingFile(filePath)
+    setEditorContent("")
+    setEditorLoading(true)
+    try {
+      const { content } = await getThreadWorktreeConflictFile(
+        threadId,
+        filePath
+      )
+      setEditorContent(content)
+    } catch (error) {
+      reportError(parseApiError(error))
+      setEditingFile(null)
+    } finally {
+      setEditorLoading(false)
+    }
+  }
+
+  function handleSaveResolution() {
+    if (!editingFile) return
+    const filePath = editingFile
+    resolveConflictContent.mutate(
+      { threadId, filePath, content: editorContent },
+      {
+        onSuccess: ({ conflicts }) => {
+          setRemainingConflicts(conflicts)
+          setMergeReadyToContinue(conflicts.length === 0)
+          setResolutions((current) => ({ ...current, [filePath]: "manual" }))
+          setEditingFile(null)
+          setEditorContent("")
+        },
+        onError: (error) => reportError(parseApiError(error)),
+      }
+    )
   }
 
   function openDialog() {
@@ -165,7 +206,7 @@ export function WorktreeSelector({
           setDialogOpen(false)
           setNewBranch("")
         },
-        onError: (error) => reportError(parseError(error)),
+        onError: (error) => reportError(parseApiError(error)),
       }
     )
   }
@@ -182,7 +223,7 @@ export function WorktreeSelector({
             // Needs confirmation to discard uncommitted changes.
             setMergeConfirmOpen(true)
           } else if ("conflicts" in result) {
-            setConflictFiles(result.conflicts)
+            conflictFiles.current = result.conflicts
             setRemainingConflicts(result.conflicts)
             setResolutions({})
             setMergeReadyToContinue(result.readyToContinue)
@@ -191,7 +232,7 @@ export function WorktreeSelector({
             reportError(result.error)
           }
         },
-        onError: (error) => reportError(parseError(error)),
+        onError: (error) => reportError(parseApiError(error)),
       }
     )
   }
@@ -213,7 +254,7 @@ export function WorktreeSelector({
           setMergeReadyToContinue(conflicts.length === 0)
           setResolutions((current) => ({ ...current, [filePath]: strategy }))
         },
-        onError: (error) => reportError(parseError(error)),
+        onError: (error) => reportError(parseApiError(error)),
       }
     )
   }
@@ -226,7 +267,7 @@ export function WorktreeSelector({
           resetConflictState()
           notifyMergeDone(result)
         },
-        onError: (error) => reportError(parseError(error)),
+        onError: (error) => reportError(parseApiError(error)),
       }
     )
   }
@@ -236,12 +277,14 @@ export function WorktreeSelector({
       onSuccess: () => {
         resetConflictState()
       },
-      onError: (error) => reportError(parseError(error)),
+      onError: (error) => reportError(parseApiError(error)),
     })
   }
 
   // Show just "Worktree" / "Local" here; the branch name is the branch selector's job.
   const label = inWorktree ? "Worktree" : "Local"
+
+  const resolvedCount = conflictFiles.current.length - remainingConflicts.length
 
   return (
     <>
@@ -422,100 +465,216 @@ export function WorktreeSelector({
       </AlertDialog>
 
       <Dialog open={conflictDialogOpen}>
-        <DialogContent className="sm:max-w-2xl" showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>Resolve merge conflicts</DialogTitle>
-            <DialogDescription>
-              Choose which version to keep for each conflicted file before
-              completing the merge.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent
+          className={editingFile ? "sm:max-w-5xl" : "sm:max-w-2xl"}
+          showCloseButton={false}
+        >
+          {editingFile ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="truncate font-mono text-sm">
+                  {editingFile}
+                </DialogTitle>
+                <DialogDescription>
+                  For each conflict, use <strong>Accept Local</strong>,{" "}
+                  <strong>Accept Worktree</strong>, or{" "}
+                  <strong>Accept Both</strong> — or edit the file directly —
+                  then save.
+                </DialogDescription>
+              </DialogHeader>
 
-          <Alert>
-            <FileWarningIcon />
-            <AlertDescription>
-              “Local” is the workspace branch. “Worktree” is{" "}
-              {worktreeBranch ?? "the incoming branch"}.
-            </AlertDescription>
-          </Alert>
-
-          <div className="flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
-            {conflictFiles.length === 0 && (
-              <Alert variant={mergeReadyToContinue ? "default" : "destructive"}>
-                <AlertDescription>
-                  {mergeReadyToContinue
-                    ? "All conflicts are resolved. Complete the merge to finish cleanup."
-                    : "Git reports an unresolved merge, but no files were returned. Cancel the merge, then retry after checking the workspace Git status."}
-                </AlertDescription>
-              </Alert>
-            )}
-            {conflictFiles.map((filePath) => {
-              const resolution = resolutions[filePath]
-              const isRemaining = remainingConflicts.includes(filePath)
-              return (
-                <div
-                  key={filePath}
-                  className="flex flex-col gap-2 rounded-lg border p-3"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate font-mono text-xs">
-                      {filePath}
-                    </span>
-                    {resolution && !isRemaining && (
-                      <Badge variant="secondary">
-                        {resolution === "ours"
-                          ? "Keeping local"
-                          : "Keeping worktree"}
-                      </Badge>
-                    )}
+              <div className="h-[60vh] overflow-hidden rounded-md border">
+                {editorLoading ? (
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                    <Loader2Icon className="animate-spin" />
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={!isRemaining || resolveConflict.isPending}
-                      onClick={() => handleResolveConflict(filePath, "ours")}
-                    >
-                      Keep local
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={!isRemaining || resolveConflict.isPending}
-                      onClick={() => handleResolveConflict(filePath, "theirs")}
-                    >
-                      Keep worktree
-                    </Button>
+                ) : (
+                  <ConflictEditor
+                    value={editorContent}
+                    language={detectLanguage(editingFile) ?? undefined}
+                    onChange={setEditorContent}
+                  />
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  disabled={resolveConflictContent.isPending}
+                  onClick={() => {
+                    setEditingFile(null)
+                    setEditorContent("")
+                  }}
+                >
+                  Back
+                </Button>
+                <Button
+                  disabled={editorLoading || resolveConflictContent.isPending}
+                  onClick={handleSaveResolution}
+                >
+                  {resolveConflictContent.isPending && (
+                    <Loader2Icon className="animate-spin" />
+                  )}
+                  Save resolution
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Resolve merge conflicts</DialogTitle>
+                <DialogDescription>
+                  Pick a side for each file, or edit it in place to resolve the
+                  conflict by hand before completing the merge.
+                </DialogDescription>
+              </DialogHeader>
+
+              {conflictFiles.current.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-medium">
+                      {resolvedCount} of {conflictFiles.current.length} resolved
+                    </span>
+                    <span className="truncate text-2xs text-muted-foreground">
+                      Local = workspace · Worktree ={" "}
+                      {worktreeBranch ?? "incoming"}
+                    </span>
+                  </div>
+                  <div
+                    className="h-1.5 overflow-hidden rounded-full bg-muted"
+                    role="progressbar"
+                    aria-valuenow={resolvedCount}
+                    aria-valuemax={conflictFiles.current.length}
+                  >
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-[width] duration-300 dark:bg-emerald-400"
+                      style={{
+                        width: `${(resolvedCount / conflictFiles.current.length) * 100}%`,
+                      }}
+                    />
                   </div>
                 </div>
-              )
-            })}
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              disabled={abortMerge.isPending || continueMerge.isPending}
-              onClick={handleAbortMerge}
-            >
-              {abortMerge.isPending && <Loader2Icon className="animate-spin" />}
-              Cancel merge
-            </Button>
-            <Button
-              disabled={
-                !mergeReadyToContinue ||
-                remainingConflicts.length > 0 ||
-                continueMerge.isPending ||
-                abortMerge.isPending
-              }
-              onClick={handleContinueMerge}
-            >
-              {continueMerge.isPending && (
-                <Loader2Icon className="animate-spin" />
               )}
-              Complete merge
-            </Button>
-          </DialogFooter>
+
+              <div className="-mx-1 flex max-h-[50vh] flex-col gap-1.5 overflow-y-auto px-1">
+                {conflictFiles.current.length === 0 && (
+                  <Alert
+                    variant={mergeReadyToContinue ? "default" : "destructive"}
+                  >
+                    <AlertDescription>
+                      {mergeReadyToContinue
+                        ? "All conflicts are resolved. Complete the merge to finish cleanup."
+                        : "Git reports an unresolved merge, but no files were returned. Cancel the merge, then retry after checking the workspace Git status."}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {conflictFiles.current.map((filePath) => {
+                  const resolution = resolutions[filePath]
+                  const isRemaining = remainingConflicts.includes(filePath)
+                  const slash = filePath.lastIndexOf("/")
+                  const dir = slash === -1 ? "" : filePath.slice(0, slash + 1)
+                  const name =
+                    slash === -1 ? filePath : filePath.slice(slash + 1)
+                  return (
+                    <div
+                      key={filePath}
+                      data-resolved={!isRemaining}
+                      className="flex flex-col gap-2.5 rounded-lg border p-3 transition-colors data-[resolved=true]:border-border/60 data-[resolved=true]:bg-muted/40"
+                    >
+                      <div className="flex items-center gap-2">
+                        {isRemaining ? (
+                          <FileWarningIcon className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        ) : (
+                          <CircleCheckIcon className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        )}
+                        <span
+                          className="flex min-w-0 flex-1 items-baseline gap-1.5 font-mono"
+                          title={filePath}
+                        >
+                          <span className="max-w-[60%] shrink-0 truncate text-xs font-medium">
+                            {name}
+                          </span>
+                          {dir && (
+                            <span className="min-w-0 truncate text-2xs text-muted-foreground">
+                              {dir}
+                            </span>
+                          )}
+                        </span>
+                        {resolution && !isRemaining && (
+                          <Badge variant="secondary" className="shrink-0">
+                            {resolution === "ours"
+                              ? "Keeping local"
+                              : resolution === "theirs"
+                                ? "Keeping worktree"
+                                : "Edited"}
+                          </Badge>
+                        )}
+                      </div>
+                      {isRemaining && (
+                        <div className="flex gap-2 pl-6">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={resolveConflict.isPending}
+                            onClick={() =>
+                              handleResolveConflict(filePath, "ours")
+                            }
+                          >
+                            Keep local
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={resolveConflict.isPending}
+                            onClick={() =>
+                              handleResolveConflict(filePath, "theirs")
+                            }
+                          >
+                            Keep worktree
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditor(filePath)}
+                          >
+                            <PencilIcon />
+                            Edit
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  disabled={abortMerge.isPending || continueMerge.isPending}
+                  onClick={handleAbortMerge}
+                >
+                  {abortMerge.isPending && (
+                    <Loader2Icon className="animate-spin" />
+                  )}
+                  Cancel merge
+                </Button>
+                <Button
+                  disabled={
+                    !mergeReadyToContinue ||
+                    remainingConflicts.length > 0 ||
+                    continueMerge.isPending ||
+                    abortMerge.isPending
+                  }
+                  onClick={handleContinueMerge}
+                >
+                  {continueMerge.isPending && (
+                    <Loader2Icon className="animate-spin" />
+                  )}
+                  Complete merge
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>
