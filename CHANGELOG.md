@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.30.0](../../releases/tag/v0.30.0) — 2026-06-20
+
+### Features
+
+* implement checkout to local functionality for worktrees, including stashing changes
+
 ## [0.29.0](../../releases/tag/v0.29.0) — 2026-06-19
 
 ### Features
