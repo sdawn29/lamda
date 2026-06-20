@@ -1,8 +1,8 @@
-import { writeFile, mkdir, readdir } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { writeFile, mkdir, readdir, rm } from "node:fs/promises";
+import { join, extname, basename } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
-import type { AttachmentMetadata } from "@lamda/db";
+import { dbPath, type AttachmentMetadata } from "@lamda/db";
 
 const ATTACHMENTS_DIR_NAME = "attachments";
 const APP_DATA_DIR = join(homedir(), ".lamda");
@@ -12,6 +12,40 @@ const APP_DATA_DIR = join(homedir(), ".lamda");
  */
 function getAttachmentsDir(): string {
   return join(APP_DATA_DIR, ATTACHMENTS_DIR_NAME);
+}
+
+/**
+ * Remove every on-disk artifact under the app data dir (`~/.lamda`) — stored
+ * attachments, managed worktrees, prompt templates, etc. — while preserving the
+ * live SQLite database files. The database is held open by the running server
+ * and is already emptied logically by the caller (`deleteAllWorkspaces()`), so
+ * we leave `db.sqlite` and its `-wal`/`-shm` sidecars in place rather than risk
+ * corrupting the open connection. Used by the "Delete all data" reset.
+ */
+export async function clearAppDataDir(): Promise<void> {
+  const dbBasename = basename(dbPath);
+  const preserve = new Set([
+    dbBasename,
+    `${dbBasename}-wal`,
+    `${dbBasename}-shm`,
+    `${dbBasename}-journal`,
+  ]);
+
+  let entries: string[];
+  try {
+    entries = await readdir(APP_DATA_DIR);
+  } catch {
+    // Data dir doesn't exist yet — nothing to clear.
+    return;
+  }
+
+  await Promise.all(
+    entries
+      .filter((name) => !preserve.has(name))
+      .map((name) =>
+        rm(join(APP_DATA_DIR, name), { recursive: true, force: true }),
+      ),
+  );
 }
 
 /**

@@ -6,10 +6,30 @@
  * - "awaiting": agent is paused waiting for the user (a gated tool needs
  *   approval, or a `question` tool is awaiting an answer). The turn is still
  *   in progress; it resumes streaming once the user responds.
+ * - "error": the turn ended in failure (a server error, or an agent_end whose
+ *   final assistant message stopped with an error). Lets clients surface a
+ *   notification for threads that errored while not in the foreground.
  */
-export type ThreadStatus = "streaming" | "idle" | "awaiting";
+export type ThreadStatus = "streaming" | "idle" | "awaiting" | "error";
 
-export type ThreadStatusEvent = { threadId: string; status: ThreadStatus };
+/** Why a thread is awaiting the user — lets clients explain the prompt precisely. */
+export type ThreadAwaitingReason = "approval" | "question";
+
+/**
+ * Optional context that explains a status to the user:
+ * - `reason`: for "awaiting", whether a tool needs approval or a question was asked.
+ * - `detail`: a short human-readable specific — the tool name (approval), the
+ *   question text (question), or the error message (error).
+ */
+export interface ThreadStatusContext {
+  reason?: ThreadAwaitingReason;
+  detail?: string;
+}
+
+export type ThreadStatusEvent = {
+  threadId: string;
+  status: ThreadStatus;
+} & ThreadStatusContext;
 
 type Subscriber = (event: ThreadStatusEvent) => void;
 
@@ -21,10 +41,14 @@ class ThreadStatusBroadcaster {
     return () => this.subscribers.delete(fn);
   }
 
-  broadcast(threadId: string, status: ThreadStatus) {
+  broadcast(
+    threadId: string,
+    status: ThreadStatus,
+    context: ThreadStatusContext = {},
+  ) {
     for (const fn of this.subscribers) {
       try {
-        fn({ threadId, status });
+        fn({ threadId, status, ...context });
       } catch {}
     }
   }

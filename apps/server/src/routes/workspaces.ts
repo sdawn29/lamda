@@ -25,6 +25,7 @@ import { sessionEvents } from "../session-events.js";
 import { workspaceIndexer } from "../services/workspace-indexer.js";
 import { fileTreeService } from "../services/file-tree-service.js";
 import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
+import { clearAppDataDir } from "../lib/attachments.js";
 
 /**
  * Resolves the directory a file-tree request should read from: a thread's git
@@ -308,6 +309,7 @@ workspaces.delete("/reset", async (_c) => {
     }
   }
   deleteAllWorkspaces();
+  await clearAppDataDir();
   return new Response(null, { status: 204 });
 });
 

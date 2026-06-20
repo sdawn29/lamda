@@ -10,6 +10,19 @@ export type ThreadStatus =
   | "error"
   | "awaiting"
 
+/** Why a thread is awaiting the user. */
+export type ThreadAwaitingReason = "approval" | "question"
+
+/**
+ * Context explaining a thread's `awaiting` / `error` status, used to write a
+ * precise notification: what kind of prompt is pending and a short specific
+ * (tool name, question text, or error message).
+ */
+export interface ThreadAttention {
+  reason?: ThreadAwaitingReason
+  detail?: string
+}
+
 const STREAMED_THREADS_KEY = "lamda:streamed-threads"
 const COMPLETED_VIEW_TIMEOUT_MS = 5000
 
@@ -38,6 +51,8 @@ function cancelTimer(threadId: string): void {
 
 interface ThreadStatusStore {
   statuses: Record<string, ThreadStatus>
+  /** Per-thread context for the latest awaiting/error status, for notifications. */
+  attention: Record<string, ThreadAttention>
   activeThreadId: string | null
   /**
    * Threads that have streamed at least once. Persisted to localStorage so an
@@ -53,6 +68,7 @@ export const useThreadStatusStore = create<ThreadStatusStore>()(
   persist(
     (set, get) => ({
       statuses: {},
+      attention: {},
       activeThreadId: null,
       streamedThreads: {},
 
@@ -146,7 +162,9 @@ function handleGlobalMessage(e: MessageEvent): void {
     const data = JSON.parse(e.data as string) as {
       type: string
       threadId?: string
-      status?: "streaming" | "idle" | "awaiting"
+      status?: "streaming" | "idle" | "awaiting" | "error"
+      reason?: ThreadAwaitingReason
+      detail?: string
       workspaceId?: string
       root?: string
       dir?: string
@@ -166,13 +184,23 @@ function handleGlobalMessage(e: MessageEvent): void {
     }
     if (data.type === "thread_status" && data.threadId && data.status) {
       const { setStatus, isThreadStreamed } = useThreadStatusStore.getState()
+      // Record the context (why awaiting / what error) BEFORE flipping status,
+      // so the notification listener — which fires on the status change — reads
+      // the matching detail. Cleared on non-attention statuses to avoid staleness.
+      const attention: ThreadAttention =
+        data.status === "awaiting" || data.status === "error"
+          ? { reason: data.reason, detail: data.detail }
+          : {}
+      useThreadStatusStore.setState((s) => ({
+        attention: { ...s.attention, [data.threadId as string]: attention },
+      }))
       if (data.status === "idle") {
         setStatus(
           data.threadId,
           isThreadStreamed(data.threadId) ? "completed" : "idle"
         )
       } else {
-        // "streaming" and "awaiting" map through directly.
+        // "streaming", "awaiting" and "error" map through directly.
         setStatus(data.threadId, data.status)
       }
     }

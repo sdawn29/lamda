@@ -7,6 +7,7 @@ import {
   CircleCheckIcon,
   InfoIcon,
   Loader2Icon,
+  TriangleAlertIcon,
 } from "lucide-react"
 
 const Toaster = ({ ...props }: ToasterProps) => {
@@ -21,6 +22,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       icons={{
         success: <CircleCheckIcon className="size-5 text-emerald-500" />,
         info: <InfoIcon className="size-5 text-blue-500" />,
+        warning: <TriangleAlertIcon className="size-5 text-amber-500" />,
         error: <AlertOctagonIcon className="size-5 text-destructive" />,
         loading: (
           <Loader2Icon className="size-5 animate-spin text-muted-foreground" />

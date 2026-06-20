@@ -13,9 +13,11 @@ health.get("/models", (c) => c.json({ models: getAvailableModels() }));
 
 export function handleGlobalEventsWs(ws: WebSocket) {
   const unsubscribeThread = threadStatusBroadcaster.subscribe(
-    ({ threadId, status }) => {
+    ({ threadId, status, reason, detail }) => {
       if (ws.readyState !== 1 /* OPEN */) return;
-      ws.send(JSON.stringify({ type: "thread_status", threadId, status }));
+      ws.send(
+        JSON.stringify({ type: "thread_status", threadId, status, reason, detail }),
+      );
     },
   );
 

@@ -17,7 +17,7 @@ export { useApiErrorToasts } from "./hooks/use-api-error-toasts"
 // Queries
 export { chatKeys, messagesQueryKey, type WorkspaceEntry } from "./queries"
 // Core hooks
-export { useSessionStream, useVisibleMessages, useScrollMeta } from "./hooks"
+export { useSessionStream, useVisibleMessages, useScrollMeta, useThreadNotifications } from "./hooks"
 export type { PendingError } from "./hooks/use-scroll-meta"
 export type { UseSessionStreamOptions } from "./hooks/use-session-stream"
 export type { UseVisibleMessagesOptions } from "./hooks/use-visible-messages"

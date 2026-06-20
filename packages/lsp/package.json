@@ -13,11 +13,11 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "vscode-jsonrpc": "^8.2.1",
-    "vscode-languageserver-protocol": "^3.17.5"
+    "vscode-jsonrpc": "^9.0.0",
+    "vscode-languageserver-protocol": "^3.18.0"
   },
   "devDependencies": {
-    "@types/node": "^25.0.0",
-    "typescript": "~6.0.2"
+    "@types/node": "^26.0.0",
+    "typescript": "~6.0.3"
   }
 }

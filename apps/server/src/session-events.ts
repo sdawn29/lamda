@@ -175,6 +175,22 @@ function parseEventId(value?: string): number | null {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 }
 
+/**
+ * Pull the first question's text out of the `question` tool's args, so a thread
+ * status notification can say what was actually asked. Returns undefined when
+ * the args don't carry a usable question string.
+ */
+function firstQuestionText(args: unknown): string | undefined {
+  if (!args || typeof args !== "object") return undefined;
+  const questions = (args as { questions?: unknown }).questions;
+  if (!Array.isArray(questions)) return undefined;
+  for (const q of questions) {
+    const text = (q as { question?: unknown })?.question;
+    if (typeof text === "string" && text.trim()) return text.trim();
+  }
+  return undefined;
+}
+
 export interface TurnFileDetail {
   filePath: string;
   postStatusCode: string;
@@ -677,7 +693,10 @@ class SessionEventHub {
     // Remember it so a thread re-mount can restore the prompt via /status.
     this.pendingApprovals.set(payload.toolCallId, payload);
     // Surface in the sidebar: this thread is now paused waiting on the user.
-    threadStatusBroadcaster.broadcast(this.threadId, "awaiting");
+    threadStatusBroadcaster.broadcast(this.threadId, "awaiting", {
+      reason: "approval",
+      detail: payload.toolName,
+    });
     this.emit({ type: "tool_approval_request", ...payload });
   }
 
@@ -862,6 +881,29 @@ class SessionEventHub {
     scheduleReflection(this.threadId);
   }
 
+  /**
+   * The error message for a turn-ending event that represents a failure — a
+   * server error, or an agent_end whose final assistant message stopped with an
+   * error — or null for a normal end. Aborted turns are user cancellations, not
+   * errors, so they read as a normal (null) end.
+   */
+  private errorEndMessage(event: HubEvent): string | null {
+    if (event.type === "server_error") {
+      return (event as { message?: string }).message ?? "The agent errored.";
+    }
+    const msg = event as {
+      messages?: { role: string; stopReason?: string; errorMessage?: string }[];
+    };
+    const lastAssistant = msg.messages
+      ?.slice()
+      .reverse()
+      .find((m) => m.role === "assistant");
+    if (lastAssistant?.stopReason === "error" && lastAssistant.errorMessage) {
+      return lastAssistant.errorMessage;
+    }
+    return null;
+  }
+
   /** Derive a turn outcome from agent_end and notify the healing observer. */
   private notifyTurnEnd(event: SessionEvent): void {
     if (!agentTurnObserver) return;
@@ -1024,7 +1066,10 @@ class SessionEventHub {
       // The `question` tool blocks until the user answers — surface that pause
       // in the sidebar the same way a gated tool's approval prompt does.
       if (msg.toolName === "question") {
-        threadStatusBroadcaster.broadcast(this.threadId, "awaiting");
+        threadStatusBroadcaster.broadcast(this.threadId, "awaiting", {
+          reason: "question",
+          detail: firstQuestionText(msg.args),
+        });
       }
 
       // A duplicate start for a call we're already tracking would persist a
@@ -1232,7 +1277,14 @@ class SessionEventHub {
       // (including the abort path); clear any stragglers so the status snapshot
       // never restores a prompt for a turn that has already ended.
       this.pendingApprovals.clear();
-      threadStatusBroadcaster.broadcast(this.threadId, "idle");
+      // Broadcast "error" (not "idle") for failed turns so clients can notify
+      // about background threads that errored without being in the foreground.
+      const errorMessage = this.errorEndMessage(event);
+      threadStatusBroadcaster.broadcast(
+        this.threadId,
+        errorMessage ? "error" : "idle",
+        errorMessage ? { detail: errorMessage } : {},
+      );
     }
 
     for (const subscriber of this.subscribers.values()) {

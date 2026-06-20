@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/shared/ui/alert"
+import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import {
   Dialog,
@@ -70,30 +71,33 @@ export function AboutSection() {
   return (
     <>
       {/* App identity */}
-      <SettingsGroup title="App">
-        <SettingsRow
-          title="Name"
-          description="Local-first desktop workspace for AI-powered coding sessions"
-        >
-          <span className="text-sm font-semibold">Lamda</span>
-        </SettingsRow>
-        <SettingsRow title="Version" description="Current installed version">
-          <span className="font-mono text-sm">{version}</span>
-        </SettingsRow>
-        <SettingsRow title="License">
-          <span className="font-mono text-sm">{LICENSE}</span>
-        </SettingsRow>
-        <SettingsRow title="Source code" description="View on GitHub">
+      <section className="flex flex-col items-center gap-4 rounded-2xl border border-border/60 px-6 py-9 text-center">
+        <LamdaMark className="size-16 rounded-2xl text-4xl shadow-sm ring-1 ring-border/50" />
+        <div className="flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-xl font-semibold tracking-tight">Lamda</h2>
+            <Badge variant="secondary" className="font-mono tabular-nums">
+              {version}
+            </Badge>
+          </div>
+          <p className="max-w-sm text-xs/relaxed text-muted-foreground">
+            Local-first desktop workspace for AI-powered coding sessions
+          </p>
+        </div>
+        <div className="flex items-center gap-2 pt-1">
           <Button
             variant="outline"
             size="sm"
             onClick={() => openExternal(GITHUB_URL)}
           >
-            <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+            <ExternalLink data-icon="inline-start" />
             GitHub
           </Button>
-        </SettingsRow>
-      </SettingsGroup>
+          <Badge variant="outline" className="h-8 px-3 text-muted-foreground">
+            {LICENSE} License
+          </Badge>
+        </div>
+      </section>
 
       {/* Updates */}
       <SettingsGroup title="Updates">
@@ -164,21 +168,33 @@ export function AboutSection() {
         </SettingsRow>
       </SettingsGroup>
 
-      <SettingsGroup title="Danger zone">
-        <SettingsRow
-          title="Delete all data"
-          description="Permanently removes all workspaces, threads, and messages. This cannot be undone."
-        >
+      {/* Danger zone */}
+      <section className="overflow-hidden rounded-xl border border-destructive/30 bg-destructive/5">
+        <header className="flex items-center gap-2 border-b border-destructive/20 px-4 py-2.5">
+          <AlertTriangle className="size-3.5 text-destructive" />
+          <h2 className="text-sm font-medium tracking-tight text-destructive">
+            Danger zone
+          </h2>
+        </header>
+        <div className="flex items-center justify-between gap-6 px-4 py-3.5">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <p className="text-sm leading-snug">Delete all data</p>
+            <p className="text-xs/relaxed text-muted-foreground">
+              Permanently removes all workspaces, threads, and messages. This
+              cannot be undone.
+            </p>
+          </div>
           <Button
             variant="destructive"
             size="sm"
+            className="shrink-0"
             onClick={() => setShowConfirm(true)}
           >
             <Trash2 data-icon="inline-start" />
             Delete all
           </Button>
-        </SettingsRow>
-      </SettingsGroup>
+        </div>
+      </section>
 
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
         <DialogContent showCloseButton={false}>
@@ -207,6 +223,23 @@ export function AboutSection() {
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+/** The Lamda brand mark — the Greek lambda in gold on a dark rounded tile
+ * (matches the app favicon). */
+function LamdaMark({ className }: { className?: string }) {
+  return (
+    <span
+      role="img"
+      aria-label="Lamda"
+      className={cn(
+        "flex select-none items-center justify-center bg-[#09090b] font-semibold leading-none text-[#d4a017]",
+        className
+      )}
+    >
+      Λ
+    </span>
   )
 }
 

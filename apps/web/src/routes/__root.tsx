@@ -5,11 +5,15 @@ import {
 } from "@/features/electron"
 import { WorkspaceProvider } from "@/features/workspace"
 import { WorkspaceLayout } from "@/features/layout"
+import { useThreadNotifications } from "@/features/chat"
 import { ErrorBoundary } from "@/shared/components/error-boundary"
 import { SplashScreen } from "@/shared/components/splash-screen"
 import { Toaster } from "@/shared/ui/sonner"
 
 function RootLayoutInner() {
+  // Toast when any thread (foreground or not) needs approval, asks a question,
+  // or errors. Lives here so it has the router + workspace data in scope.
+  useThreadNotifications()
   return <WorkspaceLayout />
 }
 
