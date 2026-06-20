@@ -2,6 +2,7 @@ import * as React from "react"
 import {
   ChevronDownIcon,
   MonitorIcon,
+  MonitorDownIcon,
   GitBranchIcon,
   FolderGit2Icon,
   GitMergeIcon,
@@ -53,6 +54,7 @@ import {
 } from "@/shared/ui/select"
 import {
   useCreateThreadWorktree,
+  useCheckoutThreadWorktreeToLocal,
   useMergeThreadWorktree,
   useResolveThreadWorktreeConflict,
   useResolveThreadWorktreeConflictContent,
@@ -128,6 +130,7 @@ export function WorktreeSelector({
   const [editorLoading, setEditorLoading] = React.useState(false)
 
   const createWorktree = useCreateThreadWorktree()
+  const checkoutToLocal = useCheckoutThreadWorktreeToLocal()
   const mergeWorktree = useMergeThreadWorktree()
   const resolveConflict = useResolveThreadWorktreeConflict()
   const resolveConflictContent = useResolveThreadWorktreeConflictContent()
@@ -242,6 +245,25 @@ export function WorktreeSelector({
     runMerge(false)
   }
 
+  function handleCheckoutToLocal() {
+    setOpen(false)
+    checkoutToLocal.mutate(
+      { threadId, sessionId },
+      {
+        onSuccess: ({ branch, cleanupWarning }) => {
+          if (cleanupWarning) {
+            toast.warning("Checked out, but changes need attention", {
+              description: cleanupWarning,
+            })
+          } else {
+            toast.success(`Checked out ${branch} in the workspace`)
+          }
+        },
+        onError: (error) => reportError(parseApiError(error)),
+      }
+    )
+  }
+
   function handleResolveConflict(
     filePath: string,
     strategy: "ours" | "theirs"
@@ -354,6 +376,25 @@ export function WorktreeSelector({
                     <CheckIcon className="mt-0.5 ml-auto size-3.5 shrink-0" />
                   )}
                 </CommandItem>
+                {inWorktree && (
+                  <CommandItem
+                    disabled={checkoutToLocal.isPending}
+                    className="items-start gap-2 rounded-md px-2 py-1.5"
+                    onSelect={handleCheckoutToLocal}
+                  >
+                    <MonitorDownIcon className="mt-0.5 size-3.5 shrink-0" />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-xs font-medium">
+                        {checkoutToLocal.isPending
+                          ? "Checking out…"
+                          : "Checkout to local"}
+                      </span>
+                      <span className="text-3xs text-muted-foreground">
+                        Check out {worktreeBranch} locally, remove the worktree
+                      </span>
+                    </span>
+                  </CommandItem>
+                )}
                 {inWorktree && (
                   <CommandItem
                     disabled={mergeWorktree.isPending}

@@ -10,6 +10,7 @@ import {
   type CreateThreadWorktreeBody,
   enterThreadWorktree as apiEnterThreadWorktree,
   switchThreadToLocal as apiSwitchThreadToLocal,
+  checkoutThreadWorktreeToLocal as apiCheckoutThreadWorktreeToLocal,
   mergeThreadWorktree as apiMergeThreadWorktree,
   resolveThreadWorktreeConflict as apiResolveThreadWorktreeConflict,
   resolveThreadWorktreeConflictContent as apiResolveThreadWorktreeConflictContent,
@@ -154,6 +155,22 @@ export function useSwitchThreadToLocal() {
       threadId: string
       sessionId?: string | null
     }) => apiSwitchThreadToLocal(threadId),
+    onSuccess: (_data, { sessionId }) => {
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+      invalidateThreadGit(queryClient, sessionId)
+    },
+  })
+}
+
+export function useCheckoutThreadWorktreeToLocal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      threadId,
+    }: {
+      threadId: string
+      sessionId?: string | null
+    }) => apiCheckoutThreadWorktreeToLocal(threadId),
     onSuccess: (_data, { sessionId }) => {
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
       invalidateThreadGit(queryClient, sessionId)

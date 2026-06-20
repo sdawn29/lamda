@@ -38,6 +38,7 @@ import {
   gitDeleteCheckpointRef,
   getRepoRoot,
   getCurrentBranch,
+  checkoutBranch,
   addWorktree,
   deleteBranch,
   listWorktrees,
@@ -54,6 +55,9 @@ import {
   isRefAncestor,
   getRefSha,
   gitStatus,
+  gitStash,
+  gitStashList,
+  gitStashPop,
 } from "@lamda/git";
 import { parseGitError } from "./git.js";
 import { store } from "../store.js";
@@ -66,6 +70,23 @@ import {
 import { scheduleReflection } from "../services/memory-reflection.js";
 import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
 
+
+/**
+ * Finds the `stash@{N}` ref whose subject contains `message`. `git stash`
+ * records the message in the subject as `On <branch>: <message>`, so we match
+ * by substring rather than exact equality.
+ */
+async function findStashRef(
+  cwd: string,
+  message: string,
+): Promise<string | null> {
+  const list = await gitStashList(cwd).catch(() => "");
+  for (const line of list.split("\n")) {
+    const [ref, ...rest] = line.split("\t");
+    if (ref && rest.join("\t").includes(message)) return ref;
+  }
+  return null;
+}
 
 async function threadOwnsActiveGitMerge(
   thread: NonNullable<ReturnType<typeof getThread>>,
@@ -623,6 +644,127 @@ threads.post("/thread/:id/worktree/local", async (c) => {
       409,
     );
   }
+});
+
+// Return the thread to the workspace directory and check out the worktree's
+// branch there — no merge. The managed worktree is removed (which frees the
+// branch) and the workspace is switched onto that branch, so work continues
+// locally on the same branch.
+threads.post("/thread/:id/worktree/checkout-local", async (c) => {
+  const threadId = c.req.param("id");
+  const thread = getThread(threadId);
+  if (!thread) return c.json({ error: "Thread not found" }, 404);
+  const ws = getWorkspace(thread.workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+
+  if (!thread.worktreePath || !thread.worktreeBranch) {
+    return c.json({ error: "Thread is not in a worktree" }, 400);
+  }
+  if (thread.worktreeMergeInProgress) {
+    return c.json({ error: "Abort the active merge before going local" }, 409);
+  }
+  // A pre-existing (user-created) worktree must not be removed, and its branch
+  // can't be checked out in the workspace while that worktree holds it.
+  if (!thread.ownsWorktreeBranch) {
+    return c.json(
+      {
+        error:
+          "This thread uses a pre-existing worktree. Check out its branch from that worktree directly.",
+      },
+      409,
+    );
+  }
+
+  const repoRoot = await getRepoRoot(ws.path);
+  if (!repoRoot)
+    return c.json({ error: "Workspace is not a git repository" }, 400);
+
+  // The workspace must be clean so the branch can be checked out and the
+  // worktree's carried-over changes restored onto a known-clean tree.
+  let workspaceStatus: string;
+  try {
+    workspaceStatus = await gitStatus(ws.path);
+  } catch (error) {
+    return c.json(
+      { error: parseGitError(error, "Could not inspect workspace status") },
+      409,
+    );
+  }
+  if (workspaceStatus.trim()) {
+    return c.json(
+      {
+        error:
+          "The workspace has uncommitted changes. Commit or stash them before checking out the branch.",
+      },
+      409,
+    );
+  }
+
+  // Carry the worktree's uncommitted changes over instead of blocking on them:
+  // stash (incl. untracked) into the shared .git store before the worktree is
+  // removed, then pop onto the freshly checked-out branch in the workspace.
+  let worktreeStatus: string;
+  try {
+    worktreeStatus = await gitStatus(thread.worktreePath);
+  } catch (error) {
+    return c.json(
+      { error: parseGitError(error, "Could not inspect worktree status") },
+      409,
+    );
+  }
+  const worktreeDirty = worktreeStatus.trim().length > 0;
+  const stashMessage = `lamda-checkout-local-${threadId}-${Date.now()}`;
+
+  if (worktreeDirty) {
+    try {
+      await gitStash(thread.worktreePath, stashMessage);
+    } catch (error) {
+      return c.json(
+        { error: parseGitError(error, "Could not stash the worktree's changes") },
+        409,
+      );
+    }
+  }
+
+  const branch = thread.worktreeBranch;
+  const worktreePath = thread.worktreePath;
+  try {
+    await relocateThreadSession(threadId, ws.path);
+    if (existsSync(worktreePath)) {
+      await removeWorktree(repoRoot, worktreePath, true);
+    }
+    await pruneWorktrees(repoRoot);
+    await checkoutBranch(ws.path, branch);
+    clearThreadWorktree(threadId);
+  } catch (error) {
+    // Best-effort rollback: only meaningful if the worktree still exists.
+    if (existsSync(worktreePath)) {
+      await relocateThreadSession(threadId, worktreePath).catch(() => {});
+    }
+    return c.json(
+      { error: parseGitError(error, "Failed to check out the branch locally") },
+      409,
+    );
+  }
+
+  // Restore the carried-over changes. The branch is already checked out, so a
+  // pop failure is non-fatal: the stash remains in the list for recovery.
+  let cleanupWarning: string | undefined;
+  if (worktreeDirty) {
+    try {
+      const ref = await findStashRef(ws.path, stashMessage);
+      if (ref) {
+        await gitStashPop(ws.path, ref);
+      } else {
+        cleanupWarning =
+          "Your changes were stashed but the stash entry couldn't be located — run `git stash list` to recover them.";
+      }
+    } catch (error) {
+      cleanupWarning = `Branch checked out, but restoring your changes failed: ${parseGitError(error, "stash pop failed")}. They remain in the stash list (\`git stash list\`).`;
+    }
+  }
+
+  return c.json({ ok: true, branch, cleanupWarning });
 });
 
 // Merge the thread's worktree branch back into the workspace, then remove the

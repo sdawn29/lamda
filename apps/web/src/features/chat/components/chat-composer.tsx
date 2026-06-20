@@ -1220,6 +1220,8 @@ export const ChatComposer = memo(
                     onBranchSelect={onBranchSelect}
                     onGitError={onBranchError}
                     sessionId={sessionId}
+                    disabled={!!worktreeBranch}
+                    disabledReason="This thread runs in a worktree — its branch is managed by the worktree selector"
                   />
                 )}
                 {showBranch && threadId && (

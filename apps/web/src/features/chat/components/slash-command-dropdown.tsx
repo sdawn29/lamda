@@ -1,7 +1,7 @@
 import * as React from "react"
 import {
+  ContainerIcon,
   FileTextIcon,
-  ZapIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -176,10 +176,10 @@ function SlashItemIcon({ item }: { item: ChatSlashItem }) {
     )
   }
   return (
-    <ZapIcon
+    <ContainerIcon
       width={12}
       height={12}
-      className="shrink-0 text-purple-600 dark:text-purple-400"
+      className="shrink-0 text-muted-foreground"
       aria-hidden
     />
   )

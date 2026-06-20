@@ -38,6 +38,13 @@ interface BranchSelectorProps {
    * session exists (e.g. the new-thread page). Ignored when `sessionId` is set.
    */
   workspaceId?: string
+  /**
+   * Disables branch switching — used when the thread runs in a worktree, where
+   * the branch is fixed by the worktree and managed via the worktree selector.
+   */
+  disabled?: boolean
+  /** Tooltip shown on the trigger when `disabled`. */
+  disabledReason?: string
 }
 
 
@@ -48,6 +55,8 @@ export function BranchSelector({
   onGitError,
   sessionId,
   workspaceId,
+  disabled,
+  disabledReason,
 }: BranchSelectorProps) {
   const [open, setOpen] = React.useState(false)
   const [dialogOpen, setDialogOpen] = React.useState(false)
@@ -95,10 +104,17 @@ export function BranchSelector({
 
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={disabled ? false : open} onOpenChange={setOpen}>
         <PopoverTrigger
+          disabled={disabled}
           render={
-            <Button variant="ghost" size="sm" aria-expanded={open}>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={open}
+              disabled={disabled}
+              title={disabled ? disabledReason : undefined}
+            >
               <GitBranchIcon data-icon="inline-start" />
               <span>
                 {branch ?? (hasRepository ? "no branch" : "no repository")}

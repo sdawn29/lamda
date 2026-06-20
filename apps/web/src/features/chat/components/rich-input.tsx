@@ -1,5 +1,5 @@
 import * as React from "react"
-import { FileTextIcon, ZapIcon, type LucideIcon } from "lucide-react"
+import { ContainerIcon, FileTextIcon, type LucideIcon } from "lucide-react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { getIconName, buildCatppuccinSvgElement } from "@/shared/ui/file-icon"
 import { cn } from "@/shared/lib/utils"
@@ -115,7 +115,7 @@ const SKILL_CHIP_CLASS =
 
 function buildSlashCommandIcon(source: SlashCommand["source"]): SVGSVGElement {
   return source === "skill"
-    ? buildLucideIcon(ZapIcon, "text-purple-600 dark:text-purple-400")
+    ? buildLucideIcon(ContainerIcon)
     : buildLucideIcon(FileTextIcon)
 }
 

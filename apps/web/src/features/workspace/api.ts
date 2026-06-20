@@ -131,6 +131,24 @@ export function switchThreadToLocal(
   )
 }
 
+/**
+ * Removes the thread's managed worktree (keeping its branch) and checks that
+ * branch out in the workspace directory, so the thread continues locally on the
+ * same branch without merging. Uncommitted changes in the worktree are carried
+ * over (stash → pop); `cleanupWarning` is set if restoring them didn't apply
+ * cleanly and they were left in the stash list.
+ */
+export function checkoutThreadWorktreeToLocal(
+  threadId: string
+): Promise<{ ok: true; branch: string; cleanupWarning?: string }> {
+  return apiFetch<{ ok: true; branch: string; cleanupWarning?: string }>(
+    `/thread/${threadId}/worktree/checkout-local`,
+    {
+      method: "POST",
+    }
+  )
+}
+
 /** Result of a merge attempt. `uncommitted` asks the caller to confirm forcing. */
 export type MergeWorktreeResult =
   | { ok: true; branch: string; cleanupWarning?: string }

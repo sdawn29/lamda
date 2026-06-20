@@ -5,6 +5,7 @@ import {
   BrainIcon,
   CheckIcon,
   CircleDotIcon,
+  ContainerIcon,
   CopyIcon,
   FilePenLineIcon,
   FilePlus2Icon,
@@ -15,7 +16,6 @@ import {
   SearchIcon,
   SquareTerminalIcon,
   WrenchIcon,
-  ZapIcon,
 } from "lucide-react"
 import { FileIcon } from "@/shared/ui/file-icon"
 
@@ -686,14 +686,18 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     showEditContent || showReadContent || showWriteContent || showOtherContent
 
   // Bash reads as an action, not a tool name: "Running" while the command is in
-  // flight, "Ran" once it has finished (or errored — it still ran).
-  const toolLabel =
-    skillName ??
-    (normalizedToolName === "bash"
+  // flight, "Ran" once it has finished (or errored — it still ran). Skills read
+  // the same way: "Loading" while in flight, "Loaded" once done, with the skill
+  // name shown alongside.
+  const toolLabel = skillName
+    ? msg.status === "running"
+      ? "Loading"
+      : "Loaded"
+    : normalizedToolName === "bash"
       ? msg.status === "running"
         ? "Running"
         : "Ran"
-      : msg.toolName)
+      : msg.toolName
 
   return (
     <div
@@ -712,10 +716,16 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         aria-expanded={hasBody ? expanded : undefined}
       >
         {skillName ? (
-          <span className="flex shrink-0 items-center gap-1 rounded-md bg-purple-500/10 px-1.5 py-0.5 text-2xs font-medium text-purple-600 dark:text-purple-400">
-            <ZapIcon className="h-3 w-3 shrink-0" />
-            <span className="leading-none">Skill</span>
-          </span>
+          <ContainerIcon
+            className={cn(
+              "h-3 w-3 shrink-0",
+              msg.status === "running"
+                ? "animate-pulse text-foreground/50"
+                : msg.status === "error"
+                  ? "text-destructive/60"
+                  : DISCLOSURE_DIM
+            )}
+          />
         ) : (
           <ToolGlyph
             toolName={msg.toolName}
@@ -732,21 +742,24 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
         <span
           className={cn(
-            "text-xs font-medium",
-            skillName ? "min-w-0 truncate" : "shrink-0",
+            "shrink-0 text-xs font-medium",
             msg.status === "running"
               ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
               : msg.status === "error"
                 ? "text-destructive/70"
-                : skillName
-                  ? "text-foreground/70"
-                  : DISCLOSURE_LABEL_DONE
+                : DISCLOSURE_LABEL_DONE
           )}
         >
           {toolLabel}
         </span>
 
-        {skillName ? null : displayFilePath ? (
+        {skillName ? (
+          <span
+            className={cn("min-w-0 flex-1 truncate text-xs", DISCLOSURE_DIM)}
+          >
+            {skillName}
+          </span>
+        ) : displayFilePath ? (
           <span
             className={cn(
               "flex min-w-0 flex-1 items-center gap-1 text-xs",

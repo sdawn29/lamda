@@ -1,4 +1,4 @@
-import { FileTextIcon, ZapIcon } from "lucide-react"
+import { ContainerIcon, FileTextIcon } from "lucide-react"
 import { Icon } from "@iconify/react"
 
 import { cn } from "@/shared/lib/utils"
@@ -62,9 +62,9 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
       }
       icon={
         isSkill ? (
-          <ZapIcon
+          <ContainerIcon
             data-icon="inline-start"
-            className="text-purple-600 dark:text-purple-400"
+            className="text-muted-foreground"
             aria-hidden
           />
         ) : (
@@ -86,7 +86,7 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
               )}
             >
               {isSkill ? (
-                <ZapIcon className="size-3.5" aria-hidden />
+                <ContainerIcon className="size-3.5 text-muted-foreground" aria-hidden />
               ) : (
                 <FileTextIcon className="size-3.5" aria-hidden />
               )}
