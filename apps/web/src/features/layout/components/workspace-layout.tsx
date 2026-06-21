@@ -29,6 +29,11 @@ const TerminalPanel = lazy(() =>
   import("@/features/terminal").then((m) => ({ default: m.TerminalPanel }))
 )
 
+// Smallest the central chat/editor column may shrink to. Both the right
+// sidebar's resize gutter and the window-resize layout clamp against this so
+// the chat panel always stays usable.
+const MIN_CHAT_PANEL_WIDTH = 420
+
 export function MainContentArea() {
   return (
     <div className="relative h-full overflow-hidden">
@@ -155,12 +160,20 @@ export function WorkspaceLayout() {
       // the cursor 1:1 instead of easing toward each new width.
       if (sidebarRef.current) sidebarRef.current.style.transition = "none"
 
+      // Cap the sidebar so the chat panel never drops below its minimum width.
+      const containerWidth =
+        sidebarRef.current?.parentElement?.clientWidth ?? Infinity
+      const maxWidth = Math.min(
+        800,
+        Math.max(240, containerWidth - MIN_CHAT_PANEL_WIDTH)
+      )
+
       const onMove = (ev: MouseEvent) => {
         if (!isDragging.current) return
         const delta = dragStartX.current - ev.clientX
         const next = Math.max(
           240,
-          Math.min(800, dragStartWidth.current + delta)
+          Math.min(maxWidth, dragStartWidth.current + delta)
         )
         // Bypass React re-renders during drag — update the CSS variable directly
         if (sidebarRef.current) {
@@ -180,7 +193,7 @@ export function WorkspaceLayout() {
         const delta = dragStartX.current - ev.clientX
         const finalWidth = Math.max(
           240,
-          Math.min(800, dragStartWidth.current + delta)
+          Math.min(maxWidth, dragStartWidth.current + delta)
         )
         setRightSidebarWidth(finalWidth)
       }
@@ -378,8 +391,11 @@ export function WorkspaceLayout() {
               terminal island stacked below it, with a resize gutter as the gap.
               Chrome lives in the unified titlebar island above. */}
           <div
-            className="flex h-full min-w-0 flex-1 flex-col overflow-hidden"
-            style={{ display: diffFullscreen ? "none" : undefined }}
+            className="flex h-full flex-1 flex-col overflow-hidden"
+            style={{
+              display: diffFullscreen ? "none" : undefined,
+              minWidth: MIN_CHAT_PANEL_WIDTH,
+            }}
           >
             <SidebarInset className="min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-border shadow-md">
               <div className="min-h-0 flex-1 overflow-hidden">
