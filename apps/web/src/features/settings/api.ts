@@ -108,6 +108,37 @@ export type LocalProviderApi =
   | "anthropic-messages"
   | "google-generative-ai"
 
+/** Mirrors the pi-ai `OpenAICompletionsCompat.thinkingFormat` enum. */
+export type ThinkingFormat =
+  | "openai"
+  | "openrouter"
+  | "deepseek"
+  | "together"
+  | "zai"
+  | "qwen"
+  | "chat-template"
+  | "qwen-chat-template"
+  | "string-thinking"
+  | "ant-ling"
+
+export type ChatTemplateKwargValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { $var: "thinking.enabled" | "thinking.effort"; omitWhenOff?: boolean }
+
+export interface ProviderCompat {
+  supportsDeveloperRole?: boolean
+  supportsReasoningEffort?: boolean
+  supportsUsageInStreaming?: boolean
+  maxTokensField?: "max_completion_tokens" | "max_tokens"
+  thinkingFormat?: ThinkingFormat
+  /** Sent as `chat_template_kwargs` when `thinkingFormat` is `"chat-template"`. */
+  chatTemplateKwargs?: Record<string, ChatTemplateKwargValue>
+  [k: string]: unknown
+}
+
 export interface LocalModelConfig {
   id: string
   name?: string
@@ -115,7 +146,7 @@ export interface LocalModelConfig {
   input?: ("text" | "image")[]
   contextWindow?: number
   maxTokens?: number
-  compat?: Record<string, unknown>
+  compat?: ProviderCompat
 }
 
 export interface LocalProviderConfig {
@@ -124,7 +155,7 @@ export interface LocalProviderConfig {
   apiKey?: string
   headers?: Record<string, string>
   authHeader?: boolean
-  compat?: Record<string, unknown>
+  compat?: ProviderCompat
   models: LocalModelConfig[]
 }
 

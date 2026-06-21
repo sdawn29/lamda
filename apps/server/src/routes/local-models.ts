@@ -21,6 +21,63 @@ const VALID_APIS = new Set([
   "google-generative-ai",
 ]);
 
+const VALID_THINKING_FORMATS = new Set([
+  "openai",
+  "openrouter",
+  "deepseek",
+  "together",
+  "zai",
+  "qwen",
+  "chat-template",
+  "qwen-chat-template",
+  "string-thinking",
+  "ant-ling",
+]);
+
+/**
+ * Validate the `compat` block's thinking-related fields. `thinkingFormat`
+ * must be a known value, and `chat-template` requires a non-empty
+ * `chatTemplateKwargs` object — otherwise Pi's thinking levels have nowhere
+ * to map and the setting silently does nothing.
+ */
+function validateCompat(compat: unknown): string | undefined {
+  if (compat === undefined) return undefined;
+  if (!compat || typeof compat !== "object") {
+    return "compat must be an object";
+  }
+  const { thinkingFormat, chatTemplateKwargs } = compat as Record<
+    string,
+    unknown
+  >;
+  if (
+    thinkingFormat !== undefined &&
+    (typeof thinkingFormat !== "string" ||
+      !VALID_THINKING_FORMATS.has(thinkingFormat))
+  ) {
+    return `thinkingFormat must be one of: ${[...VALID_THINKING_FORMATS].join(", ")}`;
+  }
+  if (chatTemplateKwargs !== undefined) {
+    if (
+      !chatTemplateKwargs ||
+      typeof chatTemplateKwargs !== "object" ||
+      Array.isArray(chatTemplateKwargs)
+    ) {
+      return "chatTemplateKwargs must be a JSON object";
+    }
+    if (Object.keys(chatTemplateKwargs).length === 0) {
+      return "chatTemplateKwargs must have at least one entry";
+    }
+  }
+  if (
+    thinkingFormat === "chat-template" &&
+    (chatTemplateKwargs === undefined ||
+      Object.keys(chatTemplateKwargs as object).length === 0)
+  ) {
+    return 'thinkingFormat "chat-template" requires chatTemplateKwargs (e.g. { "thinking": { "$var": "thinking.enabled" } })';
+  }
+  return undefined;
+}
+
 /** Trim and drop trailing slashes so `${baseUrl}/chat/completions` is well-formed. */
 function normalizeBaseUrl(url: string): string {
   return url.trim().replace(/\/+$/, "");
@@ -101,7 +158,11 @@ function validateProvider(body: unknown): {
     if (!m || typeof m !== "object" || typeof (m as { id?: unknown }).id !== "string") {
       return { ok: false, error: "each model requires a string id" };
     }
+    const modelCompatError = validateCompat((m as { compat?: unknown }).compat);
+    if (modelCompatError) return { ok: false, error: modelCompatError };
   }
+  const compatError = validateCompat(c.compat);
+  if (compatError) return { ok: false, error: compatError };
   return { ok: true, config: body as LocalProviderConfig };
 }
 

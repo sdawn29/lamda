@@ -45,9 +45,15 @@ import {
 } from "@/shared/ui/select"
 import { useOpenExternal } from "@/features/electron"
 import { getProviderMeta } from "@/shared/lib/provider-meta"
-import type { LocalProviderApi, LocalProviderConfig } from "../api"
+import type {
+  LocalProviderApi,
+  LocalProviderConfig,
+  ProviderCompat,
+  ThinkingFormat,
+} from "../api"
 import { useLocalProviders } from "../queries"
 import { useDeleteLocalProvider, useSaveLocalProvider } from "../mutations"
+import { SettingsGroup, SettingsRow } from "../components/settings-ui"
 
 // ── Presets ─────────────────────────────────────────────────────────────────
 
@@ -109,6 +115,33 @@ const API_OPTIONS: { value: LocalProviderApi; label: string }[] = [
   { value: "google-generative-ai", label: "Google Generative AI" },
 ]
 
+/**
+ * How a reasoning model receives its thinking controls. "auto" is the
+ * default `reasoning_effort` behaviour (stored as no `thinkingFormat`). The
+ * rest map Pi's thinking levels into provider-specific request fields — most
+ * relevant for self-hosted vLLM / Hugging Face servers. See the pi-coding-agent
+ * `docs/models.md` "OpenAI Compatibility" table.
+ */
+const AUTO_THINKING_FORMAT = "auto" as const
+
+const THINKING_FORMAT_OPTIONS: {
+  value: ThinkingFormat | typeof AUTO_THINKING_FORMAT
+  label: string
+}[] = [
+  { value: AUTO_THINKING_FORMAT, label: "Auto (reasoning_effort)" },
+  { value: "deepseek", label: "DeepSeek (thinking + reasoning_effort)" },
+  { value: "qwen", label: "Qwen (enable_thinking)" },
+  { value: "qwen-chat-template", label: "Qwen chat template" },
+  { value: "chat-template", label: "Chat template (custom)" },
+]
+
+/** Sensible starting point for DeepSeek V3.x behind vLLM. */
+const DEFAULT_CHAT_TEMPLATE_KWARGS = JSON.stringify(
+  { thinking: { $var: "thinking.enabled" } },
+  null,
+  2
+)
+
 function presetForId(id: string): Preset {
   return PRESETS.find((p) => p.id === id) ?? PRESETS[PRESETS.length - 1]
 }
@@ -151,6 +184,14 @@ function ConfigureProviderDialog({
   )
   const [reasoning, setReasoning] = useState(
     edit ? (edit.config.models.some((m) => m.reasoning) ?? false) : false
+  )
+  const [thinkingFormat, setThinkingFormat] = useState<
+    ThinkingFormat | typeof AUTO_THINKING_FORMAT
+  >(edit?.config.compat?.thinkingFormat ?? AUTO_THINKING_FORMAT)
+  const [chatTemplateKwargs, setChatTemplateKwargs] = useState(() =>
+    edit?.config.compat?.chatTemplateKwargs
+      ? JSON.stringify(edit.config.compat.chatTemplateKwargs, null, 2)
+      : DEFAULT_CHAT_TEMPLATE_KWARGS
   )
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
@@ -206,10 +247,33 @@ function ConfigureProviderDialog({
     // OpenAI-compatible local servers (Ollama, vLLM, …) commonly reject the
     // `developer` role and `reasoning_effort` used for reasoning models.
     if (reasoning && api === "openai-completions") {
-      config.compat = {
+      const compat: ProviderCompat = {
         supportsDeveloperRole: false,
         supportsReasoningEffort: false,
       }
+      if (thinkingFormat !== AUTO_THINKING_FORMAT) {
+        compat.thinkingFormat = thinkingFormat
+      }
+      if (thinkingFormat === "chat-template") {
+        let parsed: unknown
+        try {
+          parsed = JSON.parse(chatTemplateKwargs)
+        } catch {
+          setError("Chat template kwargs must be valid JSON.")
+          return
+        }
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          setError("Chat template kwargs must be a JSON object.")
+          return
+        }
+        if (Object.keys(parsed).length === 0) {
+          setError("Add at least one chat template kwarg.")
+          return
+        }
+        compat.chatTemplateKwargs =
+          parsed as ProviderCompat["chatTemplateKwargs"]
+      }
+      config.compat = compat
     }
 
     saveMutation.mutate(
@@ -377,6 +441,79 @@ function ConfigureProviderDialog({
               onCheckedChange={setReasoning}
             />
           </Field>
+
+          {reasoning && api === "openai-completions" && (
+            <Field>
+              <FieldLabel htmlFor="local-thinking-format">
+                Thinking format
+              </FieldLabel>
+              <Select
+                value={thinkingFormat}
+                onValueChange={(v) => {
+                  if (typeof v === "string")
+                    setThinkingFormat(
+                      v as ThinkingFormat | typeof AUTO_THINKING_FORMAT
+                    )
+                }}
+              >
+                <SelectTrigger id="local-thinking-format">
+                  <SelectValue>
+                    {
+                      THINKING_FORMAT_OPTIONS.find(
+                        (o) => o.value === thinkingFormat
+                      )?.label
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {THINKING_FORMAT_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                How thinking levels reach the server. Pick{" "}
+                <strong>Chat template</strong> for vLLM / Hugging Face models
+                that read <code className="text-2xs">chat_template_kwargs</code>{" "}
+                (e.g. DeepSeek V3.x).
+              </FieldDescription>
+            </Field>
+          )}
+
+          {reasoning &&
+            api === "openai-completions" &&
+            thinkingFormat === "chat-template" && (
+              <Field>
+                <FieldLabel htmlFor="local-chat-template-kwargs">
+                  Chat template kwargs
+                </FieldLabel>
+                <Textarea
+                  id="local-chat-template-kwargs"
+                  value={chatTemplateKwargs}
+                  onChange={(e) => setChatTemplateKwargs(e.target.value)}
+                  className="min-h-24 font-mono text-xs"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <FieldDescription>
+                  JSON sent as{" "}
+                  <code className="text-2xs">chat_template_kwargs</code>. Bind a
+                  Pi-controlled value with{" "}
+                  <code className="text-2xs">
+                    {'{ "$var": "thinking.enabled" }'}
+                  </code>{" "}
+                  or{" "}
+                  <code className="text-2xs">
+                    {'{ "$var": "thinking.effort" }'}
+                  </code>
+                  .
+                </FieldDescription>
+              </Field>
+            )}
 
           <Field>
             <FieldLabel htmlFor="local-key">API key (optional)</FieldLabel>
@@ -547,37 +684,36 @@ function ProviderRow({
 }) {
   const { icon } = getProviderMeta(id)
   return (
-    <div className="flex items-start justify-between gap-3 py-3">
-      <div className="flex min-w-0 items-start gap-2">
-        <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
-          {icon ?? <Server className="h-4 w-4 text-muted-foreground" />}
+    <SettingsRow
+      className="items-start"
+      title={
+        <span className="flex items-center gap-2">
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+            {icon ?? <Server className="h-4 w-4 text-muted-foreground" />}
+          </span>
+          <span className="truncate font-medium">{id}</span>
+          <Badge variant="secondary">{config.models.length} models</Badge>
         </span>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-medium">{id}</p>
-            <Badge variant="secondary">{config.models.length} models</Badge>
-          </div>
-          <p className="truncate font-mono text-2xs text-muted-foreground">
+      }
+      description={
+        <>
+          <span className="block truncate font-mono text-2xs">
             {config.baseUrl}
-          </p>
-          <p className="mt-0.5 truncate text-2xs text-muted-foreground">
+          </span>
+          <span className="mt-0.5 block truncate">
             {config.models.map((m) => m.id).join(", ")}
-          </p>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs"
-          onClick={onEdit}
-        >
+          </span>
+        </>
+      }
+    >
+      <div className="flex items-center gap-1.5">
+        <Button variant="outline" size="sm" onClick={onEdit}>
           Edit
         </Button>
         <Button
           variant="ghost"
           size="icon-sm"
-          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          className="text-muted-foreground hover:text-destructive"
           onClick={onDelete}
           disabled={isDeleting}
           aria-label={`Remove ${id}`}
@@ -589,7 +725,7 @@ function ProviderRow({
           )}
         </Button>
       </div>
-    </div>
+    </SettingsRow>
   )
 }
 
@@ -623,62 +759,49 @@ export function LocalModelsSection() {
   }
 
   return (
-    <div className="flex flex-col gap-9">
-      <section className="flex flex-col gap-2">
-        <div>
-          <h2 className="text-sm font-medium tracking-tight">
-            Configuration steps
-          </h2>
-          <p className="mt-0.5 text-xs/relaxed text-muted-foreground">
-            Run a local model server, then register its models below. No API key
-            or internet connection required.
-          </p>
+    <>
+      <SettingsGroup
+        title="Configuration steps"
+        description="Run a local model server, then register its models below. No API key or internet connection required."
+      >
+        <div className="pt-2">
+          <SetupGuide />
         </div>
-        <SetupGuide />
-      </section>
+      </SettingsGroup>
 
-      <section className="flex flex-col">
-        <div className="flex items-center justify-between gap-3 pb-2">
-          <h2 className="text-sm font-medium tracking-tight">
-            Configured providers
-          </h2>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs"
-            onClick={openAdd}
-          >
+      <SettingsGroup
+        title="Configured providers"
+        action={
+          <Button size="sm" variant="outline" onClick={openAdd}>
             <Plus data-icon="inline-start" />
             Add provider
           </Button>
-        </div>
-
+        }
+      >
         {isLoading ? (
-          <p className="text-xs text-muted-foreground">Loading…</p>
+          <p className="py-3.5 text-xs text-muted-foreground">Loading…</p>
         ) : data?.error ? (
-          <p className="flex items-start gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
+          <p className="my-2 flex items-start gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span className="whitespace-pre-wrap">{data.error}</span>
           </p>
         ) : entries.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border/60 px-4 py-8 text-center text-xs text-muted-foreground">
+          <p className="my-2 rounded-lg border border-dashed border-border/60 px-4 py-8 text-center text-xs text-muted-foreground">
             No local providers configured yet.
           </p>
         ) : (
-          <div className="divide-y divide-border/50">
-            {entries.map(([id, config]) => (
-              <ProviderRow
-                key={id}
-                id={id}
-                config={config}
-                onEdit={() => openEdit(id, config)}
-                onDelete={() => handleDelete(id)}
-                isDeleting={deletingId === id}
-              />
-            ))}
-          </div>
+          entries.map(([id, config]) => (
+            <ProviderRow
+              key={id}
+              id={id}
+              config={config}
+              onEdit={() => openEdit(id, config)}
+              onDelete={() => handleDelete(id)}
+              isDeleting={deletingId === id}
+            />
+          ))
         )}
-      </section>
+      </SettingsGroup>
 
       {dialogOpen && (
         <ConfigureProviderDialog
@@ -691,6 +814,6 @@ export function LocalModelsSection() {
           onClose={() => setDialogOpen(false)}
         />
       )}
-    </div>
+    </>
   )
 }

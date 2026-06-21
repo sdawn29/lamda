@@ -10,6 +10,8 @@ import { cn } from "@/shared/lib/utils"
 interface SettingsGroupProps {
   title?: string
   description?: ReactNode
+  /** Optional control aligned to the right edge of the group header. */
+  action?: ReactNode
   children: ReactNode
   className?: string
 }
@@ -18,21 +20,25 @@ interface SettingsGroupProps {
 export function SettingsGroup({
   title,
   description,
+  action,
   children,
   className,
 }: SettingsGroupProps) {
   return (
     <section className={cn("flex flex-col", className)}>
-      {(title || description) && (
-        <header className="flex flex-col gap-0.5 pb-1">
-          {title && (
-            <h2 className="text-sm font-medium tracking-tight">{title}</h2>
-          )}
-          {description && (
-            <p className="text-xs/relaxed text-muted-foreground">
-              {description}
-            </p>
-          )}
+      {(title || description || action) && (
+        <header className="flex items-start justify-between gap-4 pb-1">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            {title && (
+              <h2 className="text-sm font-medium tracking-tight">{title}</h2>
+            )}
+            {description && (
+              <p className="text-xs/relaxed text-muted-foreground">
+                {description}
+              </p>
+            )}
+          </div>
+          {action && <div className="flex shrink-0 items-center">{action}</div>}
         </header>
       )}
       <div className="divide-y divide-border/50">{children}</div>

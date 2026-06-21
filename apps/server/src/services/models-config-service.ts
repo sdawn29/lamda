@@ -11,12 +11,44 @@ import { join, dirname } from "path";
 
 export const MODELS_FILE = join(homedir(), ".pi", "agent", "models.json");
 
+/**
+ * How the provider expects the reasoning/thinking parameter. Mirrors the
+ * pi-ai `OpenAICompletionsCompat.thinkingFormat` enum. `"chat-template"` maps
+ * Pi's thinking levels into `chat_template_kwargs` for vLLM / Hugging Face
+ * chat-template models (e.g. DeepSeek V3.x behind vLLM).
+ */
+export type ThinkingFormat =
+  | "openai"
+  | "openrouter"
+  | "deepseek"
+  | "together"
+  | "zai"
+  | "qwen"
+  | "chat-template"
+  | "qwen-chat-template"
+  | "string-thinking"
+  | "ant-ling";
+
+/**
+ * A single `chat_template_kwargs` value. Use the `$var` form to bind a Pi
+ * thinking value, e.g. `{ "$var": "thinking.enabled" }`.
+ */
+export type ChatTemplateKwargValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { $var: "thinking.enabled" | "thinking.effort"; omitWhenOff?: boolean };
+
 /** OpenAI-compatibility flags. Only the subset relevant to local servers. */
 export interface ProviderCompat {
   supportsDeveloperRole?: boolean;
   supportsReasoningEffort?: boolean;
   supportsUsageInStreaming?: boolean;
   maxTokensField?: "max_completion_tokens" | "max_tokens";
+  thinkingFormat?: ThinkingFormat;
+  /** Sent as `chat_template_kwargs` when `thinkingFormat` is `"chat-template"`. */
+  chatTemplateKwargs?: Record<string, ChatTemplateKwargValue>;
   [k: string]: unknown;
 }
 

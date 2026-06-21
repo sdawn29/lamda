@@ -50,6 +50,7 @@ import {
 } from "../mutations"
 import { cn } from "@/shared/lib/utils"
 import { getProviderMeta } from "@/shared/lib/provider-meta"
+import { SettingsGroup, SettingsRow } from "./settings-ui"
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 
@@ -418,193 +419,181 @@ export function SubscriptionsCard() {
       : null
 
   return (
-    <div className="flex flex-col">
+    <SettingsGroup>
       {isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
+        <p className="py-3.5 text-xs text-muted-foreground">Loading…</p>
       ) : !providers?.length ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="py-3.5 text-xs text-muted-foreground">
           No OAuth providers available.
         </p>
       ) : (
-        <div className="divide-y divide-border/50">
-          {providers.map((p) => {
-            const isActive = activeProviderId === p.id
-            const isPending = isActive && loginState.status === "connecting"
-            const isDone = isActive && loginState.status === "done"
-            const showSignedIn = (p.loggedIn && !isActive) || isDone
+        providers.map((p) => {
+          const isActive = activeProviderId === p.id
+          const isPending = isActive && loginState.status === "connecting"
+          const isDone = isActive && loginState.status === "done"
+          const showSignedIn = (p.loggedIn && !isActive) || isDone
 
-            return (
-              <div key={p.id} className="flex flex-col gap-2 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <ProviderIcon providerId={p.id} className="h-4 w-4" />
-                    <p className="text-sm font-medium">{p.name}</p>
-                    {showSignedIn && <SuccessBadge>Signed in</SuccessBadge>}
-                    {isActive && loginState.status === "error" && (
-                      <span className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {loginState.message}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {p.loggedIn && !isActive ? (
+          return (
+            <div key={p.id} className="flex flex-col gap-2 py-3.5">
+              <div className="flex items-center justify-between gap-6">
+                <div className="flex min-w-0 items-center gap-2">
+                  <ProviderIcon providerId={p.id} className="h-4 w-4" />
+                  <p className="text-sm font-medium">{p.name}</p>
+                  {showSignedIn && <SuccessBadge>Signed in</SuccessBadge>}
+                  {isActive && loginState.status === "error" && (
+                    <span className="flex items-center gap-1 text-xs text-destructive">
+                      <AlertCircle className="h-3 w-3" />
+                      {loginState.message}
+                    </span>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {p.loggedIn && !isActive ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleLogout(p.id)}
+                    >
+                      <LogOut data-icon="inline-start" />
+                      Sign out
+                    </Button>
+                  ) : isActive &&
+                    loginState.status !== "idle" &&
+                    loginState.status !== "done" &&
+                    loginState.status !== "error" ? (
+                    <Button variant="outline" size="sm" onClick={handleAbort}>
+                      Cancel
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      disabled={
+                        isPending ||
+                        (activeProviderId !== null && activeProviderId !== p.id)
+                      }
+                      onClick={() => handleLogin(p.id)}
+                    >
+                      {isPending ? (
+                        <Loader2
+                          data-icon="inline-start"
+                          className="animate-spin"
+                        />
+                      ) : (
+                        <LogIn data-icon="inline-start" />
+                      )}
+                      {isPending ? "Connecting…" : "Sign in"}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {isActive && loginState.status === "waiting_auth" && (
+                <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                  <div className="flex items-start gap-2">
+                    <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium">
+                        Browser opened for authentication
+                      </p>
+                      {loginState.instructions && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {loginState.instructions}
+                        </p>
+                      )}
                       <Button
-                        variant="outline"
+                        variant="link"
                         size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => handleLogout(p.id)}
+                        className="h-auto justify-start px-0"
+                        onClick={() => void handleOpenExternal(loginState.url)}
                       >
-                        <LogOut data-icon="inline-start" />
-                        Sign out
+                        <ExternalLink data-icon="inline-start" />
+                        Open again
                       </Button>
-                    ) : isActive &&
-                      loginState.status !== "idle" &&
-                      loginState.status !== "done" &&
-                      loginState.status !== "error" ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={handleAbort}
-                      >
-                        Cancel
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="h-7 text-xs"
-                        disabled={
-                          isPending ||
-                          (activeProviderId !== null &&
-                            activeProviderId !== p.id)
-                        }
-                        onClick={() => handleLogin(p.id)}
-                      >
-                        {isPending ? (
-                          <Loader2
-                            data-icon="inline-start"
-                            className="animate-spin"
-                          />
-                        ) : (
-                          <LogIn data-icon="inline-start" />
-                        )}
-                        {isPending ? "Connecting…" : "Sign in"}
-                      </Button>
-                    )}
+                    </div>
                   </div>
                 </div>
+              )}
 
-                {isActive && loginState.status === "waiting_auth" && (
-                  <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-                    <div className="flex items-start gap-2">
-                      <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium">
-                          Browser opened for authentication
-                        </p>
-                        {loginState.instructions && (
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {loginState.instructions}
-                          </p>
-                        )}
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="h-auto justify-start px-0"
-                          onClick={() =>
-                            void handleOpenExternal(loginState.url)
-                          }
-                        >
-                          <ExternalLink data-icon="inline-start" />
-                          Open again
-                        </Button>
-                      </div>
-                    </div>
+              {isActive && loginState.status === "waiting_prompt" && (
+                <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                  <p className="mb-2 text-xs font-medium">
+                    {loginState.message}
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      autoFocus
+                      value={promptValue}
+                      onChange={(e) => setPromptValue(e.target.value)}
+                      placeholder={loginState.placeholder ?? "Enter code…"}
+                      className="font-mono"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handlePromptSubmit()
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      className="shrink-0"
+                      onClick={handlePromptSubmit}
+                      disabled={!promptValue.trim()}
+                    >
+                      Submit
+                    </Button>
                   </div>
-                )}
+                </div>
+              )}
 
-                {isActive && loginState.status === "waiting_prompt" && (
-                  <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-                    <p className="mb-2 text-xs font-medium">
-                      {loginState.message}
-                    </p>
-                    <div className="flex gap-2">
-                      <Input
-                        autoFocus
-                        value={promptValue}
-                        onChange={(e) => setPromptValue(e.target.value)}
-                        placeholder={loginState.placeholder ?? "Enter code…"}
-                        className="h-7 font-mono text-xs"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handlePromptSubmit()
-                        }}
-                      />
+              {isActive && loginState.status === "waiting_device_code" && (
+                <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                  <div className="flex items-start gap-2">
+                    <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium">
+                        Enter this code to authenticate
+                      </p>
+                      <p className="mt-1 font-mono text-sm font-semibold tracking-widest">
+                        {loginState.userCode}
+                      </p>
                       <Button
+                        variant="link"
                         size="sm"
-                        className="h-7 shrink-0 text-xs"
-                        onClick={handlePromptSubmit}
-                        disabled={!promptValue.trim()}
+                        className="h-auto justify-start px-0"
+                        onClick={() =>
+                          void handleOpenExternal(loginState.verificationUri)
+                        }
                       >
-                        Submit
+                        <ExternalLink data-icon="inline-start" />
+                        Open verification page
                       </Button>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {isActive && loginState.status === "waiting_device_code" && (
-                  <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-                    <div className="flex items-start gap-2">
-                      <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium">
-                          Enter this code to authenticate
-                        </p>
-                        <p className="mt-1 font-mono text-sm font-semibold tracking-widest">
-                          {loginState.userCode}
-                        </p>
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="h-auto justify-start px-0"
-                          onClick={() =>
-                            void handleOpenExternal(loginState.verificationUri)
-                          }
-                        >
-                          <ExternalLink data-icon="inline-start" />
-                          Open verification page
-                        </Button>
-                      </div>
-                    </div>
+              {isActive && loginState.status === "waiting_select" && (
+                <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                  <p className="mb-2 text-xs font-medium">
+                    {loginState.message}
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {loginState.options.map((opt) => (
+                      <Button
+                        key={opt.id}
+                        variant="outline"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => handleSelectOption(opt.id)}
+                      >
+                        {opt.label}
+                      </Button>
+                    ))}
                   </div>
-                )}
-
-                {isActive && loginState.status === "waiting_select" && (
-                  <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-                    <p className="mb-2 text-xs font-medium">
-                      {loginState.message}
-                    </p>
-                    <div className="flex flex-col gap-1.5">
-                      {loginState.options.map((opt) => (
-                        <Button
-                          key={opt.id}
-                          variant="outline"
-                          size="sm"
-                          className="h-7 justify-start text-xs"
-                          onClick={() => handleSelectOption(opt.id)}
-                        >
-                          {opt.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                </div>
+              )}
+            </div>
+          )
+        })
       )}
-    </div>
+    </SettingsGroup>
   )
 }
 
@@ -741,81 +730,78 @@ export function ApiKeysCard() {
     )
   }
 
-  return (
-    <div>
-      {isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search providers…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-7 pl-7 text-xs"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-            {configuredCount > 0 && (
-              <Badge variant="secondary">{configuredCount} configured</Badge>
-            )}
-          </div>
+  if (isLoading) {
+    return <p className="py-3.5 text-xs text-muted-foreground">Loading…</p>
+  }
 
-          <div className="divide-y divide-border/50">
-            {filteredProviders.length === 0 ? (
-              <p className="py-3 text-center text-xs text-muted-foreground">
-                No providers match
-              </p>
-            ) : (
-              filteredProviders.map(({ id, label, placeholder }) => {
-                const hasKey = !!savedKeys?.[id]
-                return (
-                  <div
-                    key={id}
-                    className="flex items-center justify-between py-2.5"
-                  >
-                    <div className="flex items-center gap-2">
-                      <ProviderIcon providerId={id} className="h-4 w-4" />
-                      <p className="text-sm">{label}</p>
-                      {hasKey && <SuccessBadge>Configured</SuccessBadge>}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => setOpenFor(id)}
-                    >
-                      {hasKey ? "Edit" : "Configure"}
-                    </Button>
-                    {openFor === id && (
-                      <ConfigureKeyDialog
-                        provider={{ id, label, placeholder }}
-                        savedKey={savedKeys?.[id] ?? ""}
-                        open={true}
-                        onOpenChange={(open) => {
-                          if (!open) setOpenFor(null)
-                        }}
-                        onSave={handleSave}
-                        isSaving={isPending}
-                      />
-                    )}
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
+  return (
+    <SettingsGroup
+      action={
+        configuredCount > 0 ? (
+          <Badge variant="secondary">{configuredCount} configured</Badge>
+        ) : undefined
+      }
+    >
+      <div className="relative py-3.5">
+        <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search providers…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-7"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+
+      {filteredProviders.length === 0 ? (
+        <p className="py-3.5 text-center text-xs text-muted-foreground">
+          No providers match
+        </p>
+      ) : (
+        filteredProviders.map(({ id, label, placeholder }) => {
+          const hasKey = !!savedKeys?.[id]
+          return (
+            <SettingsRow
+              key={id}
+              title={
+                <span className="flex items-center gap-2">
+                  <ProviderIcon providerId={id} className="h-4 w-4" />
+                  <span>{label}</span>
+                  {hasKey && <SuccessBadge>Configured</SuccessBadge>}
+                </span>
+              }
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setOpenFor(id)}
+              >
+                {hasKey ? "Edit" : "Configure"}
+              </Button>
+              {openFor === id && (
+                <ConfigureKeyDialog
+                  provider={{ id, label, placeholder }}
+                  savedKey={savedKeys?.[id] ?? ""}
+                  open={true}
+                  onOpenChange={(open) => {
+                    if (!open) setOpenFor(null)
+                  }}
+                  onSave={handleSave}
+                  isSaving={isPending}
+                />
+              )}
+            </SettingsRow>
+          )
+        })
       )}
-    </div>
+    </SettingsGroup>
   )
 }
