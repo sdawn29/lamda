@@ -5,6 +5,7 @@ import { useSyntaxTheme } from "@/features/themes"
 import { useMainTabsStore } from "@/features/main-tabs"
 import { Check, Copy } from "lucide-react"
 
+import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { getIconName } from "@/shared/ui/file-icon"
 import { SectionLabel } from "@/shared/ui/section-label"
@@ -33,15 +34,17 @@ export const chatProseClass =
  */
 export const chatProseClassRich =
   "prose prose-sm max-w-none dark:prose-invert font-chat " +
-  "prose-headings:text-foreground prose-headings:font-semibold prose-headings:leading-snug " +
-  "prose-h1:text-base prose-h2:text-[0.95rem] prose-h3:text-sm prose-h4:text-sm prose-h5:text-sm prose-h6:text-sm " +
-  "prose-p:leading-[1.75] " +
+  "prose-headings:text-foreground prose-headings:font-semibold prose-headings:leading-tight " +
+  "prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-h4:text-[0.95rem] prose-h5:text-sm prose-h6:text-[0.8125rem] " +
+  "prose-p:leading-relaxed " +
   "prose-strong:text-foreground prose-strong:font-semibold " +
   "prose-em:italic prose-em:text-foreground " +
   "prose-hr:my-4 prose-hr:border-border " +
   "prose-blockquote:border-l-2 prose-blockquote:border-border prose-blockquote:font-normal prose-blockquote:text-muted-foreground " +
-  "prose-ul:list-disc prose-ol:list-decimal prose-li:my-0.5 prose-li:marker:text-muted-foreground " +
-  "[&_li>p]:my-0 " +
+  "prose-ul:list-disc prose-ol:list-decimal prose-li:my-1 prose-li:leading-relaxed prose-li:marker:text-muted-foreground " +
+  "[&_li>p]:my-0 [&_li>p]:leading-relaxed " +
+  "[&_.contains-task-list]:list-none [&_.contains-task-list]:pl-0 " +
+  "[&_.task-list-item]:my-0.5 [&_.task-list-item]:list-none [&_.task-list-item]:pl-0 " +
   "[&_del]:text-muted-foreground [&_del]:line-through " +
   "[&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_mark]:text-foreground " +
   "[&_sub]:align-sub [&_sub]:text-[0.75em] [&_sup]:align-super [&_sup]:text-[0.75em] " +
@@ -85,6 +88,27 @@ function CopyButton({ code }: { code: string }) {
     >
       {copied ? <Check /> : <Copy />}
     </Button>
+  )
+}
+
+/**
+ * GFM task-list checkbox (`- [ ]` / `- [x]`), restyled to match the app design
+ * system instead of the native browser control: a small rounded box that fills
+ * with the primary accent and a check glyph when done, mirroring the todo panel.
+ */
+function TaskCheckbox({ checked }: { checked?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "mt-[0.2em] inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+        checked
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-muted-foreground/40 bg-transparent"
+      )}
+      aria-hidden
+    >
+      {checked ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
+    </span>
   )
 }
 
@@ -353,6 +377,24 @@ const baseMarkdownComponents: Components = {
     }
     return <CodeBlock className={className}>{children}</CodeBlock>
   },
+  // ── Task lists ──────────────────────────────────────────────────────────────
+  // remark-gfm tags task items with `task-list-item` and renders a disabled
+  // <input type="checkbox">. We lay the row out as checkbox + text and swap the
+  // native control for the design-system TaskCheckbox.
+  li: ({ className, children, ...props }) => {
+    if (className?.includes("task-list-item")) {
+      return (
+        <li className={cn(className, "flex items-start gap-2")}>{children}</li>
+      )
+    }
+    return (
+      <li className={className} {...props}>
+        {children}
+      </li>
+    )
+  },
+  input: ({ type, checked }) =>
+    type === "checkbox" ? <TaskCheckbox checked={checked} /> : null,
   // ── Links ───────────────────────────────────────────────────────────────────
   a: ({ href, children }) => (
     <a
