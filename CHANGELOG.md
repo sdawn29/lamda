@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.31.0](../../releases/tag/v0.31.0) — 2026-06-21
+
+### Features
+
+* synchronize active turn selection with last commit time to reset header diff stat after commits
+* enhance approval mode functionality to include 'edits_allowed' option and update related components
+* add environment variable import/export functionality with editor support
+* enhance rich markdown rendering with improved typography and task list support
+* implement rich chat rendering option with markdown support and persistent sidebar states
+
+### Chores
+
+* update dependencies and add thread notification hook
+
 ## [0.30.0](../../releases/tag/v0.30.0) — 2026-06-20
 
 ### Features
