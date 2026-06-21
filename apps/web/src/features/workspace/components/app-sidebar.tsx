@@ -24,7 +24,7 @@ import {
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 import { IconButtonWithTooltip } from "@/shared/ui/icon-button-with-tooltip"
-import { ShortcutKbd } from "@/shared/ui/kbd"
+import { ShortcutText } from "@/shared/ui/kbd"
 
 import {
   Sidebar,
@@ -512,7 +512,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
         />
         <TooltipContent side="right">
           New thread{" "}
-          <ShortcutKbd
+          <ShortcutText
             binding={newThreadBinding}
             className="ml-1 opacity-55"
           />
@@ -622,7 +622,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
             >
               <MessageSquarePlus className="size-3.5" />
               New Thread
-              <ShortcutKbd
+              <ShortcutText
                 binding={newThreadBinding}
                 className="ml-auto opacity-0 transition-opacity group-hover/new-thread:opacity-55"
               />
@@ -635,7 +635,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
             >
               <Search className="size-3.5" />
               Search
-              <ShortcutKbd
+              <ShortcutText
                 binding={openPaletteBinding}
                 className="ml-auto opacity-0 transition-opacity group-hover/search:opacity-55"
               />
@@ -685,7 +685,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
             />
             <TooltipContent side="right">
               New workspace{" "}
-              <ShortcutKbd
+              <ShortcutText
                 binding={newWorkspaceBinding}
                 className="ml-1 opacity-55"
               />
@@ -753,7 +753,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
           />
           <TooltipContent side="right">
             Settings{" "}
-            <ShortcutKbd
+            <ShortcutText
               binding={openSettingsBinding}
               className="ml-1 opacity-55"
             />

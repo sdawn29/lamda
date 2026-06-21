@@ -13,8 +13,9 @@ export interface CreateWorkspaceBody {
 
 export type Mode = "ask" | "plan" | "agent"
 
-/** Tool-approval gating for a thread: prompt before risky tools, or run freely. */
-export type ApprovalMode = "ask" | "all_allowed"
+/** Tool-approval gating for a thread: prompt before risky tools, auto-approve
+ *  file edits/writes only, or run every tool freely. */
+export type ApprovalMode = "ask" | "edits_allowed" | "all_allowed"
 
 export interface ThreadDto {
   id: string

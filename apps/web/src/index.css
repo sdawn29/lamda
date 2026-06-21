@@ -454,6 +454,17 @@
     background: var(--card);
     color: var(--foreground);
   }
+  /* Light mode: the black-deepened hues above are tuned for dark surfaces and
+     turn muddy / washed-out over a pale card, hurting readability. Keep the
+     base hue pure (GitHub-light style clean pastels) and lean on alpha so the
+     dark syntax text stays legible on top of the row tints. */
+  :not(.dark) .lamda-monaco-diff-viewer {
+    --lamda-diff-added: var(--diff-add);
+    --lamda-diff-removed: var(--diff-remove);
+    --lamda-diff-line-alpha: 13%;
+    --lamda-diff-char-alpha: 32%;
+    --lamda-diff-border-alpha: 55%;
+  }
   .lamda-monaco-diff-viewer .monaco-diff-editor {
     background: var(--card) !important;
   }

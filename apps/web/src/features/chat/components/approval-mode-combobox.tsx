@@ -1,5 +1,10 @@
 import * as React from "react"
-import { ChevronDownIcon, ShieldCheckIcon, ShieldOffIcon } from "lucide-react"
+import {
+  ChevronDownIcon,
+  FilePenIcon,
+  ShieldCheckIcon,
+  ShieldOffIcon,
+} from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
 import {
@@ -36,6 +41,18 @@ export const APPROVAL_MODE_OPTIONS: ApprovalModeOption[] = [
     iconAccent: "text-muted-foreground",
     selectedBg: "data-[checked=true]:bg-muted",
     triggerBg: "",
+  },
+  {
+    // Middle ground — auto-approve file edits/writes but still gate bash and
+    // MCP tools. Coloured blue to set it apart from the safe default.
+    value: "edits_allowed",
+    label: "Allow edits",
+    description: "Auto-approve file edits; still prompt for bash and MCP",
+    icon: <FilePenIcon className="size-3.5 shrink-0" />,
+    iconAccent: "text-sky-600 dark:text-sky-400",
+    selectedBg: "data-[checked=true]:bg-sky-500/10",
+    triggerBg:
+      "bg-sky-500/10 hover:bg-sky-500/15 aria-expanded:bg-sky-500/20 dark:bg-sky-500/15 dark:hover:bg-sky-500/20 dark:aria-expanded:bg-sky-500/25",
   },
   {
     // Permissive mode — coloured amber to flag that tools run unchecked.

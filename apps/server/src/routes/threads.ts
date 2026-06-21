@@ -71,6 +71,14 @@ import { scheduleReflection } from "../services/memory-reflection.js";
 import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
 
 
+type ApprovalMode = "ask" | "edits_allowed" | "all_allowed";
+
+function isApprovalMode(value: unknown): value is ApprovalMode {
+  return (
+    value === "ask" || value === "edits_allowed" || value === "all_allowed"
+  );
+}
+
 /**
  * Finds the `stash@{N}` ref whose subject contains `message`. `git stash`
  * records the message in the subject as `On <branch>: <message>`, so we match
@@ -178,11 +186,13 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
 
   if (
     body.approvalMode !== undefined &&
-    body.approvalMode !== "ask" &&
-    body.approvalMode !== "all_allowed"
+    !isApprovalMode(body.approvalMode)
   ) {
     return c.json(
-      { error: "approvalMode must be 'ask' or 'all_allowed'" },
+      {
+        error:
+          "approvalMode must be 'ask', 'edits_allowed', or 'all_allowed'",
+      },
       400,
     );
   }
@@ -190,8 +200,9 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
   const title = body.title?.trim() || "New Thread";
   const mode = normalizeMode(body.mode) ?? "agent";
   const modelId = body.modelId ?? null;
-  const approvalMode =
-    body.approvalMode === "all_allowed" ? "all_allowed" : "ask";
+  const approvalMode = isApprovalMode(body.approvalMode)
+    ? body.approvalMode
+    : "ask";
 
   // Insert with the requested mode before creating the session — the session
   // builds its custom tools from the thread's persisted mode.
@@ -410,9 +421,12 @@ threads.patch("/thread/:id/approval-mode", async (c) => {
   const body = await c.req
     .json<{ approvalMode?: string }>()
     .catch((): { approvalMode?: string } => ({}));
-  if (body.approvalMode !== "ask" && body.approvalMode !== "all_allowed") {
+  if (!isApprovalMode(body.approvalMode)) {
     return c.json(
-      { error: "approvalMode must be 'ask' or 'all_allowed'" },
+      {
+        error:
+          "approvalMode must be 'ask', 'edits_allowed', or 'all_allowed'",
+      },
       400,
     );
   }

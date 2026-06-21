@@ -137,7 +137,7 @@ export function OpenWithButton({
   return (
     <div className="flex items-center" aria-label="Open workspace in app">
       <Button
-        className="h-7 rounded-r-none px-2"
+        className="h-7 gap-1.5 rounded-r-none px-2"
         disabled={disabled}
         onClick={() => {
           void openWorkspace()
@@ -154,6 +154,7 @@ export function OpenWithButton({
             className="size-4"
           />
         )}
+        <span className="whitespace-nowrap text-xs">{selectedAppName}</span>
       </Button>
 
       <DropdownMenu>

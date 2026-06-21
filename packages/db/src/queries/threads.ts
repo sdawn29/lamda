@@ -8,7 +8,7 @@ export function insertThread(
   options?: {
     title?: string;
     mode?: "ask" | "plan" | "agent";
-    approvalMode?: "ask" | "all_allowed";
+    approvalMode?: "ask" | "edits_allowed" | "all_allowed";
     modelId?: string | null;
     forkedFromId?: string;
     baseCheckpointSha?: string;
@@ -170,7 +170,7 @@ export function updateThreadMode(id: string, mode: "ask" | "plan" | "agent") {
 
 export function updateThreadApprovalMode(
   id: string,
-  approvalMode: "ask" | "all_allowed",
+  approvalMode: "ask" | "edits_allowed" | "all_allowed",
 ) {
   db.update(threads).set({ approvalMode }).where(eq(threads.id, id)).run();
 }

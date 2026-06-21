@@ -13,6 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   PanelRight,
+  MessageSquarePlus,
+  Search,
 } from "lucide-react"
 import {
   useRouter,
@@ -52,6 +54,7 @@ import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { ShortcutKbd } from "@/shared/ui/kbd"
 import { TasksDropdown } from "@/features/tasks"
 import { useMainTabs } from "@/features/main-tabs"
+import { useCommandPalette } from "@/features/command-palette"
 import { cn } from "@/shared/lib/utils"
 
 function UpdateButton({ status }: { status: ElectronUpdateStatus }) {
@@ -156,7 +159,8 @@ export function TitleBar() {
     pinThread,
     unpinThread,
   } = useWorkspace()
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, open: sidebarOpen } = useSidebar()
+  const openPalette = useCommandPalette((state) => state.openPalette)
   const {
     isOpen: rightSidebarOpen,
     togglePanel,
@@ -268,6 +272,13 @@ export function TitleBar() {
     void navigator.clipboard.writeText(urlActiveThread.id)
   }
 
+  const handleNewThread = () => {
+    navigate({
+      to: "/new",
+      search: actionWorkspace ? { ws: actionWorkspace.id } : {},
+    })
+  }
+
   const { subscribe, getSnapshot } = useMemo(() => {
     let count = 0
     return {
@@ -314,6 +325,10 @@ export function TitleBar() {
   const rightSidebarBinding = useShortcutBinding(
     SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL
   )
+  const newThreadBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_THREAD)
+  const openPaletteBinding = useShortcutBinding(
+    SHORTCUT_ACTIONS.OPEN_COMMAND_PALETTE
+  )
 
   // The whole bar is a no-drag island so every control receives its clicks in
   // Electron; only the flexible filler in the middle opts back into the window
@@ -329,7 +344,7 @@ export function TitleBar() {
       {/* ── Left: window / navigation controls ──────────────────────────── */}
       <div
         className={cn(
-          "flex h-full shrink-0 items-center gap-0.5",
+          "flex h-full shrink-0 items-center gap-1.5",
           isMac && !isFullscreen ? "pl-[4.75rem]" : "pl-1.5"
         )}
         style={noDrag}
@@ -390,6 +405,56 @@ export function TitleBar() {
 
       {/* ── Middle: thread breadcrumb · right-panel tabs · drag filler ───── */}
       <div className="flex min-w-0 flex-1 items-center gap-1">
+        {/* When the left sidebar is closed, surface the new-thread + search
+            actions here, left of the thread name, popping out into view. */}
+        {!sidebarOpen && (
+          <div
+            className="flex shrink-0 origin-left items-center gap-0.5 pl-0.5 duration-200 animate-in fade-in-0 zoom-in-90 slide-in-from-left-2"
+            style={noDrag}
+          >
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={handleNewThread}
+                    className="size-7 text-muted-foreground/70 hover:text-foreground"
+                  >
+                    <MessageSquarePlus className="size-4" />
+                    <span className="sr-only">New thread</span>
+                  </Button>
+                }
+              />
+              <TooltipContent>
+                New thread{" "}
+                <ShortcutKbd binding={newThreadBinding} className="ml-1" />
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={openPalette}
+                    className="size-7 text-muted-foreground/70 hover:text-foreground"
+                  >
+                    <Search className="size-4" />
+                    <span className="sr-only">Search</span>
+                  </Button>
+                }
+              />
+              <TooltipContent>
+                Search{" "}
+                <ShortcutKbd binding={openPaletteBinding} className="ml-1" />
+              </TooltipContent>
+            </Tooltip>
+            {urlActiveThread && (
+              <div className="mx-0.5 h-4 w-px shrink-0 bg-border" />
+            )}
+          </div>
+        )}
         {urlActiveThread && (
           <div className="flex min-w-0 shrink items-center gap-1 pl-0.5">
             {urlActiveWorkspace && (
@@ -499,7 +564,7 @@ export function TitleBar() {
       </div>
 
       {/* ── Right: session actions + panel toggles ───────────────────────── */}
-      <div className="flex shrink-0 items-center gap-0.5" style={noDrag}>
+      <div className="flex shrink-0 items-center gap-1.5" style={noDrag}>
         {updateStatus &&
           updateStatus.phase !== "idle" &&
           updateStatus.phase !== "checking" && (

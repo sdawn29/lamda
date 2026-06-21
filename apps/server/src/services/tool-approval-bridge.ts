@@ -31,6 +31,13 @@ const AUTO_ALLOW = new Set<string>([
 ]);
 
 /**
+ * File-editing built-ins auto-allowed in the "edits_allowed" approval mode. The
+ * user has opted to let the agent edit and create files without prompting,
+ * while `bash` and MCP tools remain gated.
+ */
+const EDIT_TOOLS = new Set<string>(["edit", "write"]);
+
+/**
  * The unit a remembered decision applies to. Most tools are gated as a whole
  * (key = tool name), but `bash` is gated per leading command (`git status`,
  * `npm run`, …) so approving one command doesn't unlock every shell command.
@@ -63,6 +70,12 @@ export function createToolApprovalBridge(threadId: string): ToolApprovalBridge {
       if (approvalMode === "all_allowed") return { allow: true };
 
       if (AUTO_ALLOW.has(req.toolName)) return { allow: true };
+
+      // "edits_allowed" auto-approves file edits/writes but keeps bash and MCP
+      // tools gated.
+      if (approvalMode === "edits_allowed" && EDIT_TOOLS.has(req.toolName)) {
+        return { allow: true };
+      }
 
       const { storeKey, label } = approvalScope(req.toolName, req.input);
 

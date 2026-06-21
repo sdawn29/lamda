@@ -79,7 +79,7 @@ function mapThread(
     title: string | null;
     modelId: string | null;
     mode: "ask" | "plan" | "agent";
-    approvalMode: "ask" | "all_allowed";
+    approvalMode: "ask" | "edits_allowed" | "all_allowed";
     isStopped: boolean;
     createdAt: number;
     updatedAt: number;

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Play, Plus, Pencil, Trash2, KeyRound } from "lucide-react"
+import { Play, Plus, Pencil, Trash2, KeyRound, ChevronDown } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +9,7 @@ import {
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "../queries"
+import { useLastUsedTaskStore } from "../last-used-store"
 import { TaskIcon } from "../icons"
 import { TaskFormDialog } from "./task-form-dialog"
 import { WorkspaceEnvDialog } from "@/features/workspace/components/workspace-env-dialog"
@@ -27,6 +28,16 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
   const deleteTask = useDeleteTask(workspaceId)
   const { workspaces } = useWorkspace()
   const workspace = workspaces.find((w) => w.id === workspaceId) ?? null
+
+  const lastUsedId = useLastUsedTaskStore((s) => s.lastUsed[workspaceId])
+  const setLastUsed = useLastUsedTaskStore((s) => s.setLastUsed)
+  const lastUsedTask =
+    tasks.find((t) => t.id === lastUsedId) ?? tasks[0] ?? null
+
+  const runTask = (task: WorkspaceTask) => {
+    setLastUsed(workspaceId, task.id)
+    onRunTask(task.command)
+  }
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<WorkspaceTask | null>(null)
@@ -52,24 +63,58 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
 
   return (
     <>
-      <DropdownMenu>
+      <div className="flex items-center" aria-label="Run task">
         <Tooltip>
           <TooltipTrigger
             render={
-              <DropdownMenuTrigger
-                render={
-                  <Button variant="ghost" className="size-7">
+              <Button
+                variant="outline"
+                className="h-7 gap-1.5 rounded-r-none px-2"
+                disabled={!lastUsedTask}
+                onClick={() => lastUsedTask && runTask(lastUsedTask)}
+              >
+                {lastUsedTask ? (
+                  <>
+                    <TaskIcon
+                      id={lastUsedTask.icon}
+                      className="shrink-0 text-muted-foreground"
+                    />
+                    <span className="max-w-32 truncate whitespace-nowrap text-xs">
+                      {lastUsedTask.name || lastUsedTask.command}
+                    </span>
+                  </>
+                ) : (
+                  <>
                     <Play className="size-4" />
-                    <span className="sr-only">Tasks</span>
-                  </Button>
-                }
-              />
+                    <span className="whitespace-nowrap text-xs">Tasks</span>
+                  </>
+                )}
+              </Button>
             }
           />
-          <TooltipContent>Tasks</TooltipContent>
+          <TooltipContent>
+            {lastUsedTask
+              ? `Run ${lastUsedTask.name || lastUsedTask.command}`
+              : "Tasks"}
+          </TooltipContent>
         </Tooltip>
 
-        <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="Choose task"
+            render={
+              <Button
+                variant="outline"
+                className="h-7 w-6 rounded-l-none border-l-0"
+              >
+                <ChevronDown className="size-3" />
+              </Button>
+            }
+          >
+            <span className="sr-only">Choose task</span>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end" className="w-60">
           {tasks.length === 0 ? (
             <div className="px-3 py-2 text-xs text-muted-foreground">
               No tasks yet
@@ -79,7 +124,7 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
               <div
                 key={task.id}
                 className="group flex items-center gap-2 px-2 py-1 rounded-sm hover:bg-accent cursor-pointer"
-                onClick={() => onRunTask(task.command)}
+                onClick={() => runTask(task)}
               >
                 <TaskIcon id={task.icon} className="shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-xs">
@@ -124,8 +169,9 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
               <span className="text-xs">Environment variables</span>
             </div>
           )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <TaskFormDialog
         open={formOpen}

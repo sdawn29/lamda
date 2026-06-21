@@ -40,7 +40,9 @@ export const threads = sqliteTable("threads", {
   mode: text("mode", { enum: ["ask", "plan", "agent"] })
     .notNull()
     .default("agent"),
-  approvalMode: text("approval_mode", { enum: ["ask", "all_allowed"] })
+  approvalMode: text("approval_mode", {
+    enum: ["ask", "edits_allowed", "all_allowed"],
+  })
     .notNull()
     .default("ask"),
   lastAccessedAt: integer("last_accessed_at"),
