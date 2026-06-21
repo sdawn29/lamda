@@ -543,8 +543,11 @@ git.get("/session/:id/git/turns", (c) => {
   // Without this guard, lastTurnFiles still contains the just-completed turn's
   // files and we'd emit a phantom live turn alongside its DB counterpart.
   const currentTurnStartTime = sessionEvents.getCurrentTurnStartTime(id);
+  // Use the live accumulator (populated incrementally as the agent edits) so
+  // the in-progress turn's files surface in the review panel as they happen,
+  // not only once the turn completes (getLastTurnFiles is filled at agent_end).
   const liveFiles =
-    currentTurnStartTime > 0 ? sessionEvents.getLastTurnFiles(id) : [];
+    currentTurnStartTime > 0 ? sessionEvents.getLiveTurnFiles(id) : [];
   // Turns are keyed by the durable threadId, not the ephemeral sessionId (which
   // is regenerated for every thread on each server start) — otherwise all turn
   // history would vanish after a restart.

@@ -12,6 +12,7 @@ import { AppSidebar, useWorkspace } from "@/features/workspace"
 import { TitleBar } from "./title-bar"
 import { RightSidebarContent } from "./right-sidebar"
 import { useRightSidebar } from "../store/right-sidebar"
+import { useLeftSidebarStore } from "../store/left-sidebar"
 import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar"
 import { TooltipProvider } from "@/shared/ui/tooltip"
 import { useTerminal } from "@/features/terminal"
@@ -62,6 +63,8 @@ export function WorkspaceLayout() {
     width: rightSidebarWidth,
     setWidth: setRightSidebarWidth,
   } = useRightSidebar()
+  const leftSidebarOpen = useLeftSidebarStore((s) => s.isOpen)
+  const setLeftSidebarOpen = useLeftSidebarStore((s) => s.setOpen)
 
   const isMobile = useIsMobile(900)
   const leftSidebarRef = useRef<HTMLDivElement>(null)
@@ -352,6 +355,8 @@ export function WorkspaceLayout() {
     <TooltipProvider>
       <SidebarProvider
         ref={leftSidebarRef}
+        open={leftSidebarOpen}
+        onOpenChange={setLeftSidebarOpen}
         style={
           {
             "--sidebar-width": `${leftSidebarWidth}px`,

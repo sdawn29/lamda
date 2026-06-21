@@ -65,6 +65,7 @@ import { FeedbackDialog } from "./feedback-dialog"
 import { CreateWorkspaceDialog } from "./create-workspace-dialog"
 import { WorkspaceEnvDialog } from "./workspace-env-dialog"
 import { useEnvDialog } from "../env-dialog-store"
+import { useWorkspaceCollapseStore } from "../workspace-collapse-store"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -336,7 +337,9 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
   const { handleCreateLocal, handleCreateRemote } = useCreateWorkspaceAction()
   const openPathMutation = useOpenPath()
   const openWithAppMutation = useOpenWorkspaceWithApp()
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const collapsed = useWorkspaceCollapseStore((s) => s.collapsed)
+  const setWorkspaceCollapsed = useWorkspaceCollapseStore((s) => s.setCollapsed)
+  const toggleWorkspaceCollapsed = useWorkspaceCollapseStore((s) => s.toggle)
   const [expandedThreadLists, setExpandedThreadLists] = useState<
     Record<string, boolean>
   >({})
@@ -425,12 +428,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
   const renderWorkspaceItem = (ws: (typeof workspaces)[0]) => (
     <SidebarMenuItem key={ws.id} className="group/ws">
       <SidebarMenuButton
-        onClick={() => {
-          setCollapsed((prev) => ({
-            ...prev,
-            [ws.id]: !prev[ws.id],
-          }))
-        }}
+        onClick={() => toggleWorkspaceCollapsed(ws.id)}
         tooltip={ws.name}
       >
         <WorkspaceIcon workspaceId={ws.id} icon={ws.icon ?? null} isCollapsed={!!collapsed[ws.id]} />
@@ -500,10 +498,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
             <SidebarMenuAction
               showOnHover
               onClick={() => {
-                setCollapsed((prev) => ({
-                  ...prev,
-                  [ws.id]: false,
-                }))
+                setWorkspaceCollapsed(ws.id, false)
                 navigate({
                   to: "/new",
                   search: { ws: ws.id },
@@ -826,9 +821,9 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
           aria-label="Resize left sidebar"
           aria-orientation="vertical"
           onMouseDown={onResizeStart}
-          className="group absolute inset-y-2 right-0 z-30 hidden w-2 cursor-col-resize group-data-[collapsible=offcanvas]:hidden md:block"
+          className="group/resize absolute inset-y-2 right-0 z-30 hidden w-2 cursor-col-resize group-data-[collapsible=offcanvas]:hidden md:block"
         >
-          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-border" />
+          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover/resize:bg-border" />
         </div>
       )}
     </Sidebar>

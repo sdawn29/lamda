@@ -242,6 +242,14 @@ class SessionEventHub {
   private preTurnCheckpointSha = "";
   private preTurnCapturePromise: Promise<void> | null = null;
   private currentTurnEmittedFiles = new Set<string>();
+  // Live, in-progress turn file list — accumulated as the agent edits so the
+  // /turns endpoint can surface the current turn's changes before it completes
+  // (lastTurnFiles is only populated at agent_end). Keyed by path; upsert-only
+  // within a turn so concurrent status checks can't transiently shrink it.
+  private currentTurnLiveFiles = new Map<
+    string,
+    { postStatusCode: string; wasCreatedByTurn: boolean }
+  >();
   private currentTurnStartTime = 0;
   private lastTurnChangedRaw = "";
   private lastTurnFiles: TurnFileDetail[] = [];
@@ -296,6 +304,18 @@ class SessionEventHub {
 
   getLastTurnFiles(): TurnFileDetail[] {
     return this.lastTurnFiles;
+  }
+
+  getLiveTurnFiles(): {
+    filePath: string;
+    postStatusCode: string;
+    wasCreatedByTurn: boolean;
+  }[] {
+    return Array.from(this.currentTurnLiveFiles, ([filePath, v]) => ({
+      filePath,
+      postStatusCode: v.postStatusCode,
+      wasCreatedByTurn: v.wasCreatedByTurn,
+    }));
   }
 
   getCurrentTurnStartTime(): number {
@@ -402,12 +422,19 @@ class SessionEventHub {
       if (!this.preTurnStatusMap || this.disposed) return;
       const postMap = this.parseStatusToMap(raw);
       for (const [filePath, postStatusCode] of postMap) {
-        if (this.currentTurnEmittedFiles.has(filePath)) continue;
         const preStatusCode = this.preTurnStatusMap.get(filePath) ?? "";
-        if (preStatusCode !== postStatusCode) {
-          const wasCreatedByTurn =
-            !this.preTurnStatusMap.has(filePath) &&
-            this.isNewFileStatus(postStatusCode);
+        if (preStatusCode === postStatusCode) continue;
+        const wasCreatedByTurn =
+          !this.preTurnStatusMap.has(filePath) &&
+          this.isNewFileStatus(postStatusCode);
+        // Keep the live turn's file list current (latest status per path) so a
+        // refetch of /turns mid-turn reflects what the agent has changed so far.
+        this.currentTurnLiveFiles.set(filePath, {
+          postStatusCode,
+          wasCreatedByTurn,
+        });
+        // Emit once per file the first time it's seen, so clients refetch.
+        if (!this.currentTurnEmittedFiles.has(filePath)) {
           this.currentTurnEmittedFiles.add(filePath);
           this.emit({
             type: "turn_file_changed",
@@ -425,6 +452,7 @@ class SessionEventHub {
   private async capturePreTurnStatus(): Promise<void> {
     if (!this.cwd) return;
     this.currentTurnEmittedFiles.clear();
+    this.currentTurnLiveFiles.clear();
     // Clear the previous turn's file snapshot at the START of this turn. Otherwise
     // getLastTurnFiles() would return the just-completed turn's files while this
     // turn is in progress, and /git/turns would surface them as a phantom live
@@ -749,6 +777,7 @@ class SessionEventHub {
     this.toolMetaMap.clear();
     this.currentToolBlocks.clear();
     this.currentTurnEmittedFiles.clear();
+    this.currentTurnLiveFiles.clear();
     this.pendingApprovals.clear();
     this.currentRunEvents = [];
     this.runInProgress = false;
@@ -1393,6 +1422,14 @@ class SessionEventRegistry {
 
   getLastTurnFiles(sessionId: string): TurnFileDetail[] {
     return this.hubs.get(sessionId)?.getLastTurnFiles() ?? [];
+  }
+
+  getLiveTurnFiles(sessionId: string): {
+    filePath: string;
+    postStatusCode: string;
+    wasCreatedByTurn: boolean;
+  }[] {
+    return this.hubs.get(sessionId)?.getLiveTurnFiles() ?? [];
   }
 
   getCurrentTurnStartTime(sessionId: string): number {

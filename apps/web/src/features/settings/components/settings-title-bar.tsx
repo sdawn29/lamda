@@ -1,6 +1,6 @@
 import { type CSSProperties, useRef } from "react"
-import { ArrowLeft } from "lucide-react"
-import { useRouter } from "@tanstack/react-router"
+import { ArrowLeft, ChevronRight } from "lucide-react"
+import { useParams, useRouter } from "@tanstack/react-router"
 
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
@@ -11,6 +11,7 @@ import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
 import { useWorkspace } from "@/features/workspace"
 import { useElectronFullscreen, useElectronPlatform } from "@/features/electron"
 import { cn } from "@/shared/lib/utils"
+import { findSettingsSection } from "../sections"
 import { useAppSettings } from "../queries"
 
 /**
@@ -26,6 +27,10 @@ export function SettingsTitleBar() {
   const { data: platform } = useElectronPlatform()
   const { data: isFullscreen = false } = useElectronFullscreen()
   const isMac = platform === "darwin"
+
+  // Name of the section currently open, shown beside "Settings" in the title.
+  const { section: slug } = useParams({ strict: false })
+  const activeSection = slug ? findSettingsSection(slug) : undefined
 
   // Snapshot the thread that was active when settings opened, frozen so moving
   // between sections doesn't change where "back" returns to.
@@ -86,9 +91,19 @@ export function SettingsTitleBar() {
 
       <div className="mx-0.5 h-4 w-px shrink-0 bg-border" />
 
-      <span className="shrink-0 text-sm font-semibold text-foreground">
-        Settings
-      </span>
+      <div className="flex min-w-0 shrink items-center gap-1">
+        <span className="shrink-0 text-sm font-semibold text-foreground">
+          Settings
+        </span>
+        {activeSection && (
+          <>
+            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/60" />
+            <span className="truncate text-sm font-medium text-muted-foreground">
+              {activeSection.label}
+            </span>
+          </>
+        )}
+      </div>
 
       {/* Draggable filler — moves the frameless window. */}
       <div className="h-full min-w-4 flex-1" style={drag} />

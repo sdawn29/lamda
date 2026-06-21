@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query"
 
 import { useSessionStream } from "./hooks/use-session-stream"
 import { useVisibleMessages } from "./hooks/use-visible-messages"
+import { getChatSyncEngine } from "./hooks/use-chat-sync-engine"
 import {
   messagesQueryKey,
   useSessionStatus,
@@ -136,6 +137,57 @@ export function useChatStream({
   // settings route, which unmounts the whole chat view) triggers a resync.
   const didMountResyncRef = useRef(false)
 
+  // Rebuild the messages cache from a fresh server snapshot, mirroring what a
+  // hard refresh does (a single, correctly-paginated first page) rather than
+  // refetching whatever — possibly malformed — page structure is currently
+  // cached. A plain `invalidateQueries` refetches the existing pages in place,
+  // so if the cache was left with broken pagination (e.g. a seed/stream write
+  // dropped `hasMore`/`oldestBlockIndex`, stranding older messages with
+  // `hasPreviousPage === false`), it can't recover — which is exactly the
+  // "messages missing, scrolling doesn't help, only refresh fixes it" symptom
+  // seen when returning from the settings route.
+  const resyncMessages = useCallback(() => {
+    void (async () => {
+      try {
+        const { blocks, hasMore } = await listMessages(sessionId, {
+          limit: MESSAGES_PAGE_SIZE,
+        })
+        const serverMessages = blocksToMessages(blocks as MessageBlock[])
+        const oldestBlockIndex =
+          blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
+        // Don't clobber a cache that's ahead of the server: the WS stream may
+        // have written a just-finished turn before the server's async DB write
+        // lands (see the agent_end handler), and the user may have paged older
+        // history into the cache. Only rebuild when the server snapshot is at
+        // least as complete as what we already hold.
+        const existing = queryClient.getQueryData<MessagesInfiniteData>(
+          messagesQueryKey(sessionId)
+        )
+        const existingCount = (existing?.pages ?? []).reduce(
+          (n, p) => n + p.messages.length,
+          0
+        )
+        if (existingCount > serverMessages.length) return
+        queryClient.setQueryData<MessagesInfiniteData>(
+          messagesQueryKey(sessionId),
+          {
+            pages: [{ messages: serverMessages, hasMore, oldestBlockIndex }],
+            pageParams: [undefined],
+          }
+        )
+        getChatSyncEngine().saveMessages(sessionId, serverMessages, {
+          hasMore,
+          oldestBlockIndex,
+        })
+      } catch {
+        // Best-effort fallback — a plain invalidation still nudges a refetch.
+        void queryClient.invalidateQueries({
+          queryKey: messagesQueryKey(sessionId),
+        })
+      }
+    })()
+  }, [queryClient, sessionId])
+
   // Consume the one-shot optimistic hint for this session and bound it with a
   // safety timeout, so a prompt that never reaches the agent (e.g. send failure)
   // can't leave the working indicator stuck on screen forever. The stream
@@ -171,7 +223,7 @@ export function useChatStream({
     if (!didMountResyncRef.current) {
       didMountResyncRef.current = true
       if (!sessionStatus.isRunning) {
-        void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+        resyncMessages()
       }
       return
     }
@@ -185,10 +237,10 @@ export function useChatStream({
     if (!sessionStatus.isRunning) {
       const storedStatus = useThreadStatusStore.getState().statuses[threadId]
       if (storedStatus === "completed") {
-        void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+        resyncMessages()
       }
     }
-  }, [sessionStatus, setThreadStatus, threadId, queryClient, sessionId])
+  }, [sessionStatus, setThreadStatus, threadId, queryClient, sessionId, resyncMessages])
 
   const {
     messages,

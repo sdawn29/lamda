@@ -29,7 +29,11 @@ import {
 const remarkPlugins: PluggableList = [remarkGfm]
 
 import { ToolCallBlock } from "./tool-call-block"
-import { chatProseClass, getMarkdownComponents } from "./markdown-components"
+import {
+  chatProseClass,
+  chatProseClassRich,
+  getMarkdownComponents,
+} from "./markdown-components"
 import { UserMessageContent } from "./user-message"
 import { CopyButton } from "@/shared/components/copy-button"
 import { Button } from "@/shared/ui/button"
@@ -44,6 +48,7 @@ import {
   type AbortMessage,
 } from "../types"
 import { cn } from "@/shared/lib/utils"
+import { useRichChatRenderingSetting } from "@/shared/lib/chat-rendering"
 import { useWordReveal } from "../hooks/use-word-reveal"
 
 function assistantCopyText(
@@ -197,6 +202,7 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
   const hasContent = message.content.length > 0
   const hasError = !!message.errorMessage
   const displayContent = useWordReveal(message.content, isNew)
+  const richRendering = useRichChatRenderingSetting()
 
   if (!hasContent && !hasError) return null
 
@@ -228,10 +234,10 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
       }
     >
       {hasContent && (
-        <div className={chatProseClass}>
+        <div className={richRendering ? chatProseClassRich : chatProseClass}>
           <Markdown
             remarkPlugins={remarkPlugins}
-            components={getMarkdownComponents(rootPath)}
+            components={getMarkdownComponents(rootPath, richRendering)}
           >
             {displayContent}
           </Markdown>

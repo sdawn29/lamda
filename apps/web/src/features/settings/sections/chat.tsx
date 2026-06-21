@@ -8,6 +8,7 @@ import {
   DEFAULT_THINKING_PHRASES,
   useShowThinkingSetting,
 } from "@/shared/lib/thinking-visibility"
+import { useRichChatRenderingSetting } from "@/shared/lib/chat-rendering"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
 
 import { useAppSettings } from "../queries"
@@ -25,6 +26,7 @@ const DEFAULT_TITLE_PROMPT = `Generate a short, descriptive thread title (3–6 
 
 export function ChatSection() {
   const showThinking = useShowThinkingSetting()
+  const richRendering = useRichChatRenderingSetting()
   const updateSetting = useUpdateAppSetting()
   const { data: settings } = useAppSettings()
   const persistedPhrasesRaw =
@@ -106,6 +108,13 @@ export function ChatSection() {
     })
   }
 
+  const handleRichRenderingToggle = (checked: boolean) => {
+    updateSetting.mutate({
+      key: APP_SETTINGS_KEYS.RICH_CHAT_RENDERING,
+      value: checked ? "1" : "0",
+    })
+  }
+
   function handleSavePhrases() {
     const trimmed = phrasesValue.trim()
     updateSetting.mutate({
@@ -142,6 +151,17 @@ export function ChatSection() {
           checked={showThinking}
           onCheckedChange={handleToggle}
           aria-label="Show model thinking"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        title="Rich rendering"
+        description="Render agent messages with full markdown — sized headings, bold text, horizontal rules, and blockquotes. Off keeps the compact, flattened chat style."
+      >
+        <Switch
+          checked={richRendering}
+          onCheckedChange={handleRichRenderingToggle}
+          aria-label="Rich rendering"
         />
       </SettingsRow>
 

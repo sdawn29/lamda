@@ -26,6 +26,28 @@ export const chatProseClass =
   "[&>*+*]:mt-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 " +
   "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
 
+/**
+ * Rich variant of {@link chatProseClass}: keeps the chat font but restores the
+ * full markdown hierarchy — sized headings, bold weight, horizontal rules, and
+ * blockquotes — for users who opt into rich rendering in Chat settings.
+ */
+export const chatProseClassRich =
+  "prose prose-sm max-w-none dark:prose-invert font-chat " +
+  "prose-headings:text-foreground prose-headings:font-semibold prose-headings:leading-snug " +
+  "prose-h1:text-base prose-h2:text-[0.95rem] prose-h3:text-sm prose-h4:text-sm prose-h5:text-sm prose-h6:text-sm " +
+  "prose-p:leading-[1.75] " +
+  "prose-strong:text-foreground prose-strong:font-semibold " +
+  "prose-em:italic prose-em:text-foreground " +
+  "prose-hr:my-4 prose-hr:border-border " +
+  "prose-blockquote:border-l-2 prose-blockquote:border-border prose-blockquote:font-normal prose-blockquote:text-muted-foreground " +
+  "prose-ul:list-disc prose-ol:list-decimal prose-li:my-0.5 prose-li:marker:text-muted-foreground " +
+  "[&_li>p]:my-0 " +
+  "[&_del]:text-muted-foreground [&_del]:line-through " +
+  "[&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_mark]:text-foreground " +
+  "[&_sub]:align-sub [&_sub]:text-[0.75em] [&_sup]:align-super [&_sup]:text-[0.75em] " +
+  "[&_kbd]:rounded [&_kbd]:border [&_kbd]:border-border [&_kbd]:bg-muted [&_kbd]:px-1 [&_kbd]:font-mono [&_kbd]:text-[0.75em] " +
+  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
+
 /** Inline `code` span styling, shared by both component maps below. */
 const INLINE_CODE_CLASS =
   "rounded bg-muted px-1.5 py-0.5 font-mono text-[0.8125rem] text-foreground"
@@ -251,19 +273,28 @@ function FileReferenceLink({
   )
 }
 
-export function getMarkdownComponents(rootPath?: string): Components {
-  const cached = markdownComponentsCache.get(rootPath)
+/**
+ * Resolve the component map for the assistant message body. `rich` keeps the
+ * full markdown hierarchy (headings, bold, rules); the default compact map
+ * flattens it. Both share table/code/link styling and the file-reference chip.
+ */
+export function getMarkdownComponents(
+  rootPath?: string,
+  rich = false
+): Components {
+  const cacheKey = `${rich ? "rich" : "compact"}:${rootPath ?? ""}`
+  const cached = markdownComponentsCache.get(cacheKey)
   if (cached) return cached
-  const components = createMarkdownComponents(rootPath)
-  markdownComponentsCache.set(rootPath, components)
+  const components = createMarkdownComponents(rootPath, rich)
+  markdownComponentsCache.set(cacheKey, components)
   return components
 }
 
-const markdownComponentsCache = new Map<string | undefined, Components>()
+const markdownComponentsCache = new Map<string, Components>()
 
-function createMarkdownComponents(rootPath?: string): Components {
+function createMarkdownComponents(rootPath?: string, rich = false): Components {
   return {
-    ...markdownComponents,
+    ...(rich ? baseMarkdownComponents : markdownComponents),
     code: ({ className, children }) => {
       const isBlock =
         String(children).endsWith("\n") || className?.startsWith("language-")
@@ -280,7 +311,12 @@ function createMarkdownComponents(rootPath?: string): Components {
   }
 }
 
-export const markdownComponents: Components = {
+/**
+ * Tables, code, and links — shared by both the compact and rich component maps.
+ * Headings, bold, and rules are left to the renderer/prose defaults here; the
+ * compact map below overrides them to flatten the hierarchy.
+ */
+const baseMarkdownComponents: Components = {
   // ── Tables ──────────────────────────────────────────────────────────────────
   table: ({ children }) => (
     <div className="not-prose my-2 overflow-x-auto rounded-lg border border-border">
@@ -318,8 +354,28 @@ export const markdownComponents: Components = {
     return <CodeBlock className={className}>{children}</CodeBlock>
   },
   // ── Links ───────────────────────────────────────────────────────────────────
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="text-primary underline underline-offset-4 transition-colors hover:text-primary/70"
+    >
+      {children}
+    </a>
+  ),
+}
+
+/**
+ * Default (compact) component map: flattens the markdown hierarchy on top of the
+ * shared base so the chat surface stays dense — every heading becomes a
+ * paragraph, bold loses its weight, and horizontal rules are dropped. The rich
+ * variant skips these overrides and uses {@link baseMarkdownComponents} directly.
+ */
+export const markdownComponents: Components = {
+  ...baseMarkdownComponents,
   // ── Headings ─────────────────────────────────────────────────────────────
-  // Render all heading levels as h4 to keep the chat UI compact.
+  // Render all heading levels as paragraphs to keep the chat UI compact.
   h1: ({ children }) => <p>{children}</p>,
   h2: ({ children }) => <p>{children}</p>,
   h3: ({ children }) => <p>{children}</p>,
@@ -332,16 +388,4 @@ export const markdownComponents: Components = {
 
   // ── Horizontal rule ─────────────────────────────────────────────────────────
   hr: () => null,
-
-  // ── Links ───────────────────────────────────────────────────────────────────
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="text-primary underline underline-offset-4 transition-colors hover:text-primary/70"
-    >
-      {children}
-    </a>
-  ),
 }
