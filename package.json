@@ -26,8 +26,5 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0"
-  },
-  "overrides": {
-    "monaco-editor": "^0.53.0"
   }
 }
