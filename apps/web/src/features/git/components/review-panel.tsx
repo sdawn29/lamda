@@ -762,7 +762,15 @@ export const ReviewPanel = memo(function ReviewPanel({
   const [scMode, setScMode] = useState<DiffMode>("inline")
   const [scSortMode, setScSortMode] = useState<SortMode>("name")
   const [turnsClearedAt, setTurnsClearedAt] = useState(0)
-  const activeTurnId = turnsData[0]?.id
+
+  // Mirror TurnHistoryView's cutoff so the header diff stat resets after a
+  // commit (manual or agent-driven) — otherwise it keeps showing the last
+  // turn's +/- numbers even though the turn list below has been cleared.
+  const lastCommitAt = useLastCommitAt(sessionId)
+  const turnsCutoff = Math.max(turnsClearedAt, lastCommitAt)
+  const activeTurnId = turnsData.find(
+    (t) => t.inProgress || !turnsCutoff || t.startedAt > turnsCutoff
+  )?.id
   const { data: turnDiffStat } = useTurnDiffStat(
     sessionId,
     activeTurnId,
