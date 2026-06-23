@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from "react"
 import { flushSync } from "react-dom"
 import { useQueryClient } from "@tanstack/react-query"
 
-import { openSessionWebSocket, listRunningTools } from "../api"
+import { openSessionWebSocket, listRunningTools, fetchSessionStatus } from "../api"
 import { subscribeToSessionEvents, type AgentEndMessage } from "../session-events"
 import { messagesQueryKey, chatKeys, updateLastPageMessages, type MessagesInfiniteData } from "../queries"
 import { createAssistantMessage, createErrorMessage, blockToMessage, parseErrorMessage } from "../types"
@@ -618,6 +618,73 @@ export function useSessionStream({
     // Reset to 0 whenever a server event is successfully received.
     let reconnectAttempts = 0
     const MAX_RECONNECT_ATTEMPTS = 3
+    // After the fast attempts are exhausted but the server still can't be
+    // reached (or briefly reports idle), we keep retrying on a slower cadence
+    // rather than declaring the turn dead — this is the laptop sleep/wake case,
+    // where the network can take many seconds to come back. Bounded so a server
+    // that is genuinely gone eventually surfaces a terminal error.
+    let slowReconnectAttempts = 0
+    const MAX_SLOW_RECONNECT_ATTEMPTS = 12
+    const SLOW_RECONNECT_DELAY_MS = 5000
+
+    function teardownSocket() {
+      ws?.close()
+      ws = null
+      unsubscribe?.()
+      unsubscribe = undefined
+    }
+
+    function scheduleReconnect(delay: number) {
+      if (reconnectTimer !== null) return
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+        if (!doneFlag.current) connect(lastEventIdRef.current).catch(console.debug)
+      }, delay)
+    }
+
+    // Called when the fast reconnect attempts are exhausted while the agent was
+    // running. Instead of immediately declaring the turn lost, ask the server
+    // whether the agent is still working. If it is, the socket — not the turn —
+    // is what broke, so we keep the working indicator and keep retrying. Only
+    // after a bounded window of an unreachable/idle server do we surface a
+    // terminal "Connection Lost" error. This prevents the UI from falsely
+    // showing the agent as stopped (and the user re-prompting a still-running
+    // agent, which the server rejects with "Agent is already processing").
+    async function handleReconnectExhausted() {
+      let reachable = true
+      let stillActive = false
+      try {
+        const status = await fetchSessionStatus(sessionId)
+        stillActive = status.isRunning || status.isCompacting
+      } catch {
+        reachable = false
+      }
+      if (doneFlag.current) return
+
+      // Server confirms the agent is still working — keep the working indicator
+      // and keep retrying indefinitely on a slow cadence; a reconnect resumes
+      // the live stream and replays any events missed while disconnected.
+      if (reachable && stillActive) {
+        reconnectAttempts = 0
+        slowReconnectAttempts = 0
+        scheduleReconnect(SLOW_RECONNECT_DELAY_MS)
+        return
+      }
+
+      // Either the server is unreachable (network still down after a wake) or it
+      // is reachable but idle (the turn ended while we were disconnected, so a
+      // reconnect will replay the buffered agent_end and settle state). Retry
+      // slowly for a bounded window — keeping the working indicator — before
+      // finally surfacing a terminal error.
+      if (slowReconnectAttempts < MAX_SLOW_RECONNECT_ATTEMPTS) {
+        slowReconnectAttempts++
+        scheduleReconnect(SLOW_RECONNECT_DELAY_MS)
+        return
+      }
+      agentRunningRef.current = false
+      doneFlag.current = true
+      enqueueNow({ kind: "transport_error", lastPrompt: lastPromptRef.current })
+    }
 
     async function connect(lastEventId?: string) {
       const socket = await openSessionWebSocket(sessionId, lastEventId)
@@ -626,12 +693,11 @@ export function useSessionStream({
         return
       }
       if (!socket) {
-        // Reconnect attempt failed to open the socket at all.
+        // Reconnect attempt failed to open the socket at all. If the agent was
+        // running, don't give up — defer to the status-aware retry so a
+        // sleep/wake network lag doesn't falsely kill the live turn.
         if (agentRunningRef.current) {
-          reconnectAttempts = 0
-          agentRunningRef.current = false
-          doneFlag.current = true
-          enqueueNow({ kind: "transport_error", lastPrompt: lastPromptRef.current })
+          void handleReconnectExhausted()
         } else {
           doneFlag.current = true
           callbacksRef.current.onIsLoadingChange?.(false)
@@ -836,9 +902,10 @@ export function useSessionStream({
             // Persist across hook re-mounts so returning to a running thread
             // resumes the stream instead of replaying the whole turn.
             sessionLastEventIds.set(sessionId, id)
-            // Reset the counter whenever a server event is received — consecutive
+            // Reset the counters whenever a server event is received — consecutive
             // failures is what we care about, not lifetime reconnects.
             reconnectAttempts = 0
+            slowReconnectAttempts = 0
           },
 
           onTransportError: () => {
@@ -846,39 +913,22 @@ export function useSessionStream({
             if (!agentRunningRef.current) {
               // Connection dropped while idle (e.g. laptop sleep/wake).
               // Silently reconnect without surfacing an error to the user.
-              ws?.close()
-              ws = null
-              unsubscribe?.()
-              unsubscribe = undefined
-              reconnectTimer = setTimeout(() => {
-                reconnectTimer = null
-                if (!doneFlag.current) connect(lastEventIdRef.current).catch(console.debug)
-              }, 2000)
+              teardownSocket()
+              scheduleReconnect(2000)
               return
             }
             // Agent is running — attempt transparent reconnect using lastEventId
-            // so the stream resumes from where it dropped. Only surface the error
-            // to the user after MAX_RECONNECT_ATTEMPTS consecutive failures.
-            ws?.close()
-            ws = null
-            unsubscribe?.()
-            unsubscribe = undefined
+            // so the stream resumes from where it dropped. After the fast
+            // attempts are exhausted, defer to the status-aware retry instead of
+            // immediately declaring the turn lost (see handleReconnectExhausted).
+            teardownSocket()
             if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-              reconnectAttempts = 0
-              agentRunningRef.current = false
-              doneFlag.current = true
-              enqueueNow({
-                kind: "transport_error",
-                lastPrompt: lastPromptRef.current,
-              })
+              void handleReconnectExhausted()
               return
             }
             const delay = Math.min(500 * Math.pow(2, reconnectAttempts), 8000)
             reconnectAttempts++
-            reconnectTimer = setTimeout(() => {
-              reconnectTimer = null
-              if (!doneFlag.current) connect(lastEventIdRef.current).catch(console.debug)
-            }, delay)
+            scheduleReconnect(delay)
           },
         })
     }
@@ -893,13 +943,30 @@ export function useSessionStream({
     const handleVisibilityChange = () => {
       if (document.hidden || doneFlag.current) return
       if (!ws || (ws.readyState !== WebSocket.CONNECTING && ws.readyState !== WebSocket.OPEN)) {
-        ws = null
-        unsubscribe?.()
-        unsubscribe = undefined
+        teardownSocket()
+        reconnectAttempts = 0
+        slowReconnectAttempts = 0
         if (reconnectTimer === null) connect(lastEventIdRef.current).catch(console.debug)
       }
     }
     document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    // Desktop wake signal. After a sleep the socket can still report OPEN while
+    // actually dead (the server heartbeat hasn't terminated it yet), so a plain
+    // readyState check — like visibilitychange does — would miss it. Force a
+    // fresh reconnect: tearing down a healthy socket only costs a cheap
+    // resubscribe-from-lastEventId, which is lossless.
+    const unsubscribeResume = window.electronAPI?.onSystemResume?.(() => {
+      if (doneFlag.current) return
+      if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+      reconnectAttempts = 0
+      slowReconnectAttempts = 0
+      teardownSocket()
+      connect(lastEventIdRef.current).catch(console.debug)
+    })
 
     const pendingToolStart = pendingToolStartRef.current
     return () => {
@@ -913,6 +980,7 @@ export function useSessionStream({
       }
       if (reconnectTimer !== null) clearTimeout(reconnectTimer)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
+      unsubscribeResume?.()
       eventQueueRef.current = []
       pendingToolStart.clear()
       unsubscribe?.()

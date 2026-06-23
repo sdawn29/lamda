@@ -172,6 +172,17 @@ sessions.post("/session/:id/prompt", async (c) => {
     return c.json({ error: "text or attachments required" }, 400);
   }
 
+  // Guard against re-prompting an agent that is already mid-turn. This happens
+  // when a client that lost its WebSocket (e.g. laptop sleep/wake) re-sends a
+  // prompt while the original turn is still running server-side. Calling
+  // handle.prompt() in that state throws "Agent is already processing" and trips
+  // the catch below into recoverSession() — which rebuilds the handle and
+  // disrupts the genuinely-running turn. Reject cleanly instead; to interleave a
+  // message the client must pass streamingBehavior ("steer"/"followUp").
+  if (!body.streamingBehavior && sessionEvents.getStatus(id).isRunning) {
+    return c.json({ error: "Agent is already processing", isRunning: true }, 409);
+  }
+
   // Recover before running tools if this session's worktree was removed
   // out-of-band — otherwise every tool call resolves against a missing cwd and
   // fails with ENOENT. Heals in place (relocates to the workspace dir).

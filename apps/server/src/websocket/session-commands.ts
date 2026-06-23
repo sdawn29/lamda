@@ -153,6 +153,21 @@ async function handlePrompt(
     return;
   }
 
+  // Reject a plain prompt while the agent is already mid-turn (no explicit
+  // steer/follow-up). Mirrors the HTTP /prompt guard: a client that lost its
+  // socket and re-sends would otherwise make handle.prompt() throw "Agent is
+  // already processing" and trigger a destructive session recovery. To
+  // interleave a message the client must set streamingBehavior.
+  if (!msg.streamingBehavior && sessionEvents.getStatus(sessionId).isRunning) {
+    send(ws, {
+      type: "ack",
+      clientId: msg.id,
+      operation: "prompt",
+      accepted: false,
+    });
+    return;
+  }
+
   ensureSessionEventHub(sessionId, entry);
   // DB stores the clean user text; the SDK sees the injected preambles.
   insertUserBlock(entry.threadId, msg.text);
