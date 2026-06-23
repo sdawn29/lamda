@@ -42,6 +42,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/shared/ui/sidebar"
 import {
   DropdownMenu,
@@ -365,6 +366,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
   }, [navigate])
   const openPalette = useCommandPalette((state) => state.openPalette)
   const { pendingThreadIds } = useMainTabs()
+  const { isMobile } = useSidebar()
 
   async function handleConfirmDelete() {
     if (!deletingWorkspace) return
@@ -605,7 +607,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
       collapsible="offcanvas"
       className="top-11! h-[calc(100svh-2.75rem)]"
     >
-      <SidebarHeader className="h-2 shrink-0 p-0" />
+      <SidebarHeader className={cn("shrink-0 p-0", isMobile ? "h-9" : "h-2")} />
       <SidebarContent className="overflow-hidden">
         {workspaces.length > 0 && (
           <div className="px-2 pb-1">

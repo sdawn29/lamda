@@ -160,7 +160,7 @@ export function RightSidebarContent({
               </TooltipContent>
             </Tooltip>
           )}
-          {sessionId && (
+          {sessionId && !isMobile && (
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -244,7 +244,7 @@ export function RightSidebarContent({
           side="right"
           showCloseButton={false}
           className="bg-sidebar p-0 text-sidebar-foreground sm:max-w-none"
-          style={{ width: "90vw", maxWidth: "90vw" }}
+          style={{ width: "80vw", maxWidth: "80vw" }}
         >
           {sidebarEl}
         </SheetContent>

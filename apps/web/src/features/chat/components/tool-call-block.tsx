@@ -7,6 +7,7 @@ import {
   CircleDotIcon,
   ContainerIcon,
   CopyIcon,
+  DownloadIcon,
   FilePenLineIcon,
   FilePlus2Icon,
   FileTextIcon,
@@ -716,7 +717,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         aria-expanded={hasBody ? expanded : undefined}
       >
         {skillName ? (
-          <ContainerIcon
+          <DownloadIcon
             className={cn(
               "h-3 w-3 shrink-0",
               msg.status === "running"
@@ -755,9 +756,13 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
         {skillName ? (
           <span
-            className={cn("min-w-0 flex-1 truncate text-xs", DISCLOSURE_DIM)}
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-1 text-xs",
+              DISCLOSURE_DIM
+            )}
           >
-            {skillName}
+            <ContainerIcon className="h-3 w-3 shrink-0 opacity-60" />
+            <span className="truncate">{skillName}</span>
           </span>
         ) : displayFilePath ? (
           <span

@@ -33,17 +33,18 @@ export type { InjectableMemory } from "./memory-preamble.js";
 export type { Question, QuestionOption, QuestionPayload, AnswerWaiter } from "./question-tool.js";
 export {
   MODES,
-  MODE_CONFIG,
   BUILTIN_TOOL_NAMES,
   PLAN_DIR,
   isMode,
   normalizeMode,
+  ensureModeFiles,
+  getModeConfig,
   getModePreamble,
   applyModePreamble,
   stripModePreamble,
   computeActiveToolsForMode,
 } from "./modes.js";
-export type { Mode } from "./modes.js";
+export type { Mode, ModeConfig } from "./modes.js";
 export type {
   ManagedSessionHandle,
   ManagedSessionStats,

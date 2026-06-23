@@ -7,6 +7,7 @@ import app from "./app.js";
 import { bootstrapSessions } from "./bootstrap.js";
 import { store } from "./store.js";
 import { registerHealingHooks } from "./services/healing-service.js";
+import { ensureModeFiles } from "@lamda/pi-sdk";
 import { scheduleEmbeddingBackfill } from "./services/memory-embeddings.js";
 import { reflectOnThread } from "./services/memory-reflection.js";
 import { handleTerminalConnection } from "./services/terminal-service.js";
@@ -21,6 +22,10 @@ const port = resolvePort();
 
 // Wire self-healing observers before any session can emit events.
 registerHealingHooks();
+
+// Seed ~/.lamda/modes/<mode>.md with the built-in mode prompts so they're
+// editable on disk; existing files are left untouched.
+ensureModeFiles();
 
 bootstrapSessions()
   .then(() => {

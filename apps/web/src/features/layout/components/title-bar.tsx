@@ -55,6 +55,7 @@ import { ShortcutKbd } from "@/shared/ui/kbd"
 import { TasksDropdown } from "@/features/tasks"
 import { useMainTabs } from "@/features/main-tabs"
 import { useCommandPalette } from "@/features/command-palette"
+import { useIsMobile } from "@/shared/hooks/use-mobile"
 import { cn } from "@/shared/lib/utils"
 
 function UpdateButton({ status }: { status: ElectronUpdateStatus }) {
@@ -160,6 +161,9 @@ export function TitleBar() {
     unpinThread,
   } = useWorkspace()
   const { toggleSidebar, open: sidebarOpen } = useSidebar()
+  // Mirrors the right sidebar's mobile breakpoint — once it collapses to a
+  // sheet, surface the new-thread + search shortcuts here.
+  const isMobile = useIsMobile(900)
   const openPalette = useCommandPalette((state) => state.openPalette)
   const {
     isOpen: rightSidebarOpen,
@@ -405,9 +409,10 @@ export function TitleBar() {
 
       {/* ── Middle: thread breadcrumb · right-panel tabs · drag filler ───── */}
       <div className="flex min-w-0 flex-1 items-center gap-1">
-        {/* When the left sidebar is closed, surface the new-thread + search
-            actions here, left of the thread name, popping out into view. */}
-        {!sidebarOpen && (
+        {/* When the left sidebar is closed (or collapsed to a sheet on mobile),
+            surface the new-thread + search actions here, left of the thread
+            name, popping out into view. */}
+        {(!sidebarOpen || isMobile) && (
           <div
             className="flex shrink-0 origin-left items-center gap-0.5 pl-0.5 duration-200 animate-in fade-in-0 zoom-in-90 slide-in-from-left-2"
             style={noDrag}

@@ -8,6 +8,9 @@ export const LAMDA_DIR_NAME = ".lamda"
 /** Subdirectory (under a `.lamda` dir) that holds prompt template markdown files. */
 const PROMPTS_SUBDIR = "prompts"
 
+/** Global `.lamda` subdirectory that holds per-mode prompt override files. */
+const MODES_SUBDIR = "modes"
+
 /** Global `.lamda` subdirectory that contains managed git worktrees. */
 const WORKTREES_SUBDIR = "worktrees"
 
@@ -51,6 +54,16 @@ export function lamdaWorktreePath(
     counter += 1
   }
   return candidate
+}
+
+/** Absolute directory holding per-mode prompt override files: `~/.lamda/modes`. */
+export function lamdaModesDir(): string {
+  return join(homedir(), LAMDA_DIR_NAME, MODES_SUBDIR)
+}
+
+/** Absolute path to a single mode's prompt file: `~/.lamda/modes/<mode>.md`. */
+export function lamdaModeFilePath(mode: string): string {
+  return join(lamdaModesDir(), `${mode}.md`)
 }
 
 /**

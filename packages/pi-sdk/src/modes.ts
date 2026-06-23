@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { lamdaModeFilePath, lamdaModesDir } from "./lamda-paths.js";
 import { QUESTION_TOOL_NAME } from "./question-tool.js";
 
 export type Mode = "ask" | "plan" | "agent";
@@ -31,18 +33,32 @@ export const BUILTIN_TOOL_NAMES = [
   "ls",
 ] as const;
 
-interface ModeConfig {
+export interface ModeConfig {
+  /** Display name shown in the mode picker (frontmatter `name`). */
   label: string;
+  /** One-line summary of the mode (frontmatter `description`). */
   description: string;
-  /** Prepended to user text before it reaches the SDK. */
+  /**
+   * Prompt prepended to user text before it reaches the SDK — the body of the
+   * mode's markdown file (everything after the frontmatter).
+   */
   preamble: string;
-  /** Built-in tool names that should be active in this mode. */
+  /** Built-in tool names active in this mode (frontmatter `tools`). */
   allowedBuiltins: readonly string[];
-  /** Whether non-builtin tools (MCP/LSP/extensions) remain active in this mode. */
+  /**
+   * Whether non-builtin tools (MCP/LSP/extensions) remain active in this mode
+   * (frontmatter `allowCustomTools`).
+   */
   allowCustomTools: boolean;
 }
 
-export const MODE_CONFIG: Record<Mode, ModeConfig> = {
+/**
+ * Built-in defaults for each mode. These seed `~/.lamda/modes/<mode>.md` on
+ * first run and act as the fallback for any field a file omits (or when the file
+ * is missing/unreadable). Once a file exists, its frontmatter + body take
+ * precedence — see `getModeConfig`.
+ */
+const DEFAULT_MODE_CONFIG: Record<Mode, ModeConfig> = {
   ask: {
     label: "Ask",
     description: "Read-only Q&A. Cannot edit, write, or run shell commands.",
@@ -88,8 +104,147 @@ export const MODE_CONFIG: Record<Mode, ModeConfig> = {
   },
 };
 
+// --- Mode file format: YAML-ish frontmatter + markdown body ----------------
+//
+//   ---
+//   name: Ask
+//   description: Read-only Q&A. Cannot edit, write, or run shell commands.
+//   tools: [read, grep, find, ls, question]
+//   allowCustomTools: true
+//   ---
+//
+//   Ask mode — read-only Q&A about this codebase. ...
+//
+// The frontmatter carries the mode's metadata; the body is the preamble. We
+// parse only the small subset above (scalar strings, a boolean, and an inline
+// `[a, b, c]` list) rather than pull in a YAML dependency.
+
+interface ParsedModeFile {
+  frontmatter: Partial<Omit<ModeConfig, "preamble">>;
+  body: string;
+}
+
+/** Strip a single layer of matching single/double quotes, if present. */
+function unquote(value: string): string {
+  if (
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+/** Parse an inline `[a, b, c]` (or bare `a, b, c`) list into trimmed strings. */
+function parseList(value: string): string[] {
+  return value
+    .replace(/^\[/, "")
+    .replace(/\]$/, "")
+    .split(",")
+    .map((item) => unquote(item.trim()))
+    .filter((item) => item.length > 0);
+}
+
+function parseModeFile(raw: string): ParsedModeFile {
+  const text = raw.replace(/^\uFEFF/, "");
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
+  if (!match) return { frontmatter: {}, body: text.trim() };
+
+  const frontmatter: ParsedModeFile["frontmatter"] = {};
+  for (const line of match[1].split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const idx = trimmed.indexOf(":");
+    if (idx === -1) continue;
+    const key = trimmed.slice(0, idx).trim();
+    const value = trimmed.slice(idx + 1).trim();
+    if (key === "name") frontmatter.label = unquote(value);
+    else if (key === "description") frontmatter.description = unquote(value);
+    else if (key === "tools") frontmatter.allowedBuiltins = parseList(value);
+    else if (key === "allowCustomTools") frontmatter.allowCustomTools = value === "true";
+  }
+  return { frontmatter, body: text.slice(match[0].length).trim() };
+}
+
+/** Render a mode config as the on-disk file: frontmatter block + preamble body. */
+function serializeModeFile(config: ModeConfig): string {
+  return [
+    "---",
+    `name: ${config.label}`,
+    `description: ${config.description}`,
+    `tools: [${config.allowedBuiltins.join(", ")}]`,
+    `allowCustomTools: ${config.allowCustomTools}`,
+    "---",
+    "",
+    config.preamble,
+    "",
+  ].join("\n");
+}
+
+// Cache of file-loaded configs keyed by mode, invalidated by file mtime so a
+// manual edit to `~/.lamda/modes/<mode>.md` takes effect on the next turn without
+// a server restart (mirroring how `.lamda/tool-approvals.json` is re-read).
+const configCache = new Map<Mode, { mtimeMs: number; config: ModeConfig }>();
+
+/**
+ * The active config for a mode: the parsed `~/.lamda/modes/<mode>.md` (frontmatter
+ * over `DEFAULT_MODE_CONFIG`, body as the preamble), or the built-in default when
+ * that file is missing/unreadable. Each frontmatter field independently falls
+ * back to its default when absent, so a file may override only the prompt and
+ * keep the default tool allowlist (or vice versa). Reads are cached and
+ * invalidated by file mtime.
+ */
+export function getModeConfig(mode: Mode): ModeConfig {
+  const defaults = DEFAULT_MODE_CONFIG[mode];
+  try {
+    const stat = statSync(lamdaModeFilePath(mode));
+    const cached = configCache.get(mode);
+    if (cached && cached.mtimeMs === stat.mtimeMs) return cached.config;
+
+    const { frontmatter, body } = parseModeFile(
+      readFileSync(lamdaModeFilePath(mode), "utf8"),
+    );
+    const config: ModeConfig = {
+      label: frontmatter.label ?? defaults.label,
+      description: frontmatter.description ?? defaults.description,
+      preamble: body.length > 0 ? body : defaults.preamble,
+      allowedBuiltins: frontmatter.allowedBuiltins ?? defaults.allowedBuiltins,
+      allowCustomTools: frontmatter.allowCustomTools ?? defaults.allowCustomTools,
+    };
+    configCache.set(mode, { mtimeMs: stat.mtimeMs, config });
+    return config;
+  } catch {
+    return defaults;
+  }
+}
+
+/**
+ * Seed each built-in mode's default definition into `~/.lamda/modes/<mode>.md`
+ * when that file doesn't yet exist, so modes are discoverable and editable on
+ * disk. Existing files are never overwritten — user edits always win.
+ * Best-effort: any filesystem failure is swallowed so a read-only home dir can't
+ * break startup. Call once at server startup.
+ */
+export function ensureModeFiles(): void {
+  try {
+    mkdirSync(lamdaModesDir(), { recursive: true });
+  } catch {
+    return;
+  }
+  for (const mode of MODES) {
+    const path = lamdaModeFilePath(mode);
+    if (existsSync(path)) continue;
+    try {
+      writeFileSync(path, serializeModeFile(DEFAULT_MODE_CONFIG[mode]), "utf8");
+    } catch {
+      // Seeding is best-effort; the in-memory default still applies.
+    }
+  }
+}
+
 export function getModePreamble(mode: Mode): string {
-  return MODE_CONFIG[mode].preamble;
+  return getModeConfig(mode).preamble;
 }
 
 /** Separator inserted between an injected mode preamble and the user's text. */
@@ -109,11 +264,20 @@ export function applyModePreamble(mode: Mode, userText: string): string {
  * persisted session history (e.g. seeding a forked thread's DB blocks), where
  * the preamble is baked into the stored message. Returns the text unchanged if
  * it doesn't start with a known preamble.
+ *
+ * Tries both the current on-disk preamble and the built-in default for each
+ * mode, so text stored under an earlier (or since-edited) `~/.lamda/modes/*.md`
+ * still strips cleanly.
  */
 export function stripModePreamble(text: string): string {
   for (const mode of MODES) {
-    const prefix = MODE_CONFIG[mode].preamble + PREAMBLE_SEPARATOR;
-    if (text.startsWith(prefix)) return text.slice(prefix.length);
+    for (const preamble of new Set([
+      getModeConfig(mode).preamble,
+      DEFAULT_MODE_CONFIG[mode].preamble,
+    ])) {
+      const prefix = preamble + PREAMBLE_SEPARATOR;
+      if (text.startsWith(prefix)) return text.slice(prefix.length);
+    }
   }
   return text;
 }
@@ -127,8 +291,8 @@ export function computeActiveToolsForMode(
   mode: Mode,
   currentActive: readonly string[],
 ): string[] {
-  const modeConfig = MODE_CONFIG[mode];
-  const allowed = new Set(MODE_CONFIG[mode].allowedBuiltins);
+  const modeConfig = getModeConfig(mode);
+  const allowed = new Set(modeConfig.allowedBuiltins);
   const builtins = new Set<string>(BUILTIN_TOOL_NAMES);
   const preserved = modeConfig.allowCustomTools
     ? currentActive.filter((name) => !builtins.has(name))
