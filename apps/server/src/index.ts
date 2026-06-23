@@ -21,6 +21,7 @@ import { handleGlobalEventsWs } from "./routes/health.js";
 import { handleOAuthEventsWs } from "./routes/auth.js";
 import { handleLspWs } from "./routes/lsp.js";
 import { handleSessionCommands } from "./websocket/session-commands.js";
+import { lamdaConfigWatcher } from "./services/lamda-config-watcher.js";
 import { isAllowedOrigin, isAuthEnabled, isValidToken } from "./auth.js";
 
 const port = resolvePort();
@@ -44,6 +45,12 @@ ensureSkillsDir();
 // Seed the bundled create-prompt / create-mode skills into ~/.lamda/skills;
 // existing files are left untouched so user edits are preserved.
 ensureSkillFiles();
+
+// Watch ~/.lamda/{modes,prompts} so a mode/prompt file added/edited/removed
+// there refreshes the renderer's pickers and slash-command lists live
+// (workspace-local config is watched per-workspace as each is indexed). Started
+// after the seeding above so both directories exist.
+lamdaConfigWatcher.start();
 
 bootstrapSessions()
   .then(() => {

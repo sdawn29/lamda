@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { clearThreadWorktree, listWorkspacesWithThreads } from "@lamda/db";
 import { store } from "./store.js";
 import { workspaceIndexer } from "./services/workspace-indexer.js";
+import { lamdaConfigWatcher } from "./services/lamda-config-watcher.js";
 import {
   createSessionForThread,
   openSessionForThread,
@@ -68,8 +69,10 @@ export async function bootstrapSessions(): Promise<void> {
     console.error(`[bootstrap] restored ${total - failed}/${total} sessions`);
   }
 
-  // Start file indexing for all workspaces (non-blocking)
+  // Start file indexing for all workspaces (non-blocking) and watch each one's
+  // local `.lamda` so workspace-scoped modes and prompts refresh live.
   for (const ws of workspaceList) {
     workspaceIndexer.startIndexing(ws.id, ws.path);
+    lamdaConfigWatcher.watchWorkspace(ws.id, ws.path);
   }
 }

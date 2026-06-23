@@ -24,6 +24,7 @@ import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { workspaceIndexer } from "../services/workspace-indexer.js";
 import { fileTreeService } from "../services/file-tree-service.js";
+import { lamdaConfigWatcher } from "../services/lamda-config-watcher.js";
 import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
 import { clearAppDataDir } from "../lib/attachments.js";
 
@@ -231,6 +232,7 @@ async function finalizeWorkspaceCreation(
 ): Promise<string | null> {
   await createTasksFromPackageScripts(workspaceId, path);
   workspaceIndexer.startIndexing(workspaceId, path);
+  lamdaConfigWatcher.watchWorkspace(workspaceId, path);
   const detectedIcon = await detectWorkspaceIcon(path).catch(() => null);
   if (detectedIcon) updateWorkspaceIcon(workspaceId, detectedIcon);
   return detectedIcon;
@@ -400,6 +402,7 @@ workspaces.delete("/workspace/:id", async (c) => {
   }
   workspaceIndexer.stopIndexing(workspaceId);
   fileTreeService.stopWorkspace(workspaceId);
+  lamdaConfigWatcher.stopWorkspace(workspaceId);
   deleteWorkspace(workspaceId);
   return new Response(null, { status: 204 });
 });

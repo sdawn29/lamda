@@ -6,6 +6,8 @@ import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
 import { workspaceDirBroadcaster } from "../workspace-dir-broadcaster.js";
 import { gitStatusBroadcaster } from "../git-status-broadcaster.js";
 import { worktreeBroadcaster } from "../worktree-broadcaster.js";
+import { modesBroadcaster } from "../modes-broadcaster.js";
+import { promptsBroadcaster } from "../prompts-broadcaster.js";
 
 const health = new Hono();
 
@@ -56,12 +58,24 @@ export function handleGlobalEventsWs(ws: WebSocket) {
     },
   );
 
+  const unsubscribeModes = modesBroadcaster.subscribe(() => {
+    if (ws.readyState !== 1 /* OPEN */) return;
+    ws.send(JSON.stringify({ type: "modes_changed" }));
+  });
+
+  const unsubscribePrompts = promptsBroadcaster.subscribe(() => {
+    if (ws.readyState !== 1 /* OPEN */) return;
+    ws.send(JSON.stringify({ type: "prompts_changed" }));
+  });
+
   const cleanup = () => {
     unsubscribeThread();
     unsubscribeIndex();
     unsubscribeDir();
     unsubscribeGit();
     unsubscribeWorktree();
+    unsubscribeModes();
+    unsubscribePrompts();
   };
 
   ws.on("close", cleanup);

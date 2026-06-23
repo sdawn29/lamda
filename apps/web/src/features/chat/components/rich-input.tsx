@@ -504,6 +504,12 @@ export const RichInput = React.forwardRef<
       }
     }
 
+    // Escape outside a dropdown lets the parent leave history navigation.
+    if (e.key === "Escape") {
+      onEscape()
+      return
+    }
+
     // Backspace: delete the preceding chip in one keystroke
     if (e.key === "Backspace") {
       const div = divRef.current

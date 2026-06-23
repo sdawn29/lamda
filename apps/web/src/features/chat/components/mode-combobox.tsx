@@ -20,7 +20,9 @@ import {
   WrenchIcon,
   ZapIcon,
   type LucideIcon,
+  type LucideProps,
 } from "lucide-react"
+import { DynamicIcon, iconNames, type IconName } from "lucide-react/dynamic"
 
 import { Button } from "@/shared/ui/button"
 import {
@@ -170,6 +172,46 @@ const MODE_ICONS: Record<string, LucideIcon> = {
 
 const DEFAULT_ICON = SparklesIcon
 
+// The full set of Lucide icon names (kebab-case), so a frontmatter `icon` may
+// name any Lucide icon — not just the curated set in MODE_ICONS above.
+const LUCIDE_ICON_NAMES = new Set<string>(iconNames)
+
+// Wrapper components built for dynamically-resolved icons, cached by name so the
+// same name yields a stable component identity across renders (a fresh component
+// each render would remount DynamicIcon and re-trigger its async load).
+const dynamicIconCache = new Map<string, LucideIcon>()
+
+/** A `LucideIcon`-shaped component that lazy-loads the named icon at render. */
+function dynamicModeIcon(name: string): LucideIcon {
+  const cached = dynamicIconCache.get(name)
+  if (cached) return cached
+  const Component = React.forwardRef<SVGSVGElement, LucideProps>(
+    (props, ref) => (
+      <DynamicIcon
+        ref={ref}
+        name={name as IconName}
+        // Render the default icon while the real one is loading, so the slot is
+        // never empty mid-load.
+        fallback={() => <DEFAULT_ICON className={props.className} />}
+        {...props}
+      />
+    ),
+  ) as LucideIcon
+  dynamicIconCache.set(name, Component)
+  return Component
+}
+
+/**
+ * Resolve a frontmatter `icon` name to a component: a curated icon for the fast
+ * common path, any other valid Lucide name via dynamic import, else the default.
+ */
+function resolveModeIcon(name: string): LucideIcon {
+  return (
+    MODE_ICONS[name] ??
+    (LUCIDE_ICON_NAMES.has(name) ? dynamicModeIcon(name) : DEFAULT_ICON)
+  )
+}
+
 /** Send button styling — shared across modes. */
 export const MODE_SEND_BUTTON =
   "bg-primary text-primary-foreground hover:bg-primary hover:shadow-none"
@@ -194,7 +236,7 @@ export function modeOptionFromDto(dto: ModeDto): ModeOption {
     value: dto.id,
     label: dto.label,
     description: dto.description,
-    Icon: MODE_ICONS[dto.icon] ?? DEFAULT_ICON,
+    Icon: resolveModeIcon(dto.icon),
     style: colorStyle(dto.color),
     sendButton: MODE_SEND_BUTTON,
   }

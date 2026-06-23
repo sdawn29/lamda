@@ -215,6 +215,29 @@ function handleGlobalMessage(e: MessageEvent): void {
         queryKey: ["workspace-dir", data.root, data.dir],
       })
     }
+    if (data.type === "modes_changed") {
+      // A mode file was added/edited/removed (global or workspace-local).
+      // Refetch every mounted mode picker — each is keyed by workspace, and a
+      // global mode is visible to all of them.
+      void queryClient.invalidateQueries({ queryKey: ["modes"] })
+    }
+    if (data.type === "prompts_changed") {
+      // A prompt file was added/edited/removed (global or workspace-local).
+      // Refetch every mounted slash-command list. These are keyed per session
+      // (`["chat","session",id,"commands"]`) and per workspace
+      // (`["chat","workspace",id,"commands"]`); match both by their trailing
+      // "commands" segment, and a global prompt is visible to all of them.
+      void queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey
+          return (
+            Array.isArray(key) &&
+            key[0] === "chat" &&
+            key[key.length - 1] === "commands"
+          )
+        },
+      })
+    }
     if (data.type === "workspace_files_updated" && data.workspaceId) {
       queryClient.invalidateQueries({
         queryKey: ["workspace-files", data.workspaceId],

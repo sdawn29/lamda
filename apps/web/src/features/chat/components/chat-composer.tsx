@@ -15,6 +15,7 @@ import {
   FolderPlusIcon,
   FolderTreeIcon,
   HelpCircleIcon,
+  HistoryIcon,
   MinimizeIcon,
   MoonIcon,
   PaperclipIcon,
@@ -35,7 +36,7 @@ import { toast } from "sonner"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
-import { ShortcutKbd } from "@/shared/ui/kbd"
+import { Kbd, ShortcutKbd } from "@/shared/ui/kbd"
 import {
   useShortcutBinding,
   useRunShortcutAction,
@@ -256,6 +257,24 @@ export const ChatComposer = memo(
     // The exact value we last wrote to the input during navigation. If the
     // current value differs, the user has edited it and navigation restarts.
     const historyNavValueRef = React.useRef<string>("")
+    // UI indicator describing the active history-navigation position. `null`
+    // when showing the live draft (no badge shown). `position` is 1-based from
+    // the newest entry, `total` is the number of recallable messages.
+    const [historyNav, setHistoryNav] = React.useState<{
+      position: number
+      total: number
+    } | null>(null)
+    // Reconcile the visible indicator with the navigation cursor. Called after
+    // every navigation step and whenever the user drops out of history mode.
+    const syncHistoryIndicator = React.useCallback(() => {
+      const cursor = historyCursorRef.current
+      if (cursor === null) {
+        setHistoryNav(null)
+        return
+      }
+      const total = historyRef.current.length
+      setHistoryNav({ position: total - cursor, total })
+    }, [])
 
     useImperativeHandle(ref, () => ({
       getValue() {
@@ -734,6 +753,7 @@ export const ChatComposer = memo(
       historyCursorRef.current = null
       historyDraftRef.current = ""
       historyNavValueRef.current = ""
+      setHistoryNav(null)
       richInputRef.current?.clear()
       setIsEmpty(true)
       setAttachments([])
@@ -756,9 +776,30 @@ export const ChatComposer = memo(
       }
     }
 
+    // Leave history navigation, restoring the draft that was in the input when
+    // navigation began. Returns true if we were navigating (Escape consumed).
+    function exitHistory(): boolean {
+      if (historyCursorRef.current === null) return false
+      applyHistoryValue(historyDraftRef.current)
+      historyCursorRef.current = null
+      setHistoryNav(null)
+      return true
+    }
+
+    // Move through sent-message history, then refresh the on-screen indicator
+    // so it tracks the cursor (and disappears when we return to the draft).
+    function navigateHistory(dir: "prev" | "next", canStart: boolean): boolean {
+      const consumed = runHistoryNavigation(dir, canStart)
+      syncHistoryIndicator()
+      return consumed
+    }
+
     // Move through sent-message history. `canStart` gates beginning navigation
     // from a fresh (empty) input. Returns true when the key was consumed.
-    function navigateHistory(dir: "prev" | "next", canStart: boolean): boolean {
+    function runHistoryNavigation(
+      dir: "prev" | "next",
+      canStart: boolean
+    ): boolean {
       const history = historyRef.current
       if (history.length === 0) return false
 
@@ -803,6 +844,15 @@ export const ChatComposer = memo(
     function handleInput() {
       const text = richInputRef.current?.getValue() ?? ""
       setIsEmpty(text.trim().length === 0)
+      // If the user edits a recalled message, leave history mode so their edit
+      // becomes the live draft and the indicator clears immediately.
+      if (
+        historyCursorRef.current !== null &&
+        text !== historyNavValueRef.current
+      ) {
+        historyCursorRef.current = null
+        setHistoryNav(null)
+      }
     }
 
     function handleAtMentionChange(mention: AtMention | null) {
@@ -950,6 +1000,24 @@ export const ChatComposer = memo(
           />
 
           <div className="mx-2 mt-2 mb-2 rounded-xl bg-muted/60">
+            {historyNav && (
+              <div className="flex items-center justify-between gap-2 px-3 pt-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5 rounded-full border border-border/60 bg-background/70 px-2 py-0.5 font-medium">
+                  <HistoryIcon className="size-3" />
+                  History
+                  <span className="tabular-nums text-foreground/80">
+                    {historyNav.position}/{historyNav.total}
+                  </span>
+                </span>
+                <span className="hidden items-center gap-1 text-muted-foreground/70 sm:flex">
+                  <Kbd>↑</Kbd>
+                  <Kbd>↓</Kbd>
+                  <span>navigate</span>
+                  <Kbd className="ml-1">Esc</Kbd>
+                  <span>exit</span>
+                </span>
+              </div>
+            )}
             <div className="px-2.5 pt-3 pb-1.5">
               <RichInput
                 ref={richInputRef}
@@ -1029,6 +1097,7 @@ export const ChatComposer = memo(
                   }
                 }}
                 onEscape={() => {
+                  exitHistory()
                   setAtMention(null)
                   setSlashMention(null)
                 }}

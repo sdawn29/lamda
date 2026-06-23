@@ -11,6 +11,10 @@ export { getWorkspaceCommands, mapResourceCommands } from "./commands.js";
 export {
   lamdaWorktreesDir,
   lamdaWorktreePath,
+  lamdaModesDir,
+  lamdaLocalModesDir,
+  lamdaGlobalPromptsDir,
+  lamdaLocalPromptsDir,
   LAMDA_DIR_NAME,
   ensurePromptsDir,
   ensureSkillsDir,
