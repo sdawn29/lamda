@@ -63,13 +63,13 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
 
   return (
     <>
-      <div className="flex items-center" aria-label="Run task">
+      <div className="flex items-center gap-0.5" aria-label="Run task">
         <Tooltip>
           <TooltipTrigger
             render={
               <Button
-                variant="outline"
-                className="h-7 gap-1.5 rounded-r-none px-2"
+                variant="ghost"
+                className="h-7 gap-1.5 rounded-md px-2 text-muted-foreground hover:text-foreground"
                 disabled={!lastUsedTask}
                 onClick={() => lastUsedTask && runTask(lastUsedTask)}
               >
@@ -79,14 +79,16 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
                       id={lastUsedTask.icon}
                       className="shrink-0 text-muted-foreground"
                     />
-                    <span className="max-w-32 truncate whitespace-nowrap text-xs">
+                    <span className="max-w-32 truncate whitespace-nowrap text-xs font-medium">
                       {lastUsedTask.name || lastUsedTask.command}
                     </span>
                   </>
                 ) : (
                   <>
                     <Play className="size-4" />
-                    <span className="whitespace-nowrap text-xs">Tasks</span>
+                    <span className="whitespace-nowrap text-xs font-medium">
+                      Tasks
+                    </span>
                   </>
                 )}
               </Button>
@@ -99,15 +101,17 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
           </TooltipContent>
         </Tooltip>
 
+        <div className="h-3.5 w-px shrink-0 bg-border/70" />
+
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label="Choose task"
             render={
               <Button
-                variant="outline"
-                className="h-7 w-6 rounded-l-none border-l-0"
+                variant="ghost"
+                className="h-7 w-5 px-0 text-muted-foreground/70 hover:text-foreground"
               >
-                <ChevronDown className="size-3" />
+                <ChevronDown className="size-3.5" />
               </Button>
             }
           >

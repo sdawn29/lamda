@@ -402,7 +402,7 @@ async function createWindow(splash?: BrowserWindow) {
     show: false,
     backgroundColor: "#09090b",
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 20, y: 20 },
+    trafficLightPosition: { x: 16, y: 17 },
     webPreferences: {
       contextIsolation: true,
       devTools: !app.isPackaged,

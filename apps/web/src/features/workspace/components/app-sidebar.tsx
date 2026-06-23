@@ -605,7 +605,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
     <Sidebar
       variant="floating"
       collapsible="offcanvas"
-      className="top-11! h-[calc(100svh-2.75rem)]"
+      className="top-10! h-[calc(100svh-2.5rem)]"
     >
       <SidebarHeader className={cn("shrink-0 p-0", isMobile ? "h-9" : "h-2")} />
       <SidebarContent className="overflow-hidden">

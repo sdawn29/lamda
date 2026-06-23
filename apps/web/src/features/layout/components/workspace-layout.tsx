@@ -386,7 +386,7 @@ export function WorkspaceLayout() {
         <TitleBar />
         <AppSidebar onResizeStart={handleLeftSidebarResizeStart} />
 
-        <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-13 pr-2 pb-2 peer-data-[state=collapsed]:pl-2">
+        <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-12 pr-2 pb-2 peer-data-[state=collapsed]:pl-2">
           {/* Editor column: the editor island and (when open) a separate
               terminal island stacked below it, with a resize gutter as the gap.
               Chrome lives in the unified titlebar island above. */}

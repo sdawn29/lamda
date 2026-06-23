@@ -135,15 +135,15 @@ export function OpenWithButton({
     : null
 
   return (
-    <div className="flex items-center" aria-label="Open workspace in app">
+    <div className="flex items-center gap-0.5" aria-label="Open workspace in app">
       <Button
-        className="h-7 gap-1.5 rounded-r-none px-2"
+        className="h-7 gap-1.5 rounded-md px-2 text-muted-foreground hover:text-foreground"
         disabled={disabled}
         onClick={() => {
           void openWorkspace()
         }}
         type="button"
-        variant="outline"
+        variant="ghost"
       >
         {openWorkspaceMutation.isPending || isLoadingApps || isLoadingIcons ? (
           <Loader2 className="size-4 animate-spin" />
@@ -154,16 +154,23 @@ export function OpenWithButton({
             className="size-4"
           />
         )}
-        <span className="whitespace-nowrap text-xs">{selectedAppName}</span>
+        <span className="whitespace-nowrap text-xs font-medium">
+          {selectedAppName}
+        </span>
       </Button>
+
+      <div className="h-3.5 w-px shrink-0 bg-border/70" />
 
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="Choose app"
           disabled={disabled}
           render={
-            <Button variant="outline" className="h-7 w-6 rounded-l-none border-l-0">
-              <ChevronDown className="size-3" />
+            <Button
+              variant="ghost"
+              className="h-7 w-5 px-0 text-muted-foreground/70 hover:text-foreground"
+            >
+              <ChevronDown className="size-3.5" />
             </Button>
           }
         >
