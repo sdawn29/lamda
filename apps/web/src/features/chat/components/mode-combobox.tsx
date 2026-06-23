@@ -174,22 +174,26 @@ const DEFAULT_ICON = SparklesIcon
 
 // The full set of Lucide icon names (kebab-case), so a frontmatter `icon` may
 // name any Lucide icon — not just the curated set in MODE_ICONS above.
-const LUCIDE_ICON_NAMES = new Set<string>(iconNames)
+const LUCIDE_ICON_NAMES: ReadonlySet<string> = new Set(iconNames)
+
+function isLucideIconName(name: string): name is IconName {
+  return LUCIDE_ICON_NAMES.has(name)
+}
 
 // Wrapper components built for dynamically-resolved icons, cached by name so the
 // same name yields a stable component identity across renders (a fresh component
 // each render would remount DynamicIcon and re-trigger its async load).
-const dynamicIconCache = new Map<string, LucideIcon>()
+const dynamicIconCache = new Map<IconName, LucideIcon>()
 
 /** A `LucideIcon`-shaped component that lazy-loads the named icon at render. */
-function dynamicModeIcon(name: string): LucideIcon {
+function dynamicModeIcon(name: IconName): LucideIcon {
   const cached = dynamicIconCache.get(name)
   if (cached) return cached
   const Component = React.forwardRef<SVGSVGElement, LucideProps>(
     (props, ref) => (
       <DynamicIcon
         ref={ref}
-        name={name as IconName}
+        name={name}
         // Render the default icon while the real one is loading, so the slot is
         // never empty mid-load.
         fallback={() => <DEFAULT_ICON className={props.className} />}
@@ -208,7 +212,7 @@ function dynamicModeIcon(name: string): LucideIcon {
 function resolveModeIcon(name: string): LucideIcon {
   return (
     MODE_ICONS[name] ??
-    (LUCIDE_ICON_NAMES.has(name) ? dynamicModeIcon(name) : DEFAULT_ICON)
+    (isLucideIconName(name) ? dynamicModeIcon(name) : DEFAULT_ICON)
   )
 }
 
