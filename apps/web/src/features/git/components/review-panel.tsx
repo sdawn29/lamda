@@ -57,7 +57,7 @@ import {
   useGitPull,
   useInitializeGitRepository,
 } from "../mutations"
-import { type ChangedFile, parseStatusLine } from "./status-badge"
+import { type ChangedFile, parseStatusLine, parseStatusLines } from "./status-badge"
 import { type DiffMode } from "./diff-view"
 import { CommitInputSection } from "./commit-dialog"
 import { FilesSection } from "./files-section"
@@ -355,11 +355,7 @@ const SourceControlToolbarSection = memo(function SourceControlToolbarSection({
 }) {
   const { data: statusData } = useGitStatus(workspaceSessionId)
   const { hasStaged, hasUnstaged } = useMemo(() => {
-    const all = (statusData?.raw ?? "")
-      .split("\n")
-      .map((l: string) => l.trimEnd())
-      .filter(Boolean)
-      .map(parseStatusLine)
+    const all = parseStatusLines(statusData?.raw ?? "")
     return {
       hasStaged: all.some((f: ChangedFile) => f.isStaged),
       hasUnstaged: all.some((f: ChangedFile) => !f.isStaged),
@@ -532,11 +528,7 @@ const SourceControlContent = memo(function SourceControlContent({
   const statusRaw = statusData?.raw ?? ""
 
   const { staged, unstaged } = useMemo(() => {
-    const all = statusRaw
-      .split("\n")
-      .map((l: string) => l.trimEnd())
-      .filter(Boolean)
-      .map(parseStatusLine)
+    const all = parseStatusLines(statusRaw)
     return {
       staged: applySortMode(
         all.filter((f: ChangedFile) => f.isStaged),

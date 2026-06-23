@@ -11,7 +11,34 @@ export interface CreateWorkspaceBody {
   model?: string
 }
 
-export type Mode = "ask" | "plan" | "agent"
+/**
+ * A mode id. The built-ins ("ask" | "plan" | "agent") always exist; any other
+ * value is a custom mode defined by a `.lamda/modes/*.md` file (global or
+ * workspace-local). Kept as `string` so custom modes flow through the UI.
+ */
+export type Mode = string
+
+/** A mode as surfaced to the picker; see the server `/modes` endpoint. */
+export interface ModeDto {
+  id: string
+  label: string
+  description: string
+  /** Named accent color (e.g. "sky"); mapped to classes in the mode picker. */
+  color: string
+  /** Named icon (e.g. "bot"); mapped to a component in the mode picker. */
+  icon: string
+  /** Where the mode came from: built-in, workspace-local, or global file. */
+  source: "builtin" | "local" | "global"
+}
+
+export function listModes(
+  workspaceId?: string
+): Promise<{ modes: ModeDto[] }> {
+  const qs = workspaceId
+    ? `?workspaceId=${encodeURIComponent(workspaceId)}`
+    : ""
+  return apiFetch<{ modes: ModeDto[] }>(`/modes${qs}`)
+}
 
 /** Tool-approval gating for a thread: prompt before risky tools, auto-approve
  *  file edits/writes only, or run every tool freely. */

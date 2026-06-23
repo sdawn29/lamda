@@ -7,7 +7,9 @@ export function insertThread(
   workspaceId: string,
   options?: {
     title?: string;
-    mode?: "ask" | "plan" | "agent";
+    // A mode id: built-in ("ask" | "plan" | "agent") or a custom mode defined
+    // by a `.lamda/modes/*.md` file. Validated against available modes upstream.
+    mode?: string;
     approvalMode?: "ask" | "edits_allowed" | "all_allowed";
     modelId?: string | null;
     forkedFromId?: string;
@@ -164,7 +166,7 @@ export function setThreadWorktreeBaseBranch(id: string, branch: string) {
     .run();
 }
 
-export function updateThreadMode(id: string, mode: "ask" | "plan" | "agent") {
+export function updateThreadMode(id: string, mode: string) {
   db.update(threads).set({ mode }).where(eq(threads.id, id)).run();
 }
 

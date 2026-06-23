@@ -6,6 +6,7 @@ interface RightSidebarStore {
   isOpen: boolean
   isFileTreeOpen: boolean
   width: number
+  fileTreeWidth: number
 
   open: () => void
   close: () => void
@@ -15,12 +16,14 @@ interface RightSidebarStore {
   toggleFileTree: () => void
   togglePanel: (panel: RightSidebarPanel) => void
   setWidth: (width: number) => void
+  setFileTreeWidth: (width: number) => void
 }
 
 export const useRightSidebarStore = create<RightSidebarStore>()((set) => ({
   isOpen: false,
   isFileTreeOpen: false,
   width: 560,
+  fileTreeWidth: 256,
 
   open: () => set({ isOpen: true }),
   close: () => set({ isOpen: false, isFileTreeOpen: false }),
@@ -44,6 +47,7 @@ export const useRightSidebarStore = create<RightSidebarStore>()((set) => ({
     }),
 
   setWidth: (width) => set({ width }),
+  setFileTreeWidth: (fileTreeWidth) => set({ fileTreeWidth }),
 }))
 
 export function useRightSidebar() {

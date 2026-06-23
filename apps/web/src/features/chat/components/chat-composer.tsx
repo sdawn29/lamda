@@ -8,7 +8,6 @@ export interface ChatComposerHandle {
 }
 import {
   ArrowUpIcon,
-  BotIcon,
   BrainIcon,
   ChartColumnIcon,
   EraserIcon,
@@ -16,8 +15,6 @@ import {
   FolderPlusIcon,
   FolderTreeIcon,
   HelpCircleIcon,
-  ListTodoIcon,
-  MessageCircleQuestionIcon,
   MinimizeIcon,
   MoonIcon,
   PaperclipIcon,
@@ -52,11 +49,11 @@ import {
   chatKeys,
   type WorkspaceEntry,
 } from "../queries"
-import { useWorkspaceIndex } from "@/features/workspace/queries"
+import { useWorkspaceIndex, useModes } from "@/features/workspace/queries"
 import { useEnvDialog } from "@/features/workspace"
 import { BranchSelector, WorktreeSelector } from "@/features/git"
 import { ModelCombobox } from "./model-combobox"
-import { ModeCombobox, getModeOption } from "./mode-combobox"
+import { ModeCombobox, getModeOption, modeOptionFromDto } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
 import { ThinkingCombobox, type ThinkingLevel } from "./thinking-combobox"
 export type { ThinkingLevel } from "./thinking-combobox"
@@ -317,6 +314,8 @@ export const ChatComposer = memo(
       workspaceId,
       fileMentionOpen
     )
+    const { data: modeData } = useModes(workspaceId)
+    const modeList = React.useMemo(() => modeData ?? [], [modeData])
     const fileData = React.useMemo((): WorkspaceEntry[] => {
       if (!indexedFiles) return []
       return indexedFiles.map((f) => ({
@@ -378,40 +377,15 @@ export const ChatComposer = memo(
       const list: ChatSlashAction[] = []
 
       if (onModeChange) {
-        const modeCommands: Array<{
-          mode: Mode
-          name: string
-          description: string
-          icon: ChatSlashAction["icon"]
-        }> = [
-          {
-            mode: "ask",
-            name: "ask",
-            description: "Switch to Ask mode",
-            icon: MessageCircleQuestionIcon,
-          },
-          {
-            mode: "plan",
-            name: "plan",
-            description: "Switch to Plan mode",
-            icon: ListTodoIcon,
-          },
-          {
-            mode: "agent",
-            name: "agent",
-            description: "Switch to Agent mode",
-            icon: BotIcon,
-          },
-        ]
-
-        for (const command of modeCommands) {
-          if (command.mode === mode) continue
+        for (const dto of modeList) {
+          if (dto.id === mode) continue
+          const option = modeOptionFromDto(dto)
           list.push({
             kind: "action",
-            name: command.name,
-            description: command.description,
-            icon: command.icon,
-            onSelect: () => onModeChange(command.mode),
+            name: dto.id,
+            description: `Switch to ${dto.label} mode`,
+            icon: option.Icon,
+            onSelect: () => onModeChange(dto.id),
           })
         }
       }
@@ -583,6 +557,7 @@ export const ChatComposer = memo(
       isEmpty,
       onStop,
       mode,
+      modeList,
       onModeChange,
       navigate,
       queryClient,
@@ -925,7 +900,7 @@ export const ChatComposer = memo(
       richInputRef.current?.focus()
     }
 
-    const modeStyles = getModeOption(mode)
+    const modeStyles = getModeOption(mode, modeList)
     const modeSendButton = modeStyles.sendButton
     const stopBinding = useShortcutBinding(SHORTCUT_ACTIONS.STOP_GENERATION)
 
@@ -1107,7 +1082,11 @@ export const ChatComposer = memo(
                   />
                 )}
                 {onModeChange && (
-                  <ModeCombobox selected={mode} onSelect={onModeChange} />
+                  <ModeCombobox
+                    selected={mode}
+                    onSelect={onModeChange}
+                    modes={modeList}
+                  />
                 )}
               </div>
 

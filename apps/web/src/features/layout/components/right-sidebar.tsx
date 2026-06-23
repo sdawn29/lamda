@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, useCallback, useMemo, useRef } from "react"
 import {
   FileDiff,
   FolderTree,
@@ -14,7 +14,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import { Sidebar, SidebarContent, SidebarHeader } from "@/shared/ui/sidebar"
 import { Sheet, SheetContent } from "@/shared/ui/sheet"
 import { useRightSidebar } from "../store/right-sidebar"
-import { useReviewPanel } from "@/features/git"
+import {
+  useReviewPanel,
+  useGitStatus,
+  parseStatusLines,
+  statusLabel,
+  statusTextClass,
+} from "@/features/git"
 import { useMainTabs } from "@/features/main-tabs"
 import { useShortcutBinding } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
@@ -52,7 +58,14 @@ export function RightSidebarContent({
   workspacePath,
   treeThreadId,
 }: RightSidebarProps) {
-  const { isFileTreeOpen, toggleFileTree, isOpen, close } = useRightSidebar()
+  const {
+    isFileTreeOpen,
+    toggleFileTree,
+    isOpen,
+    close,
+    fileTreeWidth,
+    setFileTreeWidth,
+  } = useRightSidebar()
   const { isFullscreen, toggleFullscreen } = useReviewPanel()
   const isMobile = useIsMobile(900)
   const fullscreenBinding = useShortcutBinding(
@@ -64,6 +77,51 @@ export function RightSidebarContent({
   const fileTabs = tabs.filter((t) => t.type === "file")
   const isChangesActive = !fileTabs.some((t) => t.id === activeTabId)
   const hasActiveFileTab = activeTab?.type === "file"
+
+  // File tree drawer width — drag its left edge to resize. Update the element
+  // directly during the drag (no React re-renders), then commit to the store on
+  // release. The drawer is right-anchored, so dragging left widens it.
+  const fileTreeDrawerRef = useRef<HTMLDivElement>(null)
+  const handleFileTreeResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      const startX = e.clientX
+      const startWidth = fileTreeDrawerRef.current?.offsetWidth ?? 256
+      const onMove = (ev: MouseEvent) => {
+        const next = Math.max(180, Math.min(560, startWidth + (startX - ev.clientX)))
+        if (fileTreeDrawerRef.current) {
+          fileTreeDrawerRef.current.style.width = `${next}px`
+        }
+      }
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove)
+        document.removeEventListener("mouseup", onUp)
+        document.body.style.cursor = ""
+        document.body.style.userSelect = ""
+        if (fileTreeDrawerRef.current) {
+          setFileTreeWidth(fileTreeDrawerRef.current.offsetWidth)
+        }
+      }
+      document.body.style.cursor = "col-resize"
+      document.body.style.userSelect = "none"
+      document.addEventListener("mousemove", onMove)
+      document.addEventListener("mouseup", onUp)
+    },
+    [setFileTreeWidth]
+  )
+
+  // Git status per path, fed to the file tree so changed files are highlighted
+  // with their status letter/colour. Keyed by repo-relative path, which matches
+  // the tree's entry.relativePath (both resolve against the same root).
+  const { data: gitStatusData } = useGitStatus(workspaceSessionId ?? "")
+  const gitStatusByPath = useMemo(() => {
+    const map = new Map<string, { label: string; className: string }>()
+    for (const file of parseStatusLines(gitStatusData?.raw ?? "")) {
+      const label = statusLabel(file)
+      map.set(file.filePath, { label, className: statusTextClass(label) })
+    }
+    return map
+  }, [gitStatusData])
 
   const sidebarEl = (
     <Sidebar
@@ -191,7 +249,9 @@ export function RightSidebarContent({
       </SidebarHeader>
 
       <SidebarContent className="overflow-hidden p-0">
-        <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* Review / history fills the panel body; the file tree opens over it
+            as a right-anchored drawer (see below). */}
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <div className="min-w-0 flex-1 overflow-hidden">
             {(sessionId || hasActiveFileTab) ? (
               <Suspense fallback={<div className="h-full bg-background" />}>
@@ -221,16 +281,48 @@ export function RightSidebarContent({
             )}
           </div>
 
-          {isFileTreeOpen && workspaceId && workspacePath && (
-            <div className="w-52 shrink-0 overflow-hidden p-1 pl-0">
-              <Suspense fallback={<div className="h-full bg-background" />}>
-                <FileTree
-                  workspaceId={workspaceId}
-                  workspacePath={workspacePath}
-                  threadId={treeThreadId}
-                />
-              </Suspense>
-            </div>
+          {/* File tree — a sidebar drawer that slides in from the right edge of
+              the panel, overlaying the review content. A scrim dismisses it.
+              Kept mounted so it animates in/out and opens instantly. */}
+          {workspaceId && workspacePath && (
+            <>
+              <div
+                aria-hidden
+                onClick={toggleFileTree}
+                className={cn(
+                  "absolute inset-0 z-10 bg-background/50 transition-opacity duration-200",
+                  isFileTreeOpen
+                    ? "opacity-100"
+                    : "pointer-events-none opacity-0"
+                )}
+              />
+              <div
+                ref={fileTreeDrawerRef}
+                style={{ width: fileTreeWidth }}
+                className={cn(
+                  "absolute inset-y-2 right-2 z-20 flex max-w-[85%] flex-col overflow-hidden rounded-2xl border border-border bg-background p-1 shadow-md transition-transform duration-200 ease-out",
+                  isFileTreeOpen
+                    ? "translate-x-0"
+                    : "pointer-events-none translate-x-[calc(100%+0.5rem)]"
+                )}
+              >
+                {/* Resize handle — drag the drawer's left edge to widen it. */}
+                <div
+                  onMouseDown={handleFileTreeResizeStart}
+                  className="group absolute inset-y-0 left-0 z-30 w-1.5 cursor-col-resize"
+                >
+                  <div className="absolute inset-y-0 left-0 w-px bg-transparent transition-colors group-hover:bg-border" />
+                </div>
+                <Suspense fallback={<div className="h-full bg-background" />}>
+                  <FileTree
+                    workspaceId={workspaceId}
+                    workspacePath={workspacePath}
+                    threadId={treeThreadId}
+                    gitStatus={gitStatusByPath}
+                  />
+                </Suspense>
+              </div>
+            </>
           )}
         </div>
       </SidebarContent>

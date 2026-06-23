@@ -48,6 +48,12 @@ interface FileTreeProps {
   workspacePath: string
   /** Active thread id — sent so the server reads the thread's worktree dir. */
   threadId?: string | null
+  /**
+   * Git status by repo-relative path (matches entry.relativePath). Files get a
+   * coloured status letter; folders containing changes get a dot. Optional so
+   * the tree works outside a git context.
+   */
+  gitStatus?: Map<string, { label: string; className: string }>
 }
 
 const ROW_HEIGHT = 24
@@ -96,6 +102,8 @@ const TreeRow = memo(function TreeRow({
   depth,
   isExpanded,
   showFullPath,
+  status,
+  dirHasChange,
   onToggleDir,
   onSelectFile,
 }: {
@@ -103,6 +111,8 @@ const TreeRow = memo(function TreeRow({
   depth: number
   isExpanded: boolean
   showFullPath: boolean
+  status?: { label: string; className: string }
+  dirHasChange?: boolean
   onToggleDir: (relativePath: string) => void
   onSelectFile: (relativePath: string) => void
 }) {
@@ -148,11 +158,29 @@ const TreeRow = memo(function TreeRow({
       <span
         className={cn(
           "min-w-0 truncate",
-          entry.isDirectory && "font-medium text-sidebar-foreground/85"
+          entry.isDirectory && "font-medium text-sidebar-foreground/85",
+          status?.className
         )}
       >
         {showFullPath ? entry.relativePath : entry.name}
       </span>
+      {status ? (
+        <span
+          className={cn(
+            "ml-auto shrink-0 font-mono text-3xs font-semibold leading-none",
+            status.className
+          )}
+        >
+          {status.label}
+        </span>
+      ) : (
+        dirHasChange && (
+          <span
+            aria-hidden
+            className="ml-auto size-1.5 shrink-0 rounded-full bg-amber-500/80"
+          />
+        )
+      )}
     </button>
   )
 })
@@ -186,7 +214,12 @@ function FileTreeSkeleton() {
   )
 }
 
-export function FileTree({ workspaceId, workspacePath, threadId }: FileTreeProps) {
+export function FileTree({
+  workspaceId,
+  workspacePath,
+  threadId,
+  gitStatus,
+}: FileTreeProps) {
   const { addFileTab } = useMainTabs()
   const expanded = useFileTree((s) => s.expanded)
   const toggleDir = useFileTree((s) => s.toggleDir)
@@ -236,6 +269,22 @@ export function FileTree({ workspaceId, workspacePath, threadId }: FileTreeProps
     () => flattenTree(dirMap, expanded),
     [dirMap, expanded]
   )
+
+  // Directories that (transitively) contain a changed file, so collapsed
+  // folders can surface a change indicator. Built from the git status paths.
+  const changedDirs = useMemo(() => {
+    const dirs = new Set<string>()
+    if (!gitStatus) return dirs
+    for (const path of gitStatus.keys()) {
+      const parts = path.split("/")
+      let acc = ""
+      for (let i = 0; i < parts.length - 1; i++) {
+        acc = acc ? `${acc}/${parts[i]}` : parts[i]
+        dirs.add(acc)
+      }
+    }
+    return dirs
+  }, [gitStatus])
 
   // ── Filter mode: flat fuzzy search over the git-driven index (no node_modules) ─
   const { data: indexEntries = [] } = useWorkspaceIndex(workspaceId)
@@ -387,6 +436,15 @@ export function FileTree({ workspaceId, workspacePath, threadId }: FileTreeProps
                       expanded.has(row.entry.relativePath)
                     }
                     showFullPath={isFiltering}
+                    status={
+                      row.entry.isDirectory
+                        ? undefined
+                        : gitStatus?.get(row.entry.relativePath)
+                    }
+                    dirHasChange={
+                      row.entry.isDirectory &&
+                      changedDirs.has(row.entry.relativePath)
+                    }
                     onToggleDir={toggleDir}
                     onSelectFile={handleSelectFile}
                   />

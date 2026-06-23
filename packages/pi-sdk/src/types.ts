@@ -219,6 +219,13 @@ export interface ManagedSessionHandle {
   events(): AsyncGenerator<SessionEvent>
   /** List available slash commands (skills) for the current workspace. */
   getCommands(): SlashCommand[]
+  /**
+   * Re-read skills and prompt templates from disk into the session's resource
+   * loader. Lets prompt files added or edited after the session started take
+   * effect (slash-command list + prompt expansion) without restarting the
+   * server. Does not rebuild the runtime or disturb active tools/extensions.
+   */
+  reloadResources(): Promise<void>
   /** Get current context window usage. Returns undefined if unavailable. */
   getContextUsage(): ContextUsage | undefined
   /** Compact the context window by summarizing conversation history. */

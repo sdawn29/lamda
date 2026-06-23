@@ -26,7 +26,7 @@ function withModePreamble(entry: StoredSession, userText: string): string {
   const mode = normalizeMode(getThread(entry.threadId)?.mode);
   if (mode && mode !== entry.lastInjectedMode) {
     entry.lastInjectedMode = mode;
-    return applyModePreamble(mode, userText);
+    return applyModePreamble(mode, userText, entry.cwd);
   }
   return userText;
 }

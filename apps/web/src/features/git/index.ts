@@ -30,6 +30,13 @@ export {
 export { DiffStat, parseDiffCounts } from "./components/diff-stat"
 export { parseApiError } from "./parse-error"
 export {
+  parseStatusLine,
+  parseStatusLines,
+  statusLabel,
+  statusTextClass,
+  type ChangedFile,
+} from "./components/status-badge"
+export {
   useCheckoutBranch,
   useCreateBranch,
   useCreateWorkspaceBranch,

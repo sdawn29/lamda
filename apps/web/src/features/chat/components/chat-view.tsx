@@ -75,12 +75,12 @@ import { getNextMode } from "./mode-combobox"
 import { QuestionView } from "./question-view"
 import { findActiveQuestion } from "../lib/active-question"
 import { ToolApprovalBlock, type PendingApproval } from "./tool-approval-block"
-import type { ApprovalMode } from "@/features/workspace/api"
+import type { ApprovalMode, Mode } from "@/features/workspace/api"
 
 import { FileChangesCard } from "./file-changes-card"
 import { forkSession, listMessages } from "../api"
 import { blocksToMessages, type MessageBlock } from "../types"
-import { workspaceKeys } from "@/features/workspace/queries"
+import { workspaceKeys, useModes } from "@/features/workspace/queries"
 import { MESSAGES_PAGE_SIZE, type MessagesInfiniteData } from "../queries"
 import {
   TodoPanel,
@@ -118,7 +118,7 @@ interface ChatViewProps {
   workspaceId: string
   threadId: string
   initialModelId: string | null
-  initialMode: "ask" | "plan" | "agent"
+  initialMode: Mode
   initialApprovalMode: ApprovalMode
   initialIsStopped: boolean
 }
@@ -165,9 +165,9 @@ export function ChatView({
   const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<
     ThinkingLevel | undefined
   >(initialThinkingLevel)
-  const [selectedMode, setSelectedMode] = useState<"ask" | "plan" | "agent">(
-    initialMode
-  )
+  const [selectedMode, setSelectedMode] = useState<Mode>(initialMode)
+  const { data: modeData } = useModes(workspaceId)
+  const modeList = useMemo(() => modeData ?? [], [modeData])
   const [selectedApprovalMode, setSelectedApprovalMode] =
     useState<ApprovalMode>(initialApprovalMode)
   // The tool call currently paused awaiting the user's approval, if any.
@@ -632,7 +632,7 @@ export function ChatView({
   )
 
   const handleModeChange = useCallback(
-    (mode: "ask" | "plan" | "agent") => {
+    (mode: Mode) => {
       setSelectedMode(mode)
       updateThreadMode.mutate({ threadId, mode })
     },
@@ -640,9 +640,9 @@ export function ChatView({
   )
 
   const cycleAgentMode = useCallback(() => {
-    const nextMode = getNextMode(selectedMode)
+    const nextMode = getNextMode(selectedMode, modeList)
     handleModeChange(nextMode)
-  }, [handleModeChange, selectedMode])
+  }, [handleModeChange, selectedMode, modeList])
 
   const handleApprovalModeChange = useCallback(
     (approvalMode: ApprovalMode) => {

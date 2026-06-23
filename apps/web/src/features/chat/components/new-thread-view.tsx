@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -56,7 +56,7 @@ import {
   updateThreadTitle,
   enterThreadWorktree,
 } from "@/features/workspace/api"
-import { workspacesQueryKey } from "@/features/workspace/queries"
+import { workspacesQueryKey, useModes } from "@/features/workspace/queries"
 import type { ApprovalMode, Mode, WorkspaceDto } from "@/features/workspace/api"
 import { useAppSettings } from "@/features/settings/queries"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
@@ -172,6 +172,8 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
     : defaultWorkspaceId
 
   const selectedWorkspace = workspaces.find((w) => w.id === workspaceId)
+  const { data: modeData } = useModes(workspaceId)
+  const modeList = useMemo(() => modeData ?? [], [modeData])
   // New-thread branch selection is workspace-scoped. Never proxy through an
   // arbitrary existing session: it may be stale or attached to another
   // worktree, which would hide or misreport the workspace's base branch.
@@ -216,8 +218,8 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
   }, [])
 
   const cycleAgentMode = useCallback(() => {
-    setSelectedMode((mode) => getNextMode(mode))
-  }, [])
+    setSelectedMode((mode) => getNextMode(mode, modeList))
+  }, [modeList])
 
   useShortcutHandler(SHORTCUT_ACTIONS.CYCLE_AGENT_MODE, cycleAgentMode)
 

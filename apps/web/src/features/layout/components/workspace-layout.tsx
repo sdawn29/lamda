@@ -386,7 +386,7 @@ export function WorkspaceLayout() {
         <TitleBar />
         <AppSidebar onResizeStart={handleLeftSidebarResizeStart} />
 
-        <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-12 pr-2 pb-2 peer-data-[state=collapsed]:pl-2">
+        <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-12 pr-2 pb-2 max-md:pl-2 peer-data-[state=collapsed]:pl-2">
           {/* Editor column: the editor island and (when open) a separate
               terminal island stacked below it, with a resize gutter as the gap.
               Chrome lives in the unified titlebar island above. */}
@@ -461,7 +461,11 @@ export function WorkspaceLayout() {
                     : diffFullscreen
                       ? "flex-1"
                       : rightSidebarOpen
-                        ? "w-(--sidebar-width) flex-none"
+                        ? // Cap at the available space so the sidebar never
+                          // overflows the right padding as the window shrinks —
+                          // always leaving the chat panel its min width plus the
+                          // 0.5rem resize gutter (MIN_CHAT_PANEL_WIDTH = 420).
+                          "w-(--sidebar-width) max-w-[calc(100%-420px-0.5rem)] flex-none"
                         : "w-0 flex-none"
                 )}
               >

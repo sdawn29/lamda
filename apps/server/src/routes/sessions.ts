@@ -40,10 +40,14 @@ import { submitAnswer } from "../services/question-registry.js";
 import { submitApproval } from "../services/approval-registry.js";
 import {
   readSessionHistory,
-  stripModePreamble,
+  createModePreambleStripper,
   stripMemoryPreamble,
 } from "@lamda/pi-sdk";
 import { withInjections } from "../services/prompt-injection.js";
+import {
+  ensurePromptsFresh,
+  ensurePromptsFreshForText,
+} from "../services/prompt-freshness.js";
 import { recoverSession } from "../services/healing-service.js";
 import { findAttachmentFile, writeAttachment } from "../lib/attachments.js";
 import type { AttachmentMetadata } from "@lamda/db";
@@ -280,6 +284,10 @@ sessions.post("/session/:id/prompt", async (c) => {
           }
         : undefined;
 
+    // Refresh prompt templates first when this is a `/command`, so a just-authored
+    // prompt file resolves without a server restart.
+    await ensurePromptsFreshForText(entry, body.text ?? "");
+
     await entry.handle.prompt(text, promptOptions);
   };
   run().catch((err: unknown) => {
@@ -411,10 +419,13 @@ sessions.post("/session/:id/tool-approval", async (c) => {
   return c.json({ ok: true });
 });
 
-sessions.get("/session/:id/commands", (c) => {
+sessions.get("/session/:id/commands", async (c) => {
   const id = c.req.param("id");
   const entry = store.get(id);
   if (!entry) return c.json({ commands: [] });
+  // Pick up prompt files added/edited since the session started so the
+  // slash-command list is current without a server restart.
+  await ensurePromptsFresh(entry);
   return c.json({ commands: entry.handle.getCommands() });
 });
 
@@ -755,6 +766,8 @@ sessions.post("/session/:id/fork", async (c) => {
         break;
       }
     }
+    // Collect the candidate mode preambles once rather than per user block.
+    const stripModePre = createModePreambleStripper(entry.cwd);
     for (let i = 0; i < history.length; i++) {
       const block = history[i];
       if (i === lastUserIdx) continue;
@@ -765,7 +778,7 @@ sessions.post("/session/:id/fork", async (c) => {
         // then the memory block.
         insertUserBlock(
           newThreadId,
-          stripMemoryPreamble(stripModePreamble(block.content)),
+          stripMemoryPreamble(stripModePre(block.content)),
           undefined,
           block.createdAt,
         );

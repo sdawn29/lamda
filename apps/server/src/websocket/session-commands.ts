@@ -35,6 +35,7 @@ import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { ensureSessionEventHub, gitCwd } from "../services/session-service.js";
 import { withInjections } from "../services/prompt-injection.js";
+import { ensurePromptsFreshForText } from "../services/prompt-freshness.js";
 import { recoverSession } from "../services/healing-service.js";
 import {
   type ClientMessage,
@@ -218,6 +219,10 @@ async function handlePrompt(
               expandPromptTemplates: msg.expandPromptTemplates,
             }
           : undefined;
+
+      // Refresh prompt templates first when this is a `/command`, so a just-authored
+      // prompt file resolves without a server restart.
+      await ensurePromptsFreshForText(entry, msg.text);
 
       await entry.handle.prompt(text, promptOptions);
     } catch (err) {

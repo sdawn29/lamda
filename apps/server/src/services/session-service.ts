@@ -6,6 +6,7 @@ import {
   createMemoryTool,
   createQuestionTool,
   normalizeMode,
+  getModeConfig,
   PLAN_DIR,
   type SdkConfig,
   type ManagedSessionHandle,
@@ -344,9 +345,13 @@ export async function collectCustomTools(
   // and filters builtin-named ones (e.g. `todo`, `plan_*`) by the mode's allowlist.
   const todoTool = threadId ? createTodoTool(threadId) : null;
   const memoryTool = createMemoryTool(workspaceId);
-  // The `plan` tool is only meaningful in Plan mode and is gated out of other
-  // modes by the builtin allowlist anyway; create it only when needed.
-  const planTools = mode === "plan" ? createPlanModeTools(workspacePath) : [];
+  // The `plan` tool is only meaningful in modes whose allowlist includes the
+  // `plan` builtin (Plan, plus any custom mode that opts in); it's gated out of
+  // other modes by the builtin allowlist anyway, so create it only when needed.
+  const allowsPlanTool = mode
+    ? getModeConfig(mode, workspacePath).allowedBuiltins.includes("plan")
+    : false;
+  const planTools = allowsPlanTool ? createPlanModeTools(workspacePath) : [];
 
   const [mcpTools, lspTools] = await Promise.all([
     import("./mcp-service.js")

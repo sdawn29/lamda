@@ -7,7 +7,12 @@ import app from "./app.js";
 import { bootstrapSessions } from "./bootstrap.js";
 import { store } from "./store.js";
 import { registerHealingHooks } from "./services/healing-service.js";
-import { ensureModeFiles } from "@lamda/pi-sdk";
+import {
+  ensureModeFiles,
+  ensurePromptsDir,
+  ensureSkillsDir,
+  ensureSkillFiles,
+} from "@lamda/pi-sdk";
 import { scheduleEmbeddingBackfill } from "./services/memory-embeddings.js";
 import { reflectOnThread } from "./services/memory-reflection.js";
 import { handleTerminalConnection } from "./services/terminal-service.js";
@@ -26,6 +31,19 @@ registerHealingHooks();
 // Seed ~/.lamda/modes/<mode>.md with the built-in mode prompts so they're
 // editable on disk; existing files are left untouched.
 ensureModeFiles();
+
+// Ensure ~/.lamda/prompts exists so the resource loader always registers it:
+// prompt files dropped in later are then picked up by an on-demand reload
+// (slash-command list + `/`-expansion) without restarting the server.
+ensurePromptsDir();
+
+// Ensure ~/.lamda/skills exists for the same reason: skills dropped in later
+// are discovered by an on-demand resource reload without a server restart.
+ensureSkillsDir();
+
+// Seed the bundled create-prompt / create-mode skills into ~/.lamda/skills;
+// existing files are left untouched so user edits are preserved.
+ensureSkillFiles();
 
 bootstrapSessions()
   .then(() => {

@@ -289,6 +289,10 @@ export function useChatStream({
     if (modifiesFiles) {
       void queryClient.refetchQueries({ queryKey: gitStatusKey(sessionId) })
       void queryClient.refetchQueries({ queryKey: ["file-tree"] })
+      // A file write may have created/edited a `.lamda/modes/*.md` file (e.g.
+      // via the create-mode skill). The server already reads modes fresh from
+      // disk, so just refetch the picker's list to surface it without a restart.
+      void queryClient.invalidateQueries({ queryKey: ["modes"] })
     } else {
       void queryClient.invalidateQueries({ queryKey: ["file-tree"] })
     }

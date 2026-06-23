@@ -37,9 +37,10 @@ export const threads = sqliteTable("threads", {
     .notNull()
     .default(false),
   isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
-  mode: text("mode", { enum: ["ask", "plan", "agent"] })
-    .notNull()
-    .default("agent"),
+  // Mode id: built-in ("ask" | "plan" | "agent") or a custom mode from a
+  // `.lamda/modes/*.md` file. Plain text (not a fixed enum) so user-defined
+  // modes persist; validated against available modes in the API layer.
+  mode: text("mode").notNull().default("agent"),
   approvalMode: text("approval_mode", {
     enum: ["ask", "edits_allowed", "all_allowed"],
   })

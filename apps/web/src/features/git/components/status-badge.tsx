@@ -18,6 +18,15 @@ export function parseStatusLine(line: string): ChangedFile {
   return { raw, filePath, isStaged, isUntracked }
 }
 
+/** Parse raw `git status --porcelain` output into one entry per changed file. */
+export function parseStatusLines(raw: string): ChangedFile[] {
+  return raw
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .map(parseStatusLine)
+}
+
 export function statusLabel(file: ChangedFile): string {
   if (file.isUntracked) return "U"
   const X = file.raw[0] ?? " "
@@ -52,6 +61,11 @@ const STATUS_META: Record<string, { bg: string; text: string }> = {
     bg: "bg-purple-500/15 dark:bg-purple-400/10",
     text: "text-purple-600 dark:text-purple-400",
   },
+}
+
+/** Text-colour class for a status label — shared with the file tree. */
+export function statusTextClass(label: string): string {
+  return (STATUS_META[label] ?? { text: "text-muted-foreground" }).text
 }
 
 export const StatusBadge = memo(function StatusBadge({

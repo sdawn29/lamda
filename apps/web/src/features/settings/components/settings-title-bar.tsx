@@ -56,17 +56,26 @@ export function SettingsTitleBar() {
   const drag = { WebkitAppRegion: "drag" } as CSSProperties
   const noDrag = { WebkitAppRegion: "no-drag" } as CSSProperties
 
+  // Each control group is its own floating "island": a rounded, bordered pill
+  // that opts out of the window drag region so its controls receive clicks in
+  // Electron. The transparent strips between islands stay draggable so the
+  // frameless window can still be moved by the title bar. Mirrors the workspace
+  // titlebar.
+  const island =
+    "flex h-full shrink-0 items-center rounded-full border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-full"
+
   return (
     <div
-      className="fixed inset-x-2 top-2 z-50 flex h-9 items-center gap-1 overflow-hidden rounded-2xl border border-border bg-background pr-2 shadow-md"
-      style={noDrag}
+      className="fixed inset-x-2 top-2 z-50 flex h-8 items-center gap-2"
+      style={drag}
     >
-      <div
-        className={cn(
-          "flex h-full shrink-0 items-center",
-          isMac && !isFullscreen ? "pl-[4.75rem]" : "pl-1.5"
-        )}
-      >
+      {/* ── Traffic lights island (native macOS controls sit on top) ─────── */}
+      {isMac && !isFullscreen && (
+        <div className={cn(island, "w-[4.75rem]")} aria-hidden />
+      )}
+
+      {/* ── Back to threads ──────────────────────────────────────────────── */}
+      <div className={island} style={noDrag}>
         <Tooltip>
           <TooltipTrigger
             render={
@@ -89,9 +98,8 @@ export function SettingsTitleBar() {
         </Tooltip>
       </div>
 
-      <div className="mx-0.5 h-4 w-px shrink-0 bg-border" />
-
-      <div className="flex min-w-0 shrink items-center gap-1">
+      {/* ── Page title (Settings › section) ──────────────────────────────── */}
+      <div className={cn(island, "min-w-0 shrink gap-1 px-2.5")} style={noDrag}>
         <span className="shrink-0 text-sm font-semibold text-foreground">
           Settings
         </span>
@@ -106,7 +114,7 @@ export function SettingsTitleBar() {
       </div>
 
       {/* Draggable filler — moves the frameless window. */}
-      <div className="h-full min-w-4 flex-1" style={drag} />
+      <div className="h-full min-w-4 flex-1" />
     </div>
   )
 }

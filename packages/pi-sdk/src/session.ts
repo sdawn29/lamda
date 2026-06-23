@@ -14,7 +14,7 @@ import { sessionEventGenerator } from "./stream.js";
 import { computeActiveToolsForMode, type Mode } from "./modes.js";
 import { createToolApprovalExtension } from "./tool-approval-extension.js";
 import { mapResourceCommands } from "./commands.js";
-import { lamdaPromptTemplatePaths } from "./lamda-paths.js";
+import { lamdaPromptTemplatePaths, lamdaSkillPaths } from "./lamda-paths.js";
 import { LAMDA_SYSTEM_CONTEXT } from "./system-prompt.js";
 import type {
   ContextBreakdown,
@@ -114,6 +114,7 @@ function buildRuntimeHandle(
       const next = computeActiveToolsForMode(
         mode,
         session.getActiveToolNames(),
+        runtime.session.sessionManager.getCwd(),
       );
       session.setActiveToolsByName(next);
     },
@@ -154,6 +155,16 @@ function buildRuntimeHandle(
       (runtime.session as any).getAvailableThinkingLevels() as string[],
     getCommands() {
       return mapResourceCommands(runtime.session.resourceLoader);
+    },
+    async reloadResources() {
+      // Re-read skills, prompt templates, and themes from disk so prompt files
+      // added or edited after the session started are picked up without a
+      // server restart. This reloads the resource loader only — it does not
+      // rebuild the runtime or re-emit extension lifecycle events — so the
+      // live tool-approval hook and active tools are left untouched. Prompt
+      // expansion (session.prompt) and getCommands() both read the loader's
+      // prompts lazily, so the next prompt/command list reflects the change.
+      await runtime.session.resourceLoader.reload();
     },
     getSessionStats(): ManagedSessionStats {
       const stats = (runtime.session as any).getSessionStats();
@@ -225,6 +236,7 @@ function buildRuntimeFactory(
       resourceLoaderOptions: {
         appendSystemPromptOverride: (base) => [...base, LAMDA_SYSTEM_CONTEXT],
         additionalPromptTemplatePaths: lamdaPromptTemplatePaths(effectiveCwd),
+        additionalSkillPaths: lamdaSkillPaths(effectiveCwd),
         extensionFactories: config.toolApproval
           ? [createToolApprovalExtension(config.toolApproval)]
           : [],

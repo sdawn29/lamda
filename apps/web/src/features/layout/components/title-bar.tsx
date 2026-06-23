@@ -341,7 +341,7 @@ export function TitleBar() {
   const drag = { WebkitAppRegion: "drag" } as React.CSSProperties
   const noDrag = { WebkitAppRegion: "no-drag" } as React.CSSProperties
   const island =
-    "flex h-full shrink-0 items-center rounded-lg border border-border bg-background px-0.5 shadow-sm"
+    "flex h-full shrink-0 items-center rounded-full border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-full"
 
   return (
     <div

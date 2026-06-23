@@ -31,6 +31,8 @@ import {
   createTodoTool,
   createMemoryTool,
   normalizeMode,
+  listModes,
+  BUILTIN_MODES,
   lamdaWorktreesDir,
   lamdaWorktreePath,
 } from "@lamda/pi-sdk";
@@ -77,6 +79,14 @@ function isApprovalMode(value: unknown): value is ApprovalMode {
   return (
     value === "ask" || value === "edits_allowed" || value === "all_allowed"
   );
+}
+
+/** Whether `mode` is one of the modes available to the workspace at `cwd`. */
+function isAvailableMode(mode: string, cwd: string): boolean {
+  // Built-ins always exist without touching disk; only scan `.lamda/modes` for
+  // a custom mode id.
+  if ((BUILTIN_MODES as readonly string[]).includes(mode)) return true;
+  return listModes(cwd).some((m) => m.id === mode);
 }
 
 /**
@@ -180,8 +190,13 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
   const ws = getWorkspace(workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
 
-  if (body.mode !== undefined && !normalizeMode(body.mode)) {
-    return c.json({ error: "mode must be 'ask', 'plan', or 'agent'" }, 400);
+  const requestedMode =
+    body.mode !== undefined ? normalizeMode(body.mode) : undefined;
+  if (
+    body.mode !== undefined &&
+    (!requestedMode || !isAvailableMode(requestedMode, ws.path))
+  ) {
+    return c.json({ error: `Unknown mode: ${body.mode}` }, 400);
   }
 
   if (
@@ -198,7 +213,7 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
   }
 
   const title = body.title?.trim() || "New Thread";
-  const mode = normalizeMode(body.mode) ?? "agent";
+  const mode = requestedMode ?? "agent";
   const modelId = body.modelId ?? null;
   const approvalMode = isApprovalMode(body.approvalMode)
     ? body.approvalMode
@@ -392,11 +407,12 @@ threads.patch("/thread/:id/mode", async (c) => {
     .json<{ mode?: string }>()
     .catch((): { mode?: string } => ({}));
   const mode = normalizeMode(body.mode);
-  if (!mode) {
-    return c.json({ error: "mode must be 'ask', 'plan', or 'agent'" }, 400);
-  }
   const thread = getThread(threadId);
   if (!thread) return c.json({ error: "Thread not found" }, 404);
+  const ws = getWorkspace(thread.workspaceId);
+  if (!mode || (ws && !isAvailableMode(mode, ws.path))) {
+    return c.json({ error: `Unknown mode: ${body.mode}` }, 400);
+  }
   updateThreadMode(threadId, mode);
   const session = store.getByThreadId(threadId);
   if (session) {
