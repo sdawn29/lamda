@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.32.0](../../releases/tag/v0.32.0) — 2026-06-23
+
+### Features
+
+* implement live mode and prompt updates with config watchers
+* add support for custom modes and skills
+* refine UI components with improved spacing, styles, and button variants
+* add mode file management and ensure default configurations are seeded on startup
+* implement session status checks to prevent re-prompting during active turns and enhance reconnect logic
+* update monaco-editor to version 0.55.0 in package.json and package-lock.json
+* enhance local models and provider configuration with new thinking formats and validation logic
+
 ## [0.31.0](../../releases/tag/v0.31.0) — 2026-06-21
 
 ### Features
