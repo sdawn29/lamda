@@ -283,12 +283,31 @@
   }
 }
 
+/* ── Thinking dots (agent working) ─────────────────────────────────────────
+   Three dots that pulse in sequence (staggered via animation-delay) to signal
+   the agent is working while no tool is in flight. ── */
+@keyframes thinking-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @layer utilities {
   .animate-thinking-shimmer {
     animation: thinking-shimmer 2.2s linear infinite;
   }
   .animate-chat-message-in {
     animation: chat-message-in 180ms ease-out both;
+  }
+  .animate-thinking-dot {
+    animation: thinking-dot 1.4s ease-in-out infinite;
   }
 }
 
@@ -300,6 +319,10 @@
   }
   .animate-chat-message-in {
     animation: none;
+  }
+  .animate-thinking-dot {
+    animation: none;
+    opacity: 0.5;
   }
 }
 

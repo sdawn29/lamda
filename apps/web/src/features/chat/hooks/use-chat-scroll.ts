@@ -331,48 +331,68 @@ export function useChatScroll({
   ])
 
   // ── Auto-follow new content while pinned ──────────────────────────────────
-  // Coarse events (turn state changes, new groups) — e.g. the user's just-sent
-  // message. Instant snap — matches the ResizeObserver below so the two never
-  // produce competing animations (the source of scroll jitter), and reads as
-  // snappy. Anchoring is OFF while pinned, so this snap to the latest row wins.
-  useLayoutEffect(() => {
-    if (!pinnedRef.current || groupCount === 0) return
-    const el = scrollContainerRef.current
-    if (!el) return
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    if (distanceFromBottom < 5) return
-    el.scrollTop = el.scrollHeight
-  }, [isLoading, groupCount])
-
-  // Keep the view glued to the bottom as content grows (word-reveal, streaming
-  // text deltas). Instant snap only — incremental deltas are small enough to be
-  // imperceptible, and stacking smooth scrolls causes jitter. Gated on `pinned`
-  // so an older-history prepend (growth above the viewport, user scrolled up) is
-  // left to native scroll anchoring instead.
-  useEffect(() => {
-    const container = messagesContainerRef.current
-    if (!container) return
-    const ro = new ResizeObserver(() => {
-      if (!pinnedRef.current) return
-      const el = scrollContainerRef.current
-      if (!el) return
-      const distanceFromBottom =
-        el.scrollHeight - el.scrollTop - el.clientHeight
-      if (distanceFromBottom < 1) return
-      el.scrollTop = el.scrollHeight
-    })
-    ro.observe(container)
-    return () => ro.disconnect()
-  }, [])
-
-  // When the bottom bar grows/shrinks (multi-line input, todo panel) keep the
-  // bottom pinned so the latest message stays glued to the top of the bar.
-  useLayoutEffect(() => {
+  // One mechanism owns bottom-follow: while pinned, jump scrollTop to the bottom.
+  // Instant only — stacking smooth scrolls is what produces visible jitter, and
+  // incremental streaming deltas are too small to perceive. Only acts when the
+  // view is *below* the bottom (content grew); on a shrink the browser already
+  // clamps scrollTop to the new max, keeping us glued, so there's nothing to do —
+  // re-snapping there would be the redundant write the old code guarded against.
+  // Anchoring is OFF while pinned (see setPinned), so this snap always wins.
+  const followBottom = useCallback(() => {
     if (!pinnedRef.current) return
     const el = scrollContainerRef.current
     if (!el) return
-    el.scrollTop = el.scrollHeight
-  }, [bottomBarHeight])
+    const max = el.scrollHeight - el.clientHeight
+    if (el.scrollTop < max) el.scrollTop = max
+  }, [])
+
+  // Coarse triggers: a new group or the loading flag flipping (e.g. the just-sent
+  // message). Layout-phase so the snap lands before paint.
+  useLayoutEffect(() => {
+    if (groupCount === 0) return
+    followBottom()
+  }, [isLoading, groupCount, followBottom])
+
+  // Continuous follow as the content box grows (streaming text, word-reveal).
+  // A single ResizeObserver covers every growth source; gated on `pinned` so an
+  // older-history prepend (growth above a scrolled-up viewport) is left to native
+  // scroll anchoring instead.
+  useEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+    const ro = new ResizeObserver(() => followBottom())
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [followBottom])
+
+  // When the bottom bar grows/shrinks (multi-line input, todo panel, queued pill)
+  // the scroll viewport's height changes — keep the latest row glued to its top.
+  useLayoutEffect(() => {
+    followBottom()
+  }, [bottomBarHeight, followBottom])
+
+  // A turn keeps reflowing for a beat *after* it ends — the working block
+  // collapses (~300ms grid animation) and the persisted-message refetch swaps the
+  // streamed rows for stored ones (~750ms). Those land after the coarse snap
+  // above and don't all emit a growth resize, so without this the view drifts
+  // ("bounces") down as the content settles below the fold. Hold the bottom glued
+  // across a short window once loading ends; bail the instant the user scrolls up
+  // (pinnedRef cleared by the wheel/touch listeners), so it never fights them.
+  const prevIsLoadingRef = useRef(isLoading)
+  useEffect(() => {
+    const wasLoading = prevIsLoadingRef.current
+    prevIsLoadingRef.current = isLoading
+    if (!(wasLoading && !isLoading) || !pinnedRef.current) return
+    let raf = 0
+    const start = performance.now()
+    const tick = () => {
+      if (!pinnedRef.current) return
+      followBottom()
+      if (performance.now() - start < 900) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [isLoading, followBottom])
 
   return {
     scrollContainerRef,

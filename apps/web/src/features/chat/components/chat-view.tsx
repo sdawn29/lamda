@@ -966,9 +966,16 @@ export function ChatView({
                     initialSnapshot !== null &&
                     initialSnapshot.sessionId === sessionId &&
                     !initialSnapshot.keys.has(key)
-                  const isLastInTurn =
+                  // The footer (model · duration · timestamp) isn't final mid-
+                  // turn, so it stays hidden while the active turn streams — but
+                  // it's still mounted (footerPending) to reserve its height, so
+                  // it doesn't add a line and shift the pinned view when the turn
+                  // finishes.
+                  const isLastInTurn = isLastInTurnStatic
+                  const footerPending =
                     isLastInTurnStatic &&
-                    !(isLoading && groupIndex === activeTurnFooterGroupIndex)
+                    isLoading &&
+                    groupIndex === activeTurnFooterGroupIndex
                   const entryDelayMs = isNewMessage ? getEntryDelayMs(key) : 0
                   content = (
                     <div className="mx-auto w-full max-w-3xl px-3 pb-3">
@@ -981,6 +988,7 @@ export function ChatView({
                         isNewMessage={isNewMessage}
                         entryDelayMs={entryDelayMs}
                         isLastInTurn={isLastInTurn}
+                        footerPending={footerPending}
                         turnMessages={turnMessages}
                         rootPath={rootPath}
                         threadId={threadId}
@@ -1077,9 +1085,13 @@ export function ChatView({
                   Waiting for approval
                 </div>
               ) : (
-                showThinkingIndicator && (
-                  <ThinkingIndicator className="py-0.5" />
-                )
+                // Always mounted so its row height is reserved whether or not
+                // the agent is working — keeping it from shifting the pinned
+                // transcript on turn boundaries (see ThinkingIndicator).
+                <ThinkingIndicator
+                  className="py-0.5"
+                  active={showThinkingIndicator}
+                />
               )}
             </div>
           </div>

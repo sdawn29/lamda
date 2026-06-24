@@ -9,6 +9,14 @@ export interface UserMessage {
   role: "user"
   /** DB block id — present on persisted messages, absent on optimistic placeholders */
   id?: string
+  /**
+   * Stable client-side identity assigned when the optimistic row is created and
+   * carried onto the persisted row when it's swapped in. Keeps the React key
+   * constant across that swap so the row reconciles in place instead of
+   * remounting (which churned the DOM and flickered the action buttons right as
+   * a turn finished). See getMessageKey.
+   */
+  clientId?: string
   content: string
   attachments?: {
     id: string

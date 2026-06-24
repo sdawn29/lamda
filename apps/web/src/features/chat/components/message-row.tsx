@@ -90,6 +90,8 @@ interface AssistantMessageBlockProps {
   isNew?: boolean
   entryDelayMs?: number
   isLastInTurn?: boolean
+  /** Footer is mounted (height reserved) but hidden — turn still streaming. */
+  footerPending?: boolean
   turnMessages?: AssistantMessage[]
   rootPath?: string
 }
@@ -196,6 +198,7 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
   isNew = true,
   entryDelayMs = 0,
   isLastInTurn = true,
+  footerPending = false,
   turnMessages,
   rootPath,
 }: AssistantMessageBlockProps) {
@@ -247,7 +250,13 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
       {hasError && <ErrorMessageBlock message={message.errorMessage!} />}
 
       {isLastInTurn && !hasError && (
-        <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            "flex items-center gap-3 transition-opacity duration-200",
+            footerPending && "pointer-events-none opacity-0"
+          )}
+          aria-hidden={footerPending || undefined}
+        >
           {hasMeta && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {providerMeta && (
@@ -297,8 +306,13 @@ export function getMessageKey(message: Message, index: number): string {
   )
     return message.id
   if (message.role === "tool") return `tool-${message.toolCallId}`
-  // Prefer DB id when present — stable across prepends & remounts and unique
-  // even when two messages share the same millisecond-precision createdAt.
+  // Prefer the stable client-side id so a user row keeps the same key when its
+  // optimistic placeholder is swapped for the persisted (id-bearing) version —
+  // otherwise the key flips id-less→id and React remounts the row mid-finish.
+  if (message.role === "user" && message.clientId)
+    return `user-c${message.clientId}`
+  // Then the DB id — stable across prepends & remounts and unique even when two
+  // messages share the same millisecond-precision createdAt.
   if (message.role === "user" && message.id) return `user-${message.id}`
   if (message.role === "assistant" && message.id)
     return `assistant-${message.id}`
@@ -340,6 +354,8 @@ export interface MessageRowProps {
   /** Stagger offset (ms) applied as CSS animation-delay when isNewMessage is true. */
   entryDelayMs?: number
   isLastInTurn?: boolean
+  /** Footer is mounted (height reserved) but hidden — turn still streaming. */
+  footerPending?: boolean
   turnMessages?: AssistantMessage[]
   rootPath?: string
   /** Durable thread id — used to build URLs for persisted attachments. */
@@ -391,6 +407,7 @@ export const MessageRow = memo(function MessageRow({
   isNewMessage = true,
   entryDelayMs = 0,
   isLastInTurn = true,
+  footerPending = false,
   turnMessages,
   rootPath,
   threadId,
@@ -570,6 +587,7 @@ export const MessageRow = memo(function MessageRow({
       isNew={isNewMessage}
       entryDelayMs={entryDelayMs}
       isLastInTurn={isLastInTurn}
+      footerPending={footerPending}
       turnMessages={turnMessages}
       rootPath={rootPath}
     />

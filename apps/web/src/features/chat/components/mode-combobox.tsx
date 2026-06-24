@@ -189,15 +189,16 @@ const dynamicIconCache = new Map<IconName, LucideIcon>()
 function dynamicModeIcon(name: IconName): LucideIcon {
   const cached = dynamicIconCache.get(name)
   if (cached) return cached
+  const iconName: IconName = name
   const Component = React.forwardRef<SVGSVGElement, LucideProps>(
-    (props, ref) => (
+    ({ name: _svgName, ...props }, ref) => (
       <DynamicIcon
+        {...props}
         ref={ref}
-        name={name}
         // Render the default icon while the real one is loading, so the slot is
         // never empty mid-load.
         fallback={() => <DEFAULT_ICON className={props.className} />}
-        {...props}
+        name={iconName}
       />
     ),
   ) as LucideIcon

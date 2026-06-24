@@ -353,7 +353,12 @@ export function useChatStream({
                 msgs.map((msg): Message => {
                   if (msg.role !== "user" || (msg as UserMessage).id) return msg
                   const persisted = serverUserByContent.get((msg as UserMessage).content)
-                  return persisted ?? msg
+                  // Carry the optimistic row's clientId onto the persisted row so
+                  // its React key stays constant — the row reconciles in place
+                  // (gaining its id/createdAt) instead of remounting.
+                  return persisted
+                    ? { ...persisted, clientId: (msg as UserMessage).clientId }
+                    : msg
                 })
               )
           )
@@ -376,7 +381,12 @@ export function useChatStream({
   // identical trailing user row (guards against double-fires from retry paths).
   const appendOptimisticUserMessage = useCallback(
     (text: string, attachments?: UserMessage["attachments"]) => {
-      const userMessage: Message = { role: "user", content: text, attachments }
+      const userMessage: Message = {
+        role: "user",
+        content: text,
+        attachments,
+        clientId: crypto.randomUUID(),
+      }
       queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
         updateLastPageMessages(prev, (current) => {
           const lastMsg = current[current.length - 1]

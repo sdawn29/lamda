@@ -522,9 +522,10 @@ export const WorkingBlock = memo(function WorkingBlock({
         <DisclosureChevron expanded={expanded} />
       </button>
 
-      {/* Collapsible content */}
+
+      {/* Collapsible content — flush, no left rule or indent (unlike nested blocks) */}
       <CollapsibleBody open={expanded}>
-        <div className={NESTED_BODY_CLASS}>
+        <div className="mt-1.5 flex flex-col gap-1">
           {entries.map((entry, idx) => {
             if (entry.kind === "thinking") {
               return (
