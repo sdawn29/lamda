@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.33.0](../../releases/tag/v0.33.0) — 2026-06-24
+
+### Features
+
+* enhance file handling by adding delete option for untracked files and updating revert action
+* **automations:** implement automation management features
+* update system prompts for clarity and improve default mode configuration instructions
+* enhance chat components with improved footer handling and clientId for user messages
+* enhance icon handling by refining type definitions and validation for Lucide icons
+
 ## [0.32.0](../../releases/tag/v0.32.0) — 2026-06-23
 
 ### Features
