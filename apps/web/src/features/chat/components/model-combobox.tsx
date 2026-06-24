@@ -1,6 +1,7 @@
 import * as React from "react"
 import { ChevronDownIcon } from "lucide-react"
 
+import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import {
   Command,
@@ -28,12 +29,21 @@ export function ModelCombobox({
   onSelect,
   disabled,
   placeholder = "Select model",
+  triggerClassName,
+  contentClassName,
+  side = "top",
 }: {
   groups: ModelGroup
   selected: { id: string; name: string; provider: string } | null
   onSelect: (compositeKey: string) => void
   disabled?: boolean
   placeholder?: string
+  /** Extra classes for the trigger button (overrides the default ghost look). */
+  triggerClassName?: string
+  /** Extra classes for the popover content. */
+  contentClassName?: string
+  /** Side the popover opens toward. */
+  side?: "top" | "bottom" | "left" | "right"
 }) {
   const [open, setOpen] = React.useState(false)
 
@@ -66,17 +76,25 @@ export function ModelCombobox({
             size="sm"
             disabled={disabled}
             aria-expanded={open}
-            className="max-w-60"
+            className={cn("max-w-60", triggerClassName)}
           >
             {selectedMeta?.icon}
-            <span className="truncate">{selected?.name ?? placeholder}</span>
+            <span
+              className={cn(
+                "truncate",
+                triggerClassName && "mr-auto",
+                !selected && "text-muted-foreground",
+              )}
+            >
+              {selected?.name ?? placeholder}
+            </span>
             <ChevronDownIcon data-icon="inline-end" className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
           </Button>
         }
       />
       <PopoverContent
-        className="w-64 p-0"
-        side="top"
+        className={cn("w-64 p-0", contentClassName)}
+        side={side}
         align="start"
         sideOffset={6}
       >

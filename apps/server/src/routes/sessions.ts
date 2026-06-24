@@ -44,10 +44,8 @@ import {
   stripMemoryPreamble,
 } from "@lamda/pi-sdk";
 import { withInjections } from "../services/prompt-injection.js";
-import {
-  ensurePromptsFresh,
-  ensurePromptsFreshForText,
-} from "../services/prompt-freshness.js";
+import { sendPrompt } from "../services/prompt-runner.js";
+import { ensurePromptsFresh } from "../services/prompt-freshness.js";
 import { recoverSession } from "../services/healing-service.js";
 import { findAttachmentFile, writeAttachment } from "../lib/attachments.js";
 import type { AttachmentMetadata } from "@lamda/db";
@@ -246,15 +244,6 @@ sessions.post("/session/:id/prompt", async (c) => {
       }
     }
 
-    // Store user message as a block in the database (without the mode preamble)
-    // Pass the original displayed text and attachment metadata
-    insertUserBlock(entry.threadId, body.text || "", attachmentMetadata);
-
-    // The SDK sees the mode/memory preambles and injected file contents
-    const text = await withInjections(entry, agentFacingText);
-    // Kept so session-level self-healing can re-send the interrupted prompt.
-    entry.lastPromptText = text;
-
     if (body.provider && body.model)
       await entry.handle.setModel(body.provider, body.model);
     if (body.thinkingLevel) {
@@ -284,11 +273,13 @@ sessions.post("/session/:id/prompt", async (c) => {
           }
         : undefined;
 
-    // Refresh prompt templates first when this is a `/command`, so a just-authored
-    // prompt file resolves without a server restart.
-    await ensurePromptsFreshForText(entry, body.text ?? "");
-
-    await entry.handle.prompt(text, promptOptions);
+    // Persist the user block (with original text + attachment metadata), apply
+    // injections, and run the turn — shared with the automation runner.
+    await sendPrompt(id, agentFacingText, {
+      displayText: body.text || "",
+      attachments: attachmentMetadata,
+      promptOptions,
+    });
   };
   run().catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);

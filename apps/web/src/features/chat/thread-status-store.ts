@@ -182,6 +182,14 @@ function handleGlobalMessage(e: MessageEvent): void {
         for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
       }
     }
+    if (data.type === "automations_changed") {
+      // An automation was created/edited/deleted, or a run started/finished
+      // (which may have created a dedicated thread). Refresh the automations
+      // list, their run histories, and the workspace/thread tree.
+      void queryClient.invalidateQueries({ queryKey: ["automations"] })
+      void queryClient.invalidateQueries({ queryKey: ["automation-runs"] })
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] })
+    }
     if (data.type === "thread_status" && data.threadId && data.status) {
       const { setStatus, isThreadStreamed } = useThreadStatusStore.getState()
       // Record the context (why awaiting / what error) BEFORE flipping status,

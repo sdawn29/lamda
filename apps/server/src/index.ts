@@ -5,6 +5,7 @@ import { URL } from "node:url";
 import { resolvePort } from "./port.js";
 import app from "./app.js";
 import { bootstrapSessions } from "./bootstrap.js";
+import { startAutomationScheduler } from "./services/automation-scheduler.js";
 import { store } from "./store.js";
 import { registerHealingHooks } from "./services/healing-service.js";
 import {
@@ -56,6 +57,9 @@ bootstrapSessions()
   .then(() => {
     // Embed any memories missing a vector (no-op without sqlite-vec / VOYAGE_API_KEY).
     scheduleEmbeddingBackfill();
+
+    // Register cron jobs for every enabled automation now that sessions exist.
+    startAutomationScheduler();
 
     const server = serve(
       { fetch: app.fetch, port, hostname: "127.0.0.1" },

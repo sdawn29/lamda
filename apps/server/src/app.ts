@@ -15,6 +15,7 @@ import file from "./routes/file.js";
 import { mcpRouter } from "./routes/mcp.js";
 import { lspRouter } from "./routes/lsp.js";
 import { tasksRouter } from "./routes/tasks.js";
+import { automationsRouter } from "./routes/automations.js";
 import terminal from "./routes/terminal.js";
 import usage from "./routes/usage.js";
 import memories from "./routes/memories.js";
@@ -60,5 +61,6 @@ app.route("/", memories);
 app.route("/mcp", mcpRouter);
 app.route("/lsp", lspRouter);
 app.route("/tasks", tasksRouter);
+app.route("/automations", automationsRouter);
 
 export default app;

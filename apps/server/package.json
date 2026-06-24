@@ -19,6 +19,7 @@
     "@lamda/mcp": "*",
     "@lamda/pi-sdk": "*",
     "@types/ws": "^8.18.1",
+    "croner": "^10.0.1",
     "hono": "^4.12.26",
     "node-pty": "^1.1.0",
     "ws": "^8.21.0"

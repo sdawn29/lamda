@@ -15,6 +15,7 @@ import {
   PanelRight,
   MessageSquarePlus,
   Search,
+  Clock,
 } from "lucide-react"
 import {
   useRouter,
@@ -152,6 +153,7 @@ export function TitleBar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const isSettings = pathname === "/settings"
+  const isAutomations = pathname === "/automations"
   const {
     workspaces,
     setThreadTitle,
@@ -460,6 +462,16 @@ export function TitleBar() {
         </div>
       )}
 
+      {/* ── Automations page island ──────────────────────────────────────── */}
+      {isAutomations && (
+        <div className={cn(island, "shrink-0 gap-1.5 px-2.5")} style={noDrag}>
+          <Clock className="size-3.5 text-muted-foreground/70" />
+          <span className="text-sm font-semibold text-foreground">
+            Automations
+          </span>
+        </div>
+      )}
+
       {/* ── Thread name + options island (truncates, shrinks before filler) ─ */}
       {urlActiveThread && (
         <div
@@ -577,69 +589,75 @@ export function TitleBar() {
           </div>
         )}
 
-      {/* ── Task dropdown ────────────────────────────────────────────────── */}
-      <div className={island} style={noDrag}>
-        <TasksDropdown
-          workspaceId={actionWorkspace?.id ?? ""}
-          onRunTask={runTerminalCommand}
-        />
-      </div>
+      {/* Task, open-with, terminal and right-sidebar islands are workspace/
+          thread-scoped, so they're hidden on the (global) automations page. */}
+      {!isAutomations && (
+        <>
+          {/* ── Task dropdown ──────────────────────────────────────────────── */}
+          <div className={island} style={noDrag}>
+            <TasksDropdown
+              workspaceId={actionWorkspace?.id ?? ""}
+              onRunTask={runTerminalCommand}
+            />
+          </div>
 
-      {/* ── Open in workspace ────────────────────────────────────────────── */}
-      <div className={island} style={noDrag}>
-        <OpenWithButton
-          workspaceId={actionWorkspace?.id}
-          workspacePath={actionWorkspace?.path}
-          openWithAppId={actionWorkspace?.openWithAppId}
-        />
-      </div>
+          {/* ── Open in workspace ──────────────────────────────────────────── */}
+          <div className={island} style={noDrag}>
+            <OpenWithButton
+              workspaceId={actionWorkspace?.id}
+              workspacePath={actionWorkspace?.path}
+              openWithAppId={actionWorkspace?.openWithAppId}
+            />
+          </div>
 
-      {/* ── Terminal ─────────────────────────────────────────────────────── */}
-      <div className={island} style={noDrag}>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Toggle
-                pressed={terminalOpen}
-                onPressedChange={() => toggleTerminal()}
-                disabled={!effectiveWorkspacePath}
-                className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-muted aria-pressed:text-foreground"
-              >
-                <TerminalSquare className="size-4" />
-                <span className="sr-only">Toggle terminal</span>
-              </Toggle>
-            }
-          />
-          <TooltipContent>
-            Toggle terminal{" "}
-            <ShortcutKbd binding={terminalBinding} className="ml-1" />
-          </TooltipContent>
-        </Tooltip>
-      </div>
+          {/* ── Terminal ───────────────────────────────────────────────────── */}
+          <div className={island} style={noDrag}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Toggle
+                    pressed={terminalOpen}
+                    onPressedChange={() => toggleTerminal()}
+                    disabled={!effectiveWorkspacePath}
+                    className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-muted aria-pressed:text-foreground"
+                  >
+                    <TerminalSquare className="size-4" />
+                    <span className="sr-only">Toggle terminal</span>
+                  </Toggle>
+                }
+              />
+              <TooltipContent>
+                Toggle terminal{" "}
+                <ShortcutKbd binding={terminalBinding} className="ml-1" />
+              </TooltipContent>
+            </Tooltip>
+          </div>
 
-      {/* ── Right sidebar toggle ─────────────────────────────────────────── */}
-      <div className={island} style={noDrag}>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={toggleRightSidebar}
-                aria-pressed={rightSidebarOpen}
-                className="size-7 text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
-              >
-                <PanelRight className="size-4" />
-                <span className="sr-only">Toggle right sidebar</span>
-              </Button>
-            }
-          />
-          <TooltipContent>
-            Toggle right sidebar{" "}
-            <ShortcutKbd binding={rightSidebarBinding} className="ml-1" />
-          </TooltipContent>
-        </Tooltip>
-      </div>
+          {/* ── Right sidebar toggle ───────────────────────────────────────── */}
+          <div className={island} style={noDrag}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={toggleRightSidebar}
+                    aria-pressed={rightSidebarOpen}
+                    className="size-7 text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+                  >
+                    <PanelRight className="size-4" />
+                    <span className="sr-only">Toggle right sidebar</span>
+                  </Button>
+                }
+              />
+              <TooltipContent>
+                Toggle right sidebar{" "}
+                <ShortcutKbd binding={rightSidebarBinding} className="ml-1" />
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </>
+      )}
     </div>
   )
 }

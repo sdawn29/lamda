@@ -8,6 +8,7 @@ import { gitStatusBroadcaster } from "../git-status-broadcaster.js";
 import { worktreeBroadcaster } from "../worktree-broadcaster.js";
 import { modesBroadcaster } from "../modes-broadcaster.js";
 import { promptsBroadcaster } from "../prompts-broadcaster.js";
+import { automationBroadcaster } from "../automation-broadcaster.js";
 
 const health = new Hono();
 
@@ -68,6 +69,11 @@ export function handleGlobalEventsWs(ws: WebSocket) {
     ws.send(JSON.stringify({ type: "prompts_changed" }));
   });
 
+  const unsubscribeAutomations = automationBroadcaster.subscribe(() => {
+    if (ws.readyState !== 1 /* OPEN */) return;
+    ws.send(JSON.stringify({ type: "automations_changed" }));
+  });
+
   const cleanup = () => {
     unsubscribeThread();
     unsubscribeIndex();
@@ -76,6 +82,7 @@ export function handleGlobalEventsWs(ws: WebSocket) {
     unsubscribeWorktree();
     unsubscribeModes();
     unsubscribePrompts();
+    unsubscribeAutomations();
   };
 
   ws.on("close", cleanup);

@@ -24,6 +24,7 @@ import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { waitForAnswer } from "./question-registry.js";
 import { createToolApprovalBridge } from "./tool-approval-bridge.js";
+import { createAutomationTool } from "./automation-tool.js";
 import { worktreeWatcher } from "./worktree-watcher.js";
 import { worktreeBroadcaster } from "../worktree-broadcaster.js";
 
@@ -371,6 +372,7 @@ export async function collectCustomTools(
     ...(todoTool ? [todoTool] : []),
     memoryTool,
     questionTool,
+    createAutomationTool(workspaceId),
     ...planTools,
     ...mcpTools,
     ...lspTools,

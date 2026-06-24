@@ -168,6 +168,35 @@ function createDb() {
       created_at   INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS automations (
+      id            TEXT PRIMARY KEY,
+      workspace_id  TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      name          TEXT NOT NULL,
+      prompt        TEXT NOT NULL,
+      cron          TEXT NOT NULL,
+      model_id      TEXT,
+      mode          TEXT NOT NULL DEFAULT 'agent',
+      approval_mode TEXT NOT NULL DEFAULT 'all_allowed',
+      thread_id     TEXT,
+      use_worktree  INTEGER NOT NULL DEFAULT 1,
+      enabled       INTEGER NOT NULL DEFAULT 1,
+      last_run_at   INTEGER,
+      last_status   TEXT,
+      last_error    TEXT,
+      created_at    INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS automation_runs (
+      id            TEXT PRIMARY KEY,
+      automation_id TEXT NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+      thread_id     TEXT,
+      started_at    INTEGER NOT NULL,
+      finished_at   INTEGER,
+      status        TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('running', 'ok', 'error')),
+      error         TEXT,
+      trigger       TEXT NOT NULL DEFAULT 'scheduled' CHECK(trigger IN ('scheduled', 'manual'))
+    );
+
     CREATE TABLE IF NOT EXISTS mcp_servers (
       id           TEXT PRIMARY KEY,
       name         TEXT NOT NULL UNIQUE,
@@ -261,6 +290,8 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS message_blocks_thread_idx ON message_blocks(thread_id, block_index);
     CREATE INDEX IF NOT EXISTS workspace_files_workspace_idx ON workspace_files(workspace_id);
     CREATE INDEX IF NOT EXISTS workspace_tasks_workspace_idx ON workspace_tasks(workspace_id);
+    CREATE INDEX IF NOT EXISTS automations_workspace_idx ON automations(workspace_id);
+    CREATE INDEX IF NOT EXISTS automation_runs_automation_idx ON automation_runs(automation_id, started_at);
     CREATE INDEX IF NOT EXISTS agent_turns_thread_idx ON agent_turns(thread_id);
     CREATE INDEX IF NOT EXISTS ai_usage_workspace_idx ON ai_usage(workspace_id);
     CREATE INDEX IF NOT EXISTS ai_usage_created_idx ON ai_usage(created_at);

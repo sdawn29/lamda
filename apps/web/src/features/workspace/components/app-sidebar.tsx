@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, memo } from "react"
 import {
   Archive,
+  Clock,
   ExternalLink,
   Folder,
   FolderOpen,
@@ -641,6 +642,15 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
                 binding={openPaletteBinding}
                 className="ml-auto opacity-0 transition-opacity group-hover/search:opacity-55"
               />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-full justify-start gap-2 text-xs"
+              onClick={() => navigate({ to: "/automations" })}
+            >
+              <Clock className="size-3.5" />
+              Automations
             </Button>
           </div>
         )}

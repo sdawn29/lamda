@@ -284,6 +284,60 @@ export const workspaceTasks = sqliteTable("workspace_tasks", {
   createdAt: integer("created_at").notNull(),
 });
 
+/**
+ * Automations — user-defined prompts that run the agent on a cron schedule.
+ * Each fire spins up a headless session for `threadId` (created lazily on the
+ * first run) and sends `prompt`. `approvalMode` defaults to `all_allowed` since
+ * no one is present to approve tool calls during an unattended run.
+ */
+export const automations = sqliteTable("automations", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  prompt: text("prompt").notNull(),
+  // Standard 5-field cron expression (minute hour day month weekday).
+  cron: text("cron").notNull(),
+  // "<provider>::<model>" — same encoding as threads.modelId. Null = default.
+  modelId: text("model_id"),
+  mode: text("mode").notNull().default("agent"),
+  approvalMode: text("approval_mode", {
+    enum: ["ask", "edits_allowed", "all_allowed"],
+  })
+    .notNull()
+    .default("all_allowed"),
+  // Dedicated thread this automation runs in. Null until the first run creates it.
+  threadId: text("thread_id"),
+  useWorktree: integer("use_worktree", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  lastRunAt: integer("last_run_at"),
+  lastStatus: text("last_status", { enum: ["ok", "error", "running"] }),
+  lastError: text("last_error"),
+  createdAt: integer("created_at").notNull(),
+});
+
+/** One row per automation execution (manual or scheduled) — the run history. */
+export const automationRuns = sqliteTable("automation_runs", {
+  id: text("id").primaryKey(),
+  automationId: text("automation_id")
+    .notNull()
+    .references(() => automations.id, { onDelete: "cascade" }),
+  threadId: text("thread_id"),
+  startedAt: integer("started_at").notNull(),
+  finishedAt: integer("finished_at"),
+  status: text("status", { enum: ["running", "ok", "error"] })
+    .notNull()
+    .default("running"),
+  error: text("error"),
+  // "scheduled" (cron fired) or "manual" (Run now).
+  trigger: text("trigger", { enum: ["scheduled", "manual"] })
+    .notNull()
+    .default("scheduled"),
+});
+
 export const mcpServers = sqliteTable("mcp_servers", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
