@@ -1,5 +1,5 @@
 import { memo, useCallback, useState } from "react"
-import { Minus, Plus, Undo2 } from "lucide-react"
+import { Minus, Plus, Trash2, Undo2 } from "lucide-react"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
 import { LoadingSpinner } from "@/shared/ui/loading-spinner"
@@ -197,10 +197,10 @@ export const FileListItem = memo(function FileListItem({
 
         {showActions && (
           <div className="flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden transition-all duration-150 group-hover/file:max-w-20 group-hover/file:pr-1">
-            {!file.isUntracked && onRevert && (
+            {onRevert && (
               <IconButtonWithTooltip
-                icon={Undo2}
-                label="Revert changes"
+                icon={file.isUntracked ? Trash2 : Undo2}
+                label={file.isUntracked ? "Discard file (delete)" : "Revert changes"}
                 onClick={handleRevertClick}
                 variant="ghost"
                 size="icon-sm"

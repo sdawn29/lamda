@@ -342,7 +342,7 @@ export async function gitUnstageAll(cwd: string): Promise<void> {
  * Discards all changes to a file and restores it to HEAD.
  * - Tracked files (M/D/R/etc): `git restore --source=HEAD --staged --worktree`
  * - Staged-new files (A): unstages via `git restore --staged` (file stays on disk)
- * - Untracked files (??): no-op
+ * - Untracked files (??): deletes the file from disk via `git clean -f`
  */
 export async function gitRevertFile(
   cwd: string,
@@ -350,7 +350,16 @@ export async function gitRevertFile(
   raw: string,
 ): Promise<void> {
   const isUntracked = raw.trim() === "??";
-  if (isUntracked) return;
+  if (isUntracked) {
+    // The file never existed in HEAD, so "revert" means remove it. Use
+    // `git clean -fd` so untracked directories are pruned too; `-f` is
+    // required for clean to do anything.
+    await execFileAsync("git", ["clean", "-fd", "--", filePath], {
+      cwd,
+      timeout: 5000,
+    });
+    return;
+  }
 
   const X = raw[0] ?? " ";
   const isAddedOnly = X === "A" && (raw[1] ?? " ") === " ";
