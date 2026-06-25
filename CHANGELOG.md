@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.35.0](../../releases/tag/v0.35.0) — 2026-06-25
+
+### Features
+
+* enhance thread model updates and improve context usage in chat view
+
 ## [0.34.0](../../releases/tag/v0.34.0) — 2026-06-25
 
 ### Features
