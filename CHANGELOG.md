@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.34.0](../../releases/tag/v0.34.0) — 2026-06-25
+
+### Features
+
+* enhance model selection by reloading registry for newly added models
+
 ## [0.33.0](../../releases/tag/v0.33.0) — 2026-06-24
 
 ### Features
