@@ -354,7 +354,7 @@ export async function collectCustomTools(
     : false;
   const planTools = allowsPlanTool ? createPlanModeTools(workspacePath) : [];
 
-  const [mcpTools, lspTools] = await Promise.all([
+  const [mcpTools, lspTools, githubTools] = await Promise.all([
     import("./mcp-service.js")
       .then((m) => m.getMcpToolsForSession())
       .catch((err) => {
@@ -367,6 +367,21 @@ export async function collectCustomTools(
         console.warn("[session-service] failed to load LSP tools:", err);
         return [];
       }),
+    // GitHub tools are only exposed when `gh` is installed and authenticated, so
+    // the agent never sees them in a repo it can't reach.
+    Promise.all([
+      import("./github-service.js"),
+      import("./github-tool.js"),
+    ])
+      .then(async ([svc, tool]) => {
+        const cwd = svc.threadRepoCwd(threadId, workspacePath);
+        if (!(await svc.isGithubAvailable(cwd))) return [];
+        return tool.createGithubTools(threadId, workspacePath);
+      })
+      .catch((err) => {
+        console.warn("[session-service] failed to load GitHub tools:", err);
+        return [];
+      }),
   ]);
   return [
     ...(todoTool ? [todoTool] : []),
@@ -376,6 +391,7 @@ export async function collectCustomTools(
     ...planTools,
     ...mcpTools,
     ...lspTools,
+    ...githubTools,
   ];
 }
 

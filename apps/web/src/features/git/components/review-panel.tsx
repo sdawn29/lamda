@@ -34,7 +34,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
+import { Github } from "@lobehub/icons"
 import { useReviewPanel } from "../store"
+import {
+  GithubReviewView,
+  useGithubConnected,
+} from "@/features/github"
 import {
   useMainTabs,
   useMainTabsStore,
@@ -47,6 +52,7 @@ import {
   useTurnDiffStat,
   useRevertToTurn,
   useLastCommitAt,
+  useBranch,
   type TurnSummary,
 } from "../queries"
 import {
@@ -82,7 +88,7 @@ interface ReviewPanelProps {
 
 // ─── Turn History View ────────────────────────────────────────────────────────
 
-type ContentView = "turn" | "all" | "history"
+type ContentView = "turn" | "all" | "history" | "github"
 
 function formatTurnTime(ts: number): string {
   if (!ts) return "In progress"
@@ -749,6 +755,10 @@ export const ReviewPanel = memo(function ReviewPanel({
   const { data: diffStat } = useGitDiffStat(workspaceSessionId)
   const { data: turnsData = [] } = useTurns(sessionId)
 
+  // GitHub view is offered only when gh is connected for this repo.
+  const githubConnected = useGithubConnected({ id: sessionId })
+  const { data: currentBranch } = useBranch(sessionId)
+
   // Source-control tab state (lifted so toolbar and content share it)
   const [scView, setScView] = useState<ContentView>("turn")
   const [scMode, setScMode] = useState<DiffMode>("inline")
@@ -805,6 +815,8 @@ export const ReviewPanel = memo(function ReviewPanel({
                       <History className="h-3 w-3" />
                     ) : scView === "history" ? (
                       <GitCommit className="h-3 w-3" />
+                    ) : scView === "github" ? (
+                      <Github size={12} />
                     ) : (
                       <GitCompare className="h-3 w-3" />
                     )}
@@ -812,7 +824,9 @@ export const ReviewPanel = memo(function ReviewPanel({
                       ? "Turns"
                       : scView === "history"
                         ? "History"
-                        : "All Changes"}
+                        : scView === "github"
+                          ? "GitHub"
+                          : "All Changes"}
                     <ChevronDown className="h-3 w-3 opacity-60" />
                   </Button>
                 }
@@ -848,6 +862,18 @@ export const ReviewPanel = memo(function ReviewPanel({
                     <Check className="ml-auto h-3 w-3 text-muted-foreground" />
                   )}
                 </DropdownMenuItem>
+                {githubConnected && (
+                  <DropdownMenuItem
+                    onClick={() => selectScView("github")}
+                    className="flex items-center gap-2"
+                  >
+                    <Github size={14} />
+                    GitHub
+                    {scView === "github" && (
+                      <Check className="ml-auto h-3 w-3 text-muted-foreground" />
+                    )}
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -866,8 +892,8 @@ export const ReviewPanel = memo(function ReviewPanel({
 
             <div className="flex-1" />
 
-            {/* Git actions + diff mode — not in history view */}
-            {scView !== "history" && (
+            {/* Git actions + diff mode — not in history or GitHub views */}
+            {scView !== "history" && scView !== "github" && (
               <SourceControlToolbarSection
                 workspaceSessionId={workspaceSessionId}
                 view={scView}
@@ -938,6 +964,11 @@ export const ReviewPanel = memo(function ReviewPanel({
               }
               initialScrollToLine={activeFileTab.scrollToLine}
               sourceUrl={activeFileTab.sourceUrl}
+            />
+          ) : scView === "github" ? (
+            <GithubReviewView
+              sessionId={sessionId}
+              branch={currentBranch?.branch ?? null}
             />
           ) : (
             <SourceControlContent

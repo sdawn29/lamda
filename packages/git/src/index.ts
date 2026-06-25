@@ -452,6 +452,18 @@ export async function gitPush(cwd: string): Promise<void> {
   await execFileAsync("git", ["push"], { cwd, timeout: 30000 });
 }
 
+/**
+ * Pushes the current branch and sets its upstream: `git push -u origin HEAD`.
+ * Used before opening a pull request, since worktree/feature branches usually
+ * have no tracking branch yet (a plain `git push` would fail for those).
+ */
+export async function gitPushSetUpstream(cwd: string): Promise<void> {
+  await execFileAsync("git", ["push", "-u", "origin", "HEAD"], {
+    cwd,
+    timeout: 30000,
+  });
+}
+
 /** Fetches from the remote without merging: `git fetch`. */
 export async function gitFetch(cwd: string): Promise<void> {
   await execFileAsync("git", ["fetch"], { cwd, timeout: 30000 });
