@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.36.0](../../releases/tag/v0.36.0) — 2026-06-25
+
+### Features
+
+* **gitlab:** add GitLab integration with repository management, issues, and merge requests
+* **github:** add Create PR dialog and GitHub review view
+
 ## [0.35.0](../../releases/tag/v0.35.0) — 2026-06-25
 
 ### Features
