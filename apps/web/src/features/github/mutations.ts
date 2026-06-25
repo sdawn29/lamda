@@ -5,9 +5,15 @@ import {
   createIssue,
   createPullRequest,
   mergePullRequest,
+  publishRepository,
 } from "./api"
 import { githubKeys } from "./queries"
-import type { CreatePrInput, MergeMethod, RepoContext } from "./types"
+import type {
+  CreatePrInput,
+  MergeMethod,
+  PublishRepositoryInput,
+  RepoContext,
+} from "./types"
 
 export function useCreatePullRequest() {
   const qc = useQueryClient()
@@ -15,6 +21,18 @@ export function useCreatePullRequest() {
     mutationFn: (input: CreatePrInput) => createPullRequest(input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [...githubKeys.all, "prs"] })
+    },
+  })
+}
+
+export function usePublishRepository(ctx: RepoContext) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: Omit<PublishRepositoryInput, keyof RepoContext>) =>
+      publishRepository({ ...ctx, ...input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: githubKeys.repo(ctx) })
+      qc.invalidateQueries({ queryKey: githubKeys.repositories() })
     },
   })
 }

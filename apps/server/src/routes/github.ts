@@ -59,6 +59,45 @@ github.get("/github/repo", async (c) => {
   return c.json({ repo });
 });
 
+github.get("/github/repositories", async (c) => {
+  const cwd = resolveCwd(c) ?? anyRepoCwd();
+  const limitParam = c.req.query("limit");
+  const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
+  if (limitParam && !Number.isInteger(limit)) {
+    return c.json({ error: "Invalid limit" }, 400);
+  }
+  const repositories = await gh.listRepositories(cwd, { limit });
+  return c.json({ repositories });
+});
+
+github.post("/github/repo/publish", async (c) => {
+  const body = await c.req.json<{
+    id?: string;
+    ws?: string;
+    path?: string;
+    name?: string;
+    visibility?: gh.GhRepositoryVisibility;
+  }>();
+  const cwd = resolveCwdFromBody(body);
+  if (!cwd) return c.json({ error: "No repo context" }, 400);
+  if (
+    body.visibility &&
+    body.visibility !== "private" &&
+    body.visibility !== "public"
+  ) {
+    return c.json({ error: "Invalid visibility" }, 400);
+  }
+  try {
+    const repo = await gh.publishRepository(cwd, {
+      name: body.name,
+      visibility: body.visibility,
+    });
+    return c.json({ repo }, 201);
+  } catch (err) {
+    return ghErrorResponse(c, err, "Failed to publish repository");
+  }
+});
+
 // ── Pull requests ─────────────────────────────────────────────────────────────
 
 github.get("/github/prs", async (c) => {

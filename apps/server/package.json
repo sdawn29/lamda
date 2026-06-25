@@ -16,6 +16,7 @@
     "@lamda/db": "*",
     "@lamda/git": "*",
     "@lamda/github": "*",
+    "@lamda/gitlab": "*",
     "@lamda/lsp": "*",
     "@lamda/mcp": "*",
     "@lamda/pi-sdk": "*",

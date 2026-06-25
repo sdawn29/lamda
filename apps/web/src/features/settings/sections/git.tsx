@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Copy,
   ExternalLink,
+  GitBranch,
   RefreshCw,
   RotateCcw,
   Save,
@@ -11,12 +12,24 @@ import {
   XCircle,
 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
+import { Github as GithubIcon } from "@lobehub/icons"
 
+import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/shared/ui/card"
 import { Textarea } from "@/shared/ui/textarea"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
 import { openExternal } from "@/features/electron/api"
 import { useGhStatus, githubKeys } from "@/features/github"
+import { useGlabStatus, gitlabKeys } from "@/features/gitlab"
 
 import { useAppSettings } from "../queries"
 import { useUpdateAppSetting } from "../mutations"
@@ -31,11 +44,14 @@ const DEFAULT_COMMIT_PROMPT = `Generate a git commit message for the following s
 
 const GH_LOGIN_COMMAND = "gh auth login"
 const GH_INSTALL_URL = "https://cli.github.com/"
+const GLAB_LOGIN_COMMAND = "glab auth login"
+const GLAB_INSTALL_URL = "https://gitlab.com/gitlab-org/cli"
 
 export function GitSection() {
   return (
     <>
       <GitHubConnectionGroup />
+      <GitLabConnectionGroup />
       <CommitMessageGroup />
     </>
   )
@@ -50,6 +66,7 @@ function GitHubConnectionGroup() {
 
   const installed = status?.installed ?? false
   const authenticated = status?.authenticated ?? false
+  const ready = installed && authenticated
 
   function refresh() {
     qc.invalidateQueries({ queryKey: githubKeys.status() })
@@ -62,82 +79,114 @@ function GitHubConnectionGroup() {
   }
 
   return (
-    <SettingsGroup
-      title="GitHub"
-      description="Lamda connects to GitHub through the GitHub CLI (gh). Once it's installed and signed in, pull requests, issues, and CI checks appear in the review panel."
-      action={
-        <Button
-          variant="ghost"
-          size="sm"
-          className="px-2"
-          onClick={refresh}
-          disabled={isFetching}
-        >
-          <RefreshCw
-            data-icon="inline-start"
-            className={isFetching ? "animate-spin" : undefined}
-          />
-          Refresh
-        </Button>
-      }
-    >
-      <SettingsRow
-        title="GitHub CLI"
-        description={
-          installed
-            ? "The gh command-line tool is installed."
-            : "The gh command-line tool was not found on your PATH."
-        }
-      >
-        {isLoading ? (
-          <span className="text-xs text-muted-foreground">Checking…</span>
-        ) : installed ? (
-          <StatusPill tone="positive" icon={<CheckCircle2 />}>
-            Installed
-          </StatusPill>
-        ) : (
+    <Card className="border-border/60 bg-card/80 shadow-sm" size="sm">
+      <CardHeader className="border-b border-border/60">
+        <div className="flex items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground ring-1 ring-border/70">
+            <GithubIcon size={18} />
+          </div>
+          <div className="flex min-w-0 flex-col gap-1">
+            <CardTitle>GitHub</CardTitle>
+            <CardDescription>
+              Connect the GitHub CLI to enable repository lists, pull requests,
+              issues, and CI checks.
+            </CardDescription>
+          </div>
+        </div>
+        <CardAction className="flex items-center gap-2">
+          {isLoading ? (
+            <Badge variant="outline" className="h-6 px-2.5 text-xs">
+              Checking
+            </Badge>
+          ) : ready ? (
+            <StatusBadge variant="secondary" icon={<CheckCircle2 />}>
+              Connected
+            </StatusBadge>
+          ) : (
+            <StatusBadge variant="outline" icon={<XCircle />}>
+              Setup needed
+            </StatusBadge>
+          )}
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            onClick={() => void openExternal(GH_INSTALL_URL)}
+            className="px-2"
+            onClick={refresh}
+            disabled={isFetching}
           >
-            <ExternalLink data-icon="inline-start" />
-            Install gh
+            <RefreshCw
+              data-icon="inline-start"
+              className={isFetching ? "animate-spin" : undefined}
+            />
+            Check
           </Button>
-        )}
-      </SettingsRow>
+        </CardAction>
+      </CardHeader>
 
-      <SettingsRow
-        title="Account"
-        description={
-          authenticated
-            ? `Signed in to GitHub${status?.login ? ` as @${status.login}` : ""}.`
-            : "Not signed in. Run the command below in a terminal, then refresh."
-        }
-      >
-        {authenticated ? (
-          <StatusPill tone="positive" icon={<CheckCircle2 />}>
-            {status?.login ? `@${status.login}` : "Connected"}
-          </StatusPill>
-        ) : (
-          <StatusPill tone="muted" icon={<XCircle />}>
-            Disconnected
-          </StatusPill>
-        )}
-      </SettingsRow>
+      <CardContent className="divide-y divide-border/50">
+        <SettingsRow
+          title="GitHub CLI"
+          description={
+            installed
+              ? "The gh command-line tool is available on your PATH."
+              : "Install gh so Lamda can talk to GitHub using your local auth session."
+          }
+        >
+          {installed ? (
+            <StatusBadge variant="outline" icon={<CheckCircle2 />}>
+              Installed
+            </StatusBadge>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void openExternal(GH_INSTALL_URL)}
+            >
+              <ExternalLink data-icon="inline-start" />
+              Install gh
+            </Button>
+          )}
+        </SettingsRow>
+
+        <SettingsRow
+          title="Account"
+          description={
+            authenticated
+              ? `Signed in${status?.login ? ` as @${status.login}` : ""}.`
+              : "Authenticate the GitHub CLI, then check the connection again."
+          }
+        >
+          {authenticated ? (
+            <StatusBadge variant="secondary" icon={<CheckCircle2 />}>
+              {status?.login ? `@${status.login}` : "Signed in"}
+            </StatusBadge>
+          ) : (
+            <StatusBadge variant="outline" icon={<XCircle />}>
+              Not signed in
+            </StatusBadge>
+          )}
+        </SettingsRow>
+      </CardContent>
 
       {installed && !authenticated && (
-        <SettingsStack
-          title="Sign in"
-          description="Run this command in a terminal to authenticate the GitHub CLI, then click Refresh."
-        >
-          <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2">
-            <code className="flex min-w-0 items-center gap-2 font-mono text-xs">
-              <TerminalSquare className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate">{GH_LOGIN_COMMAND}</span>
-            </code>
+        <CardFooter className="flex-col items-stretch gap-2 border-t border-border/60 bg-muted/10">
+          <div className="flex flex-col gap-0.5">
+            <p className="text-sm leading-snug">Authenticate</p>
+            <p className="text-xs/relaxed text-muted-foreground">
+              Run this once in a terminal, then check the connection.
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground ring-1 ring-border/60">
+                <TerminalSquare className="size-3.5" />
+              </div>
+              <code className="truncate font-mono text-xs">
+                {GH_LOGIN_COMMAND}
+              </code>
+            </div>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               className="shrink-0 px-2"
               onClick={copyCommand}
@@ -155,32 +204,179 @@ function GitHubConnectionGroup() {
               )}
             </Button>
           </div>
-        </SettingsStack>
+        </CardFooter>
       )}
-    </SettingsGroup>
+    </Card>
   )
 }
 
-function StatusPill({
-  tone,
+// ── GitLab connection ─────────────────────────────────────────────────────────
+
+function GitLabConnectionGroup() {
+  const { data: status, isLoading, isFetching } = useGlabStatus()
+  const qc = useQueryClient()
+  const [copied, setCopied] = useState(false)
+
+  const installed = status?.installed ?? false
+  const authenticated = status?.authenticated ?? false
+  const ready = installed && authenticated
+
+  function refresh() {
+    qc.invalidateQueries({ queryKey: gitlabKeys.status() })
+  }
+
+  function copyCommand() {
+    void navigator.clipboard.writeText(GLAB_LOGIN_COMMAND)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <Card className="border-border/60 bg-card/80 shadow-sm" size="sm">
+      <CardHeader className="border-b border-border/60">
+        <div className="flex items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground ring-1 ring-border/70">
+            <GitBranch className="size-4" />
+          </div>
+          <div className="flex min-w-0 flex-col gap-1">
+            <CardTitle>GitLab</CardTitle>
+            <CardDescription>
+              Connect the GitLab CLI to enable merge requests, issues, and
+              publishing to GitLab.
+            </CardDescription>
+          </div>
+        </div>
+        <CardAction className="flex items-center gap-2">
+          {isLoading ? (
+            <Badge variant="outline" className="h-6 px-2.5 text-xs">
+              Checking
+            </Badge>
+          ) : ready ? (
+            <StatusBadge variant="secondary" icon={<CheckCircle2 />}>
+              Connected
+            </StatusBadge>
+          ) : (
+            <StatusBadge variant="outline" icon={<XCircle />}>
+              Setup needed
+            </StatusBadge>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-2"
+            onClick={refresh}
+            disabled={isFetching}
+          >
+            <RefreshCw
+              data-icon="inline-start"
+              className={isFetching ? "animate-spin" : undefined}
+            />
+            Check
+          </Button>
+        </CardAction>
+      </CardHeader>
+
+      <CardContent className="divide-y divide-border/50">
+        <SettingsRow
+          title="GitLab CLI"
+          description={
+            installed
+              ? "The glab command-line tool is available on your PATH."
+              : "Install glab so Lamda can talk to GitLab using your local auth session."
+          }
+        >
+          {installed ? (
+            <StatusBadge variant="outline" icon={<CheckCircle2 />}>
+              Installed
+            </StatusBadge>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void openExternal(GLAB_INSTALL_URL)}
+            >
+              <ExternalLink data-icon="inline-start" />
+              Install glab
+            </Button>
+          )}
+        </SettingsRow>
+
+        <SettingsRow
+          title="Account"
+          description={
+            authenticated
+              ? `Signed in${status?.login ? ` as @${status.login}` : ""}.`
+              : "Authenticate the GitLab CLI, then check the connection again."
+          }
+        >
+          {authenticated ? (
+            <StatusBadge variant="secondary" icon={<CheckCircle2 />}>
+              {status?.login ? `@${status.login}` : "Signed in"}
+            </StatusBadge>
+          ) : (
+            <StatusBadge variant="outline" icon={<XCircle />}>
+              Not signed in
+            </StatusBadge>
+          )}
+        </SettingsRow>
+      </CardContent>
+
+      {installed && !authenticated && (
+        <CardFooter className="flex-col items-stretch gap-2 border-t border-border/60 bg-muted/10">
+          <div className="flex flex-col gap-0.5">
+            <p className="text-sm leading-snug">Authenticate</p>
+            <p className="text-xs/relaxed text-muted-foreground">
+              Run this once in a terminal, then check the connection.
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground ring-1 ring-border/60">
+                <TerminalSquare className="size-3.5" />
+              </div>
+              <code className="truncate font-mono text-xs">
+                {GLAB_LOGIN_COMMAND}
+              </code>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 px-2"
+              onClick={copyCommand}
+            >
+              {copied ? (
+                <>
+                  <Check data-icon="inline-start" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy data-icon="inline-start" />
+                  Copy
+                </>
+              )}
+            </Button>
+          </div>
+        </CardFooter>
+      )}
+    </Card>
+  )
+}
+
+function StatusBadge({
+  variant,
   icon,
   children,
 }: {
-  tone: "positive" | "muted"
+  variant: "secondary" | "outline"
   icon: React.ReactNode
   children: React.ReactNode
 }) {
   return (
-    <span
-      className={
-        tone === "positive"
-          ? "inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-500 [&_svg]:size-4"
-          : "inline-flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-4"
-      }
-    >
+    <Badge variant={variant} className="h-6 gap-1.5 px-2.5 text-xs">
       {icon}
       {children}
-    </span>
+    </Badge>
   )
 }
 
@@ -269,8 +465,8 @@ function CommitMessageGroup() {
         {!hasDiffPlaceholder && (
           <p className="text-xs/relaxed text-destructive" role="alert">
             Prompt must contain{" "}
-            <code className="rounded bg-muted px-1 py-0.5">{"{diff}"}</code> — it
-            will be replaced with the staged diff.
+            <code className="rounded bg-muted px-1 py-0.5">{"{diff}"}</code> —
+            it will be replaced with the staged diff.
           </p>
         )}
         <div className="flex items-center justify-between">

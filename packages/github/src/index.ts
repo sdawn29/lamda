@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { basename } from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -66,13 +67,18 @@ async function runGh(
       cwd,
       timeout,
       maxBuffer: 1024 * 1024 * 16,
-      env: { ...process.env, GH_PROMPT_DISABLED: "1", GH_NO_UPDATE_NOTIFIER: "1" },
+      env: {
+        ...process.env,
+        GH_PROMPT_DISABLED: "1",
+        GH_NO_UPDATE_NOTIFIER: "1",
+      },
     });
     return { stdout, stderr };
   } catch (err: unknown) {
     if (isExecError(err)) {
       const stderr = typeof err.stderr === "string" ? err.stderr : "";
-      const message = stderr.trim() || (err as Error).message || "gh command failed";
+      const message =
+        stderr.trim() || (err as Error).message || "gh command failed";
       throw new GhError(message, stderr);
     }
     throw new GhError("gh command failed", "");
@@ -144,6 +150,16 @@ export interface GhRepoInfo {
   url: string;
 }
 
+export interface GhRepositorySummary {
+  nameWithOwner: string;
+  description: string | null;
+  isPrivate: boolean;
+  url: string;
+  updatedAt: string;
+}
+
+export type GhRepositoryVisibility = "private" | "public";
+
 /**
  * Resolves the GitHub repo for `cwd` from its git remote. Returns null when the
  * directory isn't a GitHub-backed repo (no remote, gh missing, etc.).
@@ -154,10 +170,7 @@ export async function getRepoInfo(cwd: string): Promise<GhRepoInfo | null> {
       nameWithOwner: string;
       defaultBranchRef: { name: string } | null;
       url: string;
-    }>(
-      ["repo", "view", "--json", "nameWithOwner,defaultBranchRef,url"],
-      cwd,
-    );
+    }>(["repo", "view", "--json", "nameWithOwner,defaultBranchRef,url"], cwd);
     return {
       nameWithOwner: data.nameWithOwner,
       defaultBranch: data.defaultBranchRef?.name ?? null,
@@ -166,6 +179,82 @@ export async function getRepoInfo(cwd: string): Promise<GhRepoInfo | null> {
   } catch {
     return null;
   }
+}
+
+export async function listRepositories(
+  cwd: string,
+  opts: { limit?: number } = {},
+): Promise<GhRepositorySummary[]> {
+  const limit = opts.limit ?? 1000;
+  assertPositiveInt(limit, "limit");
+  try {
+    return await runGhJson<GhRepositorySummary[]>(
+      [
+        "repo",
+        "list",
+        "--limit",
+        String(limit),
+        "--json",
+        "nameWithOwner,description,isPrivate,url,updatedAt",
+      ],
+      cwd,
+      30000,
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function hasRemote(cwd: string, remote: string): Promise<boolean> {
+  try {
+    await execFileAsync("git", ["remote", "get-url", remote], {
+      cwd,
+      timeout: 5000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function publishRepository(
+  cwd: string,
+  opts: { name?: string; visibility?: GhRepositoryVisibility } = {},
+): Promise<GhRepoInfo> {
+  const name = (opts.name?.trim() || basename(cwd)).trim();
+  const visibility = opts.visibility ?? "private";
+  assertNotOption(name, "repository name");
+  const remote = (await hasRemote(cwd, "origin")) ? "github" : "origin";
+  await runGh(
+    [
+      "repo",
+      "create",
+      name,
+      "--source",
+      ".",
+      "--remote",
+      remote,
+      "--push",
+      visibility === "private" ? "--private" : "--public",
+    ],
+    cwd,
+    120000,
+  );
+  const repo = await getRepoInfo(cwd);
+  if (repo) return repo;
+  const data = await runGhJson<{
+    nameWithOwner: string;
+    defaultBranchRef: { name: string } | null;
+    url: string;
+  }>(
+    ["repo", "view", name, "--json", "nameWithOwner,defaultBranchRef,url"],
+    cwd,
+  );
+  return {
+    nameWithOwner: data.nameWithOwner,
+    defaultBranch: data.defaultBranchRef?.name ?? null,
+    url: data.url,
+  };
 }
 
 // ── Pull requests ────────────────────────────────────────────────────────────
@@ -226,7 +315,16 @@ export async function listPullRequests(
   const limit = opts.limit ?? 30;
   assertPositiveInt(limit, "limit");
   const raws = await runGhJson<Parameters<typeof mapPrSummary>[0][]>(
-    ["pr", "list", "--state", state, "--limit", String(limit), "--json", PR_LIST_FIELDS],
+    [
+      "pr",
+      "list",
+      "--state",
+      state,
+      "--limit",
+      String(limit),
+      "--json",
+      PR_LIST_FIELDS,
+    ],
     cwd,
   );
   return raws.map(mapPrSummary);
@@ -258,7 +356,11 @@ export async function getPullRequest(
       reviewDecision: string | null;
       mergeable: string | null;
       files: { path: string; additions: number; deletions: number }[];
-      comments: { author: RawPrAuthor | null; body: string; createdAt: string }[];
+      comments: {
+        author: RawPrAuthor | null;
+        body: string;
+        createdAt: string;
+      }[];
       statusCheckRollup: RawStatusCheck[] | null;
     }
   >(
@@ -303,7 +405,14 @@ export async function createPullRequest(
   input: CreatePullRequestInput,
 ): Promise<{ url: string }> {
   if (!input.title.trim()) throw new Error("Pull request title is required");
-  const args = ["pr", "create", "--title", input.title, "--body", input.body ?? ""];
+  const args = [
+    "pr",
+    "create",
+    "--title",
+    input.title,
+    "--body",
+    input.body ?? "",
+  ];
   if (input.base) {
     assertNotOption(input.base, "base branch");
     args.push("--base", input.base);
@@ -399,7 +508,10 @@ export async function listIssues(
   if (opts.search?.trim()) {
     args.push("--search", opts.search.trim());
   }
-  const raws = await runGhJson<Parameters<typeof mapIssueSummary>[0][]>(args, cwd);
+  const raws = await runGhJson<Parameters<typeof mapIssueSummary>[0][]>(
+    args,
+    cwd,
+  );
   return raws.map(mapIssueSummary);
 }
 
@@ -408,12 +520,19 @@ export interface IssueDetail extends IssueSummary {
   comments: { author: string | null; body: string; createdAt: string }[];
 }
 
-export async function getIssue(cwd: string, number: number): Promise<IssueDetail> {
+export async function getIssue(
+  cwd: string,
+  number: number,
+): Promise<IssueDetail> {
   assertPositiveInt(number, "issue number");
   const raw = await runGhJson<
     Parameters<typeof mapIssueSummary>[0] & {
       body: string;
-      comments: { author: RawPrAuthor | null; body: string; createdAt: string }[];
+      comments: {
+        author: RawPrAuthor | null;
+        body: string;
+        createdAt: string;
+      }[];
     }
   >(
     [
@@ -485,7 +604,15 @@ interface RawStatusCheck {
 function normalizeBucket(state: string): string {
   const s = state.toUpperCase();
   if (["SUCCESS", "NEUTRAL"].includes(s)) return "pass";
-  if (["FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"].includes(s))
+  if (
+    [
+      "FAILURE",
+      "ERROR",
+      "TIMED_OUT",
+      "ACTION_REQUIRED",
+      "STARTUP_FAILURE",
+    ].includes(s)
+  )
     return "fail";
   if (["CANCELLED", "STALE"].includes(s)) return "cancel";
   if (["SKIPPED"].includes(s)) return "skipping";
@@ -525,7 +652,13 @@ export async function getChecks(
   args.push("--json", "name,state,bucket,link,workflow");
   try {
     const raws = await runGhJson<
-      { name: string; state: string; bucket: string; link: string; workflow: string }[]
+      {
+        name: string;
+        state: string;
+        bucket: string;
+        link: string;
+        workflow: string;
+      }[]
     >(args, cwd);
     return raws.map((c) => ({
       name: c.name,
@@ -537,7 +670,10 @@ export async function getChecks(
   } catch (err) {
     // `gh pr checks` exits non-zero when there are no checks or no PR; treat as
     // empty rather than an error so the UI/agent can say "no checks".
-    if (err instanceof GhError && /no checks|no pull requests/i.test(err.stderr)) {
+    if (
+      err instanceof GhError &&
+      /no checks|no pull requests/i.test(err.stderr)
+    ) {
       return [];
     }
     throw err;
@@ -557,6 +693,10 @@ export async function getRunLogs(cwd: string, runId: number): Promise<string> {
   } catch {
     // Fall through to full log.
   }
-  const { stdout } = await runGh(["run", "view", String(runId), "--log"], cwd, 30000);
+  const { stdout } = await runGh(
+    ["run", "view", String(runId), "--log"],
+    cwd,
+    30000,
+  );
   return stdout;
 }

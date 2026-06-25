@@ -10,6 +10,16 @@ export interface GhRepoInfo {
   url: string
 }
 
+export interface GhRepositorySummary {
+  nameWithOwner: string
+  description: string | null
+  isPrivate: boolean
+  url: string
+  updatedAt: string
+}
+
+export type GhRepositoryVisibility = "private" | "public"
+
 export type PrState = "open" | "closed" | "merged" | "all"
 export type IssueState = "open" | "closed" | "all"
 export type MergeMethod = "merge" | "squash" | "rebase"
@@ -82,4 +92,9 @@ export interface CreatePrInput extends RepoContext {
   draft?: boolean
   /** Push the current branch (with upstream) before opening the PR. Default true. */
   push?: boolean
+}
+
+export interface PublishRepositoryInput extends RepoContext {
+  name?: string
+  visibility?: GhRepositoryVisibility
 }

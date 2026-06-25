@@ -7,6 +7,7 @@ import {
   fetchPullRequest,
   fetchPullRequests,
   fetchRepoInfo,
+  fetchRepositories,
 } from "./api"
 import type { IssueState, PrState, RepoContext } from "./types"
 
@@ -20,6 +21,7 @@ function ctxKey(ctx: RepoContext): string {
 export const githubKeys = {
   all: root,
   status: () => [...root, "status"] as const,
+  repositories: () => [...root, "repositories"] as const,
   repo: (ctx: RepoContext) => [...root, "repo", ctxKey(ctx)] as const,
   prs: (ctx: RepoContext, state: PrState) =>
     [...root, "prs", ctxKey(ctx), state] as const,
@@ -45,6 +47,15 @@ export function useGhStatus(ctx: RepoContext = {}) {
 export function useGithubConnected(ctx: RepoContext = {}) {
   const { data } = useGhStatus(ctx)
   return Boolean(data?.installed && data?.authenticated)
+}
+
+export function useRepositories(enabled = true) {
+  return useQuery({
+    queryKey: githubKeys.repositories(),
+    queryFn: ({ signal }) => fetchRepositories(signal),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  })
 }
 
 export function useRepoInfo(ctx: RepoContext, enabled = true) {

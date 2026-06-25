@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { extractToken, isAllowedOrigin, isAuthEnabled, isValidToken } from "./auth.js";
+import {
+  extractToken,
+  isAllowedOrigin,
+  isAuthEnabled,
+  isValidToken,
+} from "./auth.js";
 import health from "./routes/health.js";
 import settings from "./routes/settings.js";
 import workspaces from "./routes/workspaces.js";
@@ -9,6 +14,7 @@ import threads from "./routes/threads.js";
 import sessions from "./routes/sessions.js";
 import git from "./routes/git.js";
 import github from "./routes/github.js";
+import gitlab from "./routes/gitlab.js";
 import auth from "./routes/auth.js";
 import localModels from "./routes/local-models.js";
 import modes from "./routes/modes.js";
@@ -53,6 +59,7 @@ app.route("/", threads);
 app.route("/", sessions);
 app.route("/", git);
 app.route("/", github);
+app.route("/", gitlab);
 app.route("/", auth);
 app.route("/", localModels);
 app.route("/", modes);

@@ -4,6 +4,7 @@ export { CiChecksBadge, summarizeChecks } from "./components/ci-checks-badge"
 export {
   useGhStatus,
   useGithubConnected,
+  useRepositories,
   useRepoInfo,
   usePullRequests,
   usePullRequest,
@@ -14,6 +15,7 @@ export {
 } from "./queries"
 export {
   useCreatePullRequest,
+  usePublishRepository,
   useMergePullRequest,
   useCheckoutPullRequest,
   useCreateIssue,
@@ -22,6 +24,7 @@ export {
 export type {
   GhStatus,
   GhRepoInfo,
+  GhRepositorySummary,
   PullRequestSummary,
   PullRequestDetail,
   IssueSummary,
@@ -32,4 +35,6 @@ export type {
   IssueState,
   MergeMethod,
   CreatePrInput,
+  PublishRepositoryInput,
+  GhRepositoryVisibility,
 } from "./types"

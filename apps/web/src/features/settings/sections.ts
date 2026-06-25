@@ -53,7 +53,19 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     description: "Choose how the application looks and feels.",
     icon: Palette,
     group: "interface",
-    keywords: ["theme", "dark", "light", "system", "color", "mode", "font", "typeface", "monospace", "chat", "code"],
+    keywords: [
+      "theme",
+      "dark",
+      "light",
+      "system",
+      "color",
+      "mode",
+      "font",
+      "typeface",
+      "monospace",
+      "chat",
+      "code",
+    ],
   },
   {
     slug: "chat",
@@ -119,8 +131,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     slug: "local-models",
     label: "Local Models",
     title: "Local Models",
-    description:
-      "Connect local model servers like Ollama, LM Studio, or vLLM.",
+    description: "Connect local model servers like Ollama, LM Studio, or vLLM.",
     icon: Server,
     group: "providers",
     keywords: [
@@ -161,9 +172,9 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   {
     slug: "git",
     label: "Git",
-    title: "Git & GitHub",
+    title: "Git, GitHub & GitLab",
     description:
-      "Connect your GitHub account and customize how AI commit messages are generated.",
+      "Connect Git hosting accounts and customize how AI commit messages are generated.",
     icon: GitBranch,
     group: "customization",
     keywords: [
@@ -177,7 +188,10 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
       "model",
       "github",
       "gh",
+      "gitlab",
+      "glab",
       "pull request",
+      "merge request",
       "pr",
       "issue",
       "ci",
