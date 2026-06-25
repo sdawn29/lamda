@@ -31,6 +31,7 @@ import {
   useSessionStats,
   useSessionStatus,
   messagesQueryKey,
+  chatKeys,
 } from "../queries"
 import { useBranch, useBranches, useSessionWorktrees } from "@/features/git/queries"
 import { parseApiError } from "@/features/git"
@@ -626,9 +627,20 @@ export function ChatView({
   const handleModelChange = useCallback(
     (id: string) => {
       setSelectedModelId(id)
-      updateThreadModel.mutate({ threadId, modelId: id })
+      updateThreadModel.mutate(
+        { threadId, modelId: id },
+        {
+          // The server applies the new model to the live session, which changes
+          // the context window. Refetch context-usage so the popup reflects it.
+          onSuccess: () => {
+            queryClient.invalidateQueries({
+              queryKey: chatKeys.contextUsage(sessionId),
+            })
+          },
+        }
+      )
     },
-    [threadId, updateThreadModel]
+    [threadId, updateThreadModel, queryClient, sessionId]
   )
 
   const handleModeChange = useCallback(

@@ -397,7 +397,23 @@ threads.patch("/thread/:id/model", async (c) => {
     .catch((): { modelId?: string | null } => ({}));
   const thread = getThread(threadId);
   if (!thread) return c.json({ error: "Thread not found" }, 404);
-  updateThreadModel(threadId, body.modelId ?? null);
+  const modelId = body.modelId ?? null;
+  updateThreadModel(threadId, modelId);
+  // Apply the model to the live session handle so context-usage (and the next
+  // prompt) reflects the new model immediately, rather than only after the next
+  // prompt is sent. modelId is a "provider::model" composite key.
+  if (modelId) {
+    const separator = modelId.indexOf("::");
+    if (separator > 0 && separator !== modelId.length - 2) {
+      const session = store.getByThreadId(threadId);
+      if (session) {
+        await session.handle.setModel(
+          modelId.slice(0, separator),
+          modelId.slice(separator + 2),
+        );
+      }
+    }
+  }
   return c.json({ ok: true });
 });
 

@@ -428,7 +428,7 @@ function ConfigureProviderDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[min(60vh,32rem)] min-w-0 overflow-y-auto overflow-x-hidden px-2 [scrollbar-gutter:stable]">
+        <div className="-mr-4 max-h-[min(60vh,32rem)] min-w-0 overflow-y-auto overflow-x-hidden pr-4 pl-2 [scrollbar-gutter:stable]">
           <FieldGroup className="py-1">
             {!isEditing && (
               <Field>
