@@ -102,8 +102,23 @@ function buildRuntimeHandle(
     dispose: () => runtime.session.dispose(),
     events: () => sessionEventGenerator(runtime.session),
     setModel: async (provider, modelId) => {
-      const model = runtime.services.modelRegistry.find(provider, modelId);
-      if (model) await runtime.session.setModel(model);
+      let model = runtime.services.modelRegistry.find(provider, modelId);
+      if (!model) {
+        // The model may have been added to ~/.pi/agent/models.json after this
+        // session's registry was loaded (e.g. a newly configured local
+        // provider). Reload from disk and try once more before giving up —
+        // otherwise selecting the new model silently no-ops and the session
+        // keeps running the previous one.
+        runtime.services.modelRegistry.refresh();
+        model = runtime.services.modelRegistry.find(provider, modelId);
+      }
+      if (!model) {
+        throw new Error(
+          `Model "${modelId}" from provider "${provider}" not found. ` +
+            `Check it is configured (e.g. in ~/.pi/agent/models.json) and that the provider id matches.`,
+        );
+      }
+      await runtime.session.setModel(model);
     },
     setThinkingLevel: (level) => runtime.session.setThinkingLevel(level as any),
     setMode: (mode: Mode) => {

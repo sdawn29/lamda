@@ -8,7 +8,7 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
-    "release": "node scripts/release.mjs",
+    "release": "node scripts/release.mjs && npm run build",
     "release:dry-run": "node scripts/release.mjs --dry-run"
   },
   "devDependencies": {
@@ -26,5 +26,14 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "electron-winstaller@5.4.0": true,
+    "esbuild@0.28.1": true,
+    "esbuild@0.27.7": true,
+    "node-pty@1.1.0": true,
+    "protobufjs@7.6.4": true,
+    "@google/genai@1.52.0": true
   }
 }

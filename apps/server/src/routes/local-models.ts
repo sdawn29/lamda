@@ -121,6 +121,10 @@ async function reachabilityWarning(
   const { baseUrl, apiKey, headers } = config;
   const status = await probeModelsEndpoint(baseUrl, apiKey, headers);
   if (status !== null && status < 400) return undefined;
+  // A 4xx/5xx other than 404 means the server is up and the path exists (e.g.
+  // 401/403 from an API key, 405 from a HEAD-only handler). That's reachable —
+  // only a 404 or no response points at a wrong base URL / missing `/v1`.
+  if (status !== null && status !== 404) return undefined;
 
   if (!baseUrl.endsWith("/v1")) {
     const v1Status = await probeModelsEndpoint(`${baseUrl}/v1`, apiKey, headers);
