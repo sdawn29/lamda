@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./dist/server.cjs",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "node ../../scripts/run-with-compatible-node.mjs ../../node_modules/tsx/dist/cli.mjs src/index.ts",
     "build": "node build.mjs",
     "start": "node dist/server.cjs",
     "check-types": "tsc --noEmit",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.5",
+    "@lamda/cli-env": "*",
     "@lamda/db": "*",
     "@lamda/git": "*",
     "@lamda/github": "*",

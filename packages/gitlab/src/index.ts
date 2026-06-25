@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { basename } from "node:path";
 import { promisify } from "node:util";
+import { createCliEnv } from "@lamda/cli-env";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT = 20000;
@@ -43,7 +44,7 @@ async function runGlab(
       cwd,
       timeout,
       maxBuffer: 1024 * 1024 * 16,
-      env: { ...process.env, NO_PROMPT: "1" },
+      env: createCliEnv({ GLAB_NO_PROMPT: "1" }),
     });
     return { stdout, stderr };
   } catch (err: unknown) {
@@ -71,7 +72,11 @@ async function runGit(
   cwd: string,
   timeout = DEFAULT_TIMEOUT,
 ): Promise<{ stdout: string; stderr: string }> {
-  const { stdout, stderr } = await execFileAsync("git", args, { cwd, timeout });
+  const { stdout, stderr } = await execFileAsync("git", args, {
+    cwd,
+    timeout,
+    env: createCliEnv(),
+  });
   return { stdout, stderr };
 }
 
@@ -83,13 +88,21 @@ export interface GlabStatus {
 
 export async function getGlabStatus(cwd: string): Promise<GlabStatus> {
   try {
-    await execFileAsync("glab", ["--version"], { cwd, timeout: 5000 });
+    await execFileAsync("glab", ["--version"], {
+      cwd,
+      timeout: 5000,
+      env: createCliEnv(),
+    });
   } catch {
     return { installed: false, authenticated: false, login: null };
   }
 
   try {
-    await execFileAsync("glab", ["auth", "status"], { cwd, timeout: 8000 });
+    await execFileAsync("glab", ["auth", "status"], {
+      cwd,
+      timeout: 8000,
+      env: createCliEnv({ GLAB_NO_PROMPT: "1" }),
+    });
   } catch {
     return { installed: true, authenticated: false, login: null };
   }
@@ -99,7 +112,7 @@ export async function getGlabStatus(cwd: string): Promise<GlabStatus> {
     const { stdout } = await execFileAsync(
       "glab",
       ["api", "user", "--jq", ".username"],
-      { cwd, timeout: 8000 },
+      { cwd, timeout: 8000, env: createCliEnv({ GLAB_NO_PROMPT: "1" }) },
     );
     login = stdout.trim() || null;
   } catch {
@@ -115,21 +128,77 @@ export interface GitlabRepoInfo {
   url: string;
 }
 
+export interface GitlabRepositorySummary {
+  nameWithOwner: string;
+  description: string | null;
+  isPrivate: boolean;
+  url: string;
+  cloneUrl: string;
+  updatedAt: string;
+}
+
 export type GitlabRepositoryVisibility = "private" | "public";
+
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function defaultBranchFromRaw(raw: Record<string, unknown>): string | null {
+  const direct = stringField(raw.default_branch ?? raw.defaultBranch);
+  if (direct) return direct;
+
+  const ref = raw.defaultBranchRef;
+  if (typeof ref === "object" && ref !== null && "name" in ref) {
+    return stringField(ref.name) || null;
+  }
+
+  return null;
+}
+
+function repoInfoFromRaw(raw: Record<string, unknown>): GitlabRepoInfo | null {
+  const nameWithOwner = stringField(
+    raw.path_with_namespace ??
+      raw.pathWithNamespace ??
+      raw.name_with_namespace ??
+      raw.nameWithOwner ??
+      "",
+  );
+  const url = stringField(raw.web_url ?? raw.webUrl ?? raw.url);
+  if (!nameWithOwner || !url) return null;
+
+  return {
+    nameWithOwner,
+    defaultBranch: defaultBranchFromRaw(raw),
+    url,
+  };
+}
 
 function parseGitlabRemote(
   url: string,
 ): { nameWithOwner: string; url: string } | null {
   const trimmed = url.trim();
-  const https = trimmed.match(
-    /^https?:\/\/([^/]*gitlab[^/]*)\/(.+?)(?:\.git)?$/i,
-  );
-  const ssh = trimmed.match(/^git@([^:]*gitlab[^:]*):(.+?)(?:\.git)?$/i);
-  const match = https ?? ssh;
-  if (!match) return null;
-  const host = match[1];
-  const path = match[2].replace(/\.git$/, "");
-  return { nameWithOwner: path, url: `https://${host}/${path}` };
+  const scp = trimmed.match(/^git@([^:]+):(.+?)(?:\.git)?$/i);
+  if (scp) {
+    const host = scp[1];
+    if (!host.toLowerCase().includes("gitlab")) return null;
+    const path = scp[2].replace(/^\/+/, "").replace(/\.git$/, "");
+    if (!path) return null;
+    return { nameWithOwner: path, url: `https://${host}/${path}` };
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!["http:", "https:", "ssh:"].includes(parsed.protocol)) return null;
+    if (!parsed.hostname.toLowerCase().includes("gitlab")) return null;
+    const path = parsed.pathname.replace(/^\/+/, "").replace(/\.git$/, "");
+    if (!path) return null;
+    return {
+      nameWithOwner: path,
+      url: `https://${parsed.hostname}${parsed.port ? `:${parsed.port}` : ""}/${path}`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function remoteNames(cwd: string): Promise<string[]> {
@@ -163,6 +232,17 @@ async function currentBranch(cwd: string): Promise<string | null> {
 }
 
 export async function getRepoInfo(cwd: string): Promise<GitlabRepoInfo | null> {
+  try {
+    const raw = await runGlabJson<Record<string, unknown>>(
+      ["repo", "view", "--output", "json"],
+      cwd,
+    );
+    const repo = repoInfoFromRaw(raw);
+    if (repo) return repo;
+  } catch {
+    // Fall back to local remote parsing when glab cannot resolve the repo.
+  }
+
   for (const remote of await remoteNames(cwd)) {
     const url = await remoteUrl(cwd, remote);
     if (!url) continue;
@@ -175,6 +255,66 @@ export async function getRepoInfo(cwd: string): Promise<GitlabRepoInfo | null> {
     };
   }
   return null;
+}
+
+function mapRepository(raw: Record<string, unknown>): GitlabRepositorySummary {
+  const nameWithOwner = String(
+    raw.path_with_namespace ??
+      raw.pathWithNamespace ??
+      raw.name_with_namespace ??
+      raw.name ??
+      "",
+  );
+  const url = String(raw.web_url ?? raw.webUrl ?? "");
+  const cloneUrl = String(
+    raw.ssh_url_to_repo ??
+      raw.sshUrlToRepo ??
+      raw.http_url_to_repo ??
+      raw.httpUrlToRepo ??
+      url,
+  );
+
+  return {
+    nameWithOwner,
+    description:
+      typeof raw.description === "string" && raw.description.trim()
+        ? raw.description
+        : null,
+    isPrivate: String(raw.visibility ?? "").toLowerCase() !== "public",
+    url,
+    cloneUrl,
+    updatedAt: String(
+      raw.last_activity_at ?? raw.updated_at ?? raw.updatedAt ?? "",
+    ),
+  };
+}
+
+export async function listRepositories(
+  cwd: string,
+  opts: { limit?: number } = {},
+): Promise<GitlabRepositorySummary[]> {
+  const limit = opts.limit ?? 1000;
+  assertPositiveInt(limit, "limit");
+  try {
+    const raws = await runGlabJson<Record<string, unknown>[]>(
+      [
+        "repo",
+        "list",
+        "--output",
+        "json",
+        "--member",
+        "--per-page",
+        String(limit),
+      ],
+      cwd,
+      30000,
+    );
+    return raws
+      .map(mapRepository)
+      .filter((repo) => repo.nameWithOwner && repo.cloneUrl);
+  } catch {
+    return [];
+  }
 }
 
 export type MergeRequestState = "opened" | "closed" | "merged" | "all";
@@ -208,6 +348,17 @@ function mapMergeRequest(raw: Record<string, unknown>): MergeRequestSummary {
   };
 }
 
+/**
+ * Map a list state to the matching `glab ... list` flag. Opened is the CLI
+ * default so it needs no flag; `--merged` only applies to merge requests.
+ */
+function stateListFlag(state: string): string | null {
+  if (state === "closed") return "--closed";
+  if (state === "merged") return "--merged";
+  if (state === "all") return "--all";
+  return null;
+}
+
 export async function listMergeRequests(
   cwd: string,
   opts: { state?: MergeRequestState; limit?: number } = {},
@@ -216,9 +367,61 @@ export async function listMergeRequests(
   const limit = opts.limit ?? 30;
   assertPositiveInt(limit, "limit");
   const args = ["mr", "list", "--output", "json", "--per-page", String(limit)];
-  if (state !== "all") args.push("--state", state);
+  const flag = stateListFlag(state);
+  if (flag) args.push(flag);
   const raws = await runGlabJson<Record<string, unknown>[]>(args, cwd);
   return raws.map(mapMergeRequest);
+}
+
+export interface CreateMergeRequestInput {
+  title: string;
+  description?: string;
+  sourceBranch?: string;
+  targetBranch?: string;
+  draft?: boolean;
+  removeSourceBranch?: boolean;
+}
+
+/** Pull the merge request URL out of glab's create output. */
+function extractMergeRequestUrl(stdout: string): string {
+  const matches = stdout.match(/https?:\/\/\S+/g);
+  return matches?.[matches.length - 1]?.trim() ?? "";
+}
+
+export async function createMergeRequest(
+  cwd: string,
+  input: CreateMergeRequestInput,
+): Promise<{ url: string }> {
+  if (!input.title.trim()) {
+    throw new GlabError("Merge request title is required", "");
+  }
+  const args = [
+    "mr",
+    "create",
+    "--title",
+    input.title,
+    "--description",
+    input.description ?? "",
+    // Skip the confirmation prompt and never open an editor; the title and
+    // description are supplied non-interactively above.
+    "--yes",
+    "--no-editor",
+    // Push the source branch so the MR has a remote head to open against.
+    "--push",
+  ];
+  if (input.sourceBranch) {
+    assertNotOption(input.sourceBranch, "source branch");
+    args.push("--source-branch", input.sourceBranch);
+  }
+  if (input.targetBranch) {
+    assertNotOption(input.targetBranch, "target branch");
+    args.push("--target-branch", input.targetBranch);
+  }
+  if (input.draft) args.push("--draft");
+  if (input.removeSourceBranch) args.push("--remove-source-branch");
+
+  const { stdout } = await runGlab(args, cwd, 60000);
+  return { url: extractMergeRequestUrl(stdout) };
 }
 
 export type IssueState = "opened" | "closed" | "all";
@@ -263,7 +466,8 @@ export async function listIssues(
     "--per-page",
     String(limit),
   ];
-  if (state !== "all") args.push("--state", state);
+  const flag = stateListFlag(state);
+  if (flag) args.push(flag);
   const raws = await runGlabJson<Record<string, unknown>[]>(args, cwd);
   return raws.map(mapIssue);
 }
@@ -297,7 +501,10 @@ export async function publishRepository(
   assertNotOption(rawName, "repository name");
 
   const parts = rawName.split("/").filter(Boolean);
-  const projectName = parts.pop() ?? rawName;
+  if (parts.length === 0) {
+    throw new GlabError("Repository name is required", "");
+  }
+  const projectName = parts.pop()!;
   const namespace = parts.length > 0 ? parts.join("/") : null;
   assertNotOption(projectName, "repository name");
 
@@ -313,7 +520,10 @@ export async function publishRepository(
   ];
   if (namespace) {
     const id = await namespaceId(cwd, namespace);
-    if (id) args.push("--field", `namespace_id=${id}`);
+    if (!id) {
+      throw new GlabError(`GitLab namespace "${namespace}" was not found`, "");
+    }
+    args.push("--field", `namespace_id=${id}`);
   }
 
   const project = await runGlabJson<{

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "node scripts/run-with-compatible-node.mjs ./node_modules/turbo/bin/turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
@@ -17,7 +17,7 @@
     "typescript": "6.0.3"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.19.0"
   },
   "packageManager": "npm@11.17.0",
   "workspaces": [

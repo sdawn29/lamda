@@ -37,7 +37,11 @@ import {
 import { Github } from "@lobehub/icons"
 import { useReviewPanel } from "../store"
 import { GithubReviewView, useGithubConnected } from "@/features/github"
-import { GitlabReviewView, useGitlabConnected } from "@/features/gitlab"
+import {
+  GitlabLogo,
+  GitlabReviewView,
+  useGitlabConnected,
+} from "@/features/gitlab"
 import {
   useMainTabs,
   useMainTabsStore,
@@ -826,7 +830,7 @@ export const ReviewPanel = memo(function ReviewPanel({
                     ) : scView === "github" ? (
                       <Github size={12} />
                     ) : scView === "gitlab" ? (
-                      <GitBranch className="h-3 w-3" />
+                      <GitlabLogo className="h-3 w-3" />
                     ) : (
                       <GitCompare className="h-3 w-3" />
                     )}
@@ -891,7 +895,7 @@ export const ReviewPanel = memo(function ReviewPanel({
                     onClick={() => selectScView("gitlab")}
                     className="flex items-center gap-2"
                   >
-                    <GitBranch className="h-3.5 w-3.5" />
+                    <GitlabLogo className="h-3.5 w-3.5" />
                     GitLab
                     {scView === "gitlab" && (
                       <Check className="ml-auto h-3 w-3 text-muted-foreground" />
@@ -997,7 +1001,10 @@ export const ReviewPanel = memo(function ReviewPanel({
               branch={currentBranch?.branch ?? null}
             />
           ) : scView === "gitlab" ? (
-            <GitlabReviewView sessionId={sessionId} />
+            <GitlabReviewView
+              sessionId={sessionId}
+              branch={currentBranch?.branch ?? null}
+            />
           ) : (
             <SourceControlContent
               sessionId={sessionId}

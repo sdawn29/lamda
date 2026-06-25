@@ -13,6 +13,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@lamda/cli-env": "*",
     "vscode-jsonrpc": "^9.0.0",
     "vscode-languageserver-protocol": "^3.18.0"
   },

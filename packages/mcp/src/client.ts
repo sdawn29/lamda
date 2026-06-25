@@ -2,7 +2,7 @@
  * MCP Client for connecting to Model Context Protocol servers
  */
 
-import { execSync } from "child_process";
+import { createCliEnv } from "@lamda/cli-env";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -11,41 +11,6 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { resolveTransportType } from "./types.js";
 import type { McpServerConfig, McpTool, McpToolResult, McpEvent, McpEventHandler } from "./types.js";
-
-// Lazily resolved login-shell PATH so we pick up nvm/volta/fnm/mise/asdf etc.
-let resolvedShellPath: string | undefined;
-
-function getShellPath(): string {
-  if (resolvedShellPath !== undefined) return resolvedShellPath;
-
-  const fallbackPaths = [
-    "/opt/homebrew/bin",
-    "/opt/homebrew/sbin",
-    "/usr/local/bin",
-    "/usr/bin",
-    "/bin",
-    "/usr/sbin",
-    "/sbin",
-  ];
-
-  try {
-    const shell = process.env.SHELL ?? "/bin/zsh";
-    // -l forces a login shell so .zprofile / .bash_profile / etc. are sourced
-    const output = execSync(`${shell} -l -c 'echo $PATH'`, {
-      encoding: "utf8",
-      timeout: 5_000,
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    resolvedShellPath = output || fallbackPaths.join(":");
-  } catch {
-    resolvedShellPath = [
-      ...fallbackPaths,
-      ...(process.env.PATH ? [process.env.PATH] : []),
-    ].join(":");
-  }
-
-  return resolvedShellPath;
-}
 
 /**
  * Build the SDK transport for a server config based on its transport type.
@@ -102,7 +67,7 @@ function createTransport(config: McpServerConfig): Transport {
   return new StdioClientTransport({
     command: config.command,
     args: config.args,
-    env: { ...process.env, ...config.env, PATH: getShellPath() },
+    env: createCliEnv(config.env),
     cwd: config.cwd,
   });
 }

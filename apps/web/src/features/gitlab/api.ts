@@ -1,7 +1,9 @@
 import { apiFetch } from "@/shared/lib/client"
 import type {
+  CreateMergeRequestInput,
   GlabStatus,
   GitlabRepoInfo,
+  GitlabRepositorySummary,
   IssueState,
   IssueSummary,
   MergeRequestState,
@@ -43,6 +45,16 @@ export async function fetchGitlabRepoInfo(
   return res.repo
 }
 
+export async function fetchGitlabRepositories(
+  signal?: AbortSignal
+): Promise<GitlabRepositorySummary[]> {
+  const res = await apiFetch<{ repositories: GitlabRepositorySummary[] }>(
+    "/gitlab/repositories",
+    { signal }
+  )
+  return res.repositories
+}
+
 export async function publishGitlabRepository(
   input: PublishRepositoryInput
 ): Promise<GitlabRepoInfo> {
@@ -65,6 +77,12 @@ export async function fetchMergeRequests(
     { signal }
   )
   return res.mrs
+}
+
+export async function createMergeRequest(
+  input: CreateMergeRequestInput
+): Promise<{ url: string }> {
+  return apiFetch<{ url: string }>("/gitlab/mrs", jsonInit(input))
 }
 
 export async function fetchIssues(

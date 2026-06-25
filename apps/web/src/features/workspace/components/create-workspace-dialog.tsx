@@ -23,6 +23,12 @@ import {
 import { useSelectFolder } from "@/features/electron"
 import { useGhStatus, useRepositories } from "@/features/github"
 import type { GhRepositorySummary, GhStatus } from "@/features/github"
+import {
+  GitlabLogo,
+  useGitlabRepositories,
+  useGlabStatus,
+} from "@/features/gitlab"
+import type { GitlabRepositorySummary, GlabStatus } from "@/features/gitlab"
 
 interface CreateWorkspaceDialogProps {
   open: boolean
@@ -31,7 +37,7 @@ interface CreateWorkspaceDialogProps {
   onCreateRemote: (url: string, folder: string) => Promise<void>
 }
 
-type Step = "options" | "github" | "remote"
+type Step = "options" | "github" | "gitlab" | "remote"
 
 export function CreateWorkspaceDialog({
   open,
@@ -48,11 +54,19 @@ export function CreateWorkspaceDialog({
 
   const selectFolderMutation = useSelectFolder()
   const ghStatus = useGhStatus()
-  const canLoadRepositories =
+  const glabStatus = useGlabStatus()
+  const canLoadGithubRepositories =
     open &&
     step === "github" &&
     Boolean(ghStatus.data?.installed && ghStatus.data?.authenticated)
-  const repositoriesQuery = useRepositories(canLoadRepositories)
+  const canLoadGitlabRepositories =
+    open &&
+    step === "gitlab" &&
+    Boolean(glabStatus.data?.installed && glabStatus.data?.authenticated)
+  const repositoriesQuery = useRepositories(canLoadGithubRepositories)
+  const gitlabRepositoriesQuery = useGitlabRepositories(
+    canLoadGitlabRepositories
+  )
 
   const handleClose = useCallback(() => {
     setStep("options")
@@ -75,7 +89,9 @@ export function CreateWorkspaceDialog({
         handleClose()
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create workspace")
+      setError(
+        err instanceof Error ? err.message : "Failed to create workspace"
+      )
     } finally {
       setIsLoading(false)
     }
@@ -86,6 +102,13 @@ export function CreateWorkspaceDialog({
     setRepoUrl("")
     setSelectedRepoUrl("")
     setStep("github")
+  }, [])
+
+  const handleGitlabOptionClick = useCallback(() => {
+    setError(null)
+    setRepoUrl("")
+    setSelectedRepoUrl("")
+    setStep("gitlab")
   }, [])
 
   const handleRemoteOptionClick = useCallback(() => {
@@ -107,7 +130,9 @@ export function CreateWorkspaceDialog({
         await onCreateRemote(url, cloneFolder.trim())
         handleClose()
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to clone repository")
+        setError(
+          err instanceof Error ? err.message : "Failed to clone repository"
+        )
       } finally {
         setIsLoading(false)
       }
@@ -130,7 +155,9 @@ export function CreateWorkspaceDialog({
         {step === "options" ? (
           <>
             <DialogHeader className="border-b px-4 pt-4 pb-3">
-              <DialogTitle className="text-sm font-semibold">New workspace</DialogTitle>
+              <DialogTitle className="text-sm font-semibold">
+                New workspace
+              </DialogTitle>
               <DialogDescription>
                 Choose how you want to set up your workspace.
               </DialogDescription>
@@ -153,6 +180,13 @@ export function CreateWorkspaceDialog({
                 disabled={isLoading}
               />
               <WorkspaceOption
+                icon={<GitlabLogo className="size-4 text-orange-500" />}
+                title="Open GitLab"
+                description="Choose from your GitLab projects."
+                onClick={handleGitlabOptionClick}
+                disabled={isLoading}
+              />
+              <WorkspaceOption
                 icon={<GitBranch className="size-4" />}
                 title="Clone Git repository"
                 description="Paste any Git origin URL, including SSH remotes."
@@ -166,12 +200,18 @@ export function CreateWorkspaceDialog({
           <form onSubmit={handleCloneSubmit} className="flex flex-col gap-0">
             <DialogHeader className="border-b px-4 pt-4 pb-3">
               <DialogTitle className="text-sm font-semibold">
-                {step === "github" ? "Open GitHub" : "Clone Git repository"}
+                {step === "github"
+                  ? "Open GitHub"
+                  : step === "gitlab"
+                    ? "Open GitLab"
+                    : "Clone Git repository"}
               </DialogTitle>
               <DialogDescription>
                 {step === "github"
                   ? "Select a GitHub project, then choose where to clone it."
-                  : "Enter a Git origin URL, then choose where to clone it."}
+                  : step === "gitlab"
+                    ? "Select a GitLab project, then choose where to clone it."
+                    : "Enter a Git origin URL, then choose where to clone it."}
               </DialogDescription>
             </DialogHeader>
 
@@ -188,6 +228,20 @@ export function CreateWorkspaceDialog({
                   }}
                 />
               )}
+              {step === "gitlab" && (
+                <GitlabRepositoryPicker
+                  status={glabStatus.data}
+                  repositories={gitlabRepositoriesQuery.data ?? []}
+                  isLoading={
+                    glabStatus.isLoading || gitlabRepositoriesQuery.isLoading
+                  }
+                  selectedUrl={selectedRepoUrl}
+                  onSelect={(repo) => {
+                    setSelectedRepoUrl(repo.cloneUrl)
+                    setRepoUrl("")
+                  }}
+                />
+              )}
 
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="repo-url" className="text-xs font-medium">
@@ -200,7 +254,9 @@ export function CreateWorkspaceDialog({
                     selectedRepoUrl ||
                     (step === "github"
                       ? "https://github.com/user/repo.git"
-                      : "git@github.com:user/repo.git")
+                      : step === "gitlab"
+                        ? "git@gitlab.com:group/repo.git"
+                        : "git@github.com:user/repo.git")
                   }
                   value={repoUrl}
                   onChange={(e) => {
@@ -329,6 +385,80 @@ function GithubRepositoryPicker({
                 onSelect={() => onSelect(repo)}
               >
                 <GithubIcon size={14} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{repo.nameWithOwner}</p>
+                  {repo.description && (
+                    <p className="truncate text-muted-foreground">
+                      {repo.description}
+                    </p>
+                  )}
+                </div>
+                <span className="text-2xs text-muted-foreground">
+                  {repo.isPrivate ? "Private" : "Public"}
+                </span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+      {selected && (
+        <p className="text-xs text-muted-foreground">
+          Selected {selected.nameWithOwner}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function GitlabRepositoryPicker({
+  status,
+  repositories,
+  isLoading,
+  selectedUrl,
+  onSelect,
+}: {
+  status: GlabStatus | undefined
+  repositories: GitlabRepositorySummary[]
+  isLoading: boolean
+  selectedUrl: string
+  onSelect: (repo: GitlabRepositorySummary) => void
+}) {
+  const connected = Boolean(status?.installed && status.authenticated)
+  const selected = repositories.find((repo) => repo.cloneUrl === selectedUrl)
+
+  if (status && !connected) {
+    return (
+      <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+        <p className="text-xs font-medium">GitLab is not connected</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {status.installed
+            ? "Sign in with the GitLab CLI to list your projects here."
+            : "Install the GitLab CLI to list your projects here."}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-medium">GitLab projects</label>
+      <Command className="h-56 rounded-lg border bg-background">
+        <CommandInput placeholder="Search GitLab projects…" />
+        <CommandList className="max-h-44">
+          {isLoading ? (
+            <CommandEmpty>Loading GitLab projects…</CommandEmpty>
+          ) : (
+            <CommandEmpty>No GitLab projects found</CommandEmpty>
+          )}
+          <CommandGroup>
+            {repositories.map((repo) => (
+              <CommandItem
+                key={repo.nameWithOwner}
+                value={`${repo.nameWithOwner} ${repo.description ?? ""}`}
+                data-checked={repo.cloneUrl === selectedUrl}
+                onSelect={() => onSelect(repo)}
+              >
+                <GitlabLogo className="size-3.5 text-orange-500" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{repo.nameWithOwner}</p>
                   {repo.description && (

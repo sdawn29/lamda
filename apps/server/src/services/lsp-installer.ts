@@ -9,6 +9,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { createCliEnv } from "@lamda/cli-env";
 import { listLanguageRegistry, isCommandOnPath } from "@lamda/lsp";
 import type { LspInstallSpec, LspServerCommand } from "@lamda/lsp";
 
@@ -102,7 +103,7 @@ export async function startInstall(
 
   const child = spawn(spec.command, spec.args, {
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
+    env: createCliEnv(),
     timeout: INSTALL_TIMEOUT_MS,
   });
 

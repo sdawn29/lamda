@@ -10,6 +10,15 @@ export interface GitlabRepoInfo {
   url: string
 }
 
+export interface GitlabRepositorySummary {
+  nameWithOwner: string
+  description: string | null
+  isPrivate: boolean
+  url: string
+  cloneUrl: string
+  updatedAt: string
+}
+
 export type GitlabRepositoryVisibility = "private" | "public"
 export type MergeRequestState = "opened" | "closed" | "merged" | "all"
 export type IssueState = "opened" | "closed" | "all"
@@ -47,4 +56,13 @@ export interface RepoContext {
 export interface PublishRepositoryInput extends RepoContext {
   name?: string
   visibility?: GitlabRepositoryVisibility
+}
+
+export interface CreateMergeRequestInput extends RepoContext {
+  title: string
+  description?: string
+  sourceBranch?: string
+  targetBranch?: string
+  draft?: boolean
+  removeSourceBranch?: boolean
 }

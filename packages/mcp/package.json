@@ -13,6 +13,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@lamda/cli-env": "*",
     "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {

@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { basename } from "node:path";
 import { promisify } from "node:util";
+import { createCliEnv } from "@lamda/cli-env";
 
 const execFileAsync = promisify(execFile);
 
@@ -67,11 +68,10 @@ async function runGh(
       cwd,
       timeout,
       maxBuffer: 1024 * 1024 * 16,
-      env: {
-        ...process.env,
+      env: createCliEnv({
         GH_PROMPT_DISABLED: "1",
         GH_NO_UPDATE_NOTIFIER: "1",
-      },
+      }),
     });
     return { stdout, stderr };
   } catch (err: unknown) {
@@ -112,7 +112,11 @@ export interface GhStatus {
  */
 export async function getGhStatus(cwd: string): Promise<GhStatus> {
   try {
-    await execFileAsync("gh", ["--version"], { cwd, timeout: 5000 });
+    await execFileAsync("gh", ["--version"], {
+      cwd,
+      timeout: 5000,
+      env: createCliEnv(),
+    });
   } catch {
     return { installed: false, authenticated: false, login: null };
   }
@@ -121,6 +125,10 @@ export async function getGhStatus(cwd: string): Promise<GhStatus> {
     const { stdout } = await execFileAsync("gh", ["auth", "token"], {
       cwd,
       timeout: 5000,
+      env: createCliEnv({
+        GH_PROMPT_DISABLED: "1",
+        GH_NO_UPDATE_NOTIFIER: "1",
+      }),
     });
     if (!stdout.trim()) {
       return { installed: true, authenticated: false, login: null };
@@ -134,7 +142,14 @@ export async function getGhStatus(cwd: string): Promise<GhStatus> {
     const { stdout } = await execFileAsync(
       "gh",
       ["api", "user", "--jq", ".login"],
-      { cwd, timeout: 8000 },
+      {
+        cwd,
+        timeout: 8000,
+        env: createCliEnv({
+          GH_PROMPT_DISABLED: "1",
+          GH_NO_UPDATE_NOTIFIER: "1",
+        }),
+      },
     );
     login = stdout.trim() || null;
   } catch {

@@ -1,5 +1,5 @@
 {
-  "name": "@lamda/gitlab",
+  "name": "@lamda/cli-env",
   "version": "0.36.0",
   "private": true,
   "type": "module",
@@ -11,9 +11,6 @@
   },
   "scripts": {
     "check-types": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@lamda/cli-env": "*"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

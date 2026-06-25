@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Copy,
   ExternalLink,
-  GitBranch,
   RefreshCw,
   RotateCcw,
   Save,
@@ -29,7 +28,7 @@ import { Textarea } from "@/shared/ui/textarea"
 import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
 import { openExternal } from "@/features/electron/api"
 import { useGhStatus, githubKeys } from "@/features/github"
-import { useGlabStatus, gitlabKeys } from "@/features/gitlab"
+import { GitlabLogo, useGlabStatus, gitlabKeys } from "@/features/gitlab"
 
 import { useAppSettings } from "../queries"
 import { useUpdateAppSetting } from "../mutations"
@@ -236,7 +235,7 @@ function GitLabConnectionGroup() {
       <CardHeader className="border-b border-border/60">
         <div className="flex items-start gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground ring-1 ring-border/70">
-            <GitBranch className="size-4" />
+            <GitlabLogo className="size-4" />
           </div>
           <div className="flex min-w-0 flex-col gap-1">
             <CardTitle>GitLab</CardTitle>

@@ -12,6 +12,9 @@
   "scripts": {
     "check-types": "tsc --noEmit"
   },
+  "dependencies": {
+    "@lamda/cli-env": "*"
+  },
   "devDependencies": {
     "@types/node": "^26.0.0",
     "typescript": "~6.0.3"

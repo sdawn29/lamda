@@ -7,6 +7,7 @@
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { createCliEnv } from "@lamda/cli-env";
 import {
   createMessageConnection,
   StreamMessageReader,
@@ -59,7 +60,7 @@ export class LspClient {
 
     this.proc = spawn(opts.command, opts.args, {
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env },
+      env: createCliEnv(),
     });
 
     this.proc.stderr.on("data", (chunk: Buffer) => {

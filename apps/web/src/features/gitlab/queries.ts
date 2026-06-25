@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import {
   fetchGitlabRepoInfo,
+  fetchGitlabRepositories,
   fetchGlabStatus,
   fetchIssues,
   fetchMergeRequests,
@@ -15,7 +16,13 @@ function ctxKey(ctx: RepoContext): string {
 
 export const gitlabKeys = {
   all: root,
-  status: () => [...root, "status"] as const,
+  status: (ctx: RepoContext = {}) => {
+    const key = ctxKey(ctx)
+    return key
+      ? ([...root, "status", key] as const)
+      : ([...root, "status"] as const)
+  },
+  repositories: () => [...root, "repositories"] as const,
   repo: (ctx: RepoContext) => [...root, "repo", ctxKey(ctx)] as const,
   mrs: (ctx: RepoContext, state: MergeRequestState) =>
     [...root, "mrs", ctxKey(ctx), state] as const,
@@ -25,7 +32,7 @@ export const gitlabKeys = {
 
 export function useGlabStatus(ctx: RepoContext = {}) {
   return useQuery({
-    queryKey: gitlabKeys.status(),
+    queryKey: gitlabKeys.status(ctx),
     queryFn: ({ signal }) => fetchGlabStatus(ctx, signal),
     staleTime: 30 * 1000,
   })
@@ -34,6 +41,15 @@ export function useGlabStatus(ctx: RepoContext = {}) {
 export function useGitlabConnected(ctx: RepoContext = {}) {
   const { data } = useGlabStatus(ctx)
   return Boolean(data?.installed && data?.authenticated)
+}
+
+export function useGitlabRepositories(enabled = true) {
+  return useQuery({
+    queryKey: gitlabKeys.repositories(),
+    queryFn: ({ signal }) => fetchGitlabRepositories(signal),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  })
 }
 
 export function useGitlabRepoInfo(ctx: RepoContext, enabled = true) {

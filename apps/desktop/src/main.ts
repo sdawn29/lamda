@@ -17,6 +17,7 @@ import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { createCliEnv } from "@lamda/cli-env";
 import {
   getInstalledEditorApps,
   getOpenWithAppIcon,
@@ -203,8 +204,12 @@ async function spawnServer(): Promise<number> {
   return new Promise((resolve, reject) => {
     const [executable, args] = isDev
       ? ([
-          path.join(DEV_MONOREPO_ROOT, "node_modules/.bin/tsx"),
-          [path.join(__dirname, "../../server/src/index.ts")],
+          "node",
+          [
+            path.join(DEV_MONOREPO_ROOT, "scripts/run-with-compatible-node.mjs"),
+            require.resolve("tsx/cli"),
+            path.join(__dirname, "../../server/src/index.ts"),
+          ],
         ] as const)
       : ([
           process.execPath,
@@ -212,8 +217,7 @@ async function spawnServer(): Promise<number> {
         ] as const);
 
     const child = spawn(executable, args, {
-      env: {
-        ...process.env,
+      env: createCliEnv({
         PORT: "0",
         LAMDA_AUTH_TOKEN: SERVER_AUTH_TOKEN,
         ...(isDev
@@ -226,7 +230,7 @@ async function spawnServer(): Promise<number> {
               // from extraResources. NODE_PATH makes require('<pkg>') find them.
               NODE_PATH: path.join(process.resourcesPath, "server", "addons"),
             }),
-      },
+      }),
       // pipe stdout to read the ready JSON line; pipe stderr so we can forward
       // to our own stderr AND keep a rolling tail for ServerStatus error payload
       stdio: ["ignore", "pipe", "pipe"],

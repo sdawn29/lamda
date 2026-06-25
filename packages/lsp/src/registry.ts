@@ -13,6 +13,7 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { createCliEnv } from "@lamda/cli-env";
 import type { LspInstallSpec, LspServerCommand, LspServerConfig } from "./types.js";
 
 const execFileP = promisify(execFile);
@@ -216,7 +217,9 @@ const isWindows = process.platform === "win32";
 
 async function isOnPath(command: string): Promise<boolean> {
   try {
-    await execFileP(isWindows ? "where" : "which", [command]);
+    await execFileP(isWindows ? "where" : "which", [command], {
+      env: createCliEnv(),
+    });
     return true;
   } catch {
     return false;

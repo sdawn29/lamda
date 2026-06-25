@@ -2,8 +2,7 @@ import { useState } from "react"
 import {
   CircleDot,
   ExternalLink,
-  GitBranch,
-  GitPullRequest,
+  GitMerge,
   Loader2,
   UploadCloud,
 } from "lucide-react"
@@ -38,8 +37,16 @@ import {
 } from "../queries"
 import { usePublishGitlabRepository } from "../mutations"
 import type { GitlabRepositoryVisibility, RepoContext } from "../types"
+import { CreateMrDialog } from "./create-mr-dialog"
+import { GitlabLogo } from "./gitlab-logo"
 
-export function GitlabReviewView({ sessionId }: { sessionId: string }) {
+export function GitlabReviewView({
+  sessionId,
+  branch,
+}: {
+  sessionId: string
+  branch: string | null
+}) {
   const ctx: RepoContext = { id: sessionId }
   const { data: status, isLoading: statusLoading } = useGlabStatus(ctx)
   const connected = Boolean(status?.installed && status?.authenticated)
@@ -47,6 +54,7 @@ export function GitlabReviewView({ sessionId }: { sessionId: string }) {
     ctx,
     connected
   )
+  const [createOpen, setCreateOpen] = useState(false)
   const [publishOpen, setPublishOpen] = useState(false)
 
   if (statusLoading) {
@@ -56,7 +64,7 @@ export function GitlabReviewView({ sessionId }: { sessionId: string }) {
   if (!connected) {
     return (
       <PanelMessage
-        icon={<GitBranch className="size-5" />}
+        icon={<GitlabLogo className="size-5" />}
         message={
           status?.installed
             ? "Sign in to GitLab to manage merge requests and issues."
@@ -75,7 +83,7 @@ export function GitlabReviewView({ sessionId }: { sessionId: string }) {
     return (
       <>
         <PanelMessage
-          icon={<GitBranch className="size-5" />}
+          icon={<GitlabLogo className="size-5" />}
           message="No GitLab repository found for this folder."
           hint="Publish this repository to GitLab to enable merge requests and issues."
         >
@@ -106,14 +114,29 @@ export function GitlabReviewView({ sessionId }: { sessionId: string }) {
           onClick={() => void openExternal(repo.url)}
           title={repo.nameWithOwner}
         >
-          <GitBranch className="size-3.5" />
+          <GitlabLogo className="size-3.5" />
           <span className="truncate">{repo.nameWithOwner}</span>
         </button>
+        <Button
+          size="sm"
+          className="h-6 shrink-0 gap-1.5 px-2 text-xs"
+          onClick={() => setCreateOpen(true)}
+        >
+          <GitMerge className="size-3.5" />
+          Create MR
+        </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <MergeRequestsSection ctx={ctx} />
         <IssuesSection ctx={ctx} />
       </div>
+
+      <CreateMrDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        ctx={ctx}
+        sourceBranch={branch}
+      />
     </div>
   )
 }
@@ -341,7 +364,7 @@ function MergeRequestsSection({ ctx }: { ctx: RepoContext }) {
           key={mr.number}
           onClick={() => void openExternal(mr.url)}
           icon={
-            <GitPullRequest
+            <GitlabLogo
               className={
                 mr.isDraft ? "size-3.5 text-muted-foreground" : "size-3.5"
               }
