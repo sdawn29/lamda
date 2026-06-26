@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.37.0](../../releases/tag/v0.37.0) — 2026-06-26
+
+### Features
+
+* update package configurations and scripts for compatibility
+
 ## [0.36.0](../../releases/tag/v0.36.0) — 2026-06-25
 
 ### Features
