@@ -18,6 +18,7 @@ export type {
   McpDiscoveryConfig,
 } from "./types.js";
 export {
+  MCP_TOOL_PREFIX,
   mcpToolNameToPiToolName,
   mcpToolToPiTool,
 } from "./converter.js";

@@ -6,12 +6,18 @@ import { Type, type TSchema } from "typebox";
 import type { McpTool } from "./types.js";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
+/** Prefix that marks a registered tool as originating from an MCP server. */
+export const MCP_TOOL_PREFIX = "mcp__";
+
 /**
- * Convert an MCP tool name to a pi-compatible tool name
- * E.g., "filesystem/readFile" -> "mcp_filesystem_readFile"
+ * Convert an MCP tool name to a pi-compatible tool name.
+ * E.g., "filesystem/readFile" -> "mcp__filesystem_readFile".
+ *
+ * The `mcp__` prefix namespaces MCP tools away from built-ins (so an MCP tool
+ * named e.g. "read" can't collide) and lets the UI recognise them at a glance.
  */
 export function mcpToolNameToPiToolName(mcpName: string): string {
-  return mcpName.replace(/[^a-zA-Z0-9_]/g, "_");
+  return MCP_TOOL_PREFIX + mcpName.replace(/[^a-zA-Z0-9_]/g, "_");
 }
 
 /**

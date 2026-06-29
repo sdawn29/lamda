@@ -65,6 +65,48 @@ async function removeClient(name: string): Promise<void> {
   }
 }
 
+// ── Background connection (non-blocking startup) ───────────────────────────────
+//
+// Connecting to an MCP server can take seconds (process spawn, npx download,
+// network) and is bounded only by a 30s timeout. Doing it synchronously while
+// building a session's tools would stall app startup behind every server, so
+// instead we connect in the background and inject the server's tools into live
+// sessions via a tools refresh once it's ready.
+
+// Coalesce the post-connect refresh: many servers can finish connecting within a
+// short window (especially during startup), and one refresh picks up all of them.
+let refreshScheduled = false;
+function scheduleSessionToolsRefresh(): void {
+  if (refreshScheduled) return;
+  refreshScheduled = true;
+  setTimeout(() => {
+    refreshScheduled = false;
+    import("./session-service.js")
+      .then((m) => m.refreshAllSessionTools())
+      .catch((e) =>
+        console.warn("[MCP] post-connect session tools refresh failed:", e),
+      );
+  }, 250).unref?.();
+}
+
+/**
+ * Kick off a connection without awaiting it. The client coalesces concurrent
+ * connects, so repeated calls for the same server are cheap. On success we
+ * schedule a session-tools refresh so the agent picks up the new tools.
+ */
+function ensureBackgroundConnect(
+  entry: ClientEntry,
+  config: McpServerConfig,
+): void {
+  if (entry.client.isConnected(config.name)) return;
+  entry.client
+    .connect(config)
+    .then(() => scheduleSessionToolsRefresh())
+    .catch((e) =>
+      console.warn(`[MCP] background connect error for "${config.name}":`, e),
+    );
+}
+
 // ── Settings Management ──────────────────────────────────────────────────────
 
 export function getMcpSettings(): McpSettings {
@@ -305,7 +347,11 @@ export async function getMcpToolsForSession(): Promise<ToolDefinition[]> {
       }
 
       if (!entry.client.isConnected(s.name)) {
-        await entry.client.connect(config);
+        // Don't block session creation (and therefore app startup) on the
+        // server coming up — connect in the background and inject its tools via
+        // a session-tools refresh once it's ready.
+        ensureBackgroundConnect(entry, config);
+        continue;
       }
       const mcpTools = await entry.client.listTools();
 

@@ -19,6 +19,7 @@ import {
   WrenchIcon,
 } from "lucide-react"
 import { FileIcon } from "@/shared/ui/file-icon"
+import { McpIcon } from "@/shared/ui/mcp-icon"
 
 import { cn } from "@/shared/lib/utils"
 import {
@@ -157,6 +158,22 @@ export function fileBasename(filePath: string): string {
   return filePath.split("/").pop() ?? filePath
 }
 
+// ── MCP tool detection ───────────────────────────────────────────────────────
+//
+// MCP tools are registered with an `mcp__` prefix by the converter
+// (packages/mcp/src/converter.ts), so the chat can recognise them by name.
+
+const MCP_TOOL_PREFIX = "mcp__"
+
+export function isMcpTool(toolName: string): boolean {
+  return toolName.startsWith(MCP_TOOL_PREFIX)
+}
+
+/** Display label for a tool — strips the internal `mcp__` namespace prefix. */
+export function toolDisplayName(toolName: string): string {
+  return isMcpTool(toolName) ? toolName.slice(MCP_TOOL_PREFIX.length) : toolName
+}
+
 /** Small leading glyph that identifies the tool kind at a glance. */
 export function ToolGlyph({
   toolName,
@@ -165,6 +182,9 @@ export function ToolGlyph({
   toolName: string
   className?: string
 }) {
+  // MCP tools win first: their server-defined names can contain any substring
+  // (e.g. "search", "edit"), so the prefix check must precede the heuristics.
+  if (isMcpTool(toolName)) return <McpIcon className={className} />
   const name = toolName.toLowerCase()
   const Icon =
     name === "bash" || name.includes("terminal") || name.includes("command")
@@ -698,7 +718,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       ? msg.status === "running"
         ? "Running"
         : "Ran"
-      : msg.toolName
+      : toolDisplayName(msg.toolName)
 
   return (
     <div
