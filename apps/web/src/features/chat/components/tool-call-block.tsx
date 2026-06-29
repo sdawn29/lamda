@@ -1,4 +1,6 @@
 import { lazy, memo, Suspense, useEffect, useRef, useState } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import {
   AlertCircleIcon,
   ArrowRightIcon,
@@ -30,6 +32,7 @@ import {
   DisclosureChevron,
 } from "./disclosure"
 import { LivePre } from "./live-pre"
+import { chatProseClass, markdownComponents } from "./markdown-components"
 import { DiffView, detectLanguage, parseDiffCounts } from "@/features/git"
 import { useSyntaxTheme } from "@/features/themes"
 import { RollingTimerText } from "./working-block"
@@ -143,9 +146,58 @@ function getResultText(msg: ToolMessage): string | null {
       .filter((p) => p.type === "text" && typeof p.text === "string")
       .map((p) => p.text)
       .join("")
-    if (text) return text
+    // A recognised content-array result: return its text, or null when it holds
+    // no text parts (e.g. an image-only screenshot result). Crucially we do NOT
+    // fall through to JSON.stringify here — that would dump a giant base64 blob
+    // for image content. Images are surfaced separately via getResultImages.
+    return text || null
   }
   return JSON.stringify(resultSource, null, 2)
+}
+
+// ── Result images ──────────────────────────────────────────────────────────────
+//
+// Tools (notably MCP tools and screenshot/browser tools) can return image
+// content blocks alongside or instead of text. They arrive in the MCP shape
+// `{ type: "image", data: <base64>, mimeType }` inside the result `content`
+// array (see packages/mcp/src/client.ts formatToolContent). We pull them out so
+// the chat can render the screenshot inline rather than dropping it.
+
+interface ResultImage {
+  dataUrl: string
+  alt: string
+}
+
+function getResultImages(msg: ToolMessage): ResultImage[] {
+  const resultSource = msg.result ?? msg.partialResult
+  if (typeof resultSource !== "object" || resultSource === null) return []
+  const content = (resultSource as Record<string, unknown>).content
+  if (!Array.isArray(content)) return []
+  const images: ResultImage[] = []
+  for (const part of content) {
+    if (
+      typeof part !== "object" ||
+      part === null ||
+      (part as Record<string, unknown>).type !== "image"
+    )
+      continue
+    const p = part as Record<string, unknown>
+    const mimeType = typeof p.mimeType === "string" ? p.mimeType : "image/png"
+    // Flat MCP/pi shape: { data, mimeType }. Also tolerate an Anthropic-style
+    // `{ source: { data, media_type } }` envelope just in case a provider sends
+    // one through.
+    let data = typeof p.data === "string" ? p.data : null
+    let mime = mimeType
+    if (!data && typeof p.source === "object" && p.source !== null) {
+      const src = p.source as Record<string, unknown>
+      if (typeof src.data === "string") data = src.data
+      if (typeof src.media_type === "string") mime = src.media_type
+    }
+    if (!data) continue
+    const dataUrl = data.startsWith("data:") ? data : `data:${mime};base64,${data}`
+    images.push({ dataUrl, alt: `${toolDisplayName(msg.toolName)} screenshot` })
+  }
+  return images
 }
 
 function toRelativePath(p: string, rootPath?: string): string {
@@ -295,6 +347,38 @@ function getReadSkillName(filePath: string | null): string | null {
   const parts = norm.split("/")
   const name = parts[parts.length - 2]
   return name || null
+}
+
+interface SkillFrontmatter {
+  description: string | null
+  tools: string | null
+  body: string
+}
+
+/**
+ * Parse a skill's `SKILL.md` content into its frontmatter description, allowed
+ * tools, and instruction body. Skill loads render these as a structured card
+ * instead of a raw markdown dump, so the reader sees what the skill does and
+ * what it can touch. Falls back to treating the whole text as the body when no
+ * frontmatter is present (e.g. while the read is still streaming).
+ */
+function parseSkillFrontmatter(text: string | null): SkillFrontmatter {
+  if (!text) return { description: null, tools: null, body: "" }
+  // Strip a leading UTF-8 BOM before matching so frontmatter is detected even
+  // when the file was written with one.
+  const stripped = text.replace(/^\uFEFF/, "")
+  const m = stripped.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
+  if (!m) return { description: null, tools: null, body: stripped.trim() }
+  const [, frontmatter, body] = m
+  const field = (key: string): string | null => {
+    const v = frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, "im"))?.[1]?.trim()
+    return v ? v.replace(/^["']|["']$/g, "") : null
+  }
+  return {
+    description: field("description"),
+    tools: field("allowed-tools") ?? field("tools"),
+    body: body.trim(),
+  }
 }
 
 /**
@@ -468,6 +552,77 @@ function ReadView({
           opacity={live ? 0.5 : 0.72}
         />
       </Suspense>
+    </div>
+  )
+}
+
+// ── SkillView ────────────────────────────────────────────────────────────────
+
+/**
+ * Structured view of a loaded skill: its description and allowed tools shown as
+ * labelled fields, with the instruction body rendered as markdown. Replaces the
+ * raw `SKILL.md` dump so the row reads as "this capability was pulled in" rather
+ * than "a file was read".
+ */
+function SkillView({ skill }: { skill: SkillFrontmatter }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {skill.description && (
+        <p className="text-xs leading-relaxed text-foreground/70">
+          {skill.description}
+        </p>
+      )}
+
+      {skill.tools && (
+        <div className="flex items-start gap-1.5">
+          <WrenchIcon className="mt-px h-3 w-3 shrink-0 text-muted-foreground/40" />
+          <span className="min-w-0 font-mono text-2xs leading-relaxed text-muted-foreground/60">
+            {skill.tools}
+          </span>
+        </div>
+      )}
+
+      {skill.body && (
+        <div className="max-h-72 overflow-auto border-t border-border/40 pt-2">
+          <div className={cn(chatProseClass, "text-xs opacity-70")}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={markdownComponents}
+            >
+              {skill.body}
+            </ReactMarkdown>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── ImageView ────────────────────────────────────────────────────────────────
+
+/**
+ * Renders screenshots / images returned in a tool result. Each image is capped
+ * in height inline and opens full-size in a new tab on click, so a browser or
+ * screenshot tool's output is actually visible in the chat instead of dropped.
+ */
+function ImageView({ images }: { images: ResultImage[] }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      {images.map((image, i) => (
+        <a
+          key={i}
+          href={image.dataUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="block w-full cursor-pointer overflow-hidden rounded-md border border-border/50 transition-opacity hover:opacity-90"
+        >
+          <img
+            src={image.dataUrl}
+            alt={image.alt}
+            className="h-auto w-full object-contain"
+          />
+        </a>
+      ))}
     </div>
   )
 }
@@ -676,7 +831,12 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   }
 
   const resultText = getResultText(msg)
+  const resultImages = getResultImages(msg)
   const summary = argsSummary(msg.args, rootPath)
+
+  // Skill loads parse the SKILL.md frontmatter so the row can show the skill's
+  // purpose inline and a structured card on expand, instead of a raw file dump.
+  const skill = skillName ? parseSkillFrontmatter(resultText) : null
 
   const editCounts =
     isEdit && msg.status === "done" && diff !== null
@@ -701,7 +861,10 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     !isEdit &&
     !isRead &&
     !isWrite &&
-    (resultText !== null || msg.status === "running" || msg.status === "error")
+    (resultText !== null ||
+      resultImages.length > 0 ||
+      msg.status === "running" ||
+      msg.status === "error")
 
   const hasBody =
     showEditContent || showReadContent || showWriteContent || showOtherContent
@@ -782,7 +945,15 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             )}
           >
             <ContainerIcon className="h-3 w-3 shrink-0 opacity-60" />
-            <span className="truncate">{skillName}</span>
+            <span className="shrink-0 font-medium text-foreground/55">
+              {skillName}
+            </span>
+            {skill?.description && (
+              <>
+                <span className="shrink-0 opacity-40">·</span>
+                <span className="truncate opacity-80">{skill.description}</span>
+              </>
+            )}
           </span>
         ) : displayFilePath ? (
           <span
@@ -894,24 +1065,35 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                   when there is no content yet for read/other tools */}
             {msg.status === "running" &&
               !isWrite &&
+              resultImages.length === 0 &&
               (isEdit || !resultText) && (
                 <span className="animate-thinking-shimmer bg-linear-to-r from-muted-foreground/30 via-foreground/80 to-muted-foreground/30 bg-size-[200%_100%] bg-clip-text text-transparent">
-                  {isEdit ? "Editing…" : isRead ? "Reading…" : "Running…"}
+                  {isEdit
+                    ? "Editing…"
+                    : skillName
+                      ? "Loading skill…"
+                      : isRead
+                        ? "Reading…"
+                        : "Running…"}
                 </span>
               )}
 
             {/* Running: partial result for read / other tools */}
-            {msg.status === "running" && !isWrite && resultText && (
-              <>
-                {isRead && readFilePath && (
+            {msg.status === "running" && !isWrite && (resultText || resultImages.length > 0) && (
+              <div className="flex flex-col gap-2">
+                {skill && <SkillView skill={skill} />}
+                {!skill && isRead && readFilePath && resultText && (
                   <ReadView
                     text={resultText}
                     filePath={readFilePath}
                     live={true}
                   />
                 )}
-                {!isRead && <LivePre text={resultText} live={true} />}
-              </>
+                {!isRead && resultText && <LivePre text={resultText} live={true} />}
+                {!isRead && resultImages.length > 0 && (
+                  <ImageView images={resultImages} />
+                )}
+              </div>
             )}
 
             {/* Done state */}
@@ -929,7 +1111,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                   />
                 )}
 
-                {isRead && readFilePath && resultText && (
+                {skill && <SkillView skill={skill} />}
+                {!skill && isRead && readFilePath && resultText && (
                   <ReadView
                     text={resultText}
                     filePath={readFilePath}
@@ -939,6 +1122,14 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
                 {!isEdit && !isRead && !isWrite && resultText && (
                   <LivePre text={resultText} live={false} />
+                )}
+
+                {/* Screenshots / images returned by the tool (e.g. browser or
+                    screenshot tools). Shown after any text, with a small gap. */}
+                {!isEdit && !isRead && !isWrite && resultImages.length > 0 && (
+                  <div className={cn(resultText && "mt-2")}>
+                    <ImageView images={resultImages} />
+                  </div>
                 )}
               </>
             )}
