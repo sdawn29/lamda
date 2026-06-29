@@ -1,0 +1,37 @@
+#!/bin/bash
+# codesign retry shim.
+#
+# Apple's secure timestamp server (timestamp.apple.com) intermittently drops
+# requests, producing failures like:
+#   "<file>: A timestamp was expected but was not found."
+# electron-builder signs every nested Mach-O/resource with a fresh --timestamp
+# round-trip and does NOT retry codesign, so a single dropped request aborts the
+# whole multi-minute build. We can't drop --timestamp (notarization requires it),
+# so we wrap codesign and retry only the known-transient timestamp failures with
+# backoff. Everything else passes through unchanged.
+set -uo pipefail
+
+REAL_CODESIGN=/usr/bin/codesign
+MAX_ATTEMPTS=5
+
+attempt=1
+while :; do
+  out=$("$REAL_CODESIGN" "$@" 2>&1)
+  status=$?
+  printf '%s\n' "$out" >&2
+
+  if [ "$status" -eq 0 ]; then
+    exit 0
+  fi
+
+  if [ "$attempt" -lt "$MAX_ATTEMPTS" ] && printf '%s' "$out" | grep -qE \
+    'timestamp was expected but was not found|timestamp service is not available|The network connection was lost|timed out'; then
+    delay=$((attempt * 3))
+    echo "[codesign-shim] transient timestamp failure (attempt $attempt/$MAX_ATTEMPTS); retrying in ${delay}s…" >&2
+    sleep "$delay"
+    attempt=$((attempt + 1))
+    continue
+  fi
+
+  exit "$status"
+done
