@@ -41,7 +41,11 @@
     "directories": {
       "output": "release"
     },
-    "compression": "maximum",
+    "compression": "normal",
+    "electronLanguages": [
+      "en",
+      "en_GB"
+    ],
     "asar": true,
     "files": [
       "dist/**/*"

@@ -143,7 +143,14 @@ await Promise.all([
 
 if (!bundleOnly) {
   const publishFlag = process.env.PUBLISH === "1" ? "always" : "never";
-  const electronBuilderEnv = withoutCertificateFileEnv(process.env);
+  // Prepend our codesign retry shim so electron-builder's per-file signing
+  // survives transient timestamp.apple.com failures instead of aborting the
+  // whole build. See build-tools/codesign-shim/codesign.
+  const codesignShimDir = path.join(__dirname, "build-tools/codesign-shim");
+  const electronBuilderEnv = {
+    ...withoutCertificateFileEnv(process.env),
+    PATH: `${codesignShimDir}${path.delimiter}${process.env.PATH}`,
+  };
   await run(
     path.join(monorepoRoot, "node_modules", ".bin", "electron-builder"),
     ["--mac", "dmg", "zip", "--arm64", "--publish", publishFlag],
