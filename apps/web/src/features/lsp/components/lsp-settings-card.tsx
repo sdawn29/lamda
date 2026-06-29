@@ -4,7 +4,6 @@ import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { FileIcon } from "@/shared/ui/file-icon"
 import { SectionLabel } from "@/shared/ui/section-label"
-import { Skeleton } from "@/shared/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import { cn } from "@/shared/lib/utils"
 import {
@@ -26,11 +25,9 @@ export function LspSettingsCard() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-2.5">
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-16" />
-        <Skeleton className="h-16" />
-        <Skeleton className="h-16" />
+      <div className="flex items-center gap-2 py-8 text-xs text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Loading…
       </div>
     )
   }
@@ -186,38 +183,34 @@ function LanguageRow({
   return (
     <div
       className={cn(
-        "flex flex-col gap-2 rounded-lg border bg-card px-3 py-2.5 transition-colors",
+        "flex flex-col gap-2 rounded-lg bg-card px-3 py-2.5 ring-1 transition-shadow",
         entry.available
-          ? "border-border/60"
-          : "border-border/60 hover:border-border"
+          ? "ring-foreground/10"
+          : "ring-foreground/10 hover:ring-foreground/20"
       )}
     >
       <div className="flex items-center gap-3">
         <div
           className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/40",
+            "flex size-9 shrink-0 items-center justify-center rounded-md bg-muted/60 ring-1 ring-foreground/5",
             !entry.available && "opacity-60 saturate-50"
           )}
         >
           <FileIcon filename={`file.${entry.extensions[0]}`} className="size-5" />
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium capitalize">
-              {label}
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {entry.extensions.map((ext) => (
-                <Badge
-                  key={ext}
-                  variant="outline"
-                  className="font-mono text-3xs text-muted-foreground"
-                >
-                  .{ext}
-                </Badge>
-              ))}
-            </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-sm font-medium capitalize">{label}</span>
+            {entry.extensions.map((ext) => (
+              <Badge
+                key={ext}
+                variant="outline"
+                className="font-mono text-3xs text-muted-foreground"
+              >
+                .{ext}
+              </Badge>
+            ))}
           </div>
 
           <CommandLine

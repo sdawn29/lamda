@@ -43,6 +43,8 @@ interface ModeColorStyle {
   triggerText: string
   /** Accent tint applied to the selected row in the menu. */
   selectedBg: string
+  /** Soft background tint behind the icon tile in the menu. */
+  softBg: string
   /** Translucent background tint applied to the trigger button. */
   triggerBg: string
   /** Focus ring + border classes for the chat input wrapper. */
@@ -57,6 +59,7 @@ const MODE_COLOR_STYLES: Record<string, ModeColorStyle> = {
     iconAccent: "text-sky-600 dark:text-sky-400",
     triggerText: "text-sky-700 dark:text-sky-300",
     selectedBg: "data-[checked=true]:bg-sky-500/10",
+    softBg: "bg-sky-500/10 dark:bg-sky-500/15",
     triggerBg:
       "bg-sky-500/10 hover:bg-sky-500/15 aria-expanded:bg-sky-500/20 dark:bg-sky-500/15 dark:hover:bg-sky-500/20 dark:aria-expanded:bg-sky-500/25",
     focusRing:
@@ -66,6 +69,7 @@ const MODE_COLOR_STYLES: Record<string, ModeColorStyle> = {
     iconAccent: "text-amber-600 dark:text-amber-400",
     triggerText: "text-amber-700 dark:text-amber-300",
     selectedBg: "data-[checked=true]:bg-amber-500/10",
+    softBg: "bg-amber-500/10 dark:bg-amber-500/15",
     triggerBg:
       "bg-amber-500/10 hover:bg-amber-500/15 aria-expanded:bg-amber-500/20 dark:bg-amber-500/15 dark:hover:bg-amber-500/20 dark:aria-expanded:bg-amber-500/25",
     focusRing:
@@ -75,6 +79,7 @@ const MODE_COLOR_STYLES: Record<string, ModeColorStyle> = {
     iconAccent: "text-emerald-600 dark:text-emerald-400",
     triggerText: "text-emerald-700 dark:text-emerald-300",
     selectedBg: "data-[checked=true]:bg-emerald-500/10",
+    softBg: "bg-emerald-500/10 dark:bg-emerald-500/15",
     triggerBg:
       "bg-emerald-500/10 hover:bg-emerald-500/15 aria-expanded:bg-emerald-500/20 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/20 dark:aria-expanded:bg-emerald-500/25",
     focusRing:
@@ -84,6 +89,7 @@ const MODE_COLOR_STYLES: Record<string, ModeColorStyle> = {
     iconAccent: "text-violet-600 dark:text-violet-400",
     triggerText: "text-violet-700 dark:text-violet-300",
     selectedBg: "data-[checked=true]:bg-violet-500/10",
+    softBg: "bg-violet-500/10 dark:bg-violet-500/15",
     triggerBg:
       "bg-violet-500/10 hover:bg-violet-500/15 aria-expanded:bg-violet-500/20 dark:bg-violet-500/15 dark:hover:bg-violet-500/20 dark:aria-expanded:bg-violet-500/25",
     focusRing:
@@ -93,6 +99,7 @@ const MODE_COLOR_STYLES: Record<string, ModeColorStyle> = {
     iconAccent: "text-rose-600 dark:text-rose-400",
     triggerText: "text-rose-700 dark:text-rose-300",
     selectedBg: "data-[checked=true]:bg-rose-500/10",
+    softBg: "bg-rose-500/10 dark:bg-rose-500/15",
     triggerBg:
       "bg-rose-500/10 hover:bg-rose-500/15 aria-expanded:bg-rose-500/20 dark:bg-rose-500/15 dark:hover:bg-rose-500/20 dark:aria-expanded:bg-rose-500/25",
     focusRing:
@@ -102,6 +109,7 @@ const MODE_COLOR_STYLES: Record<string, ModeColorStyle> = {
     iconAccent: "text-blue-600 dark:text-blue-400",
     triggerText: "text-blue-700 dark:text-blue-300",
     selectedBg: "data-[checked=true]:bg-blue-500/10",
+    softBg: "bg-blue-500/10 dark:bg-blue-500/15",
     triggerBg:
       "bg-blue-500/10 hover:bg-blue-500/15 aria-expanded:bg-blue-500/20 dark:bg-blue-500/15 dark:hover:bg-blue-500/20 dark:aria-expanded:bg-blue-500/25",
     focusRing:
@@ -111,6 +119,7 @@ const MODE_COLOR_STYLES: Record<string, ModeColorStyle> = {
     iconAccent: "text-teal-600 dark:text-teal-400",
     triggerText: "text-teal-700 dark:text-teal-300",
     selectedBg: "data-[checked=true]:bg-teal-500/10",
+    softBg: "bg-teal-500/10 dark:bg-teal-500/15",
     triggerBg:
       "bg-teal-500/10 hover:bg-teal-500/15 aria-expanded:bg-teal-500/20 dark:bg-teal-500/15 dark:hover:bg-teal-500/20 dark:aria-expanded:bg-teal-500/25",
     focusRing:
@@ -120,6 +129,7 @@ const MODE_COLOR_STYLES: Record<string, ModeColorStyle> = {
     iconAccent: "text-orange-600 dark:text-orange-400",
     triggerText: "text-orange-700 dark:text-orange-300",
     selectedBg: "data-[checked=true]:bg-orange-500/10",
+    softBg: "bg-orange-500/10 dark:bg-orange-500/15",
     triggerBg:
       "bg-orange-500/10 hover:bg-orange-500/15 aria-expanded:bg-orange-500/20 dark:bg-orange-500/15 dark:hover:bg-orange-500/20 dark:aria-expanded:bg-orange-500/25",
     focusRing:
@@ -129,6 +139,7 @@ const MODE_COLOR_STYLES: Record<string, ModeColorStyle> = {
     iconAccent: "text-fuchsia-600 dark:text-fuchsia-400",
     triggerText: "text-fuchsia-700 dark:text-fuchsia-300",
     selectedBg: "data-[checked=true]:bg-fuchsia-500/10",
+    softBg: "bg-fuchsia-500/10 dark:bg-fuchsia-500/15",
     triggerBg:
       "bg-fuchsia-500/10 hover:bg-fuchsia-500/15 aria-expanded:bg-fuchsia-500/20 dark:bg-fuchsia-500/15 dark:hover:bg-fuchsia-500/20 dark:aria-expanded:bg-fuchsia-500/25",
     focusRing:
@@ -138,6 +149,7 @@ const MODE_COLOR_STYLES: Record<string, ModeColorStyle> = {
     iconAccent: "text-slate-600 dark:text-slate-400",
     triggerText: "text-slate-700 dark:text-slate-300",
     selectedBg: "data-[checked=true]:bg-slate-500/10",
+    softBg: "bg-slate-500/10 dark:bg-slate-500/15",
     triggerBg:
       "bg-slate-500/10 hover:bg-slate-500/15 aria-expanded:bg-slate-500/20 dark:bg-slate-500/15 dark:hover:bg-slate-500/20 dark:aria-expanded:bg-slate-500/25",
     focusRing:
@@ -294,23 +306,21 @@ export function ModeCombobox({
             variant="ghost"
             size="sm"
             aria-expanded={open}
-            className={selectedOption.style.triggerBg}
+            className="gap-1.5 text-foreground/80 transition-colors hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
           >
             <span className={selectedOption.style.iconAccent}>
               <selectedOption.Icon className="size-3.5 shrink-0" />
             </span>
-            <span className={selectedOption.style.triggerText}>
-              {selectedOption.label}
-            </span>
+            <span className="font-medium">{selectedOption.label}</span>
             <ChevronDownIcon
               data-icon="inline-end"
-              className={`opacity-60 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+              className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
             />
           </Button>
         }
       />
       <PopoverContent
-        className="w-44 p-0"
+        className="w-64 p-0"
         side="top"
         align="start"
         sideOffset={6}
@@ -318,26 +328,41 @@ export function ModeCombobox({
         <Command>
           <CommandList>
             <CommandGroup className="p-1">
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.value}
-                  data-checked={option.value === selected}
-                  className={cn(
-                    "items-center gap-2 rounded-md px-2 py-1",
-                    option.style.selectedBg
-                  )}
-                  onSelect={() => {
-                    onSelect(option.value)
-                    setOpen(false)
-                  }}
-                >
-                  <span className={option.style.iconAccent}>
-                    <option.Icon className="size-3.5 shrink-0" />
-                  </span>
-                  <span className="text-xs font-medium">{option.label}</span>
-                </CommandItem>
-              ))}
+              {options.map((option) => {
+                const isSelected = option.value === selected
+                return (
+                  <CommandItem
+                    key={option.value}
+                    value={option.value}
+                    data-checked={isSelected}
+                    className="items-center gap-2.5 rounded-lg px-2 py-1.5"
+                    onSelect={() => {
+                      onSelect(option.value)
+                      setOpen(false)
+                    }}
+                  >
+                    <span
+                      className={cn(
+                        "flex size-7 shrink-0 items-center justify-center rounded-md",
+                        option.style.softBg,
+                        option.style.iconAccent
+                      )}
+                    >
+                      <option.Icon className="size-3.5 shrink-0" />
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-xs font-medium">
+                        {option.label}
+                      </span>
+                      {option.description && (
+                        <span className="line-clamp-2 text-3xs text-muted-foreground">
+                          {option.description}
+                        </span>
+                      )}
+                    </span>
+                  </CommandItem>
+                )
+              })}
             </CommandGroup>
           </CommandList>
         </Command>

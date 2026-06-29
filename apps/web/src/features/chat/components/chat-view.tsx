@@ -331,9 +331,6 @@ export function ChatView({
     sessionId: string
     keys: Set<string>
   } | null>(null)
-  // Always-current ref used by the snapshot update effect below.
-  const visibleMessagesRef = useRef(visibleMessages)
-  visibleMessagesRef.current = visibleMessages
   // Tracks the last-rendered session so we can detect switches during render.
   const [localSessionId, setLocalSessionId] = useState(sessionId)
   const updateTitleMutation = useUpdateThreadTitle()
@@ -352,77 +349,41 @@ export function ChatView({
     setPendingApproval(null)
   }
 
-  // Capture initial keys for this session as soon as messages are available,
-  // also during render so isNewMessage is correct on the very same frame.
-  // Use the per-message key (not per-group) so we can ask "was this message
-  // present at first paint?" for both regular and working-block messages.
-  if (
-    visibleMessages.length > 0 &&
-    (initialSnapshot === null || initialSnapshot.sessionId !== sessionId)
-  ) {
-    setInitialSnapshot({
-      sessionId,
-      keys: new Set(visibleMessages.map((m, i) => getMessageKey(m, i))),
-    })
-  }
-
-  // Per-turn appearance order: assigns a stable sequence number the first
-  // time we see a not-in-snapshot key. Used to derive `animation-delay` so
-  // rows mounted in the same RAF batch cascade instead of overlapping.
-  // Reset when the active session changes; cleared by an effect when a turn
-  // completes so the next turn's first row starts at delay 0.
-  const appearanceOrderRef = useRef<Map<string, number>>(new Map())
-  const appearanceCounterRef = useRef(0)
-  if (localSessionId !== sessionId) {
-    appearanceOrderRef.current = new Map()
-    appearanceCounterRef.current = 0
-  }
-  const getEntryDelayMs = (key: string): number => {
-    const map = appearanceOrderRef.current
-    let seq = map.get(key)
-    if (seq === undefined) {
-      seq = appearanceCounterRef.current++
-      map.set(key, seq)
-    }
-    return entryDelayFor(seq)
-  }
-
-  // Extend the snapshot to include all currently-visible messages whenever the
-  // view is idle. Two windows matter:
-  //   1. Turn end (isLoading true→false): the streaming user/assistant rows
-  //      have only index-based keys at this point, so they get added to the
-  //      snapshot under those keys.
-  //   2. The post-turn refetch (~750 ms later) replaces those streaming rows
-  //      with persisted versions that carry stable DB-id / createdAt-based
-  //      keys. Without re-snapshotting here, the next prompt would see the
-  //      new keys as "not in snapshot" and replay the entry / word-reveal
-  //      animations for messages that have already been shown.
-  // The appearance-order reset still only fires on the true→false transition
-  // so mid-turn deltas don't restart row staggering.
-  const prevIsLoadingRef = useRef(isLoading)
-  useEffect(() => {
-    const wasLoading = prevIsLoadingRef.current
-    prevIsLoadingRef.current = isLoading
-    if (isLoading || visibleMessages.length === 0) return
-    // Bail out (returning the same reference skips the re-render) when every
-    // key is already in the snapshot — idle cache updates land here often.
-    setInitialSnapshot((prev) => {
+  // Maintain the entry-animation snapshot during render (the "adjusting state
+  // while rendering" pattern above), not an effect — this keeps isNewMessage
+  // correct on the same frame and avoids the setState-in-effect cascade React
+  // 19 rejects. The per-message key (not per-group) lets us ask "was this
+  // message present at first paint?" for both regular and working-block rows.
+  //
+  //   • First paint / session switch: snapshot the visible keys so cached
+  //     messages skip entry animations.
+  //   • While idle (not streaming): fold every visible key into the snapshot.
+  //     This covers the post-turn refetch (~750 ms later) that re-keys streamed
+  //     rows to stable DB-id / createdAt keys — without it, the next prompt
+  //     would treat those as new and replay entry / word-reveal animations for
+  //     messages already shown. Skipped mid-turn so streaming rows still
+  //     animate in.
+  //
+  // The key-diff guard makes each branch converge, so the render-phase setState
+  // can't loop.
+  if (visibleMessages.length > 0) {
+    const sessionChanged =
+      initialSnapshot === null || initialSnapshot.sessionId !== sessionId
+    if (sessionChanged) {
+      setInitialSnapshot({
+        sessionId,
+        keys: new Set(visibleMessages.map((m, i) => getMessageKey(m, i))),
+      })
+    } else if (!isLoading) {
       const keys = visibleMessages.map((m, i) => getMessageKey(m, i))
-      if (
-        prev !== null &&
-        prev.sessionId === sessionId &&
-        prev.keys.size === keys.length &&
-        keys.every((k) => prev.keys.has(k))
-      ) {
-        return prev
+      const alreadySnapshotted =
+        initialSnapshot.keys.size === keys.length &&
+        keys.every((k) => initialSnapshot.keys.has(k))
+      if (!alreadySnapshotted) {
+        setInitialSnapshot({ sessionId, keys: new Set(keys) })
       }
-      return { sessionId, keys: new Set(keys) }
-    })
-    if (wasLoading) {
-      appearanceOrderRef.current = new Map()
-      appearanceCounterRef.current = 0
     }
-  }, [isLoading, sessionId, visibleMessages])
+  }
 
   // Focus textbox whenever the active session changes (imperative DOM op — effect is correct here).
   useEffect(() => {
@@ -486,6 +447,57 @@ export function ChatView({
     () => groupChatMessages(visibleMessages),
     [visibleMessages]
   )
+
+  // Per-turn appearance order: maps each not-in-snapshot ("new") key to an
+  // `animation-delay`, derived purely from its position among the new rows so
+  // rows mounted in the same RAF batch cascade instead of overlapping.
+  // Messages are append-only during a turn and the snapshot is stable until the
+  // turn ends, so render order *is* appearance order — no persistent counter is
+  // needed (which also keeps this out of render-phase ref/state mutation that
+  // the React Compiler rejects). Resets fall out naturally: a session switch
+  // builds a fresh snapshot, and a completed turn folds every key into the
+  // snapshot, so the next turn's first new row starts at delay 0.
+  const entryDelayByKey = useMemo(() => {
+    const delays = new Map<string, number>()
+    if (
+      !isLoading ||
+      initialSnapshot === null ||
+      initialSnapshot.sessionId !== sessionId
+    ) {
+      return delays
+    }
+    let seq = 0
+    for (const group of groupedMessages) {
+      if (group.type === "working") {
+        const firstMsg = group.messages[0] as WorkingMessage | undefined
+        const firstKey = firstMsg
+          ? getMessageKey(firstMsg, group.startIndex)
+          : `working-${group.startIndex}`
+        if (!initialSnapshot.keys.has(firstKey)) {
+          delays.set(firstKey, entryDelayFor(seq++))
+        }
+        continue
+      }
+      const { message, index } = group
+      // Empty assistant placeholders render nothing (content === null below),
+      // so they don't animate — skip them to keep the stagger aligned with JSX.
+      if (
+        message.role === "assistant" &&
+        !message.content.trim() &&
+        !message.thinking.trim() &&
+        !message.errorMessage
+      ) {
+        continue
+      }
+      const key = getMessageKey(message, index)
+      if (!initialSnapshot.keys.has(key)) {
+        delays.set(key, entryDelayFor(seq++))
+      }
+    }
+    return delays
+  }, [groupedMessages, isLoading, initialSnapshot, sessionId])
+  const getEntryDelayMs = (key: string): number =>
+    entryDelayByKey.get(key) ?? 0
 
   // All scroll behaviour (stick-to-bottom, restore, persistence, older-history
   // prepend, the scroll-to-bottom affordance) lives in this hook.
