@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.38.0](../../releases/tag/v0.38.0) — 2026-06-29
+
+### Features
+
+* enhance ToolCallBlock to support inline rendering of skill descriptions and result images
+* add codesign retry shim and update package.json compression settings
+* add codesign retry shim to handle transient timestamp failures
+* **mcp:** implement background connection for MCP server and enhance tool detection
+
+### Other Changes
+
+* Refactor LSP settings card loading state, improve language row styling, and enhance Git components
+
 ## [0.37.0](../../releases/tag/v0.37.0) — 2026-06-26
 
 ### Features
