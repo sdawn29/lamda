@@ -100,7 +100,7 @@ export function ApprovalModeCombobox({
             </span>
             <span
               className={cn(
-                "max-w-32 truncate @max-3xl/composer-controls:hidden",
+                "max-w-32 truncate @max-2xl/composer-controls:hidden",
                 selectedOption.iconAccent
               )}
             >

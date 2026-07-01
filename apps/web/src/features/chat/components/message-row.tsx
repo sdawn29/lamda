@@ -75,7 +75,7 @@ interface TimeStampProps {
 
 function TimeStamp({ timestamp }: TimeStampProps) {
   return (
-    <span className="text-xs text-muted-foreground/40 tabular-nums">
+    <span className="text-2xs text-muted-foreground/40 tabular-nums">
       {formatTime(timestamp)}
     </span>
   )
@@ -267,32 +267,41 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
       {isLastInTurn && !hasError && (
         <div
           className={cn(
-            "flex items-center gap-3 transition-opacity duration-200",
+            "flex items-center gap-2 transition-opacity duration-200",
             footerPending && "pointer-events-none opacity-0"
           )}
           aria-hidden={footerPending || undefined}
         >
           {hasMeta && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1 text-2xs text-muted-foreground/60">
               {providerMeta && (
                 <span className="flex shrink-0 items-center">
                   {providerMeta.icon}
                 </span>
               )}
-              {message.model && <span>{message.model}</span>}
+              {message.model && (
+                <span className="text-muted-foreground/80">
+                  {message.model}
+                </span>
+              )}
               {thinkingLabel && (
                 <>
-                  <span className="opacity-40">·</span>
+                  <span className="opacity-30">·</span>
                   <span>{thinkingLabel}</span>
                 </>
               )}
               {message.responseTime != null && (
                 <>
-                  <span className="opacity-40">·</span>
-                  <span>{formatDuration(message.responseTime)}</span>
+                  <span className="opacity-30">·</span>
+                  <span className="tabular-nums">
+                    {formatDuration(message.responseTime)}
+                  </span>
                 </>
               )}
             </div>
+          )}
+          {hasMeta && message.createdAt != null && (
+            <span className="h-3 w-px shrink-0 bg-border/60" />
           )}
           {message.createdAt != null && (
             <TimeStamp timestamp={message.createdAt} />

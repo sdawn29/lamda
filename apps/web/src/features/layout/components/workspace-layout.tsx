@@ -32,7 +32,7 @@ const TerminalPanel = lazy(() =>
 // Smallest the central chat/editor column may shrink to. Both the right
 // sidebar's resize gutter and the window-resize layout clamp against this so
 // the chat panel always stays usable.
-const MIN_CHAT_PANEL_WIDTH = 420
+const MIN_CHAT_PANEL_WIDTH = 500
 
 export function MainContentArea() {
   return (
@@ -472,8 +472,8 @@ export function WorkspaceLayout() {
                         : // Cap at the available space so the sidebar never
                           // overflows the right padding as the window shrinks —
                           // always leaving the chat panel its min width plus the
-                          // 0.5rem resize gutter (MIN_CHAT_PANEL_WIDTH = 420).
-                          "w-(--sidebar-width) max-w-[calc(100%-420px-0.5rem)] flex-none"
+                          // 0.5rem resize gutter (MIN_CHAT_PANEL_WIDTH = 500).
+                          "w-(--sidebar-width) max-w-[calc(100%-500px-0.5rem)] flex-none"
                       : "w-0 flex-none"
                 )}
               >
