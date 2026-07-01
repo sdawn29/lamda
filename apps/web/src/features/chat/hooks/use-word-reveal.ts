@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react"
 
-// Reveal cadence — base interval when caught up. Adaptive: if the reveal
-// falls more than CATCHUP_THRESHOLD words behind the actual content, the
-// interval shrinks and multiple words are revealed per tick so the cursor
-// catches up without losing the typewriter feel. Once the gap closes, it
-// returns to baseline.
+// Reveal cadence — base interval when caught up. Adaptive: as the reveal
+// falls behind the actual content, the interval and step size ramp up
+// smoothly (linear interpolation, not a threshold snap) so speeding up to
+// catch up and easing back to baseline both read as one continuous
+// acceleration rather than a visible gear-change.
 const BASE_INTERVAL_MS = 35
 const FAST_INTERVAL_MS = 12
-const CATCHUP_THRESHOLD = 12
+// Backlog range over which the ramp is interpolated: below RAMP_START the
+// reveal sits at baseline; at/above RAMP_END it's at full catch-up speed.
+const RAMP_START = 4
+const RAMP_END = 40
 // Upper bound on words revealed per tick. Each tick re-renders the markdown
 // tree, so a deep backlog is drained by widening the step (bounded number of
 // renders) instead of queueing thousands of single-word timeouts — a long
@@ -92,11 +95,12 @@ export function useWordReveal(content: string, isNew: boolean): string {
   useEffect(() => {
     if (!animate || revealedWords >= total) return
     const backlog = total - revealedWords
-    const catchingUp = backlog > CATCHUP_THRESHOLD
-    const interval = catchingUp ? FAST_INTERVAL_MS : BASE_INTERVAL_MS
-    const step = catchingUp
-      ? Math.min(MAX_WORDS_PER_TICK, Math.ceil(backlog / CATCHUP_THRESHOLD))
-      : 1
+    const ramp = Math.min(
+      1,
+      Math.max(0, (backlog - RAMP_START) / (RAMP_END - RAMP_START))
+    )
+    const interval = BASE_INTERVAL_MS - ramp * (BASE_INTERVAL_MS - FAST_INTERVAL_MS)
+    const step = 1 + Math.round(ramp * (MAX_WORDS_PER_TICK - 1))
     const id = setTimeout(() => setRevealedWords((c) => c + step), interval)
     return () => clearTimeout(id)
   }, [revealedWords, total, animate])

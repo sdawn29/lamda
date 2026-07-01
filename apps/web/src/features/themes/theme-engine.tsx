@@ -265,6 +265,12 @@ export function ThemeProvider({
 
       root.classList.remove("light", "dark")
       root.classList.add(nextResolvedTheme)
+      // The index.html bootstrap script pins an inline background so the
+      // very first paint is never wrong-themed. Once React has mounted,
+      // hand control back to the CSS variable cascade (`--background`, kept
+      // live by applyColorTheme) so the html background keeps tracking
+      // whichever color theme is active, not just the light/dark mode.
+      root.style.removeProperty("background")
 
       if (restoreTransitions) {
         restoreTransitions()

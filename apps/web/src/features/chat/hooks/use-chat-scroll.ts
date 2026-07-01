@@ -17,6 +17,38 @@ const SHOW_BUTTON_THRESHOLD = 80
 const LOAD_OLDER_THRESHOLD = 600
 // Debounce for persisting scroll position to the query cache / localStorage.
 const SCROLL_SAVE_DEBOUNCE_MS = 150
+// Eased follow (continuous streaming growth / post-turn settle): fraction of
+// the remaining distance closed per frame. Lower = smoother/slower catch-up,
+// higher = snappier. Below FOLLOW_SNAP_PX the eased loop just snaps to the
+// target and stops, so it never spins forever chasing a sub-pixel remainder.
+const FOLLOW_EASE = 0.3
+const FOLLOW_SNAP_PX = 0.5
+
+interface ScrollAnchor {
+  groupKey: string
+  offset: number
+}
+
+/**
+ * Topmost group still (at least partially) below the viewport top, plus its
+ * pixel offset from the viewport top. Used instead of a raw scrollTop for
+ * restoring a scrolled-up position — see the `anchorGroupKey` doc on
+ * `ScrollMeta` for why.
+ */
+function findScrollAnchor(
+  scrollEl: HTMLElement,
+  contentEl: HTMLElement
+): ScrollAnchor | null {
+  const viewportTop = scrollEl.getBoundingClientRect().top
+  const groups = contentEl.querySelectorAll<HTMLElement>("[data-group-key]")
+  for (const g of groups) {
+    const rect = g.getBoundingClientRect()
+    if (rect.bottom > viewportTop) {
+      return { groupKey: g.dataset.groupKey ?? "", offset: rect.top - viewportTop }
+    }
+  }
+  return null
+}
 
 interface UseChatScrollOptions {
   sessionId: string
@@ -30,6 +62,13 @@ interface UseChatScrollOptions {
   hasPreviousPage: boolean
   isFetchingPreviousPage: boolean
   fetchPreviousPage: () => void
+  /**
+   * The trailing group is assistant text actively revealing word-by-word.
+   * Only this kind of growth is eased — every other growth source (a tool
+   * call row landing, a thinking block appearing) snaps instantly so the
+   * trailing dots/rows never visibly glide.
+   */
+  isTextStreaming: boolean
   /** Height of the floating bottom bar; growth re-pins to keep the latest row glued. */
   bottomBarHeight: number
   queryClient: QueryClient
@@ -78,6 +117,7 @@ export function useChatScroll({
   hasPreviousPage,
   isFetchingPreviousPage,
   fetchPreviousPage,
+  isTextStreaming,
   bottomBarHeight,
   queryClient,
   syncEngine,
@@ -126,11 +166,13 @@ export function useChatScroll({
   }, [queryClient, sessionId, syncEngine])
 
   const saveScrollPosition = useCallback(
-    (scrollTop: number) => {
+    (scrollTop: number, anchor: ScrollAnchor | null) => {
       pendingScrollMetaRef.current = {
         scrollTop,
         isPinned: pinnedRef.current,
         visited: true,
+        anchorGroupKey: anchor?.groupKey,
+        anchorOffset: anchor?.offset,
       }
       if (scrollSaveTimeoutRef.current !== null) return
       scrollSaveTimeoutRef.current = setTimeout(() => {
@@ -205,7 +247,13 @@ export function useChatScroll({
       if (scrolledUp) setPinned(false)
       else if (distanceFromBottom <= PIN_BOTTOM_THRESHOLD) setPinned(true)
       setButtonVisible(distanceFromBottom >= SHOW_BUTTON_THRESHOLD)
-      saveScrollPosition(scrollTop)
+
+      // Only needed to restore a scrolled-up position — pinned always restores
+      // to the live bottom, so skip the extra DOM query while streaming.
+      const content = messagesContainerRef.current
+      const anchor =
+        !pinnedRef.current && content ? findScrollAnchor(el, content) : null
+      saveScrollPosition(scrollTop, anchor)
     }
   })
 
@@ -303,8 +351,24 @@ export function useChatScroll({
     }
 
     if (savedMeta?.visited) {
-      el.scrollTop = savedMeta.scrollTop
       setPinned(savedMeta.isPinned)
+      // Pinned always means "the live bottom" — recompute it fresh rather than
+      // replaying the old scrollTop, which lines up with a snapshot of
+      // scrollHeight that may no longer match (see anchorGroupKey doc).
+      const contentEl = messagesContainerRef.current
+      const anchorEl =
+        !savedMeta.isPinned && savedMeta.anchorGroupKey && contentEl
+          ? contentEl.querySelector<HTMLElement>(
+              `[data-group-key="${CSS.escape(savedMeta.anchorGroupKey)}"]`
+            )
+          : null
+      if (anchorEl) {
+        const anchorTop = anchorEl.getBoundingClientRect().top
+        const viewportTop = el.getBoundingClientRect().top
+        el.scrollTop += anchorTop - viewportTop - (savedMeta.anchorOffset ?? 0)
+      } else {
+        el.scrollTop = el.scrollHeight
+      }
     } else {
       el.scrollTop = el.scrollHeight
       const visitedMeta: ScrollMeta = {
@@ -346,24 +410,78 @@ export function useChatScroll({
     if (el.scrollTop < max) el.scrollTop = max
   }, [])
 
+  // Eased counterpart to followBottom, used for continuous streaming growth
+  // and the post-turn settle window (see below) where an instant snap every
+  // tick reads as jittery. Recomputes the target from live scrollHeight each
+  // frame, so it naturally tracks content that keeps growing mid-ease rather
+  // than easing toward a stale target. Self-terminates once within
+  // FOLLOW_SNAP_PX, and bails immediately if the user takes over (pinnedRef
+  // cleared) or the loop is already running (re-entrant calls just let the
+  // existing loop keep going toward the latest target).
+  const followRafRef = useRef<number | null>(null)
+  const smoothFollowBottom = useCallback(() => {
+    if (!pinnedRef.current || followRafRef.current !== null) return
+    const step = () => {
+      const el = scrollContainerRef.current
+      if (!pinnedRef.current || !el) {
+        followRafRef.current = null
+        return
+      }
+      const max = el.scrollHeight - el.clientHeight
+      const delta = max - el.scrollTop
+      if (delta <= FOLLOW_SNAP_PX) {
+        el.scrollTop = max
+        followRafRef.current = null
+        return
+      }
+      el.scrollTop += delta * FOLLOW_EASE
+      followRafRef.current = requestAnimationFrame(step)
+    }
+    followRafRef.current = requestAnimationFrame(step)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (followRafRef.current !== null) {
+        cancelAnimationFrame(followRafRef.current)
+        followRafRef.current = null
+      }
+    },
+    []
+  )
+
   // Coarse triggers: a new group or the loading flag flipping (e.g. the just-sent
-  // message). Layout-phase so the snap lands before paint.
+  // message). Layout-phase so the snap lands before paint — instant, not eased,
+  // to avoid a flash of the old position.
   useLayoutEffect(() => {
     if (groupCount === 0) return
     followBottom()
   }, [isLoading, groupCount, followBottom])
 
-  // Continuous follow as the content box grows (streaming text, word-reveal).
-  // A single ResizeObserver covers every growth source; gated on `pinned` so an
-  // older-history prepend (growth above a scrolled-up viewport) is left to native
-  // scroll anchoring instead.
+  // Read inside the ResizeObserver callback below without recreating it.
+  const isTextStreamingRef = useRef(isTextStreaming)
+  useEffect(() => {
+    isTextStreamingRef.current = isTextStreaming
+  }, [isTextStreaming])
+
+  // Continuous follow as the content box grows. A single ResizeObserver covers
+  // every growth source; gated on `pinned` so an older-history prepend (growth
+  // above a scrolled-up viewport) is left to native scroll anchoring instead.
+  // Word-reveal growth is eased — it fires on every reveal tick, and an instant
+  // jump each time is what made streaming feel jittery. Every other growth
+  // source (a tool call row landing, a thinking block appearing) snaps
+  // instantly instead — those are one-off size jumps, not a continuous
+  // stream, so easing them just reads as the trailing row visibly gliding.
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
-    const ro = new ResizeObserver(() => followBottom())
+    const ro = new ResizeObserver(() => {
+      if (isTextStreamingRef.current) smoothFollowBottom()
+      else followBottom()
+    })
     ro.observe(container)
     return () => ro.disconnect()
-  }, [followBottom])
+  }, [smoothFollowBottom, followBottom])
 
   // When the bottom bar grows/shrinks (multi-line input, todo panel, queued pill)
   // the scroll viewport's height changes — keep the latest row glued to its top.
@@ -387,12 +505,12 @@ export function useChatScroll({
     const start = performance.now()
     const tick = () => {
       if (!pinnedRef.current) return
-      followBottom()
+      smoothFollowBottom()
       if (performance.now() - start < 900) raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [isLoading, followBottom])
+  }, [isLoading, smoothFollowBottom])
 
   return {
     scrollContainerRef,

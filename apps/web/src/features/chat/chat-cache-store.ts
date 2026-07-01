@@ -48,9 +48,20 @@ export interface StoredThreadData {
 }
 
 export interface ScrollMeta {
+  /** Legacy/pinned fallback — only used verbatim when there's no anchor to restore against. */
   scrollTop: number
   isPinned: boolean
   visited: boolean
+  /**
+   * Anchor used to restore a scrolled-up (non-pinned) position: the group key
+   * that sat at `anchorOffset` px from the viewport top when saved. Restoring
+   * by re-locating this element and correcting by the offset is robust to
+   * `content-visibility: auto` size estimates changing between visits, unlike
+   * replaying the raw `scrollTop` (which drifts as the group elements below
+   * an unmeasured position get remeasured with real, not estimated, heights).
+   */
+  anchorGroupKey?: string
+  anchorOffset?: number
 }
 
 function threadKey(sessionId: string): string {

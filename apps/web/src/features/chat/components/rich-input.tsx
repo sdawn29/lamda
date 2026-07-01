@@ -103,7 +103,12 @@ function buildIconifyIcon(iconName: string): SVGSVGElement {
 function buildLucideIcon(Icon: LucideIcon, className?: string): SVGSVGElement {
   const template = document.createElement("template")
   template.innerHTML = renderToStaticMarkup(
-    <Icon aria-hidden size={12} strokeWidth={2} className={cn("shrink-0", className)} />
+    <Icon
+      aria-hidden
+      size={12}
+      strokeWidth={2}
+      className={cn("shrink-0", className)}
+    />
   )
 
   return template.content.firstElementChild as SVGSVGElement
@@ -138,7 +143,8 @@ export function buildSlashCommandChip(cmd: SlashCommand): HTMLSpanElement {
 
   // Skills carry a `skill:` prefix in their name — show the bare name to the
   // user while keeping the full name in the dataset for submission.
-  const displayName = cmd.source === "skill" ? cmd.name.replace(/^skill:/, "") : cmd.name
+  const displayName =
+    cmd.source === "skill" ? cmd.name.replace(/^skill:/, "") : cmd.name
 
   const name = document.createElement("span")
   name.className = "font-mono"
@@ -258,6 +264,8 @@ export const RichInput = React.forwardRef<
     onHistoryPrev: (atStart: boolean) => boolean
     /** ArrowDown pressed outside a dropdown. Returns true if consumed for history. */
     onHistoryNext: () => boolean
+    /** Overrides the default idle `min-h-7` — e.g. a taller hero textbox on the new-thread page. */
+    minHeightClassName?: string
   }
 >(function RichInput(
   {
@@ -276,6 +284,7 @@ export const RichInput = React.forwardRef<
     onPasteFiles,
     onHistoryPrev,
     onHistoryNext,
+    minHeightClassName,
   },
   ref
 ) {
@@ -594,7 +603,10 @@ export const RichInput = React.forwardRef<
       onKeyDown={handleKeyDown}
       onInput={handleInput}
       onPaste={handlePaste}
-      className="rich-input max-h-48 min-h-9 w-full cursor-text overflow-y-auto bg-transparent px-1.5 text-sm leading-relaxed outline-none"
+      className={cn(
+        "rich-input max-h-48 min-h-7 w-full cursor-text overflow-y-auto bg-transparent px-1.5 text-sm leading-relaxed wrap-break-word outline-none",
+        minHeightClassName
+      )}
     />
   )
 })

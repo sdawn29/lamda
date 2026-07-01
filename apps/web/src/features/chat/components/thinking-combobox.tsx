@@ -8,11 +8,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/shared/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/shared/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 
 export type ThinkingLevel = "low" | "medium" | "high" | "xhigh"
 
@@ -55,11 +51,13 @@ export function ThinkingCombobox({
   const [open, setOpen] = React.useState(false)
 
   const levels = React.useMemo(() => {
-    if (!availableLevels || availableLevels.length === 0) return ALL_THINKING_LEVELS
+    if (!availableLevels || availableLevels.length === 0)
+      return ALL_THINKING_LEVELS
     return ALL_THINKING_LEVELS.filter((l) => availableLevels.includes(l.value))
   }, [availableLevels])
 
-  const selectedLevel = levels.find((l) => l.value === selected) ?? levels[levels.length - 1]
+  const selectedLevel =
+    levels.find((l) => l.value === selected) ?? levels[levels.length - 1]
 
   React.useEffect(() => {
     if (selectedLevel && selectedLevel.value !== selected) {
@@ -71,10 +69,18 @@ export function ThinkingCombobox({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         render={
-          <Button variant="ghost" size="sm" aria-expanded={open}>
-            {selectedLevel?.icon}
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={open}
+            title={selectedLevel?.label ?? selected}
+          >
+            <span data-icon="inline-start">{selectedLevel?.icon}</span>
             <span>{selectedLevel?.label ?? selected}</span>
-            <ChevronDownIcon data-icon="inline-end" className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+            <ChevronDownIcon
+              data-icon="inline-end"
+              className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            />
           </Button>
         }
       />

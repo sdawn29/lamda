@@ -415,7 +415,11 @@ export const WorkingBlock = memo(function WorkingBlock({
     return () => clearInterval(id)
   }, [isActive])
 
-  // Auto-collapse + capture duration when work finishes
+  // Auto-collapse + capture duration when work finishes; auto-expand when work
+  // resumes on an already-mounted block. The latter covers a thread switch: the
+  // session's isLoading starts false and only flips true once the status fetch
+  // resolves, so a block for an already-running thread can mount collapsed
+  // (isActive false on the first render) — re-expand once isActive catches up.
   // messages omitted from deps — displayDuration useMemo handles historical fallback
   useEffect(() => {
     const wasActive = prevActiveRef.current
@@ -426,6 +430,8 @@ export const WorkingBlock = memo(function WorkingBlock({
         startTimeRef.current !== null ? Date.now() - startTimeRef.current : null
       if (duration !== null) setFinalDuration(duration)
       setExpanded(false)
+    } else if (!wasActive && isActive) {
+      setExpanded(true)
     }
   }, [isActive])
 

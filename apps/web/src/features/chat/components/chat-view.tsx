@@ -4,7 +4,17 @@ import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import type { AssistantMessage, ErrorAction, UserMessage } from "../types"
 import { WorkingBlock, type WorkingMessage } from "./working-block"
-import { ArrowDownIcon, PlugZapIcon } from "lucide-react"
+import {
+  ArrowDownIcon,
+  PlugZapIcon,
+  MoreHorizontal,
+  Pencil,
+  Pin,
+  PinOff,
+  Copy,
+  Archive,
+  Trash2,
+} from "lucide-react"
 
 import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
@@ -16,16 +26,14 @@ import {
 } from "./chat-composer"
 import { pendingToUploads, pendingToDisplay } from "../lib/attachments"
 import { MessageRow, getMessageKey } from "./message-row"
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogAction,
-} from "@/shared/ui/alert-dialog"
 import { Button } from "@/shared/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu"
 import {
   useSlashCommands,
   useSessionStats,
@@ -33,9 +41,6 @@ import {
   messagesQueryKey,
   chatKeys,
 } from "../queries"
-import { useBranch, useBranches, useSessionWorktrees } from "@/features/git/queries"
-import { parseApiError } from "@/features/git"
-import { useCheckoutBranch } from "@/features/git/mutations"
 import {
   useAbortSession,
   useGenerateTitle,
@@ -54,8 +59,6 @@ import {
   useUpdateThreadModel,
   useUpdateThreadStopped,
   useUpdateThreadTitle,
-  useEnterThreadWorktree,
-  useSwitchThreadToLocal,
 } from "@/features/workspace/mutations"
 import { useWorkspace } from "@/features/workspace"
 import { useChatStream } from "../use-chat-stream"
@@ -65,7 +68,23 @@ import {
   type ChatActions,
 } from "../contexts/chat-actions-context"
 import { formatFileCommentContext } from "../lib/file-context"
-import { useTurns, useLastCommitAt } from "@/features/git"
+import {
+  useTurns,
+  useLastCommitAt,
+  BranchSelector,
+  WorktreeSelector,
+  useThreadBranchControls,
+} from "@/features/git"
+import { useIsMobile } from "@/shared/hooks/use-mobile"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/shared/ui/alert-dialog"
 import { PlanChangesCard } from "./plan-changes-card"
 import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
 import {
@@ -137,10 +156,16 @@ export function ChatView({
   const navigate = useNavigate()
   const syncEngine = getChatSyncEngine()
   const showThinkingSetting = useShowThinkingSetting()
-  const { workspaces } = useWorkspace()
+  const {
+    workspaces,
+    setThreadTitle,
+    deleteThread,
+    archiveThread,
+    pinThread,
+    unpinThread,
+  } = useWorkspace()
   const activeWorkspace = workspaces.find((w) => w.id === workspaceId)
   const activeThread = activeWorkspace?.threads.find((t) => t.id === threadId)
-  const worktreeBranch = activeThread?.worktreeBranch ?? null
   // Files this thread touches live in its worktree when it runs in one, so
   // opened file tabs, file links, and FileChangesCard must resolve against the
   // worktree dir rather than the workspace path.
@@ -152,7 +177,72 @@ export function ChatView({
   const initialSelectedModelId = pendingPreferences?.modelId ?? initialModelId
   const initialThinkingLevel = pendingPreferences?.thinkingLevel
 
-  const [gitError, setGitError] = useState<string | null>(null)
+  // On mobile the title bar hides the thread-name/branch/worktree islands
+  // (no room) — this drives the floating island rendered over the chat view
+  // instead. Mirrors the same 900px breakpoint the title bar uses.
+  const isMobile = useIsMobile(900)
+  const {
+    branch,
+    branches,
+    gitError,
+    clearGitError,
+    handleGitError,
+    handleBranchSelect,
+  } = useThreadBranchControls({
+    threadId,
+    sessionId,
+    worktreeBranch: activeThread?.worktreeBranch ?? null,
+  })
+
+  // Thread rename + options menu for the mobile floating island — mirrors
+  // the title bar's thread-name island (hidden on mobile).
+  const [isRenamingThread, setIsRenamingThread] = useState(false)
+  const [threadRenameValue, setThreadRenameValue] = useState("")
+  const threadRenameInputRef = useRef<HTMLInputElement>(null)
+
+  const startThreadRename = () => {
+    setThreadRenameValue(activeThread?.title ?? "")
+    setIsRenamingThread(true)
+    setTimeout(() => threadRenameInputRef.current?.select(), 0)
+  }
+
+  const commitThreadRename = () => {
+    if (activeWorkspace && activeThread && threadRenameValue.trim()) {
+      setThreadTitle(
+        activeWorkspace.id,
+        activeThread.id,
+        threadRenameValue.trim()
+      )
+    }
+    setIsRenamingThread(false)
+  }
+
+  const handleTogglePinThread = async () => {
+    if (!activeWorkspace || !activeThread) return
+    if (activeThread.isPinned) {
+      await unpinThread(activeWorkspace.id, activeThread.id)
+    } else {
+      await pinThread(activeWorkspace.id, activeThread.id)
+    }
+  }
+
+  const handleArchiveThisThread = async () => {
+    if (!activeWorkspace || !activeThread) return
+    await archiveThread(activeWorkspace.id, activeThread.id)
+    navigate({ to: "/" })
+  }
+
+  const handleDeleteThisThread = async () => {
+    if (!activeWorkspace || !activeThread) return
+    await deleteThread(activeWorkspace.id, activeThread.id)
+    navigate({ to: "/" })
+  }
+
+  const handleCopyThisThreadId = () => {
+    if (!activeThread) return
+    void navigator.clipboard.writeText(activeThread.id)
+  }
+
   // Height of the floating bottom bar (error alert + todo + textbox). The
   // scroll area is padded by this so messages can scroll *behind* the input
   // instead of stopping above it.
@@ -341,7 +431,6 @@ export function ChatView({
   if (localSessionId !== sessionId) {
     const nextPendingPreferences = getPendingThreadPreferences(threadId)
     setLocalSessionId(sessionId)
-    setGitError(null)
     setSelectedModelId(nextPendingPreferences?.modelId ?? initialModelId)
     setSelectedThinkingLevel(nextPendingPreferences?.thinkingLevel)
     setSelectedMode(initialMode)
@@ -402,16 +491,8 @@ export function ChatView({
 
   // ── Queries ───────────────────────────────────────────────────────────────────
   const { data: commandsData } = useSlashCommands(sessionId)
-  const { data: branchData } = useBranch(sessionId)
-  const { data: branchesData } = useBranches(sessionId)
-  const { data: sessionWorktrees } = useSessionWorktrees(sessionId)
-  const branch = branchData?.branch ?? null
-  const branches = branchesData?.branches ?? []
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
-  const checkoutBranchMutation = useCheckoutBranch(sessionId)
-  const enterWorktreeMutation = useEnterThreadWorktree()
-  const switchToLocalMutation = useSwitchThreadToLocal()
   const abortSessionMutation = useAbortSession(sessionId)
   const generateTitleMutation = useGenerateTitle()
   const sendPromptMutation = useSendPrompt(sessionId)
@@ -496,8 +577,19 @@ export function ChatView({
     }
     return delays
   }, [groupedMessages, isLoading, initialSnapshot, sessionId])
-  const getEntryDelayMs = (key: string): number =>
-    entryDelayByKey.get(key) ?? 0
+  const getEntryDelayMs = (key: string): number => entryDelayByKey.get(key) ?? 0
+
+  // Once the reply's text has started streaming in, the growing message is
+  // itself the activity signal — the dots sitting right below it would get
+  // pushed down a line at a time as the text wraps, reading as a jump. Hide
+  // them as soon as content lands; they still cover the "waiting for the
+  // first token" gap (and reappear naturally between turns/tool calls, since
+  // the trailing group resets to non-content there).
+  const lastGroup = groupedMessages[groupedMessages.length - 1]
+  const lastGroupStreamingContent =
+    lastGroup?.type === "regular" &&
+    lastGroup.message.role === "assistant" &&
+    (lastGroup.message as AssistantMessage).content.trim().length > 0
 
   // All scroll behaviour (stick-to-bottom, restore, persistence, older-history
   // prepend, the scroll-to-bottom affordance) lives in this hook.
@@ -517,6 +609,7 @@ export function ChatView({
     hasPreviousPage,
     isFetchingPreviousPage,
     fetchPreviousPage,
+    isTextStreaming: lastGroupStreamingContent,
     bottomBarHeight,
     queryClient,
     syncEngine,
@@ -634,7 +727,11 @@ export function ChatView({
   // not working — hide the shimmering "thinking" phrase so it doesn't claim the
   // agent is busy.
   const showThinkingIndicator =
-    isLoading && !isCompacting && !activeQuestion && !pendingApproval
+    isLoading &&
+    !isCompacting &&
+    !activeQuestion &&
+    !pendingApproval &&
+    !lastGroupStreamingContent
 
   const handleModelChange = useCallback(
     (id: string) => {
@@ -674,57 +771,6 @@ export function ChatView({
       updateThreadApprovalMode.mutate({ threadId, approvalMode })
     },
     [threadId, updateThreadApprovalMode]
-  )
-
-  const handleGitError = useCallback((message: string) => {
-    setGitError(message)
-  }, [])
-
-  const handleBranchSelect = useCallback(
-    async (selectedBranch: string) => {
-      const onError = (err: unknown) => handleGitError(parseApiError(err))
-
-      // A branch checked out in a secondary worktree can't be checked out in
-      // place — open the thread in that worktree's directory instead.
-      const worktree = sessionWorktrees?.find(
-        (w) => w.branch === selectedBranch
-      )
-      if (worktree) {
-        if (worktreeBranch === selectedBranch) return
-        try {
-          if (worktreeBranch) {
-            await switchToLocalMutation.mutateAsync({ threadId, sessionId })
-          }
-          await enterWorktreeMutation.mutateAsync({
-            threadId,
-            sessionId,
-            branch: selectedBranch,
-          })
-        } catch (error) {
-          onError(error)
-        }
-        return
-      }
-
-      try {
-        if (worktreeBranch) {
-          await switchToLocalMutation.mutateAsync({ threadId, sessionId })
-        }
-        await checkoutBranchMutation.mutateAsync(selectedBranch)
-      } catch (error) {
-        onError(error)
-      }
-    },
-    [
-      checkoutBranchMutation,
-      enterWorktreeMutation,
-      switchToLocalMutation,
-      sessionWorktrees,
-      threadId,
-      sessionId,
-      worktreeBranch,
-      handleGitError,
-    ]
   )
 
   const handleStop = useCallback(() => {
@@ -890,7 +936,7 @@ export function ChatView({
       <AlertDialog
         open={gitError !== null}
         onOpenChange={(open) => {
-          if (!open) setGitError(null)
+          if (!open) clearGitError()
         }}
       >
         <AlertDialogContent>
@@ -899,14 +945,129 @@ export function ChatView({
             <AlertDialogDescription>{gitError}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setGitError(null)}>
-              OK
-            </AlertDialogAction>
+            <AlertDialogAction onClick={clearGitError}>OK</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
+        {/* ── Mobile-only floating islands: thread name, branch, working
+            location. The title bar hides these on narrow screens (no room),
+            so they float over the chat view instead. ─────────────────────── */}
+        {isMobile && activeThread && (
+          <div className="absolute inset-x-0 top-2 z-30 flex flex-wrap justify-start gap-1.5 px-2">
+            <div className="flex max-w-full min-w-0 shrink items-center gap-1 overflow-hidden rounded-lg border border-border bg-background/70 px-2 py-1 shadow-sm backdrop-blur-md">
+              {activeWorkspace && (
+                <>
+                  <span className="hidden shrink truncate text-2xs font-medium text-muted-foreground/70 sm:inline">
+                    {activeWorkspace.name}
+                  </span>
+                  <span className="mx-0.5 hidden shrink-0 text-2xs text-muted-foreground/40 select-none sm:inline">
+                    /
+                  </span>
+                </>
+              )}
+              {isRenamingThread ? (
+                <span className="inline-grid min-w-0">
+                  <span
+                    aria-hidden
+                    className="invisible col-start-1 row-start-1 text-sm font-semibold whitespace-pre"
+                  >
+                    {threadRenameValue || " "}
+                  </span>
+                  <input
+                    ref={threadRenameInputRef}
+                    autoFocus
+                    size={1}
+                    value={threadRenameValue}
+                    onChange={(e) => setThreadRenameValue(e.target.value)}
+                    onBlur={commitThreadRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitThreadRename()
+                      if (e.key === "Escape") setIsRenamingThread(false)
+                    }}
+                    className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
+                  />
+                </span>
+              ) : (
+                <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                  {activeThread.title}
+                </span>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="ml-0.5 shrink-0 text-muted-foreground/50"
+                    />
+                  }
+                >
+                  <MoreHorizontal className="size-3.5" />
+                  <span className="sr-only">Thread options</span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={startThreadRename}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Rename
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleTogglePinThread}>
+                    {activeThread.isPinned ? (
+                      <>
+                        <PinOff className="mr-2 h-4 w-4" />
+                        Unpin
+                      </>
+                    ) : (
+                      <>
+                        <Pin className="mr-2 h-4 w-4" />
+                        Pin
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCopyThisThreadId}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Thread ID
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleArchiveThisThread}>
+                    <Archive className="mr-2 h-4 w-4" />
+                    Archive
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={handleDeleteThisThread}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Thread
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <div className="flex shrink-0 items-center rounded-lg border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-md">
+              <BranchSelector
+                branch={branch}
+                branches={branches}
+                onBranchSelect={handleBranchSelect}
+                onGitError={handleGitError}
+                sessionId={sessionId}
+                disabled={!!activeThread.worktreeBranch}
+                disabledReason="This thread runs in a worktree — its branch is managed by the worktree selector"
+              />
+            </div>
+            <div className="flex shrink-0 items-center rounded-lg border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-md">
+              <WorktreeSelector
+                threadId={threadId}
+                sessionId={sessionId}
+                threadTitle={activeThread.title}
+                branches={branches}
+                currentBranch={branch}
+                worktreeBranch={activeThread.worktreeBranch}
+                onError={handleGitError}
+              />
+            </div>
+          </div>
+        )}
         {noProvider && (
           <div className="flex shrink-0 items-center gap-3 border-b border-amber-500/20 bg-amber-500/5 px-4 py-2.5">
             <PlugZapIcon className="h-4 w-4 shrink-0 text-amber-500" />
@@ -1106,7 +1267,7 @@ export function ChatView({
               ) : pendingApproval ? (
                 <div
                   aria-live="polite"
-                  className="flex animate-in items-center gap-2 py-0.5 text-sm font-medium text-amber-600 duration-200 fade-in-0 dark:text-amber-400"
+                  className="flex animate-in items-center gap-2 py-0.5 text-xs font-medium text-amber-600 duration-200 fade-in-0 dark:text-amber-400"
                 >
                   <span className="relative flex size-1.5">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500/60" />
@@ -1143,18 +1304,18 @@ export function ChatView({
           </div>
         )}
 
-        {/* Gradient fade at the bottom of the message list — anchored just above
-            the textbox so messages fade into the background as they approach the
-            input. pointer-events-none so it never blocks scrolling/clicks. */}
-        <div
-          style={{ bottom: bottomBarHeight }}
-          className="pointer-events-none absolute inset-x-0 z-10 h-8 bg-linear-to-t from-background to-transparent"
-        />
-
         {/* Bottom bar — sits directly below the scrolling message list in normal
             flow, so the chat view ends just above the input instead of scrolling
             behind it. */}
-        <div ref={bottomBarRef} className="shrink-0 bg-background">
+        <div ref={bottomBarRef} className="relative shrink-0 bg-background">
+          {/* Gradient fade at the bottom of the message list — `bottom-full` pins
+              it flush to this bar's own top edge via pure CSS, so it always
+              tracks the bar's real height (error alert / todo panel / queued
+              pill all resize it) with no JS measurement lag that could leave a
+              flat gap between the fade and whatever the bar is showing.
+              pointer-events-none so it never blocks scrolling/clicks. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-full z-10 h-8 bg-linear-to-t from-background to-transparent" />
+
           <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
 
           <div className="mx-auto w-full max-w-4xl px-3 pb-2 empty:hidden">
@@ -1198,15 +1359,8 @@ export function ChatView({
                 onStop={handleStop}
                 isLoading={isLoading}
                 isAborting={abortSessionMutation.isPending}
-                branch={branch}
-                branches={branches}
-                onBranchSelect={handleBranchSelect}
-                onBranchError={handleGitError}
                 sessionId={sessionId}
                 workspaceId={workspaceId}
-                threadId={threadId}
-                threadTitle={activeThread?.title}
-                worktreeBranch={worktreeBranch}
                 selectedModelId={selectedModelId}
                 onModelChange={handleModelChange}
                 selectedThinkingLevel={selectedThinkingLevel}

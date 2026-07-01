@@ -187,19 +187,18 @@ export function ToolApprovalBlock({
         </div>
       )}
 
-      {/* Scope explainer */}
-      <p className="text-3xs leading-snug text-muted-foreground">
-        <span className="font-medium text-foreground">Always allow</span> /{" "}
-        <span className="font-medium text-foreground">Don&apos;t allow</span>{" "}
-        remember{" "}
-        <span className="rounded bg-muted px-1 py-px font-mono text-foreground">
+      {/* Scope explainer — a single truncated line so a long command/scope
+          never blows up the card's height; the full value is still
+          available via the native title tooltip and each button's own. */}
+      <div className="flex min-w-0 items-center gap-1.5 text-3xs text-muted-foreground">
+        <span className="shrink-0">Always/Don&apos;t allow remembers</span>
+        <code
+          className="min-w-0 truncate rounded bg-muted px-1 py-px font-mono text-foreground"
+          title={remembers}
+        >
           {remembers}
-        </span>{" "}
-        for this workspace;{" "}
-        <span className="font-medium text-foreground">Allow once</span> /{" "}
-        <span className="font-medium text-foreground">Reject</span> apply only
-        to this run.
-      </p>
+        </code>
+      </div>
 
       {/* Actions */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">

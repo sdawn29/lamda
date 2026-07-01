@@ -39,6 +39,20 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { useWorkspace } from "@/features/workspace"
 import { useTerminalForWorkspace } from "@/features/terminal"
+import {
+  BranchSelector,
+  WorktreeSelector,
+  useThreadBranchControls,
+} from "@/features/git"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/shared/ui/alert-dialog"
 import { useSkillsSearchStore, useSkillDetails } from "@/features/skills"
 import { useAutomationsUiStore } from "@/features/automations"
 import { useRightSidebar } from "../store/right-sidebar"
@@ -233,6 +247,21 @@ export function TitleBar() {
     actionWorkspace?.path ??
     fileWorkspace?.path
 
+  // Branch selector + "working location" (worktree) controls for the active
+  // thread — rendered as an island beside the thread name below.
+  const {
+    branch,
+    branches,
+    gitError,
+    clearGitError,
+    handleGitError,
+    handleBranchSelect,
+  } = useThreadBranchControls({
+    threadId: urlActiveThread?.id,
+    sessionId: urlActiveThread?.sessionId ?? undefined,
+    worktreeBranch: urlActiveThread?.worktreeBranch,
+  })
+
   const {
     isOpen: terminalOpen,
     toggle: toggleTerminal,
@@ -364,380 +393,438 @@ export function TitleBar() {
     "flex h-full shrink-0 items-center rounded-lg border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-md"
 
   return (
-    <div
-      className="fixed inset-x-2 top-2 z-50 flex h-8 items-center gap-2"
-      style={drag}
-    >
-      {/* ── Traffic lights island (native macOS controls sit on top) ─────── */}
-      {isMac && !isFullscreen && (
-        <div className={cn(island, "w-[4.75rem]")} aria-hidden />
-      )}
+    <>
+      <AlertDialog
+        open={gitError !== null}
+        onOpenChange={(open) => {
+          if (!open) clearGitError()
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Git Error</AlertDialogTitle>
+            <AlertDialogDescription>{gitError}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={clearGitError}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {/* ── Left sidebar toggle ──────────────────────────────────────────── */}
-      <div className={island} style={noDrag}>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <SidebarTrigger className="size-7 text-muted-foreground/70 hover:text-foreground" />
-            }
-          />
-          <TooltipContent>
-            Toggle sidebar{" "}
-            <ShortcutKbd binding={sidebarBinding} className="ml-1" />
-          </TooltipContent>
-        </Tooltip>
-      </div>
-
-      {/* ── Navigation: back / forward ───────────────────────────────────── */}
-      <div className={cn(island, "gap-0.5")} style={noDrag}>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => router.history.back()}
-                disabled={!canGoBack}
-                className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
-              >
-                <ChevronLeft className="size-4" />
-                <span className="sr-only">Go back</span>
-              </Button>
-            }
-          />
-          <TooltipContent>
-            Go back <ShortcutKbd binding={backBinding} className="ml-1" />
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => router.history.forward()}
-                disabled={!canGoForward}
-                className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
-              >
-                <ChevronRight className="size-4" />
-                <span className="sr-only">Go forward</span>
-              </Button>
-            }
-          />
-          <TooltipContent>
-            Go forward <ShortcutKbd binding={forwardBinding} className="ml-1" />
-          </TooltipContent>
-        </Tooltip>
-      </div>
-
-      {/* ── New thread + search (surfaced when left sidebar is hidden) ────── */}
-      {(!sidebarOpen || isMobile) && (
-        <div
-          className={cn(
-            island,
-            "origin-left animate-in gap-0.5 duration-200 fade-in-0 zoom-in-90 slide-in-from-left-2"
-          )}
-          style={noDrag}
-        >
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={handleNewThread}
-                  className="size-7 text-muted-foreground/70 hover:text-foreground"
-                >
-                  <MessageSquarePlus className="size-4" />
-                  <span className="sr-only">New thread</span>
-                </Button>
-              }
-            />
-            <TooltipContent>
-              New thread{" "}
-              <ShortcutKbd binding={newThreadBinding} className="ml-1" />
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={openPalette}
-                  className="size-7 text-muted-foreground/70 hover:text-foreground"
-                >
-                  <Search className="size-4" />
-                  <span className="sr-only">Search</span>
-                </Button>
-              }
-            />
-            <TooltipContent>
-              Search{" "}
-              <ShortcutKbd binding={openPaletteBinding} className="ml-1" />
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      )}
-
-      {/* ── Automations page island: heading + new-automation action ──────── */}
-      {isAutomations && (
-        <div className={cn(island, "shrink-0 gap-1.5 px-2.5")} style={noDrag}>
-          <Clock className="size-3.5 text-muted-foreground/70" />
-          <span className="text-sm font-semibold text-foreground">
-            Automations
-          </span>
-          <Button
-            size="sm"
-            className="ml-1 h-6 gap-1 px-2 text-xs"
-            onClick={openNewAutomation}
-            disabled={workspaces.length === 0}
-          >
-            <Plus className="size-3.5" />
-            New
-          </Button>
-        </div>
-      )}
-
-      {/* ── Skills page islands: heading + registry search ────────────────── */}
-      {isSkills && (
-        <>
-          <div className={cn(island, "shrink-0 gap-1.5 px-2.5")} style={noDrag}>
-            <Container className="size-3.5 text-muted-foreground/70" />
-            <span className="text-sm font-semibold text-foreground">
-              Skills
-            </span>
-          </div>
-          <div
-            className={cn(island, "w-64 shrink-0 gap-1.5 px-2.5")}
-            style={noDrag}
-          >
-            <Search className="size-3.5 shrink-0 text-muted-foreground/60" />
-            <input
-              value={skillsQuery}
-              onChange={(e) => setSkillsQuery(e.target.value)}
-              placeholder="Search skills.sh"
-              style={noDrag}
-              className="w-full min-w-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground/50"
-            />
-          </div>
-        </>
-      )}
-
-      {/* ── Skill detail page island: breadcrumb (back nav lives in the
-          navigation island) ────────────────────────────────────────────── */}
-      {isSkillDetail && (
-        <div
-          className={cn(island, "min-w-0 shrink gap-1.5 px-2.5")}
-          style={noDrag}
-        >
-          <Container className="size-3.5 shrink-0 text-muted-foreground/70" />
-          <span className="shrink-0 text-sm font-semibold text-muted-foreground/70">
-            Skills
-          </span>
-          {skillDetails && (
-            <>
-              <span className="text-muted-foreground/40 select-none">/</span>
-              <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-                {skillDetails.name}
-              </span>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── Thread name + options island (truncates, shrinks before filler) ─ */}
-      {urlActiveThread && (
-        <div
-          className={cn(island, "min-w-0 shrink gap-1 overflow-hidden px-1.5")}
-          style={noDrag}
-        >
-          {urlActiveWorkspace && (
-            <>
-              <span className="hidden shrink truncate text-2xs font-medium text-muted-foreground/70 sm:inline">
-                {urlActiveWorkspace.name}
-              </span>
-              <span className="mx-0.5 hidden shrink-0 text-2xs text-muted-foreground/40 select-none sm:inline">
-                /
-              </span>
-            </>
-          )}
-          {isRenaming ? (
-            <span className="inline-grid min-w-0">
-              <span
-                aria-hidden
-                className="invisible col-start-1 row-start-1 text-sm font-semibold whitespace-pre"
-              >
-                {renameValue || " "}
-              </span>
-              <input
-                ref={renameInputRef}
-                autoFocus
-                size={1}
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={commitRename}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitRename()
-                  if (e.key === "Escape") setIsRenaming(false)
-                }}
-                style={noDrag}
-                className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
-              />
-            </span>
-          ) : (
-            <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-              {urlActiveThread.title}
-            </span>
-          )}
-          <Tooltip>
-            <DropdownMenu>
-              <TooltipTrigger
-                render={
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        style={noDrag}
-                        className="ml-0.5 shrink-0 text-muted-foreground/50"
-                      />
-                    }
-                  >
-                    <MoreHorizontal className="size-3.5" />
-                    <span className="sr-only">Thread options</span>
-                  </DropdownMenuTrigger>
-                }
-              />
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={startRename}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Rename
-                  <ShortcutKbd
-                    binding={renameBinding}
-                    className="ml-auto pl-2"
-                  />
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleTogglePin}>
-                  {urlActiveThread.isPinned ? (
-                    <>
-                      <PinOff className="mr-2 h-4 w-4" />
-                      Unpin
-                    </>
-                  ) : (
-                    <>
-                      <Pin className="mr-2 h-4 w-4" />
-                      Pin
-                    </>
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleCopyThreadId}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Thread ID
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleArchiveThread}>
-                  <Archive className="mr-2 h-4 w-4" />
-                  Archive
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={handleDeleteThread}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Thread
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <TooltipContent>Thread options</TooltipContent>
-          </Tooltip>
-        </div>
-      )}
-
-      {/* Flexible filler — draggable gap separating left and right islands. */}
-      <div className="h-full min-w-4 flex-1" />
-
-      {/* ── Update notice (only when an update is pending) ───────────────── */}
-      {updateStatus &&
-        updateStatus.phase !== "idle" &&
-        updateStatus.phase !== "checking" && (
-          <div className={island} style={noDrag}>
-            <UpdateButton status={updateStatus} />
-          </div>
+      <div
+        className="fixed inset-x-2 top-2 z-50 flex h-8 items-center gap-2"
+        style={drag}
+      >
+        {/* ── Traffic lights island (native macOS controls sit on top) ─────── */}
+        {isMac && !isFullscreen && (
+          <div className={cn(island, "w-[4.75rem]")} aria-hidden />
         )}
 
-      {/* Task, open-with, terminal and right-sidebar islands are workspace/
-          thread-scoped, so they're hidden on the (global) automations and
-          skills pages. */}
-      {!isAutomations && !isSkills && !isSkillDetail && (
-        <>
-          {/* ── Task dropdown ──────────────────────────────────────────────── */}
-          <div className={island} style={noDrag}>
-            <TasksDropdown
-              workspaceId={actionWorkspace?.id ?? ""}
-              onRunTask={runTerminalCommand}
-              isMobile={isMobile}
+        {/* ── Left sidebar toggle ──────────────────────────────────────────── */}
+        <div className={island} style={noDrag}>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <SidebarTrigger className="size-7 text-muted-foreground/70 hover:text-foreground" />
+              }
             />
-          </div>
+            <TooltipContent>
+              Toggle sidebar{" "}
+              <ShortcutKbd binding={sidebarBinding} className="ml-1" />
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
-          {/* ── Open in workspace ──────────────────────────────────────────── */}
-          <div className={island} style={noDrag}>
-            <OpenWithButton
-              workspaceId={actionWorkspace?.id}
-              workspacePath={actionWorkspace?.path}
-              openWithAppId={actionWorkspace?.openWithAppId}
-              isMobile={isMobile}
+        {/* ── Navigation: back / forward ───────────────────────────────────── */}
+        <div className={cn(island, "gap-0.5")} style={noDrag}>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => router.history.back()}
+                  disabled={!canGoBack}
+                  className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
+                >
+                  <ChevronLeft className="size-4" />
+                  <span className="sr-only">Go back</span>
+                </Button>
+              }
             />
-          </div>
+            <TooltipContent>
+              Go back <ShortcutKbd binding={backBinding} className="ml-1" />
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => router.history.forward()}
+                  disabled={!canGoForward}
+                  className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
+                >
+                  <ChevronRight className="size-4" />
+                  <span className="sr-only">Go forward</span>
+                </Button>
+              }
+            />
+            <TooltipContent>
+              Go forward{" "}
+              <ShortcutKbd binding={forwardBinding} className="ml-1" />
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
-          {/* ── Terminal ───────────────────────────────────────────────────── */}
-          <div className={island} style={noDrag}>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Toggle
-                    pressed={terminalOpen}
-                    onPressedChange={() => toggleTerminal()}
-                    disabled={!effectiveWorkspacePath}
-                    className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-muted aria-pressed:text-foreground"
-                  >
-                    <TerminalSquare className="size-4" />
-                    <span className="sr-only">Toggle terminal</span>
-                  </Toggle>
-                }
-              />
-              <TooltipContent>
-                Toggle terminal{" "}
-                <ShortcutKbd binding={terminalBinding} className="ml-1" />
-              </TooltipContent>
-            </Tooltip>
-          </div>
-
-          {/* ── Right sidebar toggle ───────────────────────────────────────── */}
-          <div className={island} style={noDrag}>
+        {/* ── New thread + search (surfaced when left sidebar is hidden) ────── */}
+        {(!sidebarOpen || isMobile) && (
+          <div
+            className={cn(
+              island,
+              "origin-left animate-in gap-0.5 duration-200 fade-in-0 zoom-in-90 slide-in-from-left-2"
+            )}
+            style={noDrag}
+          >
             <Tooltip>
               <TooltipTrigger
                 render={
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={toggleRightSidebar}
-                    aria-pressed={rightSidebarOpen}
-                    className="size-7 text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+                    onClick={handleNewThread}
+                    className="size-7 text-muted-foreground/70 hover:text-foreground"
                   >
-                    <PanelRight className="size-4" />
-                    <span className="sr-only">Toggle right sidebar</span>
+                    <MessageSquarePlus className="size-4" />
+                    <span className="sr-only">New thread</span>
                   </Button>
                 }
               />
               <TooltipContent>
-                Toggle right sidebar{" "}
-                <ShortcutKbd binding={rightSidebarBinding} className="ml-1" />
+                New thread{" "}
+                <ShortcutKbd binding={newThreadBinding} className="ml-1" />
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={openPalette}
+                    className="size-7 text-muted-foreground/70 hover:text-foreground"
+                  >
+                    <Search className="size-4" />
+                    <span className="sr-only">Search</span>
+                  </Button>
+                }
+              />
+              <TooltipContent>
+                Search{" "}
+                <ShortcutKbd binding={openPaletteBinding} className="ml-1" />
               </TooltipContent>
             </Tooltip>
           </div>
-        </>
-      )}
-    </div>
+        )}
+
+        {/* ── Automations page island: heading + new-automation action ──────── */}
+        {isAutomations && (
+          <div className={cn(island, "shrink-0 gap-1.5 px-2.5")} style={noDrag}>
+            <Clock className="size-3.5 text-muted-foreground/70" />
+            <span className="text-sm font-semibold text-foreground">
+              Automations
+            </span>
+            <Button
+              size="sm"
+              className="ml-1 h-6 gap-1 px-2 text-xs"
+              onClick={openNewAutomation}
+              disabled={workspaces.length === 0}
+            >
+              <Plus className="size-3.5" />
+              New
+            </Button>
+          </div>
+        )}
+
+        {/* ── Skills page islands: heading + registry search ────────────────── */}
+        {isSkills && (
+          <>
+            <div
+              className={cn(island, "shrink-0 gap-1.5 px-2.5")}
+              style={noDrag}
+            >
+              <Container className="size-3.5 text-muted-foreground/70" />
+              <span className="text-sm font-semibold text-foreground">
+                Skills
+              </span>
+            </div>
+            <div
+              className={cn(island, "w-64 shrink-0 gap-1.5 px-2.5")}
+              style={noDrag}
+            >
+              <Search className="size-3.5 shrink-0 text-muted-foreground/60" />
+              <input
+                value={skillsQuery}
+                onChange={(e) => setSkillsQuery(e.target.value)}
+                placeholder="Search skills.sh"
+                style={noDrag}
+                className="w-full min-w-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground/50"
+              />
+            </div>
+          </>
+        )}
+
+        {/* ── Skill detail page island: breadcrumb (back nav lives in the
+          navigation island) ────────────────────────────────────────────── */}
+        {isSkillDetail && (
+          <div
+            className={cn(island, "min-w-0 shrink gap-1.5 px-2.5")}
+            style={noDrag}
+          >
+            <Container className="size-3.5 shrink-0 text-muted-foreground/70" />
+            <span className="shrink-0 text-sm font-semibold text-muted-foreground/70">
+              Skills
+            </span>
+            {skillDetails && (
+              <>
+                <span className="text-muted-foreground/40 select-none">/</span>
+                <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                  {skillDetails.name}
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Thread name + options island (truncates, shrinks before filler) ─
+            Hidden on mobile — it floats over the chat view instead, alongside
+            the branch and working-location controls. ───────────────────── */}
+        {urlActiveThread && !isMobile && (
+          <div
+            className={cn(
+              island,
+              "min-w-0 shrink gap-1 overflow-hidden px-1.5"
+            )}
+            style={noDrag}
+          >
+            {urlActiveWorkspace && (
+              <>
+                <span className="hidden shrink truncate text-2xs font-medium text-muted-foreground/70 sm:inline">
+                  {urlActiveWorkspace.name}
+                </span>
+                <span className="mx-0.5 hidden shrink-0 text-2xs text-muted-foreground/40 select-none sm:inline">
+                  /
+                </span>
+              </>
+            )}
+            {isRenaming ? (
+              <span className="inline-grid min-w-0">
+                <span
+                  aria-hidden
+                  className="invisible col-start-1 row-start-1 text-sm font-semibold whitespace-pre"
+                >
+                  {renameValue || " "}
+                </span>
+                <input
+                  ref={renameInputRef}
+                  autoFocus
+                  size={1}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitRename()
+                    if (e.key === "Escape") setIsRenaming(false)
+                  }}
+                  style={noDrag}
+                  className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
+                />
+              </span>
+            ) : (
+              <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                {urlActiveThread.title}
+              </span>
+            )}
+            <Tooltip>
+              <DropdownMenu>
+                <TooltipTrigger
+                  render={
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          style={noDrag}
+                          className="ml-0.5 shrink-0 text-muted-foreground/50"
+                        />
+                      }
+                    >
+                      <MoreHorizontal className="size-3.5" />
+                      <span className="sr-only">Thread options</span>
+                    </DropdownMenuTrigger>
+                  }
+                />
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={startRename}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Rename
+                    <ShortcutKbd
+                      binding={renameBinding}
+                      className="ml-auto pl-2"
+                    />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleTogglePin}>
+                    {urlActiveThread.isPinned ? (
+                      <>
+                        <PinOff className="mr-2 h-4 w-4" />
+                        Unpin
+                      </>
+                    ) : (
+                      <>
+                        <Pin className="mr-2 h-4 w-4" />
+                        Pin
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCopyThreadId}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Thread ID
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleArchiveThread}>
+                    <Archive className="mr-2 h-4 w-4" />
+                    Archive
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={handleDeleteThread}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Thread
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <TooltipContent>Thread options</TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+
+        {/* ── Branch selector island ─────────────────────────────────────────── */}
+        {urlActiveThread && !isMobile && (
+          <div className={cn(island, "shrink-0")} style={noDrag}>
+            <BranchSelector
+              branch={branch}
+              branches={branches}
+              onBranchSelect={handleBranchSelect}
+              onGitError={handleGitError}
+              sessionId={urlActiveThread.sessionId ?? undefined}
+              disabled={!!urlActiveThread.worktreeBranch}
+              disabledReason="This thread runs in a worktree — its branch is managed by the worktree selector"
+            />
+          </div>
+        )}
+
+        {/* ── Working location (worktree) island ─────────────────────────────── */}
+        {urlActiveThread && !isMobile && (
+          <div className={cn(island, "shrink-0")} style={noDrag}>
+            <WorktreeSelector
+              threadId={urlActiveThread.id}
+              sessionId={urlActiveThread.sessionId ?? undefined}
+              threadTitle={urlActiveThread.title}
+              branches={branches}
+              currentBranch={branch}
+              worktreeBranch={urlActiveThread.worktreeBranch}
+              onError={handleGitError}
+            />
+          </div>
+        )}
+
+        {/* Flexible filler — draggable gap separating left and right islands. */}
+        <div className="h-full min-w-4 flex-1" />
+
+        {/* ── Update notice (only when an update is pending) ───────────────── */}
+        {updateStatus &&
+          updateStatus.phase !== "idle" &&
+          updateStatus.phase !== "checking" && (
+            <div className={island} style={noDrag}>
+              <UpdateButton status={updateStatus} />
+            </div>
+          )}
+
+        {/* Task, open-with, terminal and right-sidebar islands are workspace/
+          thread-scoped, so they're hidden on the (global) automations and
+          skills pages. */}
+        {!isAutomations && !isSkills && !isSkillDetail && (
+          <>
+            {/* ── Task dropdown ──────────────────────────────────────────────── */}
+            <div className={island} style={noDrag}>
+              <TasksDropdown
+                workspaceId={actionWorkspace?.id ?? ""}
+                onRunTask={runTerminalCommand}
+                isMobile={isMobile}
+              />
+            </div>
+
+            {/* ── Open in workspace ──────────────────────────────────────────── */}
+            <div className={island} style={noDrag}>
+              <OpenWithButton
+                workspaceId={actionWorkspace?.id}
+                workspacePath={actionWorkspace?.path}
+                openWithAppId={actionWorkspace?.openWithAppId}
+                isMobile={isMobile}
+              />
+            </div>
+
+            {/* ── Terminal ───────────────────────────────────────────────────── */}
+            <div className={island} style={noDrag}>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Toggle
+                      pressed={terminalOpen}
+                      onPressedChange={() => toggleTerminal()}
+                      disabled={!effectiveWorkspacePath}
+                      className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-muted aria-pressed:text-foreground"
+                    >
+                      <TerminalSquare className="size-4" />
+                      <span className="sr-only">Toggle terminal</span>
+                    </Toggle>
+                  }
+                />
+                <TooltipContent>
+                  Toggle terminal{" "}
+                  <ShortcutKbd binding={terminalBinding} className="ml-1" />
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            {/* ── Right sidebar toggle ───────────────────────────────────────── */}
+            <div className={island} style={noDrag}>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={toggleRightSidebar}
+                      aria-pressed={rightSidebarOpen}
+                      className="size-7 text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+                    >
+                      <PanelRight className="size-4" />
+                      <span className="sr-only">Toggle right sidebar</span>
+                    </Button>
+                  }
+                />
+                <TooltipContent>
+                  Toggle right sidebar{" "}
+                  <ShortcutKbd binding={rightSidebarBinding} className="ml-1" />
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   )
 }

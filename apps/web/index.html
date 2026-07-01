@@ -18,10 +18,14 @@
               window.matchMedia("(prefers-color-scheme: dark)").matches);
           document.documentElement.classList.add(dark ? "dark" : "light");
           // Apply the exact background values defined in index.css so the
-          // window background matches from the very first paint.
+          // window background matches from the very first paint. These are
+          // the default (macOS) theme's colors — if the user has selected a
+          // different color theme, apply-theme.ts takes over as soon as React
+          // mounts (see theme-engine.tsx's applyMode, which clears this
+          // inline style so the CSS variable cascade drives it from then on).
           document.documentElement.style.background = dark
-            ? "#121212"
-            : "#f3efe8";
+            ? "#161618"
+            : "#f5f5f7";
         } catch (e) {}
       })();
     </script>
@@ -31,7 +35,7 @@
         /* Fallback for the brief moment before index.css is parsed. The
            inline script above will have already set the correct colour on
            <html> via style attribute, so this just acts as a safety net. */
-        background: var(--background, #121212);
+        background: var(--background, #f5f5f7);
       }
     </style>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

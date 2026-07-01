@@ -5,6 +5,7 @@ export { CommitInputSection } from "./components/commit-dialog"
 export { BranchSelector } from "./components/branch-selector"
 export { WorktreeSelector } from "./components/worktree-selector"
 export { branchNameFromTitle } from "./branch-name"
+export { useThreadBranchControls } from "./use-thread-branch-controls"
 export {
   DiffView,
   detectLanguage,

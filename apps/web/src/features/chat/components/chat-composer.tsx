@@ -52,7 +52,6 @@ import {
 } from "../queries"
 import { useWorkspaceIndex, useModes } from "@/features/workspace/queries"
 import { useEnvDialog } from "@/features/workspace"
-import { BranchSelector, WorktreeSelector } from "@/features/git"
 import { ModelCombobox } from "./model-combobox"
 import { ModeCombobox, getModeOption, modeOptionFromDto } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
@@ -126,19 +125,10 @@ interface ChatComposerProps {
   onStop?: () => void
   placeholder?: string
   className?: string
-  branch?: string | null
-  branches?: string[]
-  onBranchSelect?: (branch: string) => void
-  onBranchError?: (message: string) => void
+  /** Overrides the textbox's default idle height — e.g. a taller hero textbox on the new-thread page. */
+  inputMinHeightClassName?: string
   sessionId?: string
   workspaceId?: string
-  /** The active thread, when this composer drives an existing thread. Enables the
-   *  worktree selector (Local / New worktree / Merge) beside the branch selector. */
-  threadId?: string
-  /** The active thread's title — used to derive the default worktree branch name. */
-  threadTitle?: string
-  /** Branch of the thread's active worktree, or null when running locally. */
-  worktreeBranch?: string | null
   selectedModelId?: string | null
   onModelChange?: (modelId: string) => void
   selectedThinkingLevel?: ThinkingLevel
@@ -148,12 +138,6 @@ interface ChatComposerProps {
   approvalMode?: ApprovalMode
   onApprovalModeChange?: (mode: ApprovalMode) => void
   sessionStats?: SessionStats | null
-  /**
-   * Extra content rendered at the start of the composer's context strip, before
-   * the branch selector. The new-thread composer uses this for its workspace
-   * picker so workspace, branch, and approval share one connected bar.
-   */
-  contextLeading?: React.ReactNode
 }
 
 export const ChatComposer = memo(
@@ -165,15 +149,9 @@ export const ChatComposer = memo(
       onStop,
       placeholder = "Ask anything @ for files, / for commands",
       className,
-      branch,
-      branches = [],
-      onBranchSelect,
-      onBranchError,
+      inputMinHeightClassName,
       sessionId,
       workspaceId,
-      threadId,
-      threadTitle,
-      worktreeBranch,
       selectedModelId: controlledModelId,
       onModelChange,
       selectedThinkingLevel: controlledThinkingLevel,
@@ -183,7 +161,6 @@ export const ChatComposer = memo(
       approvalMode = "ask",
       onApprovalModeChange,
       sessionStats,
-      contextLeading,
     }: ChatComposerProps,
     ref
   ) {
@@ -954,17 +931,14 @@ export const ChatComposer = memo(
     const modeSendButton = modeStyles.sendButton
     const stopBinding = useShortcutBinding(SHORTCUT_ACTIONS.STOP_GENERATION)
 
-    const showBranch = branch !== undefined
     const showApproval = Boolean(onApprovalModeChange)
-    const showContextStrip =
-      showBranch || showApproval || Boolean(contextLeading)
 
     return (
       <div className={cn("w-full", className)}>
         <div
           className={cn(
-            "relative flex w-full flex-col rounded-2xl border border-border/70 bg-card shadow-sm",
-            "transition-all duration-150 focus-within:border-border focus-within:shadow-md"
+            "relative flex w-full flex-col rounded-2xl border border-border/50 bg-muted/40",
+            "transition-colors duration-150 focus-within:border-primary/40"
           )}
         >
           <SlashCommandDropdown
@@ -999,13 +973,13 @@ export const ChatComposer = memo(
             onSelect={handleSelectFile}
           />
 
-          <div className="mx-2 mt-2 mb-2 rounded-xl bg-muted/60">
+          <div className="mx-1 my-1 flex flex-col">
             {historyNav && (
               <div className="flex items-center justify-between gap-2 px-3 pt-2 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5 rounded-full border border-border/60 bg-background/70 px-2 py-0.5 font-medium">
+                <span className="flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/70 px-2 py-0.5 font-medium">
                   <HistoryIcon className="size-3" />
                   History
-                  <span className="tabular-nums text-foreground/80">
+                  <span className="text-foreground/80 tabular-nums">
                     {historyNav.position}/{historyNav.total}
                   </span>
                 </span>
@@ -1018,7 +992,7 @@ export const ChatComposer = memo(
                 </span>
               </div>
             )}
-            <div className="px-2.5 pt-3 pb-0.5">
+            <div className="px-2 py-1.5">
               <RichInput
                 ref={richInputRef}
                 placeholder={
@@ -1026,6 +1000,7 @@ export const ChatComposer = memo(
                     ? "Steer the agent — your message joins this run"
                     : placeholder
                 }
+                minHeightClassName={inputMinHeightClassName}
                 mentionActive={atMention !== null && mentionEntries2.length > 0}
                 slashActive={
                   slashMention !== null &&
@@ -1107,7 +1082,7 @@ export const ChatComposer = memo(
             </div>
 
             {attachments.length > 0 && (
-              <div className="flex flex-wrap gap-2 px-2.5 pb-1.5">
+              <div className="flex flex-wrap gap-2 px-2 pb-1.5">
                 {attachments.map((attachment) => (
                   <AttachmentPreview
                     key={attachment.id}
@@ -1131,8 +1106,8 @@ export const ChatComposer = memo(
               }}
             />
 
-            <div className="flex items-center justify-between gap-2 px-2 pt-0 pb-2">
-              <div className="flex items-center gap-0.5">
+            <div className="@container/composer-controls flex items-center justify-between gap-2 px-1.5 pb-1.5">
+              <div className="flex min-w-0 items-center gap-0.5">
                 <ModelCombobox
                   groups={grouped}
                   selected={selectedModel}
@@ -1159,7 +1134,13 @@ export const ChatComposer = memo(
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center justify-end gap-2">
+                {showApproval && (
+                  <ApprovalModeCombobox
+                    selected={approvalMode}
+                    onSelect={onApprovalModeChange!}
+                  />
+                )}
                 <ContextChart
                   contextUsage={contextUsage}
                   sessionId={sessionId}
@@ -1170,13 +1151,13 @@ export const ChatComposer = memo(
                     render={
                       <Button
                         type="button"
-                        size="icon"
+                        size="icon-sm"
                         variant="ghost"
                         aria-label="Attach files"
                         onClick={() => fileInputRef.current?.click()}
-                        className="size-7 text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground"
                       >
-                        <PaperclipIcon className="size-4" />
+                        <PaperclipIcon className="size-3.5" />
                       </Button>
                     }
                   />
@@ -1190,7 +1171,7 @@ export const ChatComposer = memo(
                     <TooltipTrigger
                       render={
                         <Button
-                          size="icon-lg"
+                          size="icon"
                           onClick={handleSend}
                           aria-label="Send to running agent"
                           className={cn(
@@ -1212,7 +1193,7 @@ export const ChatComposer = memo(
                     <TooltipTrigger
                       render={
                         <Button
-                          size="icon-lg"
+                          size="icon"
                           onClick={onStop}
                           disabled={isAborting}
                           aria-label="Stop generation"
@@ -1234,7 +1215,7 @@ export const ChatComposer = memo(
                     <TooltipTrigger
                       render={
                         <Button
-                          size="icon-lg"
+                          size="icon"
                           onClick={handleSend}
                           disabled={!canSend}
                           aria-label="Send message"
@@ -1256,42 +1237,6 @@ export const ChatComposer = memo(
               </div>
             </div>
           </div>
-
-          {showContextStrip && (
-            <div className="flex items-center justify-between gap-2 px-2 pb-1">
-              <div className="flex min-w-0 items-center gap-1">
-                {contextLeading}
-                {showBranch && (
-                  <BranchSelector
-                    branch={branch ?? null}
-                    branches={branches}
-                    onBranchSelect={onBranchSelect}
-                    onGitError={onBranchError}
-                    sessionId={sessionId}
-                    disabled={!!worktreeBranch}
-                    disabledReason="This thread runs in a worktree — its branch is managed by the worktree selector"
-                  />
-                )}
-                {showBranch && threadId && (
-                  <WorktreeSelector
-                    threadId={threadId}
-                    sessionId={sessionId}
-                    threadTitle={threadTitle}
-                    branches={branches}
-                    currentBranch={branch ?? null}
-                    worktreeBranch={worktreeBranch}
-                    onError={onBranchError}
-                  />
-                )}
-              </div>
-              {showApproval && (
-                <ApprovalModeCombobox
-                  selected={approvalMode}
-                  onSelect={onApprovalModeChange!}
-                />
-              )}
-            </div>
-          )}
         </div>
       </div>
     )

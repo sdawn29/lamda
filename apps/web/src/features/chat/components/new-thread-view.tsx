@@ -102,9 +102,7 @@ interface NewThreadViewProps {
 function deriveTitleFromMessage(text: string): string {
   const firstLine = text.trim().split("\n")[0]?.trim() ?? ""
   if (!firstLine) return "New Thread"
-  return firstLine.length > 80
-    ? firstLine.slice(0, 80).trimEnd()
-    : firstLine
+  return firstLine.length > 80 ? firstLine.slice(0, 80).trimEnd() : firstLine
 }
 
 export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
@@ -694,8 +692,9 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               </div>
             </div>
 
-            <div className="mb-1 flex items-center px-1">
+            <div className="mb-1 flex min-w-0 items-center gap-1 px-1">
               {workspaceSelector}
+              {contextLeading}
             </div>
 
             <ChatComposer
@@ -711,7 +710,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               onModeChange={setSelectedMode}
               approvalMode={selectedApprovalMode}
               onApprovalModeChange={setSelectedApprovalMode}
-              contextLeading={contextLeading}
+              inputMinHeightClassName="min-h-24"
               placeholder={
                 noWorkspaces
                   ? "Add a workspace to start a thread"
@@ -763,8 +762,8 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               />
               <FieldDescription>
                 Leave blank to generate a{" "}
-                <span className="font-mono">lamda/</span> branch from your
-                first prompt.
+                <span className="font-mono">lamda/</span> branch from your first
+                prompt.
               </FieldDescription>
             </Field>
             <Field>

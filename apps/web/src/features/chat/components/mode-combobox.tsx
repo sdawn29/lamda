@@ -212,7 +212,7 @@ function dynamicModeIcon(name: IconName): LucideIcon {
         fallback={() => <DEFAULT_ICON className={props.className} />}
         name={iconName}
       />
-    ),
+    )
   ) as LucideIcon
   dynamicIconCache.set(name, Component)
   return Component
@@ -274,7 +274,7 @@ export function getModeOption(mode: Mode, modes: ModeDto[]): ModeOption {
       color: DEFAULT_COLOR,
       icon: "",
       source: "builtin",
-    },
+    }
   )
 }
 
@@ -306,12 +306,18 @@ export function ModeCombobox({
             variant="ghost"
             size="sm"
             aria-expanded={open}
+            title={selectedOption.label}
             className="gap-1.5 text-foreground/80 transition-colors hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
           >
-            <span className={selectedOption.style.iconAccent}>
+            <span
+              data-icon="inline-start"
+              className={selectedOption.style.iconAccent}
+            >
               <selectedOption.Icon className="size-3.5 shrink-0" />
             </span>
-            <span className="font-medium">{selectedOption.label}</span>
+            <span className="font-medium @max-3xl/composer-controls:hidden">
+              {selectedOption.label}
+            </span>
             <ChevronDownIcon
               data-icon="inline-end"
               className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}

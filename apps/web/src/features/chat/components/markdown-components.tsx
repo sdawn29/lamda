@@ -63,9 +63,18 @@ export const chatProseClassRich =
   "[&_sub]:align-sub [&_sub]:text-[0.75em] [&_sup]:align-super [&_sup]:text-[0.75em] " +
   "[&_kbd]:rounded [&_kbd]:border [&_kbd]:border-border [&_kbd]:bg-muted [&_kbd]:px-1 [&_kbd]:font-mono [&_kbd]:text-[0.75em]"
 
-/** Inline `code` span styling, shared by both component maps below. */
+/**
+ * Inline `code` span styling, shared by both component maps below.
+ * `inline-block` + `align-middle` so the vertical padding is reserved in the
+ * line box instead of painting outside it. `leading-none` pins the chip's own
+ * height (font-size + padding only) well under the surrounding text's
+ * line-height (21px at leading-1.5/text-sm), so it always fits inside the
+ * existing line rhythm rather than depending on the line growing to fit it —
+ * that's what kept wrapped code chips (e.g. a list item whose inline code
+ * spills onto a second line) sitting flush against the line above.
+ */
 const INLINE_CODE_CLASS =
-  "rounded bg-muted px-1.5 py-0.5 font-mono text-[0.8125rem] text-foreground"
+  "inline-block rounded bg-muted px-1.5 py-0.5 align-middle font-mono text-[0.8125rem] leading-none text-foreground"
 
 /** Fenced/indented code blocks render at 12px to match the Prism highlighter. */
 const CODE_BLOCK_PRE_CLASS =

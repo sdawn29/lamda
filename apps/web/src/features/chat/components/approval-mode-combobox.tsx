@@ -92,13 +92,18 @@ export function ApprovalModeCombobox({
             variant="ghost"
             size="sm"
             aria-expanded={open}
-            title="Tool approval"
+            title={selectedOption.label}
             className={cn(selectedOption.triggerBg)}
           >
-            <span className={selectedOption.iconAccent}>
+            <span data-icon="inline-start" className={selectedOption.iconAccent}>
               {selectedOption.icon}
             </span>
-            <span className={selectedOption.iconAccent}>
+            <span
+              className={cn(
+                "max-w-32 truncate @max-3xl/composer-controls:hidden",
+                selectedOption.iconAccent
+              )}
+            >
               {selectedOption.label}
             </span>
             <ChevronDownIcon

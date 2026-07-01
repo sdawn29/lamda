@@ -11,11 +11,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/shared/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/shared/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 import { getProviderMeta } from "@/shared/lib/provider-meta"
 
 export type ModelGroup = [
@@ -76,19 +72,23 @@ export function ModelCombobox({
             size="sm"
             disabled={disabled}
             aria-expanded={open}
+            title={selected?.name ?? placeholder}
             className={cn("max-w-60", triggerClassName)}
           >
-            {selectedMeta?.icon}
+            <span data-icon="inline-start">{selectedMeta?.icon}</span>
             <span
               className={cn(
                 "truncate",
                 triggerClassName && "mr-auto",
-                !selected && "text-muted-foreground",
+                !selected && "text-muted-foreground"
               )}
             >
               {selected?.name ?? placeholder}
             </span>
-            <ChevronDownIcon data-icon="inline-end" className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+            <ChevronDownIcon
+              data-icon="inline-end"
+              className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            />
           </Button>
         }
       />
@@ -110,7 +110,9 @@ export function ModelCombobox({
                     <CommandItem
                       key={`${provider}::${m.id}`}
                       value={`${provider}::${m.id}`}
-                      data-checked={m.id === selected?.id && provider === selected?.provider}
+                      data-checked={
+                        m.id === selected?.id && provider === selected?.provider
+                      }
                       onSelect={() => {
                         onSelect(`${provider}::${m.id}`)
                         setOpen(false)
