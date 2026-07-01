@@ -163,7 +163,7 @@ export const ChatComposer = memo(
       isLoading = false,
       isAborting = false,
       onStop,
-      placeholder = "Ask anything… @ for files, / for commands",
+      placeholder = "Ask anything @ for files, / for commands",
       className,
       branch,
       branches = [],
@@ -1023,7 +1023,7 @@ export const ChatComposer = memo(
                 ref={richInputRef}
                 placeholder={
                   isLoading
-                    ? "Steer the agent — your message joins this run…"
+                    ? "Steer the agent — your message joins this run"
                     : placeholder
                 }
                 mentionActive={atMention !== null && mentionEntries2.length > 0}
@@ -1223,7 +1223,7 @@ export const ChatComposer = memo(
                       }
                     />
                     <TooltipContent>
-                      {isAborting ? "Stopping…" : "Stop"}
+                      {isAborting ? "Stopping" : "Stop"}
                       {!isAborting && (
                         <ShortcutKbd binding={stopBinding} className="ml-1" />
                       )}

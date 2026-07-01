@@ -62,7 +62,7 @@ function ShortcutRecorder({
         title="Click to record a new shortcut"
       >
         {recording ? (
-          <span className="text-xs">Press key…</span>
+          <span className="text-xs">Press key</span>
         ) : binding ? (
           <ShortcutKbd binding={binding} />
         ) : (

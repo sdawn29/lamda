@@ -97,7 +97,7 @@ export const PlanSavedCard = memo(function PlanSavedCard({
                     : "text-amber-700 dark:text-amber-400",
               )}
             >
-              {isRunning ? "Saving plan…" : isError ? "Plan failed" : "Plan ready"}
+              {isRunning ? "Saving plan" : isError ? "Plan failed" : "Plan ready"}
             </span>
             <p className="mt-0.5 truncate font-heading text-sm font-medium text-foreground">
               {title}

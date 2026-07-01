@@ -15,6 +15,7 @@ export {
   lamdaLocalModesDir,
   lamdaGlobalPromptsDir,
   lamdaLocalPromptsDir,
+  lamdaGlobalSkillsDir,
   LAMDA_DIR_NAME,
   ensurePromptsDir,
   ensureSkillsDir,

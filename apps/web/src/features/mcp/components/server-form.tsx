@@ -501,7 +501,7 @@ function ServerFormFields({
                         envVar={header}
                         index={index}
                         keyPlaceholder="Authorization"
-                        valuePlaceholder="Bearer …"
+                        valuePlaceholder="Bearer"
                         separator=":"
                         onChange={(field, value) => updateHeader(index, field, value)}
                         onRemove={() => removeHeader(index)}
@@ -598,7 +598,7 @@ function ServerFormFields({
             {testConnection.isPending ? (
               <>
                 <Loader2 className="animate-spin" />
-                Testing…
+                Testing
               </>
             ) : (
               <>
@@ -755,7 +755,7 @@ export function ServerFormPage({ serverName }: ServerFormPageProps) {
           {saveSettings.isPending ? (
             <>
               <Loader2 className="animate-spin" />
-              Saving…
+              Saving
             </>
           ) : server ? (
             "Update Server"

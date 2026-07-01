@@ -103,7 +103,7 @@ function deriveTitleFromMessage(text: string): string {
   const firstLine = text.trim().split("\n")[0]?.trim() ?? ""
   if (!firstLine) return "New Thread"
   return firstLine.length > 80
-    ? `${firstLine.slice(0, 80).trimEnd()}…`
+    ? firstLine.slice(0, 80).trimEnd()
     : firstLine
 }
 
@@ -471,7 +471,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         sideOffset={6}
       >
         <Command>
-          <CommandInput placeholder="Search workspaces…" />
+          <CommandInput placeholder="Search workspaces" />
           <CommandList>
             <CommandEmpty>No workspaces found</CommandEmpty>
             <CommandGroup>
@@ -522,7 +522,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
       <GitBranchPlusIcon data-icon="inline-start" />
       <span>
         {initWorkspaceRepo.isPending
-          ? "Initializing…"
+          ? "Initializing"
           : "Initialize git repository"}
       </span>
     </Button>
@@ -543,7 +543,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         >
           <GitBranchIcon data-icon="inline-start" />
           <span className="max-w-[12rem] truncate">
-            {worktreeBranchName.trim() || "lamda/… (from prompt)"}
+            {worktreeBranchName.trim() || "lamda/ (from prompt)"}
           </span>
         </Button>
       ) : (
@@ -715,7 +715,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               placeholder={
                 noWorkspaces
                   ? "Add a workspace to start a thread"
-                  : "Ask anything… / for commands, @ for files"
+                  : "Ask anything / for commands, @ for files"
               }
             />
 
@@ -763,7 +763,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               />
               <FieldDescription>
                 Leave blank to generate a{" "}
-                <span className="font-mono">lamda/…</span> branch from your
+                <span className="font-mono">lamda/</span> branch from your
                 first prompt.
               </FieldDescription>
             </Field>

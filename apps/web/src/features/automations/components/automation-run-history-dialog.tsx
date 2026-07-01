@@ -38,7 +38,7 @@ export function AutomationRunHistoryDialog({
         <div className="flex flex-col overflow-y-auto px-2 py-2">
           {isLoading ? (
             <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-              Loading…
+              Loading
             </p>
           ) : runs.length === 0 ? (
             <p className="px-2 py-6 text-center text-xs text-muted-foreground">
@@ -125,7 +125,7 @@ function formatDateTime(ts: number): string {
 }
 
 function formatDuration(start: number, end: number | null): string {
-  if (!end) return "running…"
+  if (!end) return "running"
   const secs = Math.max(0, Math.round((end - start) / 1000))
   if (secs < 60) return `${secs}s`
   const m = Math.floor(secs / 60)

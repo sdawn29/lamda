@@ -421,7 +421,7 @@ export function SubscriptionsCard() {
   return (
     <SettingsGroup>
       {isLoading ? (
-        <p className="py-3.5 text-xs text-muted-foreground">Loading…</p>
+        <p className="py-3.5 text-xs text-muted-foreground">Loading</p>
       ) : !providers?.length ? (
         <p className="py-3.5 text-xs text-muted-foreground">
           No OAuth providers available.
@@ -481,7 +481,7 @@ export function SubscriptionsCard() {
                       ) : (
                         <LogIn data-icon="inline-start" />
                       )}
-                      {isPending ? "Connecting…" : "Sign in"}
+                      {isPending ? "Connecting" : "Sign in"}
                     </Button>
                   )}
                 </div>
@@ -524,7 +524,7 @@ export function SubscriptionsCard() {
                       autoFocus
                       value={promptValue}
                       onChange={(e) => setPromptValue(e.target.value)}
-                      placeholder={loginState.placeholder ?? "Enter code…"}
+                      placeholder={loginState.placeholder ?? "Enter code"}
                       className="font-mono"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handlePromptSubmit()
@@ -688,7 +688,7 @@ function ConfigureKeyDialog({
             {isSaving ? (
               <>
                 <Loader2 data-icon="inline-start" className="animate-spin" />
-                Saving…
+                Saving
               </>
             ) : (
               <>
@@ -731,7 +731,7 @@ export function ApiKeysCard() {
   }
 
   if (isLoading) {
-    return <p className="py-3.5 text-xs text-muted-foreground">Loading…</p>
+    return <p className="py-3.5 text-xs text-muted-foreground">Loading</p>
   }
 
   return (
@@ -745,7 +745,7 @@ export function ApiKeysCard() {
       <div className="relative py-3.5">
         <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search providers…"
+          placeholder="Search providers"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-7"

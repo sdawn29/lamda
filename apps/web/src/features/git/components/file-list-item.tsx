@@ -225,7 +225,7 @@ export const FileListItem = memo(function FileListItem({
           {diffLoading ? (
             <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/10 px-3 py-3 text-xs text-muted-foreground">
               <LoadingSpinner size="sm" />
-              Loading diff…
+              Loading diff
             </div>
           ) : diff != null ? (
             <DiffView

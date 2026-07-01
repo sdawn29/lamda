@@ -87,7 +87,7 @@ export function DataSection() {
               onClick={handleReset}
               disabled={resetting}
             >
-              {resetting ? "Deleting…" : "Delete all"}
+              {resetting ? "Deleting" : "Delete all"}
             </Button>
           </DialogFooter>
         </DialogContent>

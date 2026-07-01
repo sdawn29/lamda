@@ -40,6 +40,7 @@ import {
   useRunAutomation,
 } from "../queries"
 import { humanizeCron } from "../schedule"
+import { useAutomationsUiStore } from "../store"
 import type { Automation, AutomationInput } from "../types"
 import { AutomationFormDialog } from "./automation-form-dialog"
 import { AutomationRunHistoryDialog } from "./automation-run-history-dialog"
@@ -55,19 +56,10 @@ export function AutomationsPage() {
   const deleteMutation = useDeleteAutomation()
   const runMutation = useRunAutomation()
 
-  const [formOpen, setFormOpen] = useState(false)
-  const [editing, setEditing] = useState<Automation | null>(null)
+  const { formOpen, editing, openNew, openEdit, closeForm } =
+    useAutomationsUiStore()
   const [historyFor, setHistoryFor] = useState<Automation | null>(null)
   const [deleting, setDeleting] = useState<Automation | null>(null)
-
-  const openNew = () => {
-    setEditing(null)
-    setFormOpen(true)
-  }
-  const openEdit = (automation: Automation) => {
-    setEditing(automation)
-    setFormOpen(true)
-  }
 
   const handleSave = (input: AutomationInput, workspaceId: string) => {
     if (editing) {
@@ -78,70 +70,54 @@ export function AutomationsPage() {
         {
           onError: (err) =>
             toast.error(
-              err instanceof Error ? err.message : "Failed to create",
+              err instanceof Error ? err.message : "Failed to create"
             ),
-        },
+        }
       )
     }
   }
 
   const handleRun = (automation: Automation) => {
     runMutation.mutate(automation.id)
-    toast.message(`Running "${automation.name}"…`)
+    toast.message(`Running "${automation.name}"`)
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3">
-        <Clock className="size-4 text-muted-foreground" />
-        <h1 className="text-sm font-semibold">Automations</h1>
-        <Button
-          size="sm"
-          className="ml-auto h-7 gap-1.5 text-xs"
-          onClick={openNew}
-          disabled={workspaces.length === 0}
-        >
-          <Plus className="size-3.5" />
-          New
-        </Button>
-      </header>
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto max-w-3xl px-5 py-4">
+        <p className="mb-3 text-3xs text-muted-foreground/60">
+          Automations run their prompt through the agent on a schedule. They
+          fire only while the app is running.
+        </p>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-5 py-4">
-          <p className="mb-3 text-3xs text-muted-foreground/60">
-            Automations run their prompt through the agent on a schedule. They
-            fire only while the app is running.
-          </p>
-
-          {automations.length === 0 ? (
-            <EmptyState onNew={openNew} disabled={workspaces.length === 0} />
-          ) : (
-            <div className="flex flex-col divide-y divide-border/60 rounded-lg border border-border">
-              {automations.map((automation) => (
-                <AutomationRow
-                  key={automation.id}
-                  automation={automation}
-                  workspaceName={workspaceName(automation.workspaceId)}
-                  onRun={() => handleRun(automation)}
-                  onEdit={() => openEdit(automation)}
-                  onHistory={() => setHistoryFor(automation)}
-                  onDelete={() => setDeleting(automation)}
-                  onToggle={(enabled) =>
-                    updateMutation.mutate({
-                      id: automation.id,
-                      updates: { enabled },
-                    })
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {automations.length === 0 ? (
+          <EmptyState onNew={openNew} disabled={workspaces.length === 0} />
+        ) : (
+          <div className="flex flex-col divide-y divide-border/60 rounded-lg border border-border">
+            {automations.map((automation) => (
+              <AutomationRow
+                key={automation.id}
+                automation={automation}
+                workspaceName={workspaceName(automation.workspaceId)}
+                onRun={() => handleRun(automation)}
+                onEdit={() => openEdit(automation)}
+                onHistory={() => setHistoryFor(automation)}
+                onDelete={() => setDeleting(automation)}
+                onToggle={(enabled) =>
+                  updateMutation.mutate({
+                    id: automation.id,
+                    updates: { enabled },
+                  })
+                }
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <AutomationFormDialog
         open={formOpen}
-        onOpenChange={setFormOpen}
+        onOpenChange={(open) => !open && closeForm()}
         automation={editing}
         workspaces={workspaces}
         onSave={handleSave}
@@ -159,8 +135,8 @@ export function AutomationsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete automation?</AlertDialogTitle>
             <AlertDialogDescription>
-              "{deleting?.name}" and its run history will be permanently deleted.
-              The thread it created is kept.
+              "{deleting?.name}" and its run history will be permanently
+              deleted. The thread it created is kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -210,7 +186,9 @@ function AutomationRow({
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-2">
-          <span className="truncate text-xs font-medium">{automation.name}</span>
+          <span className="truncate text-xs font-medium">
+            {automation.name}
+          </span>
           {!automation.enabled && (
             <span className="text-3xs text-muted-foreground/50">(off)</span>
           )}

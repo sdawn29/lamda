@@ -27,7 +27,7 @@ export function LspSettingsCard() {
     return (
       <div className="flex items-center gap-2 py-8 text-xs text-muted-foreground">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        Loading…
+        Loading
       </div>
     )
   }
@@ -318,7 +318,7 @@ function StatusBadge({
     return (
       <Badge variant="secondary" className="shrink-0">
         <Loader2 data-icon="inline-start" className="animate-spin" />
-        Installing…
+        Installing
       </Badge>
     )
   }

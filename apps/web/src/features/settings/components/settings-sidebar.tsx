@@ -73,7 +73,7 @@ export function SettingsSidebar() {
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
           <Input
-            placeholder="Search settings…"
+            placeholder="Search settings"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-7 bg-sidebar-accent/40 pr-7 pl-7 text-xs shadow-none"

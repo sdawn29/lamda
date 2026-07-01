@@ -125,14 +125,14 @@ export function FileSearchModal({
         <CommandInput
           value={query}
           onValueChange={setQuery}
-          placeholder="Search files…"
+          placeholder="Search files"
           autoFocus
         />
         <CommandList className="max-h-96">
           {isLoading && (
             <div className="flex items-center gap-2 px-3 py-6 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
-              Indexing workspace…
+              Indexing workspace
             </div>
           )}
           {!isLoading && filteredFiles.length === 0 && <CommandEmpty>No files found.</CommandEmpty>}

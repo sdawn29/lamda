@@ -217,7 +217,7 @@ export function AboutSection() {
               onClick={handleReset}
               disabled={resetting}
             >
-              {resetting ? "Deleting…" : "Delete all"}
+              {resetting ? "Deleting" : "Delete all"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -274,7 +274,7 @@ function UpdateStatusRow({
       return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-          Checking for updates…
+          Checking for updates
         </div>
       )
     case "available":
@@ -295,7 +295,7 @@ function UpdateStatusRow({
     case "downloading":
       return (
         <Progress value={status.percent} className="flex-col gap-1.5">
-          <ProgressLabel>Downloading update…</ProgressLabel>
+          <ProgressLabel>Downloading update</ProgressLabel>
           <ProgressValue>
             {() => `${Math.round(status.percent)}%`}
           </ProgressValue>

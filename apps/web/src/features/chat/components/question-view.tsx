@@ -448,7 +448,7 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
               onChange={(e) =>
                 update(currentIndex, { otherText: e.target.value })
               }
-              placeholder="Type your answer…"
+              placeholder="Type your answer"
               className={cn(
                 "mx-2 mt-1 min-h-12 w-auto resize-none rounded-lg text-xs",
                 "animate-in duration-150 fade-in-0"

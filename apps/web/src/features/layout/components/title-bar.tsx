@@ -16,6 +16,8 @@ import {
   MessageSquarePlus,
   Search,
   Clock,
+  Container,
+  Plus,
 } from "lucide-react"
 import {
   useRouter,
@@ -37,6 +39,8 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { useWorkspace } from "@/features/workspace"
 import { useTerminalForWorkspace } from "@/features/terminal"
+import { useSkillsSearchStore } from "@/features/skills"
+import { useAutomationsUiStore } from "@/features/automations"
 import { useRightSidebar } from "../store/right-sidebar"
 import {
   useElectronFullscreen,
@@ -104,8 +108,8 @@ function UpdateButton({ status }: { status: ElectronUpdateStatus }) {
         return {
           label:
             status.percent != null
-              ? `Downloading… ${Math.round(status.percent)}%`
-              : "Downloading…",
+              ? `Downloading ${Math.round(status.percent)}%`
+              : "Downloading",
           icon: <Download className="size-3.5 shrink-0 animate-bounce" />,
           tooltip: "Downloading update",
         }
@@ -154,6 +158,10 @@ export function TitleBar() {
   const { pathname } = useLocation()
   const isSettings = pathname === "/settings"
   const isAutomations = pathname === "/automations"
+  const isSkills = pathname === "/skills"
+  const skillsQuery = useSkillsSearchStore((s) => s.query)
+  const setSkillsQuery = useSkillsSearchStore((s) => s.setQuery)
+  const openNewAutomation = useAutomationsUiStore((s) => s.openNew)
   const {
     workspaces,
     setThreadTitle,
@@ -417,7 +425,7 @@ export function TitleBar() {
         <div
           className={cn(
             island,
-            "gap-0.5 origin-left duration-200 animate-in fade-in-0 zoom-in-90 slide-in-from-left-2"
+            "origin-left animate-in gap-0.5 duration-200 fade-in-0 zoom-in-90 slide-in-from-left-2"
           )}
           style={noDrag}
         >
@@ -462,14 +470,48 @@ export function TitleBar() {
         </div>
       )}
 
-      {/* ── Automations page island ──────────────────────────────────────── */}
+      {/* ── Automations page island: heading + new-automation action ──────── */}
       {isAutomations && (
         <div className={cn(island, "shrink-0 gap-1.5 px-2.5")} style={noDrag}>
           <Clock className="size-3.5 text-muted-foreground/70" />
           <span className="text-sm font-semibold text-foreground">
             Automations
           </span>
+          <Button
+            size="sm"
+            className="ml-1 h-6 gap-1 px-2 text-xs"
+            onClick={openNewAutomation}
+            disabled={workspaces.length === 0}
+          >
+            <Plus className="size-3.5" />
+            New
+          </Button>
         </div>
+      )}
+
+      {/* ── Skills page islands: heading + registry search ────────────────── */}
+      {isSkills && (
+        <>
+          <div className={cn(island, "shrink-0 gap-1.5 px-2.5")} style={noDrag}>
+            <Container className="size-3.5 text-muted-foreground/70" />
+            <span className="text-sm font-semibold text-foreground">
+              Skills
+            </span>
+          </div>
+          <div
+            className={cn(island, "w-64 shrink-0 gap-1.5 px-2.5")}
+            style={noDrag}
+          >
+            <Search className="size-3.5 shrink-0 text-muted-foreground/60" />
+            <input
+              value={skillsQuery}
+              onChange={(e) => setSkillsQuery(e.target.value)}
+              placeholder="Search skills.sh"
+              style={noDrag}
+              className="w-full min-w-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground/50"
+            />
+          </div>
+        </>
       )}
 
       {/* ── Thread name + options island (truncates, shrinks before filler) ─ */}
@@ -539,7 +581,10 @@ export function TitleBar() {
                 <DropdownMenuItem onClick={startRename}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Rename
-                  <ShortcutKbd binding={renameBinding} className="ml-auto pl-2" />
+                  <ShortcutKbd
+                    binding={renameBinding}
+                    className="ml-auto pl-2"
+                  />
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleTogglePin}>
                   {urlActiveThread.isPinned ? (

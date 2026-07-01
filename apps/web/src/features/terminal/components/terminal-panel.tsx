@@ -209,7 +209,7 @@ const TerminalInstance = memo(function TerminalInstance({
         // dropped socket (sleep/wake, server restart, network blip) should be
         // recovered by reattaching rather than abandoned.
         if (!reconnectNoticeShown) {
-          term.write("\r\n\x1b[33m[reconnecting…]\x1b[0m\r\n")
+          term.write("\r\n\x1b[33m[reconnecting]\x1b[0m\r\n")
           reconnectNoticeShown = true
         }
         scheduleReconnect()

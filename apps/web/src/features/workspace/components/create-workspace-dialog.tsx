@@ -322,7 +322,7 @@ export function CreateWorkspaceDialog({
                 {isLoading ? (
                   <>
                     <Loader2 className="size-3 animate-spin" />
-                    Cloning…
+                    Cloning
                   </>
                 ) : (
                   "Clone repository"
@@ -369,10 +369,10 @@ function GithubRepositoryPicker({
     <div className="flex flex-col gap-1.5">
       <label className="text-xs font-medium">GitHub projects</label>
       <Command className="h-56 rounded-lg border bg-background">
-        <CommandInput placeholder="Search GitHub projects…" />
+        <CommandInput placeholder="Search GitHub projects" />
         <CommandList className="max-h-44">
           {isLoading ? (
-            <CommandEmpty>Loading GitHub projects…</CommandEmpty>
+            <CommandEmpty>Loading GitHub projects</CommandEmpty>
           ) : (
             <CommandEmpty>No GitHub projects found</CommandEmpty>
           )}
@@ -443,10 +443,10 @@ function GitlabRepositoryPicker({
     <div className="flex flex-col gap-1.5">
       <label className="text-xs font-medium">GitLab projects</label>
       <Command className="h-56 rounded-lg border bg-background">
-        <CommandInput placeholder="Search GitLab projects…" />
+        <CommandInput placeholder="Search GitLab projects" />
         <CommandList className="max-h-44">
           {isLoading ? (
-            <CommandEmpty>Loading GitLab projects…</CommandEmpty>
+            <CommandEmpty>Loading GitLab projects</CommandEmpty>
           ) : (
             <CommandEmpty>No GitLab projects found</CommandEmpty>
           )}

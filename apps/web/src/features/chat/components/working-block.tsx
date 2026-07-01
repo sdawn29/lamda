@@ -148,7 +148,7 @@ function buildGroupDescription(
           const s = argsSummary(t.args, rootPath)
           if (!s) return null
           if (groupId === "web") {
-            const q = s.length > 26 ? `${s.slice(0, 26)}…` : s
+            const q = s.length > 26 ? s.slice(0, 26) : s
             return `"${q}"`
           }
           return s.split("/").pop() ?? s

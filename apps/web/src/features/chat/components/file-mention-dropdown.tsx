@@ -51,7 +51,7 @@ export function FileMentionDropdown({
         <CommandList ref={listRef} className="max-h-60">
           {isLoading && entries.length === 0 ? (
             <div className="px-2 py-1.5 text-xs text-muted-foreground">
-              Loading files…
+              Loading files
             </div>
           ) : entries.length === 0 ? (
             <CommandEmpty>No files found</CommandEmpty>

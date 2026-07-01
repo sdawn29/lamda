@@ -239,7 +239,7 @@ export function ArchivedThreadsDialog({
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search by title or workspace…"
+                placeholder="Search by title or workspace"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-7 text-xs"
@@ -342,7 +342,7 @@ export function ArchivedThreadsDialog({
                 handleDeleteAll()
               }}
             >
-              {isDeletingAll ? "Deleting…" : "Delete all"}
+              {isDeletingAll ? "Deleting" : "Delete all"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

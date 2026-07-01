@@ -116,7 +116,7 @@ function CommitRow({
             {isLoading ? (
               <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
                 <Loader2 className="size-3 animate-spin" />
-                Loading…
+                Loading
               </div>
             ) : files && files.length > 0 ? (
               <div className="divide-y divide-border/20">
@@ -169,7 +169,7 @@ export const HistoryView = memo(function HistoryView({
       <div className="flex min-h-0 flex-1 items-center justify-center">
         <div className="flex items-center gap-2 text-xs text-muted-foreground/50">
           <Loader2 className="size-3 animate-spin" />
-          Loading history…
+          Loading history
         </div>
       </div>
     )

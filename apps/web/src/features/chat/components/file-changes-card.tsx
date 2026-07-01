@@ -178,7 +178,7 @@ const ChangedFileItem = memo(function ChangedFileItem({
           {diffLoading ? (
             <div className="flex items-center gap-2 rounded-md border border-border/40 bg-muted/10 px-3 py-2.5 text-xs text-muted-foreground/55">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Loading diff…
+              Loading diff
             </div>
           ) : diff != null ? (
             <DiffView diff={diff} filePath={file.filePath} mode="inline" maxHeight="16rem" className="border-border/30" />

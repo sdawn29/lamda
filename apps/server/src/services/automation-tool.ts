@@ -28,8 +28,7 @@ function deriveName(prompt: string): string {
   if (!first) return "Untitled automation"
   const words = first.split(/\s+/)
   let name = words.slice(0, 7).join(" ")
-  if (words.length > 7) name += "…"
-  if (name.length > 52) name = name.slice(0, 52).trimEnd() + "…"
+  if (name.length > 52) name = name.slice(0, 52).trimEnd()
   return name.charAt(0).toUpperCase() + name.slice(1)
 }
 

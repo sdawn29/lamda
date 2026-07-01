@@ -296,7 +296,7 @@ export function CommitInputSection({
         <AutoTextarea
           value={message}
           onChange={setMessage}
-          placeholder="Write a commit message…"
+          placeholder="Write a commit message"
           className="px-3 pt-2 pb-1 text-xs"
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCommit()
@@ -336,7 +336,7 @@ export function CommitInputSection({
                   ) : (
                     <Sparkles />
                   )}
-                  {generating ? "Generating…" : "Generate"}
+                  {generating ? "Generating" : "Generate"}
                 </Button>
               }
             />

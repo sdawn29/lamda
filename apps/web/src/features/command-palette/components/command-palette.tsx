@@ -205,7 +205,7 @@ export function CommandPalette() {
     >
       <Command>
         <CommandInput
-          placeholder="Search commands…"
+          placeholder="Search commands"
           autoFocus
           onValueChange={setSearch}
         />
@@ -222,7 +222,7 @@ export function CommandPalette() {
                 {filesLoading ? (
                   <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
                     <Loader2 className="size-3 animate-spin" />
-                    Indexing workspace…
+                    Indexing workspace
                   </div>
                 ) : (
                   files.map((file) => {

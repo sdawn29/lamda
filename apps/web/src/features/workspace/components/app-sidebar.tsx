@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, memo } from "react"
 import {
   Archive,
   Clock,
+  Container,
   ExternalLink,
   Folder,
   FolderOpen,
@@ -652,6 +653,15 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
               <Clock className="size-3.5" />
               Automations
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-full justify-start gap-2 text-xs"
+              onClick={() => navigate({ to: "/skills" })}
+            >
+              <Container className="size-3.5" />
+              Skills
+            </Button>
           </div>
         )}
 
@@ -814,7 +824,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
               onClick={handleConfirmDelete}
               disabled={isDeleting}
             >
-              {isDeleting ? "Deleting…" : "Delete"}
+              {isDeleting ? "Deleting" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

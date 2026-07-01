@@ -324,7 +324,7 @@ export function ContextChart({
               {isCompacting ? (
                 <>
                   <Loader2Icon className="h-3 w-3 animate-spin" />
-                  Compacting…
+                  Compacting
                 </>
               ) : (
                 <>

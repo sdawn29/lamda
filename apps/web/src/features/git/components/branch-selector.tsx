@@ -143,7 +143,7 @@ export function BranchSelector({
           sideOffset={6}
         >
           <Command>
-            <CommandInput placeholder="Search branch…" />
+            <CommandInput placeholder="Search branch" />
             <CommandList>
               <CommandEmpty>No branches found</CommandEmpty>
               <CommandGroup>
@@ -182,7 +182,7 @@ export function BranchSelector({
                       >
                         <PlusIcon />
                         {initializeRepository.isPending
-                          ? "Initializing repository…"
+                          ? "Initializing repository"
                           : "Initialize repository"}
                       </CommandItem>
                     ) : null}
@@ -222,7 +222,7 @@ export function BranchSelector({
               onClick={handleCreate}
               disabled={!newBranch.trim() || createPending}
             >
-              {createPending ? "Creating…" : "Create"}
+              {createPending ? "Creating" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -70,7 +70,7 @@ export function ThemeEditor() {
           }}
         >
           <SelectTrigger className="min-w-40" aria-label="Start from a preset">
-            <SelectValue placeholder="Start from preset…" />
+            <SelectValue placeholder="Start from preset" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>

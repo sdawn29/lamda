@@ -247,7 +247,7 @@ function EnvDialogBody({
           Cancel
         </Button>
         <Button size="sm" onClick={handleSave} disabled={updateEnv.isPending}>
-          {updateEnv.isPending ? "Saving…" : "Save changes"}
+          {updateEnv.isPending ? "Saving" : "Save changes"}
         </Button>
       </DialogFooter>
     </>

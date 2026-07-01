@@ -157,7 +157,7 @@ export function CreateMrDialog({
                   <Loader2 className="size-4 animate-spin" />
                 )}
                 {createMr.isPending
-                  ? "Pushing & creating…"
+                  ? "Pushing & creating"
                   : "Create merge request"}
               </Button>
             </>

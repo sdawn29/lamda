@@ -844,7 +844,7 @@ export const FileContentView = memo(function FileContentView({
           <div className="flex flex-1 items-center justify-center">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
-              Loading file…
+              Loading file
             </div>
           </div>
         ) : (

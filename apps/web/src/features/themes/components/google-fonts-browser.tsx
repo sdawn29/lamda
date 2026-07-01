@@ -189,7 +189,7 @@ export function GoogleFontsBrowser({
       <PopoverContent align="end" className="w-72 gap-0 p-0">
         <Command shouldFilter={false} defaultValue={value}>
           <CommandInput
-            placeholder="Search fonts…"
+            placeholder="Search fonts"
             value={search}
             onValueChange={setSearch}
           />

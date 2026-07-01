@@ -50,7 +50,7 @@ export function McpSettingsCard() {
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
             {isLoading
-              ? "Loading…"
+              ? "Loading"
               : servers.length === 0
                 ? "No servers configured"
                 : `${servers.length} server${servers.length === 1 ? "" : "s"}`}

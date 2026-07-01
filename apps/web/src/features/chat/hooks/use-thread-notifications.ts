@@ -37,7 +37,7 @@ function clip(text: string | undefined, max = 140): string | undefined {
   if (!text) return undefined
   const oneLine = text.replace(/\s+/g, " ").trim()
   if (!oneLine) return undefined
-  return oneLine.length > max ? `${oneLine.slice(0, max - 1)}…` : oneLine
+  return oneLine.length > max ? oneLine.slice(0, max) : oneLine
 }
 
 /**

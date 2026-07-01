@@ -471,7 +471,7 @@ function describeTodo(msg: ToolMessage): { label: string; tone: TodoTone } {
     const n = Array.isArray(a.items) ? a.items.length : 0
     if (running) {
       return {
-        label: goal ? `Creating "${goal}"…` : "Creating tasks…",
+        label: goal ? `Creating "${goal}"` : "Creating tasks",
         tone: "active",
       }
     }
@@ -492,7 +492,7 @@ function describeTodo(msg: ToolMessage): { label: string; tone: TodoTone } {
     if (status === "completed") {
       if (content) return { label: `Completed "${content}"`, tone: "done" }
       return {
-        label: running ? "Completing task…" : "Task completed",
+        label: running ? "Completing task" : "Task completed",
         tone: "done",
       }
     }
@@ -503,22 +503,22 @@ function describeTodo(msg: ToolMessage): { label: string; tone: TodoTone } {
           tone: running ? "active" : "done",
         }
       return {
-        label: running ? "Starting task…" : "Task in progress",
+        label: running ? "Starting task" : "Task in progress",
         tone: "active",
       }
     }
     if (content) return { label: `Updated: ${content}`, tone: "done" }
-    return { label: running ? "Updating task…" : "Task updated", tone: "done" }
+    return { label: running ? "Updating task" : "Task updated", tone: "done" }
   }
 
   if (op === "delete") {
     const id = typeof a.id === "string" ? a.id : ""
     const content = findTodoTask(parseTodoGoals(msg), id)?.content
     if (content) return { label: `Removed: ${content}`, tone: "done" }
-    return { label: running ? "Removing task…" : "Task removed", tone: "done" }
+    return { label: running ? "Removing task" : "Task removed", tone: "done" }
   }
 
-  return { label: running ? "Loading tasks…" : "Tasks", tone: "done" }
+  return { label: running ? "Loading tasks" : "Tasks", tone: "done" }
 }
 
 // ── ReadView ───────────────────────────────────────────────────────────────────
@@ -688,7 +688,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     if (isPending) {
       const summary =
         prompts.length === 0
-          ? "Waiting for your answer…"
+          ? "Waiting for your answer"
           : prompts.length === 1
             ? prompts[0]
             : `Asked you ${prompts.length} questions`
@@ -1069,12 +1069,12 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               (isEdit || !resultText) && (
                 <span className="animate-thinking-shimmer bg-linear-to-r from-muted-foreground/30 via-foreground/80 to-muted-foreground/30 bg-size-[200%_100%] bg-clip-text text-transparent">
                   {isEdit
-                    ? "Editing…"
+                    ? "Editing"
                     : skillName
-                      ? "Loading skill…"
+                      ? "Loading skill"
                       : isRead
-                        ? "Reading…"
-                        : "Running…"}
+                        ? "Reading"
+                        : "Running"}
                 </span>
               )}
 

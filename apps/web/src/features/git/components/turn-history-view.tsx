@@ -62,7 +62,7 @@ export const TurnHistoryView = memo(function TurnHistoryView({
       <div className="flex min-h-0 flex-1 items-center justify-center">
         <div className="flex items-center gap-2 text-xs text-muted-foreground/50">
           <Loader2 className="size-3 animate-spin" />
-          Loading…
+          Loading
         </div>
       </div>
     )

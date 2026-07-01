@@ -108,7 +108,7 @@ export function SlashCommandDropdown({
         <CommandList ref={listRef} className="max-h-60">
           {isLoading && flat.length === 0 ? (
             <div className="px-2 py-1.5 text-xs text-muted-foreground">
-              Loading commands…
+              Loading commands
             </div>
           ) : flat.length === 0 ? (
             <CommandEmpty>

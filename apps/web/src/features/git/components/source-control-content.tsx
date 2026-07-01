@@ -139,7 +139,7 @@ export const SourceControlContent = memo(function SourceControlContent({
                   {loading && staged.length === 0 && unstaged.length === 0 && (
                     <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
                       <Loader2 className="size-3 animate-spin" />
-                      Loading status…
+                      Loading status
                     </div>
                   )}
 

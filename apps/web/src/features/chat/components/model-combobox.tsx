@@ -99,7 +99,7 @@ export function ModelCombobox({
         sideOffset={6}
       >
         <Command filter={filter}>
-          <CommandInput placeholder="Search models…" />
+          <CommandInput placeholder="Search models" />
           <CommandList>
             <CommandEmpty>No models found</CommandEmpty>
             {groups.map(([provider, items]) => {

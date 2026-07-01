@@ -386,7 +386,7 @@ export function WorktreeSelector({
                     <span className="flex min-w-0 flex-col">
                       <span className="text-xs font-medium">
                         {checkoutToLocal.isPending
-                          ? "Checking out…"
+                          ? "Checking out"
                           : "Checkout to local"}
                       </span>
                       <span className="text-3xs text-muted-foreground">
@@ -405,7 +405,7 @@ export function WorktreeSelector({
                     <span className="flex min-w-0 flex-col">
                       <span className="text-xs font-medium">
                         {mergeWorktree.isPending
-                          ? "Merging…"
+                          ? "Merging"
                           : "Merge to workspace"}
                       </span>
                       <span className="text-3xs text-muted-foreground">
@@ -476,7 +476,7 @@ export function WorktreeSelector({
               onClick={handleCreate}
               disabled={!newBranch.trim() || createWorktree.isPending}
             >
-              {createWorktree.isPending ? "Creating…" : "Create worktree"}
+              {createWorktree.isPending ? "Creating" : "Create worktree"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -499,7 +499,7 @@ export function WorktreeSelector({
               onClick={() => runMerge(true)}
               disabled={mergeWorktree.isPending}
             >
-              {mergeWorktree.isPending ? "Merging…" : "Merge anyway"}
+              {mergeWorktree.isPending ? "Merging" : "Merge anyway"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

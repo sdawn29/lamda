@@ -58,7 +58,7 @@ export function GitlabReviewView({
   const [publishOpen, setPublishOpen] = useState(false)
 
   if (statusLoading) {
-    return <PanelMessage loading message="Checking GitLab…" />
+    return <PanelMessage loading message="Checking GitLab" />
   }
 
   if (!connected) {
@@ -76,7 +76,7 @@ export function GitlabReviewView({
   }
 
   if (repoLoading) {
-    return <PanelMessage loading message="Loading repository…" />
+    return <PanelMessage loading message="Loading repository" />
   }
 
   if (!repo) {
@@ -272,7 +272,7 @@ function PublishGitlabRepositoryDialog({
             {publishRepository.isPending ? (
               <>
                 <Loader2 className="size-3 animate-spin" />
-                Publishing…
+                Publishing
               </>
             ) : (
               <>
@@ -337,7 +337,7 @@ function ListState({
     return (
       <div className="flex items-center gap-2 px-3 py-2 text-2xs text-muted-foreground/60">
         <Loader2 className="size-3 animate-spin" />
-        Loading…
+        Loading
       </div>
     )
   }

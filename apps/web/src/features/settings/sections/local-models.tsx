@@ -717,7 +717,7 @@ function ConfigureProviderDialog({
             {saveMutation.isPending ? (
               <>
                 <Loader2 data-icon="inline-start" className="animate-spin" />
-                Saving…
+                Saving
               </>
             ) : (
               <>
@@ -958,7 +958,7 @@ export function LocalModelsSection() {
         {isLoading ? (
           <div className="flex items-center gap-2 py-8 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Loading…
+            Loading
           </div>
         ) : data?.error ? (
           <p className="flex items-start gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
