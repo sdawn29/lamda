@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.40.0](../../releases/tag/v0.40.0) — 2026-07-01
+
+### Features
+
+* **chat:** remove unused inputMinHeightClassName from NewThreadView component
+* **chat:** enhance working block behavior and chat scroll functionality
+
 ## [0.39.0](../../releases/tag/v0.39.0) — 2026-07-01
 
 ### Features
