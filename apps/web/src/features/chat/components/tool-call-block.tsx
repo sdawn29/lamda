@@ -1,6 +1,5 @@
 import { lazy, memo, Suspense, useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
 import {
   AlertCircleIcon,
   ArrowRightIcon,
@@ -32,7 +31,11 @@ import {
   DisclosureChevron,
 } from "./disclosure"
 import { LivePre } from "./live-pre"
-import { chatProseClass, markdownComponents } from "./markdown-components"
+import {
+  chatProseClass,
+  markdownComponents,
+  remarkPlugins,
+} from "./markdown-components"
 import { DiffView, detectLanguage, parseDiffCounts } from "@/features/git"
 import { useSyntaxTheme } from "@/features/themes"
 import { RollingTimerText } from "./working-block"
@@ -586,7 +589,7 @@ function SkillView({ skill }: { skill: SkillFrontmatter }) {
         <div className="max-h-72 overflow-auto border-t border-border/40 pt-2">
           <div className={cn(chatProseClass, "text-xs opacity-70")}>
             <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
+              remarkPlugins={remarkPlugins}
               components={markdownComponents}
             >
               {skill.body}

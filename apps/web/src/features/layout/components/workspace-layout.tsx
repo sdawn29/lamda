@@ -391,10 +391,12 @@ export function WorkspaceLayout() {
               terminal island stacked below it, with a resize gutter as the gap.
               Chrome lives in the unified titlebar island above. */}
           <div
-            className="flex h-full flex-1 flex-col overflow-hidden"
+            className="flex h-full flex-1 flex-col overflow-hidden transition-[flex-grow,opacity] duration-200 ease-linear"
             style={{
-              display: diffFullscreen ? "none" : undefined,
-              minWidth: MIN_CHAT_PANEL_WIDTH,
+              flexGrow: diffFullscreen ? 0 : 1,
+              minWidth: diffFullscreen ? 0 : MIN_CHAT_PANEL_WIDTH,
+              opacity: diffFullscreen ? 0 : 1,
+              pointerEvents: diffFullscreen ? "none" : undefined,
             }}
           >
             <SidebarInset className="min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-border shadow-md">
@@ -452,21 +454,27 @@ export function WorkspaceLayout() {
                 style={
                   {
                     "--sidebar-width": `${rightSidebarWidth}px`,
+                    // flex-basis comes from the width classes below (flex-none
+                    // resolves an "auto" basis to the element's width); only
+                    // flex-grow toggles here, so fullscreen grows smoothly
+                    // from whatever width is currently on screen instead of
+                    // snapping to a recalculated basis.
+                    flexGrow: diffFullscreen ? 1 : 0,
                   } as React.CSSProperties
                 }
                 className={cn(
-                  "h-full min-h-0 overflow-hidden transition-[width] duration-200 ease-linear",
+                  "h-full min-h-0 overflow-hidden transition-[width,flex-grow] duration-200 ease-linear",
                   isMobile
                     ? "hidden"
-                    : diffFullscreen
-                      ? "flex-1"
-                      : rightSidebarOpen
-                        ? // Cap at the available space so the sidebar never
+                    : rightSidebarOpen
+                      ? diffFullscreen
+                        ? "w-(--sidebar-width) flex-none"
+                        : // Cap at the available space so the sidebar never
                           // overflows the right padding as the window shrinks —
                           // always leaving the chat panel its min width plus the
                           // 0.5rem resize gutter (MIN_CHAT_PANEL_WIDTH = 420).
                           "w-(--sidebar-width) max-w-[calc(100%-420px-0.5rem)] flex-none"
-                        : "w-0 flex-none"
+                      : "w-0 flex-none"
                 )}
               >
                 <RightSidebarContent

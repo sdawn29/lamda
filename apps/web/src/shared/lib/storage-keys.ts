@@ -6,7 +6,6 @@ export const APP_SETTINGS_KEYS = {
   TITLE_GENERATION_PROMPT: "title_generation_prompt",
   TITLE_GENERATION_MODEL: "title_generation_model",
   SHOW_THINKING: "show_thinking",
-  THINKING_PHRASES: "thinking_phrases",
   RICH_CHAT_RENDERING: "rich_chat_rendering",
   ONBOARDING_COMPLETED: "onboarding_completed",
   THEME: "theme",

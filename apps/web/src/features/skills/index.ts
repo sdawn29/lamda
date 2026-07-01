@@ -1,6 +1,7 @@
 export { SkillsPage } from "./components/skills-page"
 export { SkillDetailPage } from "./components/skill-detail-page"
 export { useSkillsSearchStore } from "./store"
+export { useSkillDetails } from "./queries"
 export type {
   InstalledSkill,
   SkillDetails,

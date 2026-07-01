@@ -39,7 +39,7 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { useWorkspace } from "@/features/workspace"
 import { useTerminalForWorkspace } from "@/features/terminal"
-import { useSkillsSearchStore } from "@/features/skills"
+import { useSkillsSearchStore, useSkillDetails } from "@/features/skills"
 import { useAutomationsUiStore } from "@/features/automations"
 import { useRightSidebar } from "../store/right-sidebar"
 import {
@@ -159,6 +159,7 @@ export function TitleBar() {
   const isSettings = pathname === "/settings"
   const isAutomations = pathname === "/automations"
   const isSkills = pathname === "/skills"
+  const isSkillDetail = pathname.startsWith("/skills/")
   const skillsQuery = useSkillsSearchStore((s) => s.query)
   const setSkillsQuery = useSkillsSearchStore((s) => s.setQuery)
   const openNewAutomation = useAutomationsUiStore((s) => s.openNew)
@@ -184,7 +185,16 @@ export function TitleBar() {
   const { activeTab } = useMainTabs()
 
   // URL-based thread — drives center display and thread actions
-  const { threadId } = useParams({ strict: false }) as { threadId?: string }
+  const { threadId, id: skillDetailId } = useParams({ strict: false }) as {
+    threadId?: string
+    id?: string
+  }
+  const skillDetailSource = skillDetailId
+    ? decodeURIComponent(skillDetailId)
+    : undefined
+  const { data: skillDetails } = useSkillDetails(
+    isSkillDetail ? skillDetailSource : undefined
+  )
   const urlActiveThread = useMemo(
     () =>
       threadId
@@ -351,7 +361,7 @@ export function TitleBar() {
   const drag = { WebkitAppRegion: "drag" } as React.CSSProperties
   const noDrag = { WebkitAppRegion: "no-drag" } as React.CSSProperties
   const island =
-    "flex h-full shrink-0 items-center rounded-full border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-full"
+    "flex h-full shrink-0 items-center rounded-lg border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-md"
 
   return (
     <div
@@ -514,6 +524,28 @@ export function TitleBar() {
         </>
       )}
 
+      {/* ── Skill detail page island: breadcrumb (back nav lives in the
+          navigation island) ────────────────────────────────────────────── */}
+      {isSkillDetail && (
+        <div
+          className={cn(island, "min-w-0 shrink gap-1.5 px-2.5")}
+          style={noDrag}
+        >
+          <Container className="size-3.5 shrink-0 text-muted-foreground/70" />
+          <span className="shrink-0 text-sm font-semibold text-muted-foreground/70">
+            Skills
+          </span>
+          {skillDetails && (
+            <>
+              <span className="text-muted-foreground/40 select-none">/</span>
+              <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                {skillDetails.name}
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ── Thread name + options island (truncates, shrinks before filler) ─ */}
       {urlActiveThread && (
         <div
@@ -635,14 +667,16 @@ export function TitleBar() {
         )}
 
       {/* Task, open-with, terminal and right-sidebar islands are workspace/
-          thread-scoped, so they're hidden on the (global) automations page. */}
-      {!isAutomations && (
+          thread-scoped, so they're hidden on the (global) automations and
+          skills pages. */}
+      {!isAutomations && !isSkills && !isSkillDetail && (
         <>
           {/* ── Task dropdown ──────────────────────────────────────────────── */}
           <div className={island} style={noDrag}>
             <TasksDropdown
               workspaceId={actionWorkspace?.id ?? ""}
               onRunTask={runTerminalCommand}
+              isMobile={isMobile}
             />
           </div>
 
@@ -652,6 +686,7 @@ export function TitleBar() {
               workspaceId={actionWorkspace?.id}
               workspacePath={actionWorkspace?.path}
               openWithAppId={actionWorkspace?.openWithAppId}
+              isMobile={isMobile}
             />
           </div>
 

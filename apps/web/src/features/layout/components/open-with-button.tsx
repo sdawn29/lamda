@@ -68,10 +68,12 @@ export function OpenWithButton({
   workspaceId,
   workspacePath,
   openWithAppId,
+  isMobile = false,
 }: {
   workspaceId?: string
   workspacePath?: string
   openWithAppId?: string | null
+  isMobile?: boolean
 }) {
   const { data: platform } = useElectronPlatform()
   const isMac = platform === "darwin"
@@ -137,7 +139,10 @@ export function OpenWithButton({
   return (
     <div className="flex items-center gap-0.5" aria-label="Open workspace in app">
       <Button
-        className="h-7 gap-1.5 rounded-md px-2 text-muted-foreground hover:text-foreground"
+        className={cn(
+          "h-7 rounded-md text-muted-foreground hover:text-foreground",
+          isMobile ? "w-7 px-0" : "gap-1.5 px-2"
+        )}
         disabled={disabled}
         onClick={() => {
           void openWorkspace()
@@ -154,9 +159,11 @@ export function OpenWithButton({
             className="size-4"
           />
         )}
-        <span className="whitespace-nowrap text-xs font-medium">
-          {selectedAppName}
-        </span>
+        {!isMobile && (
+          <span className="whitespace-nowrap text-xs font-medium">
+            {selectedAppName}
+          </span>
+        )}
       </Button>
 
       <div className="h-3.5 w-px shrink-0 bg-border/70" />

@@ -1018,7 +1018,7 @@ export const ChatComposer = memo(
                 </span>
               </div>
             )}
-            <div className="px-2.5 pt-3 pb-1.5">
+            <div className="px-2.5 pt-3 pb-0.5">
               <RichInput
                 ref={richInputRef}
                 placeholder={
@@ -1131,7 +1131,7 @@ export const ChatComposer = memo(
               }}
             />
 
-            <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-2">
+            <div className="flex items-center justify-between gap-2 px-2 pt-0 pb-2">
               <div className="flex items-center gap-0.5">
                 <ModelCombobox
                   groups={grouped}

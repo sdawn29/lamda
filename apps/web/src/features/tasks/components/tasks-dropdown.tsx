@@ -8,6 +8,7 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
+import { cn } from "@/shared/lib/utils"
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "../queries"
 import { useLastUsedTaskStore } from "../last-used-store"
 import { TaskIcon } from "../icons"
@@ -19,9 +20,14 @@ import type { WorkspaceTask } from "../types"
 interface TasksDropdownProps {
   workspaceId: string
   onRunTask: (command: string) => void
+  isMobile?: boolean
 }
 
-export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
+export function TasksDropdown({
+  workspaceId,
+  onRunTask,
+  isMobile = false,
+}: TasksDropdownProps) {
   const { data: tasks = [] } = useTasks(workspaceId)
   const createTask = useCreateTask(workspaceId)
   const updateTask = useUpdateTask(workspaceId)
@@ -69,7 +75,10 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
             render={
               <Button
                 variant="ghost"
-                className="h-7 gap-1.5 rounded-md px-2 text-muted-foreground hover:text-foreground"
+                className={cn(
+                  "h-7 rounded-md text-muted-foreground hover:text-foreground",
+                  isMobile ? "w-7 px-0" : "gap-1.5 px-2"
+                )}
                 disabled={!lastUsedTask}
                 onClick={() => lastUsedTask && runTask(lastUsedTask)}
               >
@@ -79,16 +88,20 @@ export function TasksDropdown({ workspaceId, onRunTask }: TasksDropdownProps) {
                       id={lastUsedTask.icon}
                       className="shrink-0 text-muted-foreground"
                     />
-                    <span className="max-w-32 truncate whitespace-nowrap text-xs font-medium">
-                      {lastUsedTask.name || lastUsedTask.command}
-                    </span>
+                    {!isMobile && (
+                      <span className="max-w-32 truncate whitespace-nowrap text-xs font-medium">
+                        {lastUsedTask.name || lastUsedTask.command}
+                      </span>
+                    )}
                   </>
                 ) : (
                   <>
                     <Play className="size-4" />
-                    <span className="whitespace-nowrap text-xs font-medium">
-                      Tasks
-                    </span>
+                    {!isMobile && (
+                      <span className="whitespace-nowrap text-xs font-medium">
+                        Tasks
+                      </span>
+                    )}
                   </>
                 )}
               </Button>

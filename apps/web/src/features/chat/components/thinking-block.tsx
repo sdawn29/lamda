@@ -1,7 +1,10 @@
 import { memo } from "react"
 import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import { chatProseClass, markdownComponents } from "./markdown-components"
+import {
+  chatProseClass,
+  markdownComponents,
+  remarkPlugins,
+} from "./markdown-components"
 import { useWordReveal } from "../hooks/use-word-reveal"
 
 export const ThinkingBlock = memo(function ThinkingBlock({
@@ -17,7 +20,7 @@ export const ThinkingBlock = memo(function ThinkingBlock({
     <div className="opacity-50">
       <div className={chatProseClass}>
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
+          remarkPlugins={remarkPlugins}
           components={markdownComponents}
         >
           {displayContent}

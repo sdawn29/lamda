@@ -335,8 +335,8 @@ export function RightSidebarContent({
         <SheetContent
           side="right"
           showCloseButton={false}
-          className="bg-sidebar p-0 text-sidebar-foreground sm:max-w-none"
-          style={{ width: "80vw", maxWidth: "80vw" }}
+          className="bg-transparent p-0 text-sidebar-foreground shadow-none data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100%-1rem)] data-[side=right]:border-l-0 sm:max-w-none"
+          style={{ width: 720, maxWidth: "calc(85vw - 1rem)" }}
         >
           {sidebarEl}
         </SheetContent>

@@ -3,7 +3,6 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import {
   AlertCircle,
-  ArrowLeft,
   Download,
   ExternalLink,
   FileText,
@@ -63,24 +62,6 @@ export function SkillDetailPage({ source }: { source: string }) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
-          onClick={() => navigate({ to: "/skills" })}
-        >
-          <ArrowLeft className="size-3.5" />
-          Skills
-        </Button>
-        {details && (
-          <>
-            <span className="text-muted-foreground/40">/</span>
-            <h1 className="truncate text-sm font-semibold">{details.name}</h1>
-          </>
-        )}
-      </header>
-
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-5">
           {isLoading && <DetailSkeleton />}

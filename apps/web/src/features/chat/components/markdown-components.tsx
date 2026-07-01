@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import type { Components } from "react-markdown"
+import remarkGfm from "remark-gfm"
+import type { PluggableList } from "unified"
 import { Icon } from "@iconify/react"
 import { useSyntaxTheme } from "@/features/themes"
 import { useMainTabsStore } from "@/features/main-tabs"
@@ -13,19 +15,30 @@ import { MessageChip } from "./message-chip"
 
 const PrismCode = lazy(() => import("./prism-code"))
 
+/** Shared remark plugin list — hoisted so every markdown surface passes the
+ * same stable reference instead of allocating a new array each render. */
+export const remarkPlugins: PluggableList = [remarkGfm]
+
+/**
+ * Shared base for both prose variants below: sizing, font, and link styling
+ * that never differ between compact and rich chat rendering.
+ */
+const CHAT_PROSE_BASE =
+  "prose prose-sm max-w-none dark:prose-invert font-chat " +
+  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
+
 /**
  * Single source of truth for chat-surface markdown typography, shared by the
  * assistant message body and the (dimmed) thinking block so their font, leading,
  * and block spacing stay identical. Code-block sizing lives in CodeBlock below.
  */
 export const chatProseClass =
-  "prose prose-sm max-w-none dark:prose-invert font-chat " +
-  "prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-snug prose-headings:my-0 " +
-  "prose-p:leading-[1.75] prose-p:mt-0 prose-p:mb-[0.75em] " +
+  CHAT_PROSE_BASE +
+  " prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-snug prose-headings:my-0 " +
+  "prose-p:leading-[1.5] prose-p:mt-0 prose-p:mb-[0.5em] " +
   "prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 " +
-  "[&_li]:text-sm [&_li]:leading-[1.75] [&_li>p]:my-0 " +
-  "[&>*+*]:mt-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 " +
-  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
+  "[&_li]:text-sm [&_li]:leading-[1.5] [&_li>p]:my-0 " +
+  "[&>*+*]:mt-1 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
 
 /**
  * Rich variant of {@link chatProseClass}: keeps the chat font but restores the
@@ -33,23 +46,22 @@ export const chatProseClass =
  * blockquotes — for users who opt into rich rendering in Chat settings.
  */
 export const chatProseClassRich =
-  "prose prose-sm max-w-none dark:prose-invert font-chat " +
-  "prose-headings:text-foreground prose-headings:font-semibold prose-headings:leading-tight " +
+  CHAT_PROSE_BASE +
+  " prose-headings:text-foreground prose-headings:font-semibold prose-headings:leading-tight " +
   "prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-h4:text-[0.95rem] prose-h5:text-sm prose-h6:text-[0.8125rem] " +
-  "prose-p:leading-relaxed " +
+  "prose-p:leading-normal " +
   "prose-strong:text-foreground prose-strong:font-semibold " +
   "prose-em:italic prose-em:text-foreground " +
-  "prose-hr:my-4 prose-hr:border-border " +
+  "prose-hr:my-3 prose-hr:border-border " +
   "prose-blockquote:border-l-2 prose-blockquote:border-border prose-blockquote:font-normal prose-blockquote:text-muted-foreground " +
-  "prose-ul:list-disc prose-ol:list-decimal prose-li:my-1 prose-li:leading-relaxed prose-li:marker:text-muted-foreground " +
-  "[&_li>p]:my-0 [&_li>p]:leading-relaxed " +
+  "prose-ul:list-disc prose-ol:list-decimal prose-li:my-0.5 prose-li:leading-normal prose-li:marker:text-muted-foreground " +
+  "[&_li>p]:my-0 [&_li>p]:leading-normal " +
   "[&_.contains-task-list]:list-none [&_.contains-task-list]:pl-0 " +
   "[&_.task-list-item]:my-0.5 [&_.task-list-item]:list-none [&_.task-list-item]:pl-0 " +
   "[&_del]:text-muted-foreground [&_del]:line-through " +
   "[&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_mark]:text-foreground " +
   "[&_sub]:align-sub [&_sub]:text-[0.75em] [&_sup]:align-super [&_sup]:text-[0.75em] " +
-  "[&_kbd]:rounded [&_kbd]:border [&_kbd]:border-border [&_kbd]:bg-muted [&_kbd]:px-1 [&_kbd]:font-mono [&_kbd]:text-[0.75em] " +
-  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
+  "[&_kbd]:rounded [&_kbd]:border [&_kbd]:border-border [&_kbd]:bg-muted [&_kbd]:px-1 [&_kbd]:font-mono [&_kbd]:text-[0.75em]"
 
 /** Inline `code` span styling, shared by both component maps below. */
 const INLINE_CODE_CLASS =
@@ -57,7 +69,11 @@ const INLINE_CODE_CLASS =
 
 /** Fenced/indented code blocks render at 12px to match the Prism highlighter. */
 const CODE_BLOCK_PRE_CLASS =
-  "overflow-x-auto bg-transparent px-4 py-3 font-code text-xs leading-relaxed text-foreground"
+  "overflow-x-auto bg-transparent px-3 py-2.5 font-code text-xs leading-normal text-foreground"
+
+/** Wrapper margin shared by highlighted and plain code blocks. */
+const CODE_BLOCK_WRAPPER_CLASS =
+  "group/codeblock relative my-2.5 overflow-hidden rounded-lg border border-border"
 
 function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
@@ -112,6 +128,13 @@ function TaskCheckbox({ checked }: { checked?: boolean }) {
   )
 }
 
+// react-markdown v9+ removed the `inline` prop. The reliable heuristic: remark
+// always appends a trailing "\n" to fenced/indented code block content, but
+// never to inline code spans.
+function isCodeBlock(className: string | undefined, children: React.ReactNode) {
+  return String(children).endsWith("\n") || !!className?.startsWith("language-")
+}
+
 function CodeBlock({
   className,
   children,
@@ -125,7 +148,7 @@ function CodeBlock({
 
   if (match) {
     return (
-      <div className="group/codeblock relative my-4 overflow-hidden rounded-lg border border-border">
+      <div className={CODE_BLOCK_WRAPPER_CLASS}>
         <CopyButton code={code} />
         <Suspense
           fallback={
@@ -148,7 +171,7 @@ function CodeBlock({
 
   // Unlabelled code blocks stay unhighlighted to keep the base chat chunk small.
   return (
-    <div className="group/codeblock relative my-4 overflow-hidden rounded-lg border border-border">
+    <div className={CODE_BLOCK_WRAPPER_CLASS}>
       <CopyButton code={code} />
       <pre className={CODE_BLOCK_PRE_CLASS}>
         <code className="text-foreground">{code}</code>
@@ -320,17 +343,14 @@ function createMarkdownComponents(rootPath?: string, rich = false): Components {
   return {
     ...(rich ? baseMarkdownComponents : markdownComponents),
     code: ({ className, children }) => {
-      const isBlock =
-        String(children).endsWith("\n") || className?.startsWith("language-")
-      if (!isBlock) {
-        const text = String(children)
-        const reference = parseFileReference(text)
-        if (reference) {
-          return <FileReferenceLink reference={reference} rootPath={rootPath} />
-        }
-        return <code className={INLINE_CODE_CLASS}>{children}</code>
+      if (isCodeBlock(className, children)) {
+        return <CodeBlock className={className}>{children}</CodeBlock>
       }
-      return <CodeBlock className={className}>{children}</CodeBlock>
+      const reference = parseFileReference(String(children))
+      if (reference) {
+        return <FileReferenceLink reference={reference} rootPath={rootPath} />
+      }
+      return <code className={INLINE_CODE_CLASS}>{children}</code>
     },
   }
 }
@@ -343,18 +363,18 @@ function createMarkdownComponents(rootPath?: string, rich = false): Components {
 const baseMarkdownComponents: Components = {
   // ── Tables ──────────────────────────────────────────────────────────────────
   table: ({ children }) => (
-    <div className="not-prose my-2 overflow-x-auto rounded-lg border border-border">
+    <div className="not-prose my-1.5 overflow-x-auto rounded-lg border border-border">
       <table className="w-full border-collapse text-sm">{children}</table>
     </div>
   ),
   thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
   th: ({ children }) => (
-    <th className="border-b border-border px-4 py-2 text-left font-medium">
+    <th className="border-b border-border px-3 py-1.5 text-left font-medium">
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="border-b border-border/50 px-4 py-2 last:border-0">
+    <td className="border-b border-border/50 px-3 py-1.5 last:border-0">
       {children}
     </td>
   ),
@@ -366,17 +386,12 @@ const baseMarkdownComponents: Components = {
   // We intercept at the `code` level so we can read the language from className.
   // `pre` is suppressed (returns Fragment) so SyntaxHighlighter owns the wrapper.
   pre: ({ children }) => <>{children}</>,
-  code: ({ className, children }) => {
-    // react-markdown v9+ removed the `inline` prop. The reliable heuristic:
-    // remark always appends a trailing "\n" to fenced/indented code block
-    // content, but never to inline code spans.
-    const isBlock =
-      String(children).endsWith("\n") || className?.startsWith("language-")
-    if (!isBlock) {
-      return <code className={INLINE_CODE_CLASS}>{children}</code>
-    }
-    return <CodeBlock className={className}>{children}</CodeBlock>
-  },
+  code: ({ className, children }) =>
+    isCodeBlock(className, children) ? (
+      <CodeBlock className={className}>{children}</CodeBlock>
+    ) : (
+      <code className={INLINE_CODE_CLASS}>{children}</code>
+    ),
   // ── Task lists ──────────────────────────────────────────────────────────────
   // remark-gfm tags task items with `task-list-item` and renders a disabled
   // <input type="checkbox">. We lay the row out as checkbox + text and swap the

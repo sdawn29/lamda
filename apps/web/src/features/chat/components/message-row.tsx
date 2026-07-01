@@ -1,7 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react"
 import Markdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import type { PluggableList } from "unified"
 import {
   AlertCircleIcon,
   CheckIcon,
@@ -26,13 +24,12 @@ import {
   AlertDialogCancel,
 } from "@/shared/ui/alert-dialog"
 
-const remarkPlugins: PluggableList = [remarkGfm]
-
 import { ToolCallBlock } from "./tool-call-block"
 import {
   chatProseClass,
   chatProseClassRich,
   getMarkdownComponents,
+  remarkPlugins,
 } from "./markdown-components"
 import { UserMessageContent } from "./user-message"
 import { CopyButton } from "@/shared/components/copy-button"
