@@ -710,7 +710,6 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               onModeChange={setSelectedMode}
               approvalMode={selectedApprovalMode}
               onApprovalModeChange={setSelectedApprovalMode}
-              inputMinHeightClassName="min-h-24"
               placeholder={
                 noWorkspaces
                   ? "Add a workspace to start a thread"
