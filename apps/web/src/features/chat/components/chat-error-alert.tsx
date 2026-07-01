@@ -87,7 +87,7 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-3xl px-6 pb-1",
+        "mx-auto w-full max-w-4xl px-3 pb-1",
         "animate-in slide-in-from-bottom-2 fade-in-0 duration-200"
       )}
     >

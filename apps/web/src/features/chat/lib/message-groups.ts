@@ -14,6 +14,8 @@ export type MessageGroup =
       suppressThinking?: boolean
       isLastInTurnStatic: boolean
       turnMessages?: AssistantMessage[]
+      /** Consecutive identical assistant errors folded into this one row. */
+      repeatCount?: number
     }
   | {
       type: "working"
@@ -53,6 +55,15 @@ export function groupChatMessages(messages: Message[]): MessageGroup[] {
     return false
   }
 
+  // A "pure" error message carries nothing but the error — no reply text, no
+  // thinking — so a run of these back-to-back (repeated auto-retries hitting
+  // the same failure) is just noise repeated, not new information.
+  const isPureError = (m: Message): m is AssistantMessage =>
+    m.role === "assistant" &&
+    !(m as AssistantMessage).content.trim() &&
+    !(m as AssistantMessage).thinking.trim() &&
+    !!(m as AssistantMessage).errorMessage
+
   while (i < messages.length) {
     const msg = messages[i]
     if (isWorkingEntry(msg)) {
@@ -82,6 +93,20 @@ export function groupChatMessages(messages: Message[]): MessageGroup[] {
     } else {
       const suppress = suppressNextThinking && msg.role === "assistant"
       suppressNextThinking = false
+
+      const prevGroup = groups[groups.length - 1]
+      if (
+        isPureError(msg) &&
+        prevGroup?.type === "regular" &&
+        isPureError(prevGroup.message) &&
+        prevGroup.message.errorMessage === msg.errorMessage
+      ) {
+        prevGroup.message = msg
+        prevGroup.index = i
+        prevGroup.repeatCount = (prevGroup.repeatCount ?? 1) + 1
+        i++
+        continue
+      }
 
       // If this assistant message has thinking that wasn't already pulled into a
       // preceding working block, create a synthetic working block for it now.

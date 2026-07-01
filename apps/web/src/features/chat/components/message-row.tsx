@@ -93,6 +93,7 @@ interface AssistantMessageBlockProps {
   /** Footer is mounted (height reserved) but hidden — turn still streaming. */
   footerPending?: boolean
   turnMessages?: AssistantMessage[]
+  errorRepeatCount?: number
   rootPath?: string
 }
 
@@ -105,7 +106,13 @@ const THINKING_LEVEL_LABELS: Record<string, string> = {
 
 // Inline error attached to an assistant turn. Mirrors the pending-error banner
 // (chat-error-alert): collapsed to a single line, expandable to the full text.
-function ErrorMessageBlock({ message }: { message: string }) {
+function ErrorMessageBlock({
+  message,
+  repeatCount,
+}: {
+  message: string
+  repeatCount?: number
+}) {
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -146,6 +153,11 @@ function ErrorMessageBlock({ message }: { message: string }) {
           <AlertCircleIcon className="h-3 w-3 shrink-0" />
           <span className="leading-none">Error</span>
         </span>
+        {!!repeatCount && repeatCount > 1 && (
+          <span className="shrink-0 text-2xs font-medium text-muted-foreground/60">
+            ×{repeatCount}
+          </span>
+        )}
         <span className="min-w-0 flex-1 truncate text-muted-foreground/70">
           {!expanded && message}
         </span>
@@ -200,6 +212,7 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
   isLastInTurn = true,
   footerPending = false,
   turnMessages,
+  errorRepeatCount,
   rootPath,
 }: AssistantMessageBlockProps) {
   const hasContent = message.content.length > 0
@@ -247,7 +260,12 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
         </div>
       )}
 
-      {hasError && <ErrorMessageBlock message={message.errorMessage!} />}
+      {hasError && (
+        <ErrorMessageBlock
+          message={message.errorMessage!}
+          repeatCount={errorRepeatCount}
+        />
+      )}
 
       {isLastInTurn && !hasError && (
         <div
@@ -357,6 +375,8 @@ export interface MessageRowProps {
   /** Footer is mounted (height reserved) but hidden — turn still streaming. */
   footerPending?: boolean
   turnMessages?: AssistantMessage[]
+  /** Consecutive identical assistant errors folded into this row (see message-groups.ts). */
+  errorRepeatCount?: number
   rootPath?: string
   /** Durable thread id — used to build URLs for persisted attachments. */
   threadId?: string
@@ -409,6 +429,7 @@ export const MessageRow = memo(function MessageRow({
   isLastInTurn = true,
   footerPending = false,
   turnMessages,
+  errorRepeatCount,
   rootPath,
   threadId,
   onFork,
@@ -589,6 +610,7 @@ export const MessageRow = memo(function MessageRow({
       isLastInTurn={isLastInTurn}
       footerPending={footerPending}
       turnMessages={turnMessages}
+      errorRepeatCount={errorRepeatCount}
       rootPath={rootPath}
     />
   )

@@ -641,7 +641,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         // seamless. Shown the instant the user sends, before the session exists.
         <>
           <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pt-4 pb-8 [overflow-anchor:none]">
-            <div className="mx-auto w-full max-w-3xl px-6 pb-3">
+            <div className="mx-auto w-full max-w-4xl px-3 pb-3">
               <div className="flex flex-col items-end gap-1.5 self-end">
                 <div
                   className="max-w-3/4 rounded-xl bg-muted/70 px-2 py-2 text-sm wrap-break-word whitespace-pre-wrap ring-1 ring-foreground/5"
@@ -654,13 +654,13 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
                 </div>
               </div>
             </div>
-            <div className="mx-auto w-full max-w-3xl px-6 pt-4 pb-8">
+            <div className="mx-auto w-full max-w-4xl px-3 pt-4 pb-8">
               <ThinkingIndicator className="py-0.5" />
             </div>
           </div>
 
           <div className="shrink-0 bg-background">
-            <div className="mx-auto w-full max-w-3xl px-3 pb-3">
+            <div className="mx-auto w-full max-w-4xl px-3 pb-3">
               <ChatComposer
                 onSend={() => {}}
                 isLoading
@@ -679,7 +679,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         </>
       ) : (
         <div className="flex flex-1 items-center justify-center overflow-y-auto px-6">
-          <div className="-mt-12 flex w-full max-w-3xl flex-col items-stretch">
+          <div className="-mt-12 flex w-full max-w-4xl flex-col items-stretch">
             <div className="mb-7 flex flex-col items-center gap-3 text-center select-none">
               <LambdaMark />
               <div className="space-y-1.5">

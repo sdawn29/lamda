@@ -961,7 +961,7 @@ export function ChatView({
                   !initialSnapshot.keys.has(firstKey)
                 const entryDelayMs = isNewGroup ? getEntryDelayMs(firstKey) : 0
                 content = (
-                  <div className="mx-auto w-full max-w-3xl px-3 pb-3">
+                  <div className="mx-auto w-full max-w-4xl px-3 pb-3">
                     <WorkingBlock
                       messages={group.messages}
                       isActive={isGroupActive}
@@ -974,8 +974,13 @@ export function ChatView({
                   </div>
                 )
               } else {
-                const { message, index, isLastInTurnStatic, turnMessages } =
-                  group
+                const {
+                  message,
+                  index,
+                  isLastInTurnStatic,
+                  turnMessages,
+                  repeatCount,
+                } = group
                 if (
                   message.role === "assistant" &&
                   !message.content.trim() &&
@@ -1002,7 +1007,7 @@ export function ChatView({
                     groupIndex === activeTurnFooterGroupIndex
                   const entryDelayMs = isNewMessage ? getEntryDelayMs(key) : 0
                   content = (
-                    <div className="mx-auto w-full max-w-3xl px-3 pb-3">
+                    <div className="mx-auto w-full max-w-4xl px-3 pb-3">
                       <MessageRow
                         message={message}
                         commandsByName={commandsByName}
@@ -1014,6 +1019,7 @@ export function ChatView({
                         isLastInTurn={isLastInTurn}
                         footerPending={footerPending}
                         turnMessages={turnMessages}
+                        errorRepeatCount={repeatCount}
                         rootPath={rootPath}
                         threadId={threadId}
                         onFork={handleFork}
@@ -1062,7 +1068,7 @@ export function ChatView({
                   {completedTodoLists.map((goals) => (
                     <div
                       key={`todo-${goals[0]?.id ?? groupIndex}`}
-                      className="mx-auto w-full max-w-3xl px-3 pb-3"
+                      className="mx-auto w-full max-w-4xl px-3 pb-3"
                     >
                       <CompletedTodoPanel goals={goals} />
                     </div>
@@ -1094,7 +1100,7 @@ export function ChatView({
                 is what lets its appearance grow the observed content and the
                 auto-follow snap the view onto it, so sending a message lands on
                 the thinking indicator rather than just the latest message row. */}
-            <div className="mx-auto w-full max-w-3xl px-3">
+            <div className="mx-auto w-full max-w-4xl px-3">
               {isCompacting ? (
                 <CompactingIndicator reason={compactionReason} />
               ) : pendingApproval ? (
@@ -1151,12 +1157,12 @@ export function ChatView({
         <div ref={bottomBarRef} className="shrink-0 bg-background">
           <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
 
-          <div className="mx-auto w-full max-w-3xl px-3 pb-2 empty:hidden">
+          <div className="mx-auto w-full max-w-4xl px-3 pb-2 empty:hidden">
             <TodoPanel messages={visibleMessages} />
           </div>
 
           {isLoading && queuedCount > 0 && !activeQuestion && (
-            <div className="mx-auto w-full max-w-3xl px-3 pb-1.5">
+            <div className="mx-auto w-full max-w-4xl px-3 pb-1.5">
               <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
@@ -1171,7 +1177,7 @@ export function ChatView({
 
           <div
             ref={textboxWrapRef}
-            className="mx-auto w-full max-w-3xl px-3 pb-3"
+            className="mx-auto w-full max-w-4xl px-3 pb-3"
           >
             {pendingApproval ? (
               <ToolApprovalBlock

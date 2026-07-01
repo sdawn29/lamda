@@ -38,7 +38,7 @@ export const PlanChangesCard = memo(function PlanChangesCard({
   if (!planFiles) return null
 
   return (
-    <div className="mx-auto mb-3 w-full max-w-3xl px-3 py-2">
+    <div className="mx-auto mb-3 w-full max-w-4xl px-3 py-2">
       <div className="overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10">
         <div className="flex items-start gap-3 px-3 py-3">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-amber-500/12 text-amber-600 dark:bg-amber-400/12 dark:text-amber-400">
