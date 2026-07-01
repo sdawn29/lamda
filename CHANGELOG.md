@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.39.0](../../releases/tag/v0.39.0) — 2026-07-01
+
+### Features
+
+* refactor chat components for improved layout and responsiveness; remove unused thinking phrases functionality
+* update component layouts to increase maximum width for better responsiveness
+* add skills management feature with search, install, and detail views
+
 ## [0.38.0](../../releases/tag/v0.38.0) — 2026-06-29
 
 ### Features
