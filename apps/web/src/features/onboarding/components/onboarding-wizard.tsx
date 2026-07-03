@@ -1,4 +1,3 @@
-import type React from "react"
 import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
@@ -16,14 +15,8 @@ import {
   UserRound,
 } from "lucide-react"
 
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/shared/ui/accordion"
-import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 import { Input } from "@/shared/ui/input"
 import { Label } from "@/shared/ui/label"
 import { cn } from "@/shared/lib/utils"
@@ -68,7 +61,8 @@ const STEP_META: Record<Step, { title: string; subtitle: string }> = {
   },
   provider: {
     title: "Connect an AI provider",
-    subtitle: "Sign in or add an API key to power the coding agent.",
+    subtitle:
+      "Sign in with a subscription (recommended) or bring your own API key.",
   },
   finish: {
     title: "You're all set",
@@ -177,7 +171,7 @@ export function OnboardingWizard() {
               />
             )}
             {step === "theme" && <ThemeStep />}
-            {step === "provider" && <ProviderStep />}
+            {step === "provider" && <ProviderStep hasProvider={hasProvider} />}
             {step === "finish" && (
               <FinishStep
                 name={trimmedName}
@@ -208,7 +202,11 @@ export function OnboardingWizard() {
                 disabled={!canAdvance}
                 className="gap-1.5"
               >
-                {step === "provider" ? "Continue" : "Next"}
+                {step === "provider"
+                  ? hasProvider
+                    ? "Continue"
+                    : "Skip for now"
+                  : "Next"}
                 <ArrowRight className="size-3.5" />
               </Button>
             ) : (
@@ -430,76 +428,47 @@ function ThemeStep() {
   )
 }
 
-function ProviderStep() {
+function ProviderStep({ hasProvider }: { hasProvider: boolean }) {
   return (
-    <div className="max-h-[22rem] overflow-y-auto pr-1">
-      <Accordion defaultValue={["subscription"]}>
-        <ProviderOption
+    <div className="flex flex-col gap-3">
+      <Tabs defaultValue="subscription">
+        <TabsList className="w-full">
+          <TabsTrigger value="subscription">
+            <Sparkles data-icon="inline-start" />
+            Subscription
+          </TabsTrigger>
+          <TabsTrigger value="api-key">
+            <KeyRound data-icon="inline-start" />
+            API key
+          </TabsTrigger>
+        </TabsList>
+        {/* keepMounted so an in-flight OAuth sign-in survives a peek at the
+            API-key tab. */}
+        <TabsContent
           value="subscription"
-          icon={Sparkles}
-          iconClassName="text-primary"
-          title="Sign in with a subscription"
-          description="Use your existing Claude or other plan via OAuth."
-          recommended
+          keepMounted
+          className="max-h-72 overflow-y-auto pr-1"
         >
           <SubscriptionsCard />
-        </ProviderOption>
-
-        <ProviderOption
-          value="api-key"
-          icon={KeyRound}
-          iconClassName="text-muted-foreground"
-          title="Add an API key"
-          description="Paste a key from any supported provider."
-        >
+        </TabsContent>
+        <TabsContent value="api-key" className="max-h-72 overflow-y-auto pr-1">
           <ApiKeysCard />
-        </ProviderOption>
-      </Accordion>
-    </div>
-  )
-}
+        </TabsContent>
+      </Tabs>
 
-function ProviderOption({
-  value,
-  icon: Icon,
-  iconClassName,
-  title,
-  description,
-  recommended,
-  children,
-}: {
-  value: string
-  icon: typeof Sparkles
-  iconClassName?: string
-  title: string
-  description: string
-  recommended?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <AccordionItem value={value} className="border-0 data-open:bg-transparent">
-      <AccordionTrigger className="items-center gap-3 px-1 py-3 hover:no-underline">
-        <span className="flex items-center gap-2.5 text-left">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted">
-            <Icon className={cn("size-3.5", iconClassName)} />
-          </span>
-          <span className="flex flex-col">
-            <span className="flex items-center gap-2 text-sm font-medium">
-              {title}
-              {recommended && (
-                <Badge variant="secondary" className="px-1.5 py-0 text-2xs">
-                  Recommended
-                </Badge>
-              )}
-            </span>
-            <span className="text-xs font-normal text-muted-foreground">
-              {description}
-            </span>
-          </span>
-        </span>
-      </AccordionTrigger>
-      <AccordionContent className="px-1 pb-3">{children}</AccordionContent>
-    </AccordionItem>
+      {hasProvider ? (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2">
+          <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
+          <p className="text-xs">
+            Provider connected — you&rsquo;re ready to continue.
+          </p>
+        </div>
+      ) : (
+        <p className="text-center text-xs text-muted-foreground">
+          You can skip this and set it up later in Settings.
+        </p>
+      )}
+    </div>
   )
 }
 

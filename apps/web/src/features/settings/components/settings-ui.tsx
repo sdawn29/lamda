@@ -1,4 +1,6 @@
 import { type ReactNode } from "react"
+import { Link } from "@tanstack/react-router"
+import { ArrowRight } from "lucide-react"
 
 import { cn } from "@/shared/lib/utils"
 
@@ -117,5 +119,45 @@ export function SettingsStack({
       )}
       {children}
     </div>
+  )
+}
+
+interface SettingsNavCardProps {
+  icon: ReactNode
+  title: ReactNode
+  description: ReactNode
+  /** Settings section slug to navigate to. */
+  section: string
+  className?: string
+}
+
+/** Dashed cross-link card pointing to a related settings section. */
+export function SettingsNavCard({
+  icon,
+  title,
+  description,
+  section,
+  className,
+}: SettingsNavCardProps) {
+  return (
+    <Link
+      to="/settings/$section"
+      params={{ section }}
+      className={cn(
+        "group flex items-center gap-3 rounded-lg border border-dashed border-border/60 px-4 py-3 transition-colors hover:border-border hover:bg-muted/30",
+        className
+      )}
+    >
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground ring-1 ring-foreground/5">
+        {icon}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-sm leading-snug">{title}</span>
+        <span className="text-xs/relaxed text-muted-foreground">
+          {description}
+        </span>
+      </span>
+      <ArrowRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+    </Link>
   )
 }
