@@ -73,7 +73,7 @@ export function closeDb(): void {
 // `user_version = 0` (SQLite's default), so on first run after an upgrade the
 // whole gated block below runs once and then never again — instead of on
 // every app startup, which is what it did before this version gate existed.
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 function getTableColumns(sqlite: Database.Database, table: string): string[] {
   const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as {
@@ -271,6 +271,7 @@ function createDb() {
       output_tokens      INTEGER NOT NULL DEFAULT 0,
       cache_read_tokens  INTEGER NOT NULL DEFAULT 0,
       cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+      reasoning_tokens   INTEGER NOT NULL DEFAULT 0,
       total_tokens       INTEGER NOT NULL DEFAULT 0,
       cost               REAL NOT NULL DEFAULT 0,
       created_at         INTEGER NOT NULL
@@ -662,6 +663,21 @@ function createDb() {
     try {
       if (!hasColumn(sqlite, "message_blocks", "client_id")) {
         sqlite.exec(`ALTER TABLE message_blocks ADD COLUMN client_id TEXT`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
+  }
+
+  if (currentVersion < 3) {
+    // Migration: Add reasoning_tokens column to ai_usage. Providers that report
+    // a reasoning/thinking breakdown (pi-ai `Usage.reasoning`) get it recorded;
+    // it is a subset of output_tokens, not an additional bucket.
+    try {
+      if (!hasColumn(sqlite, "ai_usage", "reasoning_tokens")) {
+        sqlite.exec(
+          `ALTER TABLE ai_usage ADD COLUMN reasoning_tokens INTEGER NOT NULL DEFAULT 0`,
+        );
       }
     } catch {
       // Safe to ignore — column may already exist.

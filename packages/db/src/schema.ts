@@ -224,6 +224,9 @@ export const aiUsage = sqliteTable("ai_usage", {
   outputTokens: integer("output_tokens").notNull().default(0),
   cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
   cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+  // Reasoning/thinking tokens when the provider reports them — a subset of
+  // outputTokens, not an additional bucket.
+  reasoningTokens: integer("reasoning_tokens").notNull().default(0),
   totalTokens: integer("total_tokens").notNull().default(0),
   cost: real("cost").notNull().default(0),
   createdAt: integer("created_at").notNull(),

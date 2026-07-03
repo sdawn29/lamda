@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Wrapper around `@mariozechner/pi-coding-agent` that provides managed session lifecycle, model discovery, auth resolution, and SSE-compatible event streaming for the lamda server.
+Wrapper around `@earendil-works/pi-coding-agent` that provides managed session lifecycle, model discovery, auth resolution, and SSE-compatible event streaming for the lamda server.
 
 ## Quick Reference
 
@@ -108,11 +108,12 @@ Priority order for API key:
 
 ## Dependencies
 
-- `@mariozechner/pi-coding-agent` (v0.70.2) — Core Pi coding agent SDK
+- `@earendil-works/pi-coding-agent` (v0.80.3) — Core Pi coding agent SDK
 
 ## Gotchas
 
-- **SDK version is pinned** to `0.70.2` — upgrading may break the event type mapping in `stream.ts`
+- **SDK minor bumps can break `stream.ts`** — upgrading may break the event type mapping; re-run type checks after any version change
+- **pi-ai global API moved to `/compat`** — as of 0.80.0, `getProviders`/`getModels`/`stream` etc. live in `@earendil-works/pi-ai/compat`; the root entrypoint keeps `Type`, `getSupportedThinkingLevels`, and the new `createModels()` API
 - **Event generator is long-lived** — it survives across multiple `prompt()` calls; breaking out of the loop unsubscribes and cleans up
 - **Title generation creates a disposable session** — each call to `generateThreadTitle` spins up and tears down its own agent session with `tools: []`
 - **Node.js single-threaded guarantee** — the event queue in `stream.ts` relies on Node.js being single-threaded to avoid races between the subscribe callback and the generator

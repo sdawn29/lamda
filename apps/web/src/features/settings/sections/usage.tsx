@@ -341,6 +341,7 @@ const emptyDay = (day: string): AiUsageDaily => ({
   outputTokens: 0,
   cacheReadTokens: 0,
   cacheWriteTokens: 0,
+  reasoningTokens: 0,
   totalTokens: 0,
   cost: 0,
 })
@@ -408,7 +409,11 @@ function OverviewCards({
     {
       label: "Output tokens",
       value: formatTokens(totals.outputTokens),
-      detail: `${fullFormat.format(totals.outputTokens)} generated`,
+      // Reasoning is a subset of output, so it reads as a share, not a bucket.
+      detail:
+        totals.reasoningTokens > 0
+          ? `${fullFormat.format(totals.outputTokens)} generated · ${formatTokens(totals.reasoningTokens)} reasoning`
+          : `${fullFormat.format(totals.outputTokens)} generated`,
       icon: ArrowDownToLine,
     },
     {
@@ -786,6 +791,9 @@ function ModelCostChart({
 // ── Model table ───────────────────────────────────────────────────────────────
 
 function ModelTable({ models }: { models: AiUsageByModel[] }) {
+  // Reasoning is a subset of Output — only show the column when some model in
+  // the period actually reported a reasoning breakdown.
+  const hasReasoning = models.some((m) => m.reasoningTokens > 0)
   return (
     <div className="overflow-x-auto py-3.5">
       <table className="w-full text-xs">
@@ -795,6 +803,9 @@ function ModelTable({ models }: { models: AiUsageByModel[] }) {
             <th className="pr-3 pb-2 text-right font-medium">Requests</th>
             <th className="pr-3 pb-2 text-right font-medium">Input</th>
             <th className="pr-3 pb-2 text-right font-medium">Output</th>
+            {hasReasoning && (
+              <th className="pr-3 pb-2 text-right font-medium">Reasoning</th>
+            )}
             <th className="pr-3 pb-2 text-right font-medium">Cache read</th>
             <th className="pr-3 pb-2 text-right font-medium">Cache write</th>
             <th className="pr-3 pb-2 text-right font-medium">Total</th>
@@ -825,6 +836,11 @@ function ModelTable({ models }: { models: AiUsageByModel[] }) {
               <td className="py-2 pr-3 text-right tabular-nums">
                 {formatTokens(m.outputTokens)}
               </td>
+              {hasReasoning && (
+                <td className="py-2 pr-3 text-right tabular-nums">
+                  {formatTokens(m.reasoningTokens)}
+                </td>
+              )}
               <td className="py-2 pr-3 text-right tabular-nums">
                 {formatTokens(m.cacheReadTokens)}
               </td>

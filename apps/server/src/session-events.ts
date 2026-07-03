@@ -1041,6 +1041,8 @@ class SessionEventHub {
             output: number;
             cacheRead: number;
             cacheWrite: number;
+            /** Reasoning/thinking tokens (subset of output) — only some providers report it. */
+            reasoning?: number;
             totalTokens?: number;
             cost?: { total?: number };
           };
@@ -1065,6 +1067,7 @@ class SessionEventHub {
           outputTokens: output,
           cacheReadTokens: cacheRead,
           cacheWriteTokens: cacheWrite,
+          reasoningTokens: m.usage.reasoning ?? 0,
           totalTokens:
             m.usage.totalTokens ?? input + output + cacheRead + cacheWrite,
           cost: m.usage.cost?.total ?? 0,
@@ -1246,7 +1249,11 @@ class SessionEventHub {
       this.compactionReason = cs.reason;
       this.pendingErrorState = null;
     } else if (event.type === "compaction_end") {
-      const ce = event as { aborted?: boolean; errorMessage?: string };
+      const ce = event as {
+        aborted?: boolean;
+        willRetry?: boolean;
+        errorMessage?: string;
+      };
       this.isCompacting = false;
       this.compactionReason = null;
       if (!ce.aborted && ce.errorMessage) {
@@ -1265,8 +1272,12 @@ class SessionEventHub {
             r.event.type !== "compaction_end",
         );
         // History is about to be summarized away — consolidate durable memories
-        // from what's still in the transcript before it's compacted.
-        scheduleReflection(this.threadId);
+        // from what's still in the transcript before it's compacted. When the
+        // compaction is an overflow retry (willRetry), the SDK immediately
+        // re-runs the prompt: defer the reflection model call to the per-turn /
+        // idle triggers instead of competing with the resumed turn (the DB
+        // transcript it mines is unaffected by compaction, so nothing is lost).
+        if (!ce.willRetry) scheduleReflection(this.threadId);
       }
     } else if (event.type === "server_error") {
       const se = event as { message: string };

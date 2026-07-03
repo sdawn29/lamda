@@ -1,4 +1,5 @@
 import {
+  AntGroup,
   Anthropic,
   Azure,
   Bedrock,
@@ -17,7 +18,9 @@ import {
   LmStudio,
   Minimax,
   Mistral,
+  Moonshot,
   Novita,
+  Nvidia,
   Ollama,
   OpenAI,
   OpenCode,
@@ -31,6 +34,7 @@ import {
   Voyage,
   Windsurf,
   XAI,
+  XiaomiMiMo,
   ZAI,
 } from "@lobehub/icons"
 import * as React from "react"
@@ -101,10 +105,14 @@ const PROVIDER_META: Record<string, { label: string; icon: React.ReactNode }> =
       icon: <Cerebras.Color size={14} />,
     },
     zai: {
-      label: "ZAI",
+      label: "ZAI Coding Plan (Global)",
       icon: <ZAI size={14} />,
     },
-    "opencode-zen": {
+    "zai-coding-cn": {
+      label: "ZAI Coding Plan (China)",
+      icon: <ZAI size={14} />,
+    },
+    opencode: {
       label: "OpenCode Zen",
       icon: <OpenCode size={14} />,
     },
@@ -120,13 +128,49 @@ const PROVIDER_META: Record<string, { label: string; icon: React.ReactNode }> =
       label: "Fireworks",
       icon: <Fireworks.Color size={14} />,
     },
-    "kimi-for-coding": {
+    "kimi-coding": {
       label: "Kimi For Coding",
       icon: <Kimi.Color size={14} />,
+    },
+    moonshotai: {
+      label: "Moonshot AI",
+      icon: <Moonshot size={14} />,
+    },
+    "moonshotai-cn": {
+      label: "Moonshot AI (China)",
+      icon: <Moonshot size={14} />,
     },
     minimax: {
       label: "MiniMax",
       icon: <Minimax.Color size={14} />,
+    },
+    "minimax-cn": {
+      label: "MiniMax (China)",
+      icon: <Minimax.Color size={14} />,
+    },
+    xiaomi: {
+      label: "Xiaomi MiMo",
+      icon: <XiaomiMiMo size={14} />,
+    },
+    "xiaomi-token-plan-cn": {
+      label: "Xiaomi MiMo Token Plan (China)",
+      icon: <XiaomiMiMo size={14} />,
+    },
+    "xiaomi-token-plan-ams": {
+      label: "Xiaomi MiMo Token Plan (Amsterdam)",
+      icon: <XiaomiMiMo size={14} />,
+    },
+    "xiaomi-token-plan-sgp": {
+      label: "Xiaomi MiMo Token Plan (Singapore)",
+      icon: <XiaomiMiMo size={14} />,
+    },
+    nvidia: {
+      label: "NVIDIA NIM",
+      icon: <Nvidia.Color size={14} />,
+    },
+    "ant-ling": {
+      label: "Ant Ling",
+      icon: <AntGroup.Color size={14} />,
     },
     ollama: {
       label: "Ollama",
@@ -174,12 +218,12 @@ const PROVIDER_META: Record<string, { label: string; icon: React.ReactNode }> =
       label: "Novita AI",
       icon: <Novita.Color size={14} />,
     },
-    "cloudflare-workers": {
-      label: "Cloudflare Workers",
+    "cloudflare-workers-ai": {
+      label: "Cloudflare Workers AI",
       icon: <Cloudflare.Color size={14} />,
     },
-    cloudflare: {
-      label: "Cloudflare",
+    "cloudflare-ai-gateway": {
+      label: "Cloudflare AI Gateway",
       icon: <Cloudflare.Color size={14} />,
     },
     replicate: {

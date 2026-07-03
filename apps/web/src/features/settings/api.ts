@@ -212,6 +212,8 @@ export interface AiUsageTotals {
   outputTokens: number
   cacheReadTokens: number
   cacheWriteTokens: number
+  /** Reasoning/thinking tokens reported by the provider — a subset of outputTokens. */
+  reasoningTokens: number
   totalTokens: number
   cost: number
 }
@@ -235,6 +237,7 @@ export interface AiUsageDaily {
   outputTokens: number
   cacheReadTokens: number
   cacheWriteTokens: number
+  reasoningTokens: number
   totalTokens: number
   cost: number
 }

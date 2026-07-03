@@ -11,6 +11,8 @@ export interface AiUsageRecord {
   outputTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
+  /** Reasoning/thinking tokens reported by the provider — a subset of outputTokens. */
+  reasoningTokens: number;
   totalTokens: number;
   cost: number;
 }
@@ -21,6 +23,8 @@ export interface AiUsageTotals {
   outputTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
+  /** Reasoning/thinking tokens reported by the provider — a subset of outputTokens. */
+  reasoningTokens: number;
   totalTokens: number;
   cost: number;
 }
@@ -44,6 +48,7 @@ export interface AiUsageDaily {
   outputTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
+  reasoningTokens: number;
   totalTokens: number;
   cost: number;
 }
@@ -67,6 +72,7 @@ const totalsColumns = {
   outputTokens: sql<number>`coalesce(sum(${aiUsage.outputTokens}), 0)`,
   cacheReadTokens: sql<number>`coalesce(sum(${aiUsage.cacheReadTokens}), 0)`,
   cacheWriteTokens: sql<number>`coalesce(sum(${aiUsage.cacheWriteTokens}), 0)`,
+  reasoningTokens: sql<number>`coalesce(sum(${aiUsage.reasoningTokens}), 0)`,
   totalTokens: sql<number>`coalesce(sum(${aiUsage.totalTokens}), 0)`,
   cost: sql<number>`coalesce(sum(${aiUsage.cost}), 0)`,
 };
@@ -91,6 +97,7 @@ export function getAiUsageStats(
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
+    reasoningTokens: 0,
     totalTokens: 0,
     cost: 0,
   };
@@ -150,6 +157,7 @@ export function getAiUsageStats(
       outputTokens: totalsColumns.outputTokens,
       cacheReadTokens: totalsColumns.cacheReadTokens,
       cacheWriteTokens: totalsColumns.cacheWriteTokens,
+      reasoningTokens: totalsColumns.reasoningTokens,
       totalTokens: totalsColumns.totalTokens,
       cost: totalsColumns.cost,
     })
