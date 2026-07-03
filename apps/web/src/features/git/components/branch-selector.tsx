@@ -101,6 +101,24 @@ export function BranchSelector({
     })
   }
 
+  if (!hasRepository && sessionId && !disabled) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleInitializeRepository}
+        disabled={initializeRepository.isPending}
+      >
+        <GitBranchIcon data-icon="inline-start" />
+        <span>
+          {initializeRepository.isPending
+            ? "Initializing repository"
+            : "Initialize repository"}
+        </span>
+      </Button>
+    )
+  }
+
   return (
     <>
       <Popover open={disabled ? false : open} onOpenChange={setOpen}>

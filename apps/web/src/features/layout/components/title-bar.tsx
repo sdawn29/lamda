@@ -26,6 +26,7 @@ import {
   useLocation,
   useSearch,
 } from "@tanstack/react-router"
+import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Toggle } from "@/shared/ui/toggle"
 import { useSidebar, SidebarTrigger } from "@/shared/ui/sidebar"
@@ -390,7 +391,7 @@ export function TitleBar() {
   const drag = { WebkitAppRegion: "drag" } as React.CSSProperties
   const noDrag = { WebkitAppRegion: "no-drag" } as React.CSSProperties
   const island =
-    "flex h-full shrink-0 items-center rounded-lg border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-md"
+    "flex h-full shrink-0 items-center rounded-2xl border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-xl"
 
   return (
     <>
@@ -604,19 +605,17 @@ export function TitleBar() {
           <div
             className={cn(
               island,
-              "min-w-0 shrink gap-1 overflow-hidden px-1.5"
+              "group/thread-title min-w-0 shrink gap-1 overflow-hidden px-1.5"
             )}
             style={noDrag}
           >
             {urlActiveWorkspace && (
-              <>
-                <span className="hidden shrink truncate text-2xs font-medium text-muted-foreground/70 sm:inline">
-                  {urlActiveWorkspace.name}
-                </span>
-                <span className="mx-0.5 hidden shrink-0 text-2xs text-muted-foreground/40 select-none sm:inline">
-                  /
-                </span>
-              </>
+              <Badge
+                variant="secondary"
+                className="hidden shrink truncate sm:inline-flex"
+              >
+                {urlActiveWorkspace.name}
+              </Badge>
             )}
             {isRenaming ? (
               <span className="inline-grid min-w-0">
@@ -656,7 +655,7 @@ export function TitleBar() {
                           variant="ghost"
                           size="icon-xs"
                           style={noDrag}
-                          className="ml-0.5 shrink-0 text-muted-foreground/50"
+                          className="ml-0 max-w-0 shrink-0 translate-x-1 overflow-hidden text-muted-foreground/50 opacity-0 transition-all duration-150 group-hover/thread-title:ml-0.5 group-hover/thread-title:max-w-5 group-hover/thread-title:translate-x-0 group-hover/thread-title:opacity-100 aria-expanded:ml-0.5 aria-expanded:max-w-5 aria-expanded:translate-x-0 aria-expanded:opacity-100 focus-visible:ml-0.5 focus-visible:max-w-5 focus-visible:translate-x-0 focus-visible:opacity-100"
                         />
                       }
                     >
@@ -726,7 +725,7 @@ export function TitleBar() {
         )}
 
         {/* ── Working location (worktree) island ─────────────────────────────── */}
-        {urlActiveThread && !isMobile && (
+        {urlActiveThread && !isMobile && (branch !== null || branches.length > 0) && (
           <div className={cn(island, "shrink-0")} style={noDrag}>
             <WorktreeSelector
               threadId={urlActiveThread.id}

@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react"
 
+import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import {
   DropdownMenu,
@@ -104,16 +105,14 @@ export function MobileThreadIslands({
 
   return (
     <div className="absolute inset-x-0 top-2 z-30 flex flex-wrap justify-start gap-1.5 px-2">
-      <div className="flex max-w-full min-w-0 shrink items-center gap-1 overflow-hidden rounded-lg border border-border bg-background/70 px-2 py-1 shadow-sm backdrop-blur-md">
+      <div className="group/thread-title flex max-w-full min-w-0 shrink items-center gap-1 overflow-hidden rounded-2xl border border-border bg-background/70 px-2 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-xl">
         {activeWorkspace && (
-          <>
-            <span className="hidden shrink truncate text-2xs font-medium text-muted-foreground/70 sm:inline">
-              {activeWorkspace.name}
-            </span>
-            <span className="mx-0.5 hidden shrink-0 text-2xs text-muted-foreground/40 select-none sm:inline">
-              /
-            </span>
-          </>
+          <Badge
+            variant="secondary"
+            className="hidden shrink truncate sm:inline-flex"
+          >
+            {activeWorkspace.name}
+          </Badge>
         )}
         {isRenamingThread ? (
           <span className="inline-grid min-w-0">
@@ -148,7 +147,7 @@ export function MobileThreadIslands({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="ml-0.5 shrink-0 text-muted-foreground/50"
+                className="ml-0 max-w-0 shrink-0 translate-x-1 overflow-hidden text-muted-foreground/50 opacity-0 transition-all duration-150 group-hover/thread-title:ml-0.5 group-hover/thread-title:max-w-5 group-hover/thread-title:translate-x-0 group-hover/thread-title:opacity-100 aria-expanded:ml-0.5 aria-expanded:max-w-5 aria-expanded:translate-x-0 aria-expanded:opacity-100 focus-visible:ml-0.5 focus-visible:max-w-5 focus-visible:translate-x-0 focus-visible:opacity-100"
               />
             }
           >
@@ -192,7 +191,7 @@ export function MobileThreadIslands({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="flex shrink-0 items-center rounded-lg border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-md">
+      <div className="flex shrink-0 items-center rounded-2xl border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-xl">
         <BranchSelector
           branch={branch}
           branches={branches}
@@ -203,17 +202,19 @@ export function MobileThreadIslands({
           disabledReason="This thread runs in a worktree — its branch is managed by the worktree selector"
         />
       </div>
-      <div className="flex shrink-0 items-center rounded-lg border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-md">
-        <WorktreeSelector
-          threadId={threadId}
-          sessionId={sessionId}
-          threadTitle={activeThread.title}
-          branches={branches}
-          currentBranch={branch}
-          worktreeBranch={activeThread.worktreeBranch}
-          onError={onGitError}
-        />
-      </div>
+      {(branch !== null || branches.length > 0) && (
+        <div className="flex shrink-0 items-center rounded-2xl border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-xl">
+          <WorktreeSelector
+            threadId={threadId}
+            sessionId={sessionId}
+            threadTitle={activeThread.title}
+            branches={branches}
+            currentBranch={branch}
+            worktreeBranch={activeThread.worktreeBranch}
+            onError={onGitError}
+          />
+        </div>
+      )}
     </div>
   )
 }

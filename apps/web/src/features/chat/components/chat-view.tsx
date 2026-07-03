@@ -1151,7 +1151,7 @@ export function ChatView({
               size="sm"
               variant="secondary"
               onClick={scrollToBottom}
-              className="pointer-events-auto rounded-full shadow-md"
+              className="pointer-events-auto rounded-full bg-secondary/70 shadow-md backdrop-blur-md"
             >
               <ArrowDownIcon className="h-4 w-4" /> Scroll to bottom
             </Button>

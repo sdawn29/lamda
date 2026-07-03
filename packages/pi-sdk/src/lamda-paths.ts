@@ -7,6 +7,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
 
 /** Directory name lamda uses for its config/data, both globally and per workspace. */
 export const LAMDA_DIR_NAME = ".lamda";
@@ -243,21 +244,45 @@ function skillDirSignatureParts(dir: string): string[] {
 }
 
 /**
+ * Skill directories the Pi SDK's package manager auto-discovers on top of
+ * lamda's own `.lamda/skills` dirs: the SDK's `~/.pi/agent/skills` and
+ * `<cwd>/.pi/skills` defaults, plus the cross-tool `~/.agents/skills` and
+ * `<cwd>/.agents/skills` convention (see `collectAutoSkillEntries` /
+ * `collectAncestorAgentsSkillDirs` in the vendored `pi-coding-agent` package).
+ * These aren't paths lamda passes in explicitly, but a session's resource
+ * loader scans them anyway, so they must be fingerprinted too or edits made
+ * there never trip a reload.
+ */
+function sdkAutoDiscoveredSkillDirs(cwd: string): string[] {
+  return [
+    join(getAgentDir(), "skills"),
+    join(cwd, CONFIG_DIR_NAME, "skills"),
+    join(homedir(), ".agents", "skills"),
+    join(cwd, ".agents", "skills"),
+  ];
+}
+
+/**
  * A cheap fingerprint of every prompt template and skill visible to a workspace
  * — global `~/.lamda/prompts` + `~/.lamda/skills` plus the workspace's
- * `<cwd>/.lamda/{prompts,skills}` — derived from each file's path and
- * last-modified time. The signature changes whenever a prompt or skill file is
- * added, edited, or removed, so callers can detect staleness and reload the
- * resource loader on demand rather than caching the resource set for the
- * lifetime of the server. Best-effort and non-recursive beyond one level —
- * unreadable dirs contribute nothing rather than throwing.
+ * `<cwd>/.lamda/{prompts,skills}`, plus the Pi SDK's own auto-discovered skill
+ * dirs (see {@link sdkAutoDiscoveredSkillDirs}) — derived from each file's path
+ * and last-modified time. The signature changes whenever a prompt or skill
+ * file is added, edited, or removed, so callers can detect staleness and
+ * reload the resource loader on demand rather than caching the resource set
+ * for the lifetime of the server. Best-effort and non-recursive beyond one
+ * level — unreadable dirs contribute nothing rather than throwing.
  */
 export function promptTemplatesSignature(cwd: string): string {
   const parts: string[] = [];
   for (const dir of [lamdaGlobalPromptsDir(), lamdaLocalPromptsDir(cwd)]) {
     parts.push(...dirMdSignatureParts(dir));
   }
-  for (const dir of [lamdaGlobalSkillsDir(), lamdaLocalSkillsDir(cwd)]) {
+  for (const dir of [
+    lamdaGlobalSkillsDir(),
+    lamdaLocalSkillsDir(cwd),
+    ...sdkAutoDiscoveredSkillDirs(cwd),
+  ]) {
     parts.push(...skillDirSignatureParts(dir));
   }
   return parts.join("|");
