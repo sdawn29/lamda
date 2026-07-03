@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.41.0](../../releases/tag/v0.41.0) — 2026-07-03
+
+### Features
+
+* **onboarding:** refactor provider step to use tabs and improve UI feedback feat(settings): enhance API key management with navigation cards for subscriptions feat(settings): add navigation card for subscriptions in API keys section feat(settings): add navigation card for API keys in subscriptions section
+* **chat:** enhance UI components with improved styling and badge integration
+* **workspace:** add workspace sorting functionality with persistent state
+* **chat:** implement pure state-transition logic for WebSocket event stream
+
+### Bug Fixes
+
+* **chat:** adjust responsive breakpoints and improve layout consistency
+
+### Code Refactoring
+
+* **dropdown-menu:** replace className with variant for destructive items
+
 ## [0.40.0](../../releases/tag/v0.40.0) — 2026-07-01
 
 ### Features
