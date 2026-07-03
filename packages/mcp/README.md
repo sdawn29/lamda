@@ -64,24 +64,24 @@ import { McpClient, createMcpClient, mcpToolToPiTool } from "@lamda/mcp";
 
 async function main() {
   const client = createMcpClient();
-  
+
   // Connect to an MCP server
   await client.connect({
     name: "filesystem",
     command: "npx",
-    args: ["-y", "@modelcontextprotocol/server-filesystem", "./"]
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
   });
-  
+
   // List available tools
   const tools = await client.listTools();
   console.log("Available MCP tools:", tools);
-  
+
   // Call a tool
   const result = await client.callTool("filesystem/readFile", {
-    path: "./README.md"
+    path: "./README.md",
   });
   console.log(result);
-  
+
   // Cleanup
   await client.disconnectAll();
 }
@@ -93,38 +93,51 @@ main();
 
 ```typescript
 import { createManagedSession } from "@lamda/pi-sdk";
-import { McpClient, createMcpClient, mcpToolToPiTool, mcpToolNameToPiToolName } from "@lamda/mcp";
+import {
+  McpClient,
+  createMcpClient,
+  mcpToolToPiTool,
+  mcpToolNameToPiToolName,
+} from "@lamda/mcp";
 import { Type } from "typebox";
 
 async function main() {
   const mcpClient = createMcpClient();
-  
+
   // Connect to MCP servers from config
-  await mcpClient.connect({ name: "github", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"], env: { GITHUB_TOKEN: process.env.GITHUB_TOKEN } });
-  
+  await mcpClient.connect({
+    name: "github",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-github"],
+    env: { GITHUB_TOKEN: process.env.GITHUB_TOKEN },
+  });
+
   // Convert MCP tools to pi tools
   const mcpTools = await mcpClient.listTools();
-  const piTools = mcpTools.map(tool => ({
+  const piTools = mcpTools.map((tool) => ({
     name: mcpToolNameToPiToolName(tool.name),
     label: tool.name,
     description: tool.description || `MCP tool: ${tool.originalName}`,
     parameters: Type.Object({}),
     execute: async (toolCallId, params) => {
-      const result = await mcpClient.callTool(tool.name, params as Record<string, unknown>);
+      const result = await mcpClient.callTool(
+        tool.name,
+        params as Record<string, unknown>,
+      );
       return {
-        content: result.success 
-          ? result.content 
-          : [{ type: "text", text: result.error || "Tool failed" }]
+        content: result.success
+          ? result.content
+          : [{ type: "text", text: result.error || "Tool failed" }],
       };
-    }
+    },
   }));
-  
+
   // Create session with MCP tools
   const session = await createManagedSession({
     cwd: process.cwd(),
-    customTools: piTools
+    customTools: piTools,
   });
-  
+
   // Use the session...
 }
 
@@ -135,15 +148,15 @@ main();
 
 Here are some popular MCP servers you can use:
 
-| Server | Package | Description |
-|--------|---------|-------------|
-| Filesystem | `@modelcontextprotocol/server-filesystem` | Local file operations |
-| GitHub | `@modelcontextprotocol/server-github` | GitHub API integration |
-| Brave Search | `@modelcontextprotocol/server-brave-search` | Web search |
-| SQLite | `@modelcontextprotocol/server-sqlite` | SQLite database |
-| AWS KB Retrieval | `@modelcontextprotocol/server-aws-kb-retrieval` | AWS Knowledge Base |
-| Slack | `@modelcontextprotocol/server-slack` | Slack messaging |
-| Puppeteer | `@modelcontextprotocol/server-puppeteer` | Browser automation |
+| Server           | Package                                         | Description            |
+| ---------------- | ----------------------------------------------- | ---------------------- |
+| Filesystem       | `@modelcontextprotocol/server-filesystem`       | Local file operations  |
+| GitHub           | `@modelcontextprotocol/server-github`           | GitHub API integration |
+| Brave Search     | `@modelcontextprotocol/server-brave-search`     | Web search             |
+| SQLite           | `@modelcontextprotocol/server-sqlite`           | SQLite database        |
+| AWS KB Retrieval | `@modelcontextprotocol/server-aws-kb-retrieval` | AWS Knowledge Base     |
+| Slack            | `@modelcontextprotocol/server-slack`            | Slack messaging        |
+| Puppeteer        | `@modelcontextprotocol/server-puppeteer`        | Browser automation     |
 
 Find more servers at [modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers)
 
@@ -161,7 +174,7 @@ await client.connect({
   command: "npx",
   args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
   env: { MY_VAR: "value" },
-  cwd: "/path/to/cwd"
+  cwd: "/path/to/cwd",
 });
 ```
 
@@ -187,7 +200,7 @@ Call an MCP tool by name (format: `serverName/toolName`).
 
 ```typescript
 const result = await client.callTool("filesystem/readFile", {
-  path: "./example.txt"
+  path: "./example.txt",
 });
 ```
 
@@ -219,13 +232,13 @@ client.onType("tool_called", (event) => {
 
 ### Events
 
-| Event Type | Description |
-|------------|-------------|
-| `server_connected` | A server connected successfully |
-| `server_disconnected` | A server disconnected |
-| `server_error` | A server encountered an error |
-| `tool_called` | An MCP tool was called |
-| `tool_result` | An MCP tool returned a result |
+| Event Type            | Description                     |
+| --------------------- | ------------------------------- |
+| `server_connected`    | A server connected successfully |
+| `server_disconnected` | A server disconnected           |
+| `server_error`        | A server encountered an error   |
+| `tool_called`         | An MCP tool was called          |
+| `tool_result`         | An MCP tool returned a result   |
 
 ## License
 

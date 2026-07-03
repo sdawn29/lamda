@@ -14,10 +14,7 @@ import { cn } from "@/shared/lib/utils"
  * Renders a <span> by default; pass `asChild` to project the styles onto a
  * different element (e.g. a <div> or a clickable header) without an extra node.
  */
-function SectionLabel({
-  className,
-  ...props
-}: React.ComponentProps<"span">) {
+function SectionLabel({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       data-slot="section-label"

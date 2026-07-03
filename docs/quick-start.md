@@ -4,7 +4,7 @@ Get up and running with lamda in 5 minutes.
 
 ## Prerequisites
 
-- **Node.js** 18+ 
+- **Node.js** 18+
 - **npm** 11+
 - **Git** (for workspace git features)
 - **macOS on Apple Silicon** (for packaged desktop builds)
@@ -25,11 +25,11 @@ npm run dev
 
 This starts all three components:
 
-| Component | URL | Description |
-|-----------|-----|-------------|
-| Web UI | http://localhost:5173 | The user interface |
-| Server | http://localhost:3001 | API backend |
-| Desktop | (Electron window) | Desktop shell |
+| Component | URL                   | Description        |
+| --------- | --------------------- | ------------------ |
+| Web UI    | http://localhost:5173 | The user interface |
+| Server    | http://localhost:3001 | API backend        |
+| Desktop   | (Electron window)     | Desktop shell      |
 
 ## Step 3: Configure Your AI Provider
 
@@ -108,13 +108,13 @@ Agent: "Let me investigate... I can see the issue.
 
 ## Essential Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl + Enter` | Send message |
-| `Cmd/Ctrl + K` | Command palette |
-| `Cmd/Ctrl + ,` | Open settings |
-| `Shift + Enter` | New line in input |
-| `Escape` | Cancel current operation |
+| Shortcut           | Action                   |
+| ------------------ | ------------------------ |
+| `Cmd/Ctrl + Enter` | Send message             |
+| `Cmd/Ctrl + K`     | Command palette          |
+| `Cmd/Ctrl + ,`     | Open settings            |
+| `Shift + Enter`    | New line in input        |
+| `Escape`           | Cancel current operation |
 
 ---
 

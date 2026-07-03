@@ -94,7 +94,10 @@ function flushBufferedOutput(session: TerminalSession) {
   });
 }
 
-function scheduleFlush(session: TerminalSession, delay = TERMINAL_OUTPUT_BATCH_MS) {
+function scheduleFlush(
+  session: TerminalSession,
+  delay = TERMINAL_OUTPUT_BATCH_MS,
+) {
   if (session.flushTimer) {
     if (delay !== 0) return;
     clearFlushTimer(session);

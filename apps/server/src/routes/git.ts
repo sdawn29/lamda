@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import {
@@ -52,8 +53,26 @@ import { store } from "../store.js";
 import { gitCwd } from "../services/session-service.js";
 import { sessionEvents } from "../session-events.js";
 import { parseModelKey } from "./settings.js";
+import { parseJsonBody } from "../lib/validate.js";
 
 const git = new Hono();
+
+const cloneSchema = z.object({
+  url: z.string().optional(),
+  path: z.string().optional(),
+});
+const branchBodySchema = z.object({ branch: z.string().optional() });
+const commitMessageSchema = z.object({ message: z.string().optional() });
+const generateCommitMessageSchema = z.object({
+  promptTemplate: z.string().optional(),
+});
+const filePathSchema = z.object({ filePath: z.string().optional() });
+const revertFileSchema = z.object({
+  filePath: z.string().optional(),
+  raw: z.string().optional(),
+});
+const stashSchema = z.object({ message: z.string().optional() });
+const stashRefSchema = z.object({ ref: z.string().optional() });
 
 export function parseGitError(err: unknown, fallback: string): string {
   const raw = err instanceof Error ? err.message : String(err);
@@ -72,7 +91,9 @@ export function parseGitError(err: unknown, fallback: string): string {
 // ── Clone repository ────────────────────────────────────────────────────────────
 
 git.post("/git/clone", async (c) => {
-  const body = await c.req.json<{ url?: string; path?: string }>();
+  const parsed = await parseJsonBody(c, cloneSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.url || !body.path)
     return c.json({ error: "url and path are required" }, 400);
   try {
@@ -141,7 +162,9 @@ git.get("/workspace/:id/branches", async (c) => {
 git.post("/workspace/:id/branch", async (c) => {
   const ws = getWorkspace(c.req.param("id"));
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
-  const body = await c.req.json<{ branch: string }>();
+  const parsed = await parseJsonBody(c, branchBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.branch) return c.json({ error: "branch is required" }, 400);
   try {
     await createBranch(ws.path, body.branch);
@@ -154,7 +177,9 @@ git.post("/workspace/:id/branch", async (c) => {
 git.post("/session/:id/checkout", async (c) => {
   const cwd = store.getCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req.json<{ branch: string }>();
+  const parsed = await parseJsonBody(c, branchBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.branch) return c.json({ error: "branch is required" }, 400);
   try {
     await checkoutBranch(cwd, body.branch);
@@ -167,7 +192,9 @@ git.post("/session/:id/checkout", async (c) => {
 git.post("/session/:id/branch", async (c) => {
   const cwd = store.getCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req.json<{ branch: string }>();
+  const parsed = await parseJsonBody(c, branchBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.branch) return c.json({ error: "branch is required" }, 400);
   try {
     await createBranch(cwd, body.branch);
@@ -256,7 +283,9 @@ git.get("/session/:id/git/diff", async (c) => {
 git.post("/session/:id/git/commit", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req.json<{ message?: string }>();
+  const parsed = await parseJsonBody(c, commitMessageSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.message) return c.json({ error: "message is required" }, 400);
   try {
     return c.json({ output: await gitCommit(cwd, body.message) });
@@ -271,9 +300,9 @@ git.post("/session/:id/git/commit", async (c) => {
 git.post("/session/:id/git/generate-commit-message", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req
-    .json<{ promptTemplate?: string }>()
-    .catch((): { promptTemplate?: string } => ({}));
+  const parsed = await parseJsonBody(c, generateCommitMessageSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const diff = await gitStagedDiff(cwd);
   if (!diff.trim())
     return c.json(
@@ -427,7 +456,9 @@ git.get("/session/:id/git/show-file-diff", async (c) => {
 git.post("/session/:id/git/stage", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req.json<{ filePath?: string }>();
+  const parsed = await parseJsonBody(c, filePathSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.filePath) return c.json({ error: "filePath is required" }, 400);
   await gitStage(cwd, body.filePath);
   return new Response(null, { status: 204 });
@@ -436,7 +467,9 @@ git.post("/session/:id/git/stage", async (c) => {
 git.post("/session/:id/git/unstage", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req.json<{ filePath?: string }>();
+  const parsed = await parseJsonBody(c, filePathSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.filePath) return c.json({ error: "filePath is required" }, 400);
   await gitUnstage(cwd, body.filePath);
   return new Response(null, { status: 204 });
@@ -459,7 +492,9 @@ git.post("/session/:id/git/unstage-all", async (c) => {
 git.post("/session/:id/git/revert-file", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req.json<{ filePath?: string; raw?: string }>();
+  const parsed = await parseJsonBody(c, revertFileSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.filePath || body.raw === undefined)
     return c.json({ error: "filePath and raw are required" }, 400);
   await gitRevertFile(cwd, body.filePath, body.raw);
@@ -469,10 +504,9 @@ git.post("/session/:id/git/revert-file", async (c) => {
 git.post("/session/:id/git/stash", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req
-    .json<{ message?: string }>()
-    .catch((): { message?: string } => ({}));
-  await gitStash(cwd, body.message);
+  const parsed = await parseJsonBody(c, stashSchema);
+  if (!parsed.ok) return parsed.response;
+  await gitStash(cwd, parsed.data.message);
   return new Response(null, { status: 204 });
 });
 
@@ -485,7 +519,9 @@ git.get("/session/:id/git/stash-list", async (c) => {
 git.post("/session/:id/git/stash-pop", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req.json<{ ref?: string }>();
+  const parsed = await parseJsonBody(c, stashRefSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.ref) return c.json({ error: "ref is required" }, 400);
   try {
     await gitStashPop(cwd, body.ref);
@@ -501,7 +537,9 @@ git.post("/session/:id/git/stash-pop", async (c) => {
 git.post("/session/:id/git/stash-apply", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req.json<{ ref?: string }>();
+  const parsed = await parseJsonBody(c, stashRefSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.ref) return c.json({ error: "ref is required" }, 400);
   try {
     await gitStashApply(cwd, body.ref);
@@ -517,7 +555,9 @@ git.post("/session/:id/git/stash-apply", async (c) => {
 git.post("/session/:id/git/stash-drop", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
-  const body = await c.req.json<{ ref?: string }>();
+  const parsed = await parseJsonBody(c, stashRefSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.ref) return c.json({ error: "ref is required" }, 400);
   try {
     await gitStashDrop(cwd, body.ref);

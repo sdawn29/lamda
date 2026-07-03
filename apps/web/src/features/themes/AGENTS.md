@@ -49,7 +49,7 @@ themes/
   blocks, write-view, and tool-call-block.
 - **Code tokens** (`code-tokens.ts`) are a separate `CodePalette` of syntax
   roles (text/comment/keyword/string/number/function/type/property/parameter/
-  builtin). They are *not* derived from the UI chart colors: they default to a
+  builtin). They are _not_ derived from the UI chart colors: they default to a
   fixed JetBrains Fleet palette and are overridable only on the custom theme
   (`ColorTheme.code`). Both the Markdown code blocks and the Monaco editors read
   them, so code renders identically everywhere; built-ins fall back to the Fleet

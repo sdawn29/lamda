@@ -14,11 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog"
-import {
-  Progress,
-  ProgressLabel,
-  ProgressValue,
-} from "@/shared/ui/progress"
+import { Progress, ProgressLabel, ProgressValue } from "@/shared/ui/progress"
 import { cn } from "@/shared/lib/utils"
 
 import { useDownloadUpdate, useInstallUpdate } from "./mutations"

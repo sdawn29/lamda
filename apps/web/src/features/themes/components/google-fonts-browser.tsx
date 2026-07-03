@@ -10,11 +10,7 @@ import {
   CommandList,
   CommandItem,
 } from "@/shared/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/shared/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 
 import {
   GOOGLE_FONTS,
@@ -179,7 +175,9 @@ export function GoogleFontsBrowser({
       >
         <span
           className="truncate"
-          style={currentFontFamily ? { fontFamily: currentFontFamily } : undefined}
+          style={
+            currentFontFamily ? { fontFamily: currentFontFamily } : undefined
+          }
         >
           {currentLabel}
         </span>

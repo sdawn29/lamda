@@ -35,14 +35,14 @@ Thin abstraction layer over the Pi coding agent SDK. Key responsibilities:
 
 ## Public API
 
-| Export                                  | Type                            | Description                                                     |
-| --------------------------------------- | ------------------------------- | --------------------------------------------------------------- |
-| `createManagedSession(config)`          | `Promise<ManagedSessionHandle>` | Creates a new session with prompt/abort/dispose/events         |
-| `openManagedSession(sessionFilePath, config?)` | `Promise<ManagedSessionHandle>` | Resumes an existing session from JSONL file |
-| `getAvailableModels()`                  | `ModelInfo[]`                   | Returns all models registered in the SDK                        |
-| `generateThreadTitle(message, config?)` | `Promise<string>`               | LLM-generated thread title from first message                  |
-| `generateCommitMessage(diff, config?)`   | `Promise<string>`               | LLM-generated conventional commit message from git diff         |
-| `DEFAULT_COMMIT_PROMPT`                 | `string`                        | Default prompt template for commit message generation           |
+| Export                                         | Type                            | Description                                             |
+| ---------------------------------------------- | ------------------------------- | ------------------------------------------------------- |
+| `createManagedSession(config)`                 | `Promise<ManagedSessionHandle>` | Creates a new session with prompt/abort/dispose/events  |
+| `openManagedSession(sessionFilePath, config?)` | `Promise<ManagedSessionHandle>` | Resumes an existing session from JSONL file             |
+| `getAvailableModels()`                         | `ModelInfo[]`                   | Returns all models registered in the SDK                |
+| `generateThreadTitle(message, config?)`        | `Promise<string>`               | LLM-generated thread title from first message           |
+| `generateCommitMessage(diff, config?)`         | `Promise<string>`               | LLM-generated conventional commit message from git diff |
+| `DEFAULT_COMMIT_PROMPT`                        | `string`                        | Default prompt template for commit message generation   |
 
 ### Interfaces
 
@@ -51,8 +51,8 @@ Thin abstraction layer over the Pi coding agent SDK. Key responsibilities:
 ```typescript
 interface ManagedSessionHandle {
   prompt(text: string, options?: PromptOptions): Promise<void>;
-  steer(text: string): Promise<void>;           // Queue steering message
-  followUp(text: string): Promise<void>;       // Queue follow-up message
+  steer(text: string): Promise<void>; // Queue steering message
+  followUp(text: string): Promise<void>; // Queue follow-up message
   abort(): Promise<void>;
   dispose(): void;
   setModel(provider: string, modelId: string): Promise<void>;

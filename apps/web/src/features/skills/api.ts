@@ -20,9 +20,12 @@ export async function fetchSkillSearch(
 export async function fetchPopularSkills(
   signal?: AbortSignal
 ): Promise<SkillSearchResult[]> {
-  const res = await apiFetch<{ skills: SkillSearchResult[] }>("/skills/popular", {
-    signal,
-  })
+  const res = await apiFetch<{ skills: SkillSearchResult[] }>(
+    "/skills/popular",
+    {
+      signal,
+    }
+  )
   return res.skills
 }
 
@@ -40,9 +43,12 @@ export async function fetchSkillDetails(
 export async function fetchInstalledSkills(
   signal?: AbortSignal
 ): Promise<InstalledSkill[]> {
-  const res = await apiFetch<{ skills: InstalledSkill[] }>("/skills/installed", {
-    signal,
-  })
+  const res = await apiFetch<{ skills: InstalledSkill[] }>(
+    "/skills/installed",
+    {
+      signal,
+    }
+  )
   return res.skills
 }
 

@@ -14,7 +14,11 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createCliEnv } from "@lamda/cli-env";
-import type { LspInstallSpec, LspServerCommand, LspServerConfig } from "./types.js";
+import type {
+  LspInstallSpec,
+  LspServerCommand,
+  LspServerConfig,
+} from "./types.js";
 
 const execFileP = promisify(execFile);
 
@@ -49,7 +53,11 @@ const EXTENSION_REGISTRY: Record<string, LspServerConfig> = {
       {
         command: "pylsp",
         args: [],
-        install: { tool: "pip3", command: "pip3", args: ["install", "python-lsp-server"] },
+        install: {
+          tool: "pip3",
+          command: "pip3",
+          args: ["install", "python-lsp-server"],
+        },
       },
     ],
   },
@@ -58,14 +66,22 @@ const EXTENSION_REGISTRY: Record<string, LspServerConfig> = {
     language: "rust",
     command: "rust-analyzer",
     args: [],
-    install: { tool: "rustup", command: "rustup", args: ["component", "add", "rust-analyzer"] },
+    install: {
+      tool: "rustup",
+      command: "rustup",
+      args: ["component", "add", "rust-analyzer"],
+    },
   },
 
   go: {
     language: "go",
     command: "gopls",
     args: ["serve"],
-    install: { tool: "go", command: "go", args: ["install", "golang.org/x/tools/gopls@latest"] },
+    install: {
+      tool: "go",
+      command: "go",
+      args: ["install", "golang.org/x/tools/gopls@latest"],
+    },
   },
 
   sh: shellConfig(),
@@ -176,12 +192,16 @@ export function listLanguageRegistry(): LanguageRegistryEntry[] {
   );
 }
 
-export function getLanguageConfigForExtension(ext: string): LspServerConfig | null {
+export function getLanguageConfigForExtension(
+  ext: string,
+): LspServerConfig | null {
   const key = ext.toLowerCase().replace(/^\./, "");
   return EXTENSION_REGISTRY[key] ?? null;
 }
 
-export function getLanguageConfigForFilePath(filePath: string): LspServerConfig | null {
+export function getLanguageConfigForFilePath(
+  filePath: string,
+): LspServerConfig | null {
   const dot = filePath.lastIndexOf(".");
   if (dot < 0) return null;
   return getLanguageConfigForExtension(filePath.slice(dot + 1));

@@ -1,4 +1,4 @@
-type Subscriber = () => void;
+import { Broadcaster } from "./lib/broadcaster.js";
 
 /**
  * Broadcasts "the set of available modes changed" — a mode file was added,
@@ -9,21 +9,4 @@ type Subscriber = () => void;
  * picker. Mode lists are keyed by workspace, and a global mode is visible to all
  * of them, so scoping the signal wouldn't save meaningful work.
  */
-class ModesBroadcaster {
-  private subscribers = new Set<Subscriber>();
-
-  subscribe(fn: Subscriber): () => void {
-    this.subscribers.add(fn);
-    return () => this.subscribers.delete(fn);
-  }
-
-  broadcast(): void {
-    for (const fn of this.subscribers) {
-      try {
-        fn();
-      } catch {}
-    }
-  }
-}
-
-export const modesBroadcaster = new ModesBroadcaster();
+export const modesBroadcaster = new Broadcaster();

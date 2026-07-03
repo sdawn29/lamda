@@ -18,4 +18,5 @@ export const APP_SETTINGS_KEYS = {
   CODE_FONT: "code_font",
 } as const
 
-export type AppSettingKey = (typeof APP_SETTINGS_KEYS)[keyof typeof APP_SETTINGS_KEYS]
+export type AppSettingKey =
+  (typeof APP_SETTINGS_KEYS)[keyof typeof APP_SETTINGS_KEYS]

@@ -1,10 +1,5 @@
 import { memo, useState } from "react"
-import {
-  BotIcon,
-  ChevronRightIcon,
-  EyeIcon,
-  ListTodoIcon,
-} from "lucide-react"
+import { BotIcon, ChevronRightIcon, EyeIcon, ListTodoIcon } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
 import { cn } from "@/shared/lib/utils"
@@ -56,10 +51,7 @@ export const PlanSavedCard = memo(function PlanSavedCard({
 
   return (
     <div
-      className={cn(
-        "w-full",
-        isNew && "animate-chat-message-in",
-      )}
+      className={cn("w-full", isNew && "animate-chat-message-in")}
       style={
         isNew && entryDelayMs > 0
           ? { animationDelay: `${entryDelayMs}ms` }
@@ -69,9 +61,7 @@ export const PlanSavedCard = memo(function PlanSavedCard({
       <div
         className={cn(
           "overflow-hidden rounded-lg bg-card ring-1 transition-shadow",
-          isError
-            ? "ring-destructive/30"
-            : "ring-foreground/10 hover:shadow-sm",
+          isError ? "ring-destructive/30" : "ring-foreground/10 hover:shadow-sm"
         )}
       >
         {/* Header */}
@@ -81,7 +71,7 @@ export const PlanSavedCard = memo(function PlanSavedCard({
               "flex size-8 shrink-0 items-center justify-center rounded-md",
               isError
                 ? "bg-destructive/10 text-destructive"
-                : "bg-amber-500/12 text-amber-600 dark:bg-amber-400/12 dark:text-amber-400",
+                : "bg-amber-500/12 text-amber-600 dark:bg-amber-400/12 dark:text-amber-400"
             )}
           >
             <ListTodoIcon className="size-4" />
@@ -89,15 +79,19 @@ export const PlanSavedCard = memo(function PlanSavedCard({
           <div className="min-w-0 flex-1">
             <span
               className={cn(
-                "text-3xs font-semibold uppercase tracking-wider",
+                "text-3xs font-semibold tracking-wider uppercase",
                 isRunning
                   ? "animate-thinking-shimmer bg-linear-to-r from-amber-600/40 via-amber-700 to-amber-600/40 bg-size-[200%_100%] bg-clip-text text-transparent dark:from-amber-300/40 dark:via-amber-200 dark:to-amber-300/40"
                   : isError
                     ? "text-destructive/80"
-                    : "text-amber-700 dark:text-amber-400",
+                    : "text-amber-700 dark:text-amber-400"
               )}
             >
-              {isRunning ? "Saving plan" : isError ? "Plan failed" : "Plan ready"}
+              {isRunning
+                ? "Saving plan"
+                : isError
+                  ? "Plan failed"
+                  : "Plan ready"}
             </span>
             <p className="mt-0.5 truncate font-heading text-sm font-medium text-foreground">
               {title}
@@ -108,12 +102,15 @@ export const PlanSavedCard = memo(function PlanSavedCard({
               className="mt-1 inline-flex max-w-full items-center gap-1 text-2xs text-muted-foreground transition-colors hover:text-foreground"
               aria-expanded={expanded}
             >
-              <FileIcon filename={fileName} className="size-3 shrink-0 opacity-70" />
+              <FileIcon
+                filename={fileName}
+                className="size-3 shrink-0 opacity-70"
+              />
               <span className="truncate font-mono">{relativePath}</span>
               <ChevronRightIcon
                 className={cn(
                   "size-3 shrink-0 transition-transform",
-                  expanded && "rotate-90",
+                  expanded && "rotate-90"
                 )}
               />
             </button>
@@ -149,12 +146,16 @@ export const PlanSavedCard = memo(function PlanSavedCard({
         <div
           className={cn(
             "grid transition-all duration-300 ease-in-out",
-            expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+            expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
           )}
         >
           <div className="overflow-hidden">
             <div className="border-t border-border px-3 py-2">
-              <WriteView content={content} filePath={relativePath} live={isRunning} />
+              <WriteView
+                content={content}
+                filePath={relativePath}
+                live={isRunning}
+              />
             </div>
           </div>
         </div>

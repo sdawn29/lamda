@@ -41,7 +41,9 @@ export interface McpServerConfig {
 /**
  * Resolve the effective transport for a config, inferring it when not set.
  */
-export function resolveTransportType(config: McpServerConfig): McpTransportType {
+export function resolveTransportType(
+  config: McpServerConfig,
+): McpTransportType {
   if (config.transport) return config.transport;
   return config.url ? "http" : "stdio";
 }
@@ -143,7 +145,10 @@ export interface McpToolResult {
   /** Whether the tool call was successful */
   success: boolean;
   /** Tool output content */
-  content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }>;
+  content: Array<
+    | { type: "text"; text: string }
+    | { type: "image"; data: string; mimeType: string }
+  >;
   /** Additional metadata */
   details?: Record<string, unknown>;
   /** Error message if failed */

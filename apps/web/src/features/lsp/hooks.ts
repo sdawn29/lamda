@@ -22,11 +22,18 @@ import type { Diagnostic, DocumentSymbolResult } from "./types"
 
 const EMPTY_DIAGS: Diagnostic[] = []
 
-export function useLspConnection(workspaceId: string | null | undefined): LspConnection | null {
-  return useMemo(() => (workspaceId ? getLspConnection(workspaceId) : null), [workspaceId])
+export function useLspConnection(
+  workspaceId: string | null | undefined
+): LspConnection | null {
+  return useMemo(
+    () => (workspaceId ? getLspConnection(workspaceId) : null),
+    [workspaceId]
+  )
 }
 
-export function useResolveWorkspaceId(workspacePath: string | undefined): string | null {
+export function useResolveWorkspaceId(
+  workspacePath: string | undefined
+): string | null {
   const { data: workspaces = [] } = useWorkspaces()
   return useMemo(() => {
     if (!workspacePath) return null
@@ -41,7 +48,7 @@ export function useResolveWorkspaceId(workspacePath: string | undefined): string
 export function useOpenDocument(
   connection: LspConnection | null,
   filePath: string | null,
-  content: string | null,
+  content: string | null
 ) {
   useEffect(() => {
     if (!connection || !filePath || content === null) return
@@ -58,7 +65,7 @@ export function useOpenDocument(
 
 export function useFileDiagnostics(
   connection: LspConnection | null,
-  filePath: string | null,
+  filePath: string | null
 ): Diagnostic[] {
   const subscribe = useCallback(
     (onChange: () => void) => {
@@ -67,7 +74,7 @@ export function useFileDiagnostics(
         if (path === filePath) onChange()
       })
     },
-    [connection, filePath],
+    [connection, filePath]
   )
   const getSnapshot = useCallback((): Diagnostic[] => {
     if (!connection || !filePath) return EMPTY_DIAGS
@@ -84,10 +91,13 @@ export function useFileDiagnostics(
 export function useDocumentSymbols(
   connection: LspConnection | null,
   filePath: string | null,
-  enabled: boolean,
+  enabled: boolean
 ): DocumentSymbolResult | null {
   const targetKey = enabled && connection && filePath ? filePath : ""
-  const [state, setState] = useState<{ key: string; symbols: DocumentSymbolResult | null }>({
+  const [state, setState] = useState<{
+    key: string
+    symbols: DocumentSymbolResult | null
+  }>({
     key: "",
     symbols: null,
   })

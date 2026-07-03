@@ -428,7 +428,7 @@ function ConfigureProviderDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="-mr-4 max-h-[min(60vh,32rem)] min-w-0 overflow-y-auto overflow-x-hidden pr-4 pl-2 [scrollbar-gutter:stable]">
+        <div className="-mr-4 max-h-[min(60vh,32rem)] min-w-0 [scrollbar-gutter:stable] overflow-x-hidden overflow-y-auto pr-4 pl-2">
           <FieldGroup className="py-1">
             {!isEditing && (
               <Field>
@@ -817,8 +817,8 @@ function SetupGuide() {
             <GuideStep n={4}>
               Click <strong>Add provider</strong> above, choose{" "}
               <strong>LM Studio</strong>, and paste the model id shown in the
-              server panel. Set <strong>Context size</strong> to the model&rsquo;s
-              loaded <Code>Context Length</Code>.
+              server panel. Set <strong>Context size</strong> to the
+              model&rsquo;s loaded <Code>Context Length</Code>.
             </GuideStep>
           </ol>
         </AccordionContent>
@@ -973,8 +973,8 @@ export function LocalModelsSection() {
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium">No local providers yet</p>
               <p className="max-w-xs text-xs/relaxed text-muted-foreground">
-                Run a model server like Ollama or LM Studio, then register it
-                to use its models in chat.
+                Run a model server like Ollama or LM Studio, then register it to
+                use its models in chat.
               </p>
             </div>
             <Button size="sm" onClick={openAdd}>

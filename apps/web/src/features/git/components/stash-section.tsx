@@ -14,14 +14,24 @@ export const StashSection = memo(function StashSection({
 
   const stashes = useMemo(() => parseStashList(stashRaw ?? ""), [stashRaw])
 
-  const handleApply = useCallback((ref: string) => apply.mutateAsync(ref), [apply])
+  const handleApply = useCallback(
+    (ref: string) => apply.mutateAsync(ref),
+    [apply]
+  )
   const handlePop = useCallback((ref: string) => pop.mutateAsync(ref), [pop])
   const handleDrop = useCallback((ref: string) => drop.mutateAsync(ref), [drop])
 
   return (
-    <SectionCard label="Stashes" count={stashes.length} isLoading={isLoading} className="mb-1.5">
+    <SectionCard
+      label="Stashes"
+      count={stashes.length}
+      isLoading={isLoading}
+      className="mb-1.5"
+    >
       {!isLoading && stashes.length === 0 && (
-        <p className="px-4 py-2.5 text-xs text-muted-foreground/40">No stashes</p>
+        <p className="px-4 py-2.5 text-xs text-muted-foreground/40">
+          No stashes
+        </p>
       )}
       {stashes.map((s) => (
         <StashEntryRow

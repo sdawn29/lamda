@@ -26,7 +26,12 @@ interface TaskFormDialogProps {
   onSave: (data: Omit<WorkspaceTask, "id">) => void
 }
 
-export function TaskFormDialog({ open, onOpenChange, task, onSave }: TaskFormDialogProps) {
+export function TaskFormDialog({
+  open,
+  onOpenChange,
+  task,
+  onSave,
+}: TaskFormDialogProps) {
   const [icon, setIcon] = useState<TaskIconId>("terminal")
   const [name, setName] = useState("")
   const [command, setCommand] = useState("")
@@ -69,7 +74,10 @@ export function TaskFormDialog({ open, onOpenChange, task, onSave }: TaskFormDia
         <div className="flex flex-col gap-4 px-4 py-5">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium">Icon</label>
-            <Select value={icon} onValueChange={(v) => setIcon(v as TaskIconId)}>
+            <Select
+              value={icon}
+              onValueChange={(v) => setIcon(v as TaskIconId)}
+            >
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue>
                   <span className="flex items-center gap-2">
@@ -129,11 +137,17 @@ export function TaskFormDialog({ open, onOpenChange, task, onSave }: TaskFormDia
         </div>
 
         <div className="flex items-center justify-between border-t bg-muted/20 px-4 py-2.5">
-          <Button variant="ghost" size="sm" onClick={() => handleOpenChange(false)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleOpenChange(false)}
+          >
             Cancel
           </Button>
           <div className="flex items-center gap-2.5">
-            <span className="text-3xs text-muted-foreground/40 select-none">⌘↵</span>
+            <span className="text-3xs text-muted-foreground/40 select-none">
+              ⌘↵
+            </span>
             <Button size="sm" onClick={handleSave}>
               {task ? "Update" : "Create"}
             </Button>

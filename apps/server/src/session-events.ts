@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import {
-  insertUserBlock,
   insertAssistantStartBlock,
   insertToolBlock,
   appendAssistantTextDelta,
@@ -19,10 +18,7 @@ import {
 import type { ManagedSessionHandle, SessionEvent } from "@lamda/pi-sdk";
 import { PLAN_DIR } from "@lamda/pi-sdk";
 import { gitStatus, gitStashCreate, gitWriteCheckpointRef } from "@lamda/git";
-import {
-  threadStatusBroadcaster,
-  type ThreadStatus,
-} from "./thread-status-broadcaster.js";
+import { threadStatusBroadcaster } from "./thread-status-broadcaster.js";
 import { scheduleReflection } from "./services/memory-reflection.js";
 import { store } from "./store.js";
 

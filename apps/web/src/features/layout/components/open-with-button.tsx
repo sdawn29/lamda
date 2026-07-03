@@ -137,7 +137,10 @@ export function OpenWithButton({
     : null
 
   return (
-    <div className="flex items-center gap-0.5" aria-label="Open workspace in app">
+    <div
+      className="flex items-center gap-0.5"
+      aria-label="Open workspace in app"
+    >
       <Button
         className={cn(
           "h-7 rounded-md text-muted-foreground hover:text-foreground",
@@ -160,7 +163,7 @@ export function OpenWithButton({
           />
         )}
         {!isMobile && (
-          <span className="whitespace-nowrap text-xs font-medium">
+          <span className="text-xs font-medium whitespace-nowrap">
             {selectedAppName}
           </span>
         )}

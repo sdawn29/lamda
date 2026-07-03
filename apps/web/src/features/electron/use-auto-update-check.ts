@@ -32,6 +32,6 @@ export function useAutoUpdateCheck() {
       .catch(() => {
         // Silently ignore network/API errors for the background check.
       })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // intentionally runs only once per mount
 }

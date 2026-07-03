@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent"
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
   getMemory,
   listMemories,
@@ -9,31 +9,31 @@ import {
   type MemoryRow,
   type MemoryScope,
   type MemoryKind,
-} from "@lamda/db"
-import { persistMemory, type PersistOutcome } from "./memory-persist.js"
+} from "@lamda/db";
+import { persistMemory, type PersistOutcome } from "./memory-persist.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-export const MEMORY_TOOL_NAME = "memory"
+export const MEMORY_TOOL_NAME = "memory";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
-export type { MemoryScope }
+export type { MemoryScope };
 
 export interface MemoryItem {
-  id: string
-  scope: MemoryScope
-  title: string
-  content: string
-  category: string | null
-  kind: MemoryKind
-  pinned: boolean
+  id: string;
+  scope: MemoryScope;
+  title: string;
+  content: string;
+  category: string | null;
+  kind: MemoryKind;
+  pinned: boolean;
 }
 
 export interface MemoryToolResult {
-  operation: string
-  memories: MemoryItem[]
-  message?: string
+  operation: string;
+  memories: MemoryItem[];
+  message?: string;
 }
 
 // ── Serialization ─────────────────────────────────────────────────────────────
@@ -47,30 +47,37 @@ function toItem(row: MemoryRow): MemoryItem {
     category: row.category,
     kind: row.kind,
     pinned: row.pinned,
-  }
+  };
 }
 
 function ok(
   operation: string,
   memories: MemoryRow[],
   message?: string,
-): { content: { type: "text"; text: string }[]; details: Record<string, unknown> } {
-  const items = memories.map(toItem)
-  const payload: MemoryToolResult = { operation, memories: items, ...(message ? { message } : {}) }
+): {
+  content: { type: "text"; text: string }[];
+  details: Record<string, unknown>;
+} {
+  const items = memories.map(toItem);
+  const payload: MemoryToolResult = {
+    operation,
+    memories: items,
+    ...(message ? { message } : {}),
+  };
   return {
     content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
     details: { memories: items },
-  }
+  };
 }
 
 function err(message: string): {
-  content: { type: "text"; text: string }[]
-  details: Record<string, unknown>
+  content: { type: "text"; text: string }[];
+  details: Record<string, unknown>;
 } {
   return {
     content: [{ type: "text", text: JSON.stringify({ error: message }) }],
     details: {},
-  }
+  };
 }
 
 // ── Tool factory ──────────────────────────────────────────────────────────────
@@ -142,7 +149,8 @@ Never save: secrets, credentials, API keys, tokens, or anything derivable by rea
         },
         category: {
           type: "string",
-          description: "Optional free-form category label (for 'save' and 'update').",
+          description:
+            "Optional free-form category label (for 'save' and 'update').",
         },
         kind: {
           type: "string",
@@ -163,7 +171,8 @@ Never save: secrets, credentials, API keys, tokens, or anything derivable by rea
         },
         query: {
           type: "string",
-          description: "Text to search for in titles and content (for 'search').",
+          description:
+            "Text to search for in titles and content (for 'search').",
         },
         id: {
           type: "string",
@@ -173,37 +182,56 @@ Never save: secrets, credentials, API keys, tokens, or anything derivable by rea
     },
 
     execute: async (_toolCallId, params, _signal, _onUpdate) => {
-      const p = (params && typeof params === "object" ? params : {}) as Record<string, unknown>
-      const operation = typeof p.operation === "string" ? p.operation : undefined
-      if (!operation) return err("Missing required parameter: operation")
+      const p = (params && typeof params === "object" ? params : {}) as Record<
+        string,
+        unknown
+      >;
+      const operation =
+        typeof p.operation === "string" ? p.operation : undefined;
+      if (!operation) return err("Missing required parameter: operation");
 
-      const KINDS = ["fact", "preference", "convention", "decision", "episode"] as const
+      const KINDS = [
+        "fact",
+        "preference",
+        "convention",
+        "decision",
+        "episode",
+      ] as const;
       const parseKind = (): MemoryKind | undefined =>
-        typeof p.kind === "string" && (KINDS as readonly string[]).includes(p.kind)
+        typeof p.kind === "string" &&
+        (KINDS as readonly string[]).includes(p.kind)
           ? (p.kind as MemoryKind)
-          : undefined
+          : undefined;
       const parseFilePaths = (): string[] | undefined =>
         Array.isArray(p.filePaths)
-          ? p.filePaths.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
-          : undefined
+          ? p.filePaths.filter(
+              (x): x is string => typeof x === "string" && x.trim().length > 0,
+            )
+          : undefined;
 
       try {
         switch (operation) {
           // ── save ────────────────────────────────────────────────────────────
           case "save": {
-            const title = typeof p.title === "string" ? p.title.trim() : ""
-            const content = typeof p.content === "string" ? p.content.trim() : ""
+            const title = typeof p.title === "string" ? p.title.trim() : "";
+            const content =
+              typeof p.content === "string" ? p.content.trim() : "";
             if (!title || !content) {
-              return err("'save' requires non-empty 'title' and 'content' strings.")
+              return err(
+                "'save' requires non-empty 'title' and 'content' strings.",
+              );
             }
-            const scope: MemoryScope = p.scope === "user" ? "user" : "workspace"
+            const scope: MemoryScope =
+              p.scope === "user" ? "user" : "workspace";
             if (scope === "workspace" && !workspaceId) {
               return err(
                 "This session has no workspace — use scope 'user' for cross-project memories.",
-              )
+              );
             }
             const category =
-              typeof p.category === "string" && p.category.trim() ? p.category.trim() : null
+              typeof p.category === "string" && p.category.trim()
+                ? p.category.trim()
+                : null;
             const result = await persistMemory({
               scope,
               workspaceId,
@@ -214,95 +242,115 @@ Never save: secrets, credentials, API keys, tokens, or anything derivable by rea
               filePaths: parseFilePaths() ?? null,
               pinned: p.pinned === true,
               source: "agent",
-            })
+            });
             if (result.outcome === "rejected") {
-              return err(result.message ?? "Memory rejected.")
+              return err(result.message ?? "Memory rejected.");
             }
-            const savedMessage: Record<Exclude<PersistOutcome, "rejected">, string> = {
+            const savedMessage: Record<
+              Exclude<PersistOutcome, "rejected">,
+              string
+            > = {
               created: `Memory saved (scope: ${scope}).`,
               reinforced:
                 "A matching memory already existed — reinforced it instead of saving a duplicate.",
               superseded:
                 "Replaced an existing memory with the same title; the prior version was superseded.",
-            }
-            return ok("save", result.row ? [result.row] : [], savedMessage[result.outcome])
+            };
+            return ok(
+              "save",
+              result.row ? [result.row] : [],
+              savedMessage[result.outcome],
+            );
           }
 
           // ── list ────────────────────────────────────────────────────────────
           case "list": {
             const scope =
-              p.scope === "user" || p.scope === "workspace" ? (p.scope as MemoryScope) : undefined
+              p.scope === "user" || p.scope === "workspace"
+                ? (p.scope as MemoryScope)
+                : undefined;
             const rows = listMemories(
               scope === "workspace"
                 ? { scope, workspaceId }
                 : scope === "user"
                   ? { scope }
                   : undefined,
-            ).filter((m) => m.scope === "user" || m.workspaceId === workspaceId)
-            touchMemoryUse(rows.map((m) => m.id))
-            return ok("list", rows)
+            ).filter(
+              (m) => m.scope === "user" || m.workspaceId === workspaceId,
+            );
+            touchMemoryUse(rows.map((m) => m.id));
+            return ok("list", rows);
           }
 
           // ── search ──────────────────────────────────────────────────────────
           case "search": {
-            const query = typeof p.query === "string" ? p.query.trim() : ""
-            if (!query) return err("'search' requires a non-empty 'query' string.")
-            const rows = searchMemories(query, workspaceId)
-            touchMemoryUse(rows.map((m) => m.id))
-            return ok("search", rows, rows.length === 0 ? "No matching memories." : undefined)
+            const query = typeof p.query === "string" ? p.query.trim() : "";
+            if (!query)
+              return err("'search' requires a non-empty 'query' string.");
+            const rows = searchMemories(query, workspaceId);
+            touchMemoryUse(rows.map((m) => m.id));
+            return ok(
+              "search",
+              rows,
+              rows.length === 0 ? "No matching memories." : undefined,
+            );
           }
 
           // ── update ──────────────────────────────────────────────────────────
           case "update": {
-            const id = typeof p.id === "string" ? p.id.trim() : ""
-            if (!id) return err("'update' requires an 'id'.")
-            const existing = getMemory(id)
-            if (!existing) return err(`No memory with id "${id}".`)
+            const id = typeof p.id === "string" ? p.id.trim() : "";
+            if (!id) return err("'update' requires an 'id'.");
+            const existing = getMemory(id);
+            if (!existing) return err(`No memory with id "${id}".`);
 
             const updates: {
-              title?: string
-              content?: string
-              category?: string | null
-              kind?: MemoryKind
-              filePaths?: string[] | null
-              pinned?: boolean
-            } = {}
-            if (typeof p.title === "string" && p.title.trim()) updates.title = p.title.trim()
+              title?: string;
+              content?: string;
+              category?: string | null;
+              kind?: MemoryKind;
+              filePaths?: string[] | null;
+              pinned?: boolean;
+            } = {};
+            if (typeof p.title === "string" && p.title.trim())
+              updates.title = p.title.trim();
             if (typeof p.content === "string" && p.content.trim())
-              updates.content = p.content.trim()
-            if (typeof p.category === "string") updates.category = p.category.trim() || null
-            const kind = parseKind()
-            if (kind) updates.kind = kind
-            const filePaths = parseFilePaths()
-            if (filePaths) updates.filePaths = filePaths
-            if (typeof p.pinned === "boolean") updates.pinned = p.pinned
+              updates.content = p.content.trim();
+            if (typeof p.category === "string")
+              updates.category = p.category.trim() || null;
+            const kind = parseKind();
+            if (kind) updates.kind = kind;
+            const filePaths = parseFilePaths();
+            if (filePaths) updates.filePaths = filePaths;
+            if (typeof p.pinned === "boolean") updates.pinned = p.pinned;
             if (Object.keys(updates).length === 0) {
               return err(
                 "'update' requires at least one of 'title', 'content', 'category', 'kind', 'filePaths', or 'pinned'.",
-              )
+              );
             }
 
-            updateMemory(id, updates)
-            const row = getMemory(id)
-            return ok("update", row ? [row] : [], "Memory updated.")
+            updateMemory(id, updates);
+            const row = getMemory(id);
+            return ok("update", row ? [row] : [], "Memory updated.");
           }
 
           // ── delete ──────────────────────────────────────────────────────────
           case "delete": {
-            const id = typeof p.id === "string" ? p.id.trim() : ""
-            if (!id) return err("'delete' requires an 'id'.")
-            const existing = getMemory(id)
-            if (!existing) return err(`No memory with id "${id}".`)
-            deleteMemory(id)
-            return ok("delete", [], "Memory deleted.")
+            const id = typeof p.id === "string" ? p.id.trim() : "";
+            if (!id) return err("'delete' requires an 'id'.");
+            const existing = getMemory(id);
+            if (!existing) return err(`No memory with id "${id}".`);
+            deleteMemory(id);
+            return ok("delete", [], "Memory deleted.");
           }
 
           default:
-            return err(`Unknown operation "${operation}". Use: save, list, search, update, delete.`)
+            return err(
+              `Unknown operation "${operation}". Use: save, list, search, update, delete.`,
+            );
         }
       } catch (e) {
-        return err(e instanceof Error ? e.message : String(e))
+        return err(e instanceof Error ? e.message : String(e));
       }
     },
-  }
+  };
 }

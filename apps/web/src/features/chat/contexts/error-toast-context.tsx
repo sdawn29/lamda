@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  type ReactNode
-} from "react"
+import { useCallback, useEffect, useRef, type ReactNode } from "react"
 import { create } from "zustand"
 import { toast } from "sonner"
 import { type ErrorMessage } from "@/features/chat"
@@ -35,7 +30,9 @@ export function ErrorToastProvider({ children }: { children: ReactNode }) {
   const activeToastsRef = useRef<Map<string, string>>(new Map())
   const setInitialized = useErrorToastStore((state) => state.setInitialized)
   const setShowApiError = useErrorToastStore((state) => state.setShowApiError)
-  const setDismissApiError = useErrorToastStore((state) => state.setDismissApiError)
+  const setDismissApiError = useErrorToastStore(
+    (state) => state.setDismissApiError
+  )
 
   const dismissApiError = useCallback((id: string) => {
     const toastId = activeToastsRef.current.get(id)
@@ -52,9 +49,10 @@ export function ErrorToastProvider({ children }: { children: ReactNode }) {
       const retryAction = error.action?.type === "retry" ? error.action : null
       const canRetry = retryAction != null && !!retryAction.prompt
 
-      const description = error.retryCount != null
-        ? `Retry attempt ${error.retryCount}`
-        : error.message
+      const description =
+        error.retryCount != null
+          ? `Retry attempt ${error.retryCount}`
+          : error.message
 
       if (existingToastId) {
         toast.error(error.title, {
@@ -68,21 +66,24 @@ export function ErrorToastProvider({ children }: { children: ReactNode }) {
       const toastId = toast.error(error.title, {
         description,
         duration: canRetry ? Infinity : 8000,
-        onDismiss: () => { activeToastsRef.current.delete(error.id) },
-        onAutoClose: () => { activeToastsRef.current.delete(error.id) },
-        action:
-          canRetry
-            ? {
-                label: "Retry",
-                onClick: () => {
-                  window.dispatchEvent(
-                    new CustomEvent("chat-retry", {
-                      detail: { prompt: retryAction.prompt },
-                    })
-                  )
-                },
-              }
-            : undefined,
+        onDismiss: () => {
+          activeToastsRef.current.delete(error.id)
+        },
+        onAutoClose: () => {
+          activeToastsRef.current.delete(error.id)
+        },
+        action: canRetry
+          ? {
+              label: "Retry",
+              onClick: () => {
+                window.dispatchEvent(
+                  new CustomEvent("chat-retry", {
+                    detail: { prompt: retryAction.prompt },
+                  })
+                )
+              },
+            }
+          : undefined,
         cancel:
           error.action?.type === "dismiss"
             ? {

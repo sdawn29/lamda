@@ -9,7 +9,12 @@ import {
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 import { cn } from "@/shared/lib/utils"
-import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "../queries"
+import {
+  useTasks,
+  useCreateTask,
+  useUpdateTask,
+  useDeleteTask,
+} from "../queries"
 import { useLastUsedTaskStore } from "../last-used-store"
 import { TaskIcon } from "../icons"
 import { TaskFormDialog } from "./task-form-dialog"
@@ -89,7 +94,7 @@ export function TasksDropdown({
                       className="shrink-0 text-muted-foreground"
                     />
                     {!isMobile && (
-                      <span className="max-w-32 truncate whitespace-nowrap text-xs font-medium">
+                      <span className="max-w-32 truncate text-xs font-medium whitespace-nowrap">
                         {lastUsedTask.name || lastUsedTask.command}
                       </span>
                     )}
@@ -98,7 +103,7 @@ export function TasksDropdown({
                   <>
                     <Play className="size-4" />
                     {!isMobile && (
-                      <span className="whitespace-nowrap text-xs font-medium">
+                      <span className="text-xs font-medium whitespace-nowrap">
                         Tasks
                       </span>
                     )}
@@ -132,60 +137,69 @@ export function TasksDropdown({
           </DropdownMenuTrigger>
 
           <DropdownMenuContent align="end" className="w-60">
-          {tasks.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-muted-foreground">
-              No tasks yet
-            </div>
-          ) : (
-            tasks.map((task) => (
-              <div
-                key={task.id}
-                className="group flex items-center gap-2 px-2 py-1 rounded-sm hover:bg-accent cursor-pointer"
-                onClick={() => runTask(task)}
-              >
-                <TaskIcon id={task.icon} className="shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate text-xs">
-                  {task.name || task.command}
-                </span>
-                <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
-                  <button
-                    className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-background hover:text-foreground"
-                    onClick={(e) => { e.stopPropagation(); openEdit(task) }}
-                    title="Edit"
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </button>
-                  <button
-                    className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-background hover:text-destructive"
-                    onClick={(e) => { e.stopPropagation(); deleteTask.mutate(task.id) }}
-                    title="Delete"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
+            {tasks.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">
+                No tasks yet
               </div>
-            ))
-          )}
+            ) : (
+              tasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="group flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 hover:bg-accent"
+                  onClick={() => runTask(task)}
+                >
+                  <TaskIcon
+                    id={task.icon}
+                    className="shrink-0 text-muted-foreground"
+                  />
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    {task.name || task.command}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                    <button
+                      className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-background hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEdit(task)
+                      }}
+                      title="Edit"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button
+                      className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-background hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteTask.mutate(task.id)
+                      }}
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
 
-          <DropdownMenuSeparator />
+            <DropdownMenuSeparator />
 
-          <div
-            className="flex items-center gap-2 px-2 py-1 rounded-sm hover:bg-accent cursor-pointer text-muted-foreground hover:text-foreground"
-            onClick={openNew}
-          >
-            <Plus className="h-3.5 w-3.5 shrink-0" />
-            <span className="text-xs">New task</span>
-          </div>
-
-          {workspace && (
             <div
-              className="flex items-center gap-2 px-2 py-1 rounded-sm hover:bg-accent cursor-pointer text-muted-foreground hover:text-foreground"
-              onClick={() => setEnvOpen(true)}
+              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              onClick={openNew}
             >
-              <KeyRound className="h-3.5 w-3.5 shrink-0" />
-              <span className="text-xs">Environment variables</span>
+              <Plus className="h-3.5 w-3.5 shrink-0" />
+              <span className="text-xs">New task</span>
             </div>
-          )}
+
+            {workspace && (
+              <div
+                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                onClick={() => setEnvOpen(true)}
+              >
+                <KeyRound className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-xs">Environment variables</span>
+              </div>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

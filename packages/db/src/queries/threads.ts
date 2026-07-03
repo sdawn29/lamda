@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "../client.js";
 import { threads, workspaces } from "../schema.js";
 

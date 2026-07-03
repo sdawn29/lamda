@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import {
@@ -71,7 +72,7 @@ import {
 } from "../services/session-service.js";
 import { scheduleReflection } from "../services/memory-reflection.js";
 import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
-
+import { parseJsonBody } from "../lib/validate.js";
 
 type ApprovalMode = "ask" | "edits_allowed" | "all_allowed";
 
@@ -80,6 +81,48 @@ function isApprovalMode(value: unknown): value is ApprovalMode {
     value === "ask" || value === "edits_allowed" || value === "all_allowed"
   );
 }
+
+const createThreadSchema = z.object({
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  title: z.string().optional(),
+  mode: z.string().optional(),
+  modelId: z.string().nullable().optional(),
+  // Kept as a plain string (not a zod enum) — invalid values are rejected
+  // below by isApprovalMode so the existing error message is preserved.
+  approvalMode: z.string().optional(),
+  worktree: z
+    .object({
+      newBranch: z.string().optional(),
+      baseRef: z.string().optional(),
+    })
+    .optional(),
+});
+
+const threadTitleSchema = z.object({ title: z.string().optional() });
+const threadModelSchema = z.object({
+  modelId: z.string().nullable().optional(),
+});
+const threadModeSchema = z.object({ mode: z.string().optional() });
+const threadApprovalModeSchema = z.object({
+  approvalMode: z.string().optional(),
+});
+const threadStoppedSchema = z.object({ stopped: z.boolean().optional() });
+const createWorktreeSchema = z.object({
+  newBranch: z.string().optional(),
+  baseRef: z.string().optional(),
+});
+const enterWorktreeSchema = z.object({ branch: z.string().optional() });
+const resolveConflictSchema = z.object({
+  filePath: z.string().optional(),
+  // Kept as a plain string (not a zod enum) — an invalid value is rejected
+  // below by the existing manual check so its error message is preserved.
+  strategy: z.string().optional(),
+});
+const resolveContentSchema = z.object({
+  filePath: z.string().optional(),
+  content: z.string().optional(),
+});
 
 /** Whether `mode` is one of the modes available to the workspace at `cwd`. */
 function isAvailableMode(mode: string, cwd: string): boolean {
@@ -171,21 +214,9 @@ const threads = new Hono();
 
 threads.post("/workspace/:workspaceId/thread", async (c) => {
   const workspaceId = c.req.param("workspaceId");
-  type CreateThreadBody = {
-    provider?: string;
-    model?: string;
-    title?: string;
-    mode?: string;
-    modelId?: string | null;
-    approvalMode?: string;
-    worktree?: {
-      newBranch?: string;
-      baseRef?: string;
-    };
-  };
-  const body = await c.req
-    .json<CreateThreadBody>()
-    .catch((): CreateThreadBody => ({}));
+  const parsed = await parseJsonBody(c, createThreadSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const ws = getWorkspace(workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
@@ -199,14 +230,10 @@ threads.post("/workspace/:workspaceId/thread", async (c) => {
     return c.json({ error: `Unknown mode: ${body.mode}` }, 400);
   }
 
-  if (
-    body.approvalMode !== undefined &&
-    !isApprovalMode(body.approvalMode)
-  ) {
+  if (body.approvalMode !== undefined && !isApprovalMode(body.approvalMode)) {
     return c.json(
       {
-        error:
-          "approvalMode must be 'ask', 'edits_allowed', or 'all_allowed'",
+        error: "approvalMode must be 'ask', 'edits_allowed', or 'all_allowed'",
       },
       400,
     );
@@ -380,9 +407,9 @@ threads.delete("/thread/:id", async (c) => {
 
 threads.patch("/thread/:id/title", async (c) => {
   const threadId = c.req.param("id");
-  const body = await c.req
-    .json<{ title?: string }>()
-    .catch((): { title?: string } => ({}));
+  const parsed = await parseJsonBody(c, threadTitleSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.title) return c.json({ error: "title is required" }, 400);
   const thread = getThread(threadId);
   if (!thread) return c.json({ error: "Thread not found" }, 404);
@@ -392,12 +419,11 @@ threads.patch("/thread/:id/title", async (c) => {
 
 threads.patch("/thread/:id/model", async (c) => {
   const threadId = c.req.param("id");
-  const body = await c.req
-    .json<{ modelId?: string | null }>()
-    .catch((): { modelId?: string | null } => ({}));
+  const parsed = await parseJsonBody(c, threadModelSchema);
+  if (!parsed.ok) return parsed.response;
   const thread = getThread(threadId);
   if (!thread) return c.json({ error: "Thread not found" }, 404);
-  const modelId = body.modelId ?? null;
+  const modelId = parsed.data.modelId ?? null;
   updateThreadModel(threadId, modelId);
   // Apply the model to the live session handle so context-usage (and the next
   // prompt) reflects the new model immediately, rather than only after the next
@@ -419,9 +445,9 @@ threads.patch("/thread/:id/model", async (c) => {
 
 threads.patch("/thread/:id/mode", async (c) => {
   const threadId = c.req.param("id");
-  const body = await c.req
-    .json<{ mode?: string }>()
-    .catch((): { mode?: string } => ({}));
+  const parsed = await parseJsonBody(c, threadModeSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const mode = normalizeMode(body.mode);
   const thread = getThread(threadId);
   if (!thread) return c.json({ error: "Thread not found" }, 404);
@@ -450,14 +476,13 @@ threads.patch("/thread/:id/mode", async (c) => {
 
 threads.patch("/thread/:id/approval-mode", async (c) => {
   const threadId = c.req.param("id");
-  const body = await c.req
-    .json<{ approvalMode?: string }>()
-    .catch((): { approvalMode?: string } => ({}));
+  const parsed = await parseJsonBody(c, threadApprovalModeSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!isApprovalMode(body.approvalMode)) {
     return c.json(
       {
-        error:
-          "approvalMode must be 'ask', 'edits_allowed', or 'all_allowed'",
+        error: "approvalMode must be 'ask', 'edits_allowed', or 'all_allowed'",
       },
       400,
     );
@@ -472,12 +497,11 @@ threads.patch("/thread/:id/approval-mode", async (c) => {
 
 threads.patch("/thread/:id/stopped", async (c) => {
   const threadId = c.req.param("id");
-  const body = await c.req
-    .json<{ stopped?: boolean }>()
-    .catch((): { stopped?: boolean } => ({}));
+  const parsed = await parseJsonBody(c, threadStoppedSchema);
+  if (!parsed.ok) return parsed.response;
   const thread = getThread(threadId);
   if (!thread) return c.json({ error: "Thread not found" }, 404);
-  updateThreadStopped(threadId, body.stopped ?? false);
+  updateThreadStopped(threadId, parsed.data.stopped ?? false);
   return c.json({ ok: true });
 });
 
@@ -544,9 +568,9 @@ threads.post("/thread/:id/worktree", async (c) => {
   const ws = getWorkspace(thread.workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
 
-  const body = await c.req
-    .json<{ newBranch?: string; baseRef?: string }>()
-    .catch((): { newBranch?: string; baseRef?: string } => ({}));
+  const parsed = await parseJsonBody(c, createWorktreeSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const newBranch = body.newBranch?.trim();
   if (!newBranch) return c.json({ error: "newBranch is required" }, 400);
 
@@ -608,10 +632,9 @@ threads.post("/thread/:id/worktree/enter", async (c) => {
   const ws = getWorkspace(thread.workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
 
-  const body = await c.req
-    .json<{ branch?: string }>()
-    .catch((): { branch?: string } => ({}));
-  const branch = body.branch?.trim();
+  const parsed = await parseJsonBody(c, enterWorktreeSchema);
+  if (!parsed.ok) return parsed.response;
+  const branch = parsed.data.branch?.trim();
   if (!branch) return c.json({ error: "branch is required" }, 400);
 
   const repoRoot = await getRepoRoot(ws.path);
@@ -766,7 +789,9 @@ threads.post("/thread/:id/worktree/checkout-local", async (c) => {
       await gitStash(thread.worktreePath, stashMessage);
     } catch (error) {
       return c.json(
-        { error: parseGitError(error, "Could not stash the worktree's changes") },
+        {
+          error: parseGitError(error, "Could not stash the worktree's changes"),
+        },
         409,
       );
     }
@@ -979,7 +1004,7 @@ threads.post("/thread/:id/worktree/merge", async (c) => {
   if (!claimThreadWorktreeMerge(threadId, thread.workspaceId)) {
     return c.json({ error: "Another thread claimed the workspace merge" }, 409);
   }
-  let mergePending = false;
+  let mergePending: boolean;
   try {
     mergePending = await mergeBranch(ws.path, thread.worktreeBranch);
   } catch (err) {
@@ -1083,13 +1108,9 @@ threads.post("/thread/:id/worktree/merge/resolve", async (c) => {
     );
   }
 
-  type ResolveConflictBody = {
-    filePath?: string;
-    strategy?: "ours" | "theirs";
-  };
-  const body = await c.req
-    .json<ResolveConflictBody>()
-    .catch((): ResolveConflictBody => ({}));
+  const parsed = await parseJsonBody(c, resolveConflictSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.filePath || !["ours", "theirs"].includes(body.strategy ?? "")) {
     return c.json({ error: "filePath and strategy are required" }, 400);
   }
@@ -1098,7 +1119,8 @@ threads.post("/thread/:id/worktree/merge/resolve", async (c) => {
   if (!conflicts.includes(body.filePath)) {
     return c.json({ error: "File is not an active merge conflict" }, 400);
   }
-  await resolveMergeConflict(ws.path, body.filePath, body.strategy!);
+  const strategy = body.strategy as "ours" | "theirs";
+  await resolveMergeConflict(ws.path, body.filePath, strategy);
   return c.json({ conflicts: await listMergeConflicts(ws.path) });
 });
 
@@ -1157,10 +1179,9 @@ threads.post("/thread/:id/worktree/merge/resolve-content", async (c) => {
     );
   }
 
-  type ResolveContentBody = { filePath?: string; content?: string };
-  const body = await c.req
-    .json<ResolveContentBody>()
-    .catch((): ResolveContentBody => ({}));
+  const parsed = await parseJsonBody(c, resolveContentSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.filePath || typeof body.content !== "string") {
     return c.json({ error: "filePath and content are required" }, 400);
   }

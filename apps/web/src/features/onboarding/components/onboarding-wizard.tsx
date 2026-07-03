@@ -36,11 +36,12 @@ import {
   SubscriptionsCard,
 } from "@/features/settings/components/provider-cards"
 import { useProviders, useOAuthProviders } from "@/features/settings/queries"
-import { useCreateMemory, useUpdateAppSetting } from "@/features/settings/mutations"
-import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
 import {
-  useCreateWorkspaceAction,
-} from "@/features/workspace"
+  useCreateMemory,
+  useUpdateAppSetting,
+} from "@/features/settings/mutations"
+import { APP_SETTINGS_KEYS } from "@/shared/lib/storage-keys"
+import { useCreateWorkspaceAction } from "@/features/workspace"
 import { CreateWorkspaceDialog } from "@/features/workspace/components/create-workspace-dialog"
 
 type Step = "welcome" | "about" | "theme" | "provider" | "finish"
@@ -54,7 +55,8 @@ const PROGRESS_STEPS = STEP_ORDER.slice(1)
 const STEP_META: Record<Step, { title: string; subtitle: string }> = {
   welcome: {
     title: "Welcome to Lamda",
-    subtitle: "Your AI pair programmer for reading, editing, and shipping code.",
+    subtitle:
+      "Your AI pair programmer for reading, editing, and shipping code.",
   },
   about: {
     title: "Tell us about yourself",
@@ -145,7 +147,7 @@ export function OnboardingWizard() {
   return (
     <>
       <div className="flex h-full items-center justify-center p-6">
-        <div className="flex w-full max-w-xl flex-col gap-6 animate-in duration-300 fade-in-0 zoom-in-95">
+        <div className="flex w-full max-w-xl animate-in flex-col gap-6 duration-300 fade-in-0 zoom-in-95">
           {/* Brand + progress */}
           <div className="flex flex-col items-center gap-4 text-center">
             <LambdaMark />
@@ -200,7 +202,12 @@ export function OnboardingWizard() {
             </Button>
 
             {step !== "finish" ? (
-              <Button size="sm" onClick={goNext} disabled={!canAdvance} className="gap-1.5">
+              <Button
+                size="sm"
+                onClick={goNext}
+                disabled={!canAdvance}
+                className="gap-1.5"
+              >
                 {step === "provider" ? "Continue" : "Next"}
                 <ArrowRight className="size-3.5" />
               </Button>
@@ -249,7 +256,7 @@ const WELCOME_FEATURES = [
 function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <div className="flex h-full items-center justify-center p-6">
-      <div className="flex w-full max-w-md flex-col items-center gap-8 text-center animate-in duration-500 fade-in-0 zoom-in-95">
+      <div className="flex w-full max-w-md animate-in flex-col items-center gap-8 text-center duration-500 fade-in-0 zoom-in-95">
         <div className="flex flex-col items-center gap-4">
           <LambdaMark />
           <div className="space-y-2">

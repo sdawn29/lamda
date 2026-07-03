@@ -3,7 +3,7 @@ import type { DiffLine, CharRange, WordDiffMap } from "./types"
 
 function computeCharDiff(
   oldText: string,
-  newText: string,
+  newText: string
 ): { oldRanges: CharRange[]; newRanges: CharRange[] } {
   const dmp = new diff_match_patch()
   const diffs = dmp.diff_main(oldText, newText)
@@ -74,7 +74,8 @@ export function buildWordDiffMap(lines: DiffLine[]): WordDiffMap {
       // Only store if there are actual changes (avoids marking full lines when
       // lines are completely different — in that case, full-line colour is clearer)
       const totalChanged = oldRanges.reduce((s, r) => s + r.end - r.start, 0)
-      const coverageRatio = rem.content.length > 0 ? totalChanged / rem.content.length : 1
+      const coverageRatio =
+        rem.content.length > 0 ? totalChanged / rem.content.length : 1
       if (coverageRatio < 0.8) {
         if (oldRanges.length > 0) removed.set(rem.index, oldRanges)
         if (newRanges.length > 0) added.set(add.index, newRanges)
@@ -89,7 +90,7 @@ export function buildWordDiffMap(lines: DiffLine[]): WordDiffMap {
 
 export function renderWithWordDiff(
   text: string,
-  ranges: CharRange[],
+  ranges: CharRange[]
 ): Array<{ text: string; highlighted: boolean }> {
   if (ranges.length === 0) return [{ text, highlighted: false }]
 

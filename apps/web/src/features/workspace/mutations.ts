@@ -39,7 +39,7 @@ import {
   type ApprovalMode,
   type WorkspaceDto,
 } from "./api"
-import { workspacesQueryKey } from "./queries"
+import { workspacesQueryKey, threadKeys } from "./queries"
 import { gitClone } from "@/features/git/api"
 import {
   createSession,
@@ -605,7 +605,7 @@ export function useArchiveThread() {
         )
       )
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
-      queryClient.invalidateQueries({ queryKey: ["threads", "archived"] })
+      queryClient.invalidateQueries({ queryKey: threadKeys.archived })
       useMainTabsStore.getState().closeTab(`thread-${threadId}`)
     },
   })

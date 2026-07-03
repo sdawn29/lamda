@@ -1,20 +1,3 @@
-type Subscriber = (workspaceId: string) => void;
+import { Broadcaster } from "./lib/broadcaster.js";
 
-class GitStatusBroadcaster {
-  private subscribers = new Set<Subscriber>();
-
-  subscribe(fn: Subscriber): () => void {
-    this.subscribers.add(fn);
-    return () => this.subscribers.delete(fn);
-  }
-
-  broadcast(workspaceId: string) {
-    for (const fn of this.subscribers) {
-      try {
-        fn(workspaceId);
-      } catch {}
-    }
-  }
-}
-
-export const gitStatusBroadcaster = new GitStatusBroadcaster();
+export const gitStatusBroadcaster = new Broadcaster<[workspaceId: string]>();

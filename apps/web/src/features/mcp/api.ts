@@ -39,19 +39,21 @@ export async function saveMcpSettings(settings: McpSettings): Promise<void> {
 export async function fetchMcpTools(
   signal?: AbortSignal
 ): Promise<Array<{ serverName: string; name: string; description?: string }>> {
-  const res = await apiFetch<{ tools: Array<{ serverName: string; name: string; description?: string }> }>(
-    "/mcp/tools",
-    { signal }
-  )
+  const res = await apiFetch<{
+    tools: Array<{ serverName: string; name: string; description?: string }>
+  }>("/mcp/tools", { signal })
   return res.tools
 }
 
 /**
  * Test connecting to an MCP server
  */
-export async function testMcpConnection(
-  server: McpServerConfig
-): Promise<{ success: boolean; toolCount: number; tools?: Array<{ name: string; description?: string }>; error?: string }> {
+export async function testMcpConnection(server: McpServerConfig): Promise<{
+  success: boolean
+  toolCount: number
+  tools?: Array<{ name: string; description?: string }>
+  error?: string
+}> {
   const res = await apiFetch<{
     success: boolean
     toolCount: number
@@ -68,13 +70,24 @@ export async function testMcpConnection(
 /**
  * Get MCP server status
  */
-export async function fetchMcpServerStatus(
-  signal?: AbortSignal
-): Promise<Array<{ name: string; connected: boolean; toolCount: number; error?: string; enabled?: boolean }>> {
-  const res = await apiFetch<{ servers: Array<{ name: string; connected: boolean; toolCount: number; error?: string; enabled?: boolean }> }>(
-    "/mcp/status",
-    { signal }
-  )
+export async function fetchMcpServerStatus(signal?: AbortSignal): Promise<
+  Array<{
+    name: string
+    connected: boolean
+    toolCount: number
+    error?: string
+    enabled?: boolean
+  }>
+> {
+  const res = await apiFetch<{
+    servers: Array<{
+      name: string
+      connected: boolean
+      toolCount: number
+      error?: string
+      enabled?: boolean
+    }>
+  }>("/mcp/status", { signal })
   return res.servers
 }
 
@@ -84,10 +97,11 @@ export async function fetchMcpServerStatus(
 export async function startMcpServer(
   serverName: string
 ): Promise<{ success: boolean; error?: string; toolCount?: number }> {
-  const res = await apiFetch<{ success: boolean; error?: string; toolCount?: number }>(
-    `/mcp/start/${encodeURIComponent(serverName)}`,
-    { method: "POST" }
-  )
+  const res = await apiFetch<{
+    success: boolean
+    error?: string
+    toolCount?: number
+  }>(`/mcp/start/${encodeURIComponent(serverName)}`, { method: "POST" })
   return res
 }
 

@@ -27,7 +27,11 @@ export interface SessionMessageStartEvent {
 }
 
 export interface SessionMessageUpdateEvent {
-  assistantMessageEvent?: { type: string; delta?: string; partial?: { model?: string; provider?: string } }
+  assistantMessageEvent?: {
+    type: string
+    delta?: string
+    partial?: { model?: string; provider?: string }
+  }
 }
 
 export interface SessionToolExecutionStartEvent {
@@ -51,8 +55,8 @@ export interface SessionToolExecutionEndEvent {
 }
 
 export interface SessionQueueUpdateEvent {
-  steering: readonly string[];
-  followUp: readonly string[];
+  steering: readonly string[]
+  followUp: readonly string[]
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -65,81 +69,83 @@ export interface SessionTurnEndEvent {}
 export interface SessionAgentStartEvent {}
 
 export interface SessionTurnFileChangedEvent {
-  filePath: string;
-  postStatusCode: string;
-  wasCreatedByTurn: boolean;
+  filePath: string
+  postStatusCode: string
+  wasCreatedByTurn: boolean
 }
 
 export interface SessionPlanSavedEvent {
   /** Absolute path on the server's filesystem. */
-  filePath: string;
+  filePath: string
   /** Workspace-relative forward-slash path (always starts with `.lamda/plans/`). */
-  relativePath: string;
+  relativePath: string
 }
 
 export interface SessionAgentEndEvent {
-  messages?: AgentEndMessage[];
+  messages?: AgentEndMessage[]
 }
 
 export interface SessionToolApprovalRequestEvent {
-  toolCallId: string;
-  toolName: string;
-  input: Record<string, unknown>;
+  toolCallId: string
+  toolName: string
+  input: Record<string, unknown>
   /** What an Always/Don't-allow decision will remember (e.g. `git status`). */
-  scopeLabel: string;
+  scopeLabel: string
 }
 
 export interface SessionToolApprovalResolvedEvent {
-  toolCallId: string;
-  decision: "once" | "always" | "never" | "reject";
+  toolCallId: string
+  decision: "once" | "always" | "never" | "reject"
 }
 
 export interface SessionAutoRetryStartEvent {
-  attempt: number;
-  maxAttempts: number;
-  delayMs: number;
-  errorMessage: string;
+  attempt: number
+  maxAttempts: number
+  delayMs: number
+  errorMessage: string
 }
 
 export interface SessionAutoRetryEndEvent {
-  success: boolean;
-  attempt: number;
-  finalError?: string;
+  success: boolean
+  attempt: number
+  finalError?: string
 }
 
 export interface SessionMessageEndEvent {
-  message: unknown;
+  message: unknown
 }
 
 export interface SessionEventHandlers {
-  onMessageStart: (event: SessionMessageStartEvent) => void;
-  onMessageUpdate: (event: SessionMessageUpdateEvent) => void;
-  onMessageEnd: (event: SessionMessageEndEvent) => void;
-  onToolExecutionStart: (event: SessionToolExecutionStartEvent) => void;
-  onToolExecutionUpdate: (event: SessionToolExecutionUpdateEvent) => void;
-  onToolExecutionEnd: (event: SessionToolExecutionEndEvent) => void;
-  onTurnStart: (event: SessionTurnStartEvent) => void;
-  onTurnEnd: (event: SessionTurnEndEvent) => void;
-  onAgentStart: (event: SessionAgentStartEvent) => void;
-  onAgentEnd: (event: SessionAgentEndEvent) => void;
-  onTurnFileChanged?: (event: SessionTurnFileChangedEvent) => void;
-  onPlanSaved?: (event: SessionPlanSavedEvent) => void;
-  onToolApprovalRequest?: (event: SessionToolApprovalRequestEvent) => void;
-  onToolApprovalResolved?: (event: SessionToolApprovalResolvedEvent) => void;
-  onQueueUpdate: (event: SessionQueueUpdateEvent) => void;
-  onAutoRetryStart: (event: SessionAutoRetryStartEvent) => void;
-  onAutoRetryEnd: (event: SessionAutoRetryEndEvent) => void;
-  onCompactionStart: (event: { reason: "manual" | "threshold" | "overflow" }) => void;
+  onMessageStart: (event: SessionMessageStartEvent) => void
+  onMessageUpdate: (event: SessionMessageUpdateEvent) => void
+  onMessageEnd: (event: SessionMessageEndEvent) => void
+  onToolExecutionStart: (event: SessionToolExecutionStartEvent) => void
+  onToolExecutionUpdate: (event: SessionToolExecutionUpdateEvent) => void
+  onToolExecutionEnd: (event: SessionToolExecutionEndEvent) => void
+  onTurnStart: (event: SessionTurnStartEvent) => void
+  onTurnEnd: (event: SessionTurnEndEvent) => void
+  onAgentStart: (event: SessionAgentStartEvent) => void
+  onAgentEnd: (event: SessionAgentEndEvent) => void
+  onTurnFileChanged?: (event: SessionTurnFileChangedEvent) => void
+  onPlanSaved?: (event: SessionPlanSavedEvent) => void
+  onToolApprovalRequest?: (event: SessionToolApprovalRequestEvent) => void
+  onToolApprovalResolved?: (event: SessionToolApprovalResolvedEvent) => void
+  onQueueUpdate: (event: SessionQueueUpdateEvent) => void
+  onAutoRetryStart: (event: SessionAutoRetryStartEvent) => void
+  onAutoRetryEnd: (event: SessionAutoRetryEndEvent) => void
+  onCompactionStart: (event: {
+    reason: "manual" | "threshold" | "overflow"
+  }) => void
   onCompactionEnd: (event: {
-    reason: "manual" | "threshold" | "overflow";
-    aborted: boolean;
-    willRetry: boolean;
-    errorMessage?: string;
-  }) => void;
-  onServerError: (event: SessionServerErrorEvent) => void;
-  onTransportError?: (event: Event) => void;
+    reason: "manual" | "threshold" | "overflow"
+    aborted: boolean
+    willRetry: boolean
+    errorMessage?: string
+  }) => void
+  onServerError: (event: SessionServerErrorEvent) => void
+  onTransportError?: (event: Event) => void
   /** Called with the numeric event id from each server message, for lastEventId tracking. */
-  onEventId?: (id: string) => void;
+  onEventId?: (id: string) => void
 }
 
 export interface SessionServerErrorEvent {
@@ -152,7 +158,10 @@ export function subscribeToSessionEvents(
 ) {
   const handleMessage = (event: MessageEvent) => {
     try {
-      const data = JSON.parse(event.data as string) as { type: string; id?: number } & Record<string, unknown>
+      const data = JSON.parse(event.data as string) as {
+        type: string
+        id?: number
+      } & Record<string, unknown>
       if (data.id !== undefined) {
         handlers.onEventId?.(String(data.id))
       }
@@ -167,13 +176,19 @@ export function subscribeToSessionEvents(
           handlers.onMessageEnd(data as unknown as SessionMessageEndEvent)
           break
         case "tool_execution_start":
-          handlers.onToolExecutionStart(data as unknown as SessionToolExecutionStartEvent)
+          handlers.onToolExecutionStart(
+            data as unknown as SessionToolExecutionStartEvent
+          )
           break
         case "tool_execution_update":
-          handlers.onToolExecutionUpdate(data as unknown as SessionToolExecutionUpdateEvent)
+          handlers.onToolExecutionUpdate(
+            data as unknown as SessionToolExecutionUpdateEvent
+          )
           break
         case "tool_execution_end":
-          handlers.onToolExecutionEnd(data as unknown as SessionToolExecutionEndEvent)
+          handlers.onToolExecutionEnd(
+            data as unknown as SessionToolExecutionEndEvent
+          )
           break
         case "turn_start":
           handlers.onTurnStart(data as unknown as SessionTurnStartEvent)
@@ -188,36 +203,48 @@ export function subscribeToSessionEvents(
           handlers.onAgentEnd(data as unknown as SessionAgentEndEvent)
           break
         case "turn_file_changed":
-          handlers.onTurnFileChanged?.(data as unknown as SessionTurnFileChangedEvent)
+          handlers.onTurnFileChanged?.(
+            data as unknown as SessionTurnFileChangedEvent
+          )
           break
         case "plan_saved":
           handlers.onPlanSaved?.(data as unknown as SessionPlanSavedEvent)
           break
         case "tool_approval_request":
-          handlers.onToolApprovalRequest?.(data as unknown as SessionToolApprovalRequestEvent)
+          handlers.onToolApprovalRequest?.(
+            data as unknown as SessionToolApprovalRequestEvent
+          )
           break
         case "tool_approval_resolved":
-          handlers.onToolApprovalResolved?.(data as unknown as SessionToolApprovalResolvedEvent)
+          handlers.onToolApprovalResolved?.(
+            data as unknown as SessionToolApprovalResolvedEvent
+          )
           break
         case "queue_update":
           handlers.onQueueUpdate(data as unknown as SessionQueueUpdateEvent)
           break
         case "auto_retry_start":
-          handlers.onAutoRetryStart(data as unknown as SessionAutoRetryStartEvent)
+          handlers.onAutoRetryStart(
+            data as unknown as SessionAutoRetryStartEvent
+          )
           break
         case "auto_retry_end":
           handlers.onAutoRetryEnd(data as unknown as SessionAutoRetryEndEvent)
           break
         case "compaction_start":
-          handlers.onCompactionStart(data as unknown as { reason: "manual" | "threshold" | "overflow" })
+          handlers.onCompactionStart(
+            data as unknown as { reason: "manual" | "threshold" | "overflow" }
+          )
           break
         case "compaction_end":
-          handlers.onCompactionEnd(data as unknown as {
-            reason: "manual" | "threshold" | "overflow"
-            aborted: boolean
-            willRetry: boolean
-            errorMessage?: string
-          })
+          handlers.onCompactionEnd(
+            data as unknown as {
+              reason: "manual" | "threshold" | "overflow"
+              aborted: boolean
+              willRetry: boolean
+              errorMessage?: string
+            }
+          )
           break
         case "server_error":
           handlers.onServerError(data as unknown as SessionServerErrorEvent)

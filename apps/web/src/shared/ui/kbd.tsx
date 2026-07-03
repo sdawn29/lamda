@@ -1,5 +1,8 @@
 import { cn } from "@/shared/lib/utils"
-import { formatBinding, formatBindingParts } from "@/shared/lib/keyboard-shortcuts"
+import {
+  formatBinding,
+  formatBindingParts,
+} from "@/shared/lib/keyboard-shortcuts"
 
 function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
   return (
@@ -25,7 +28,13 @@ function KbdGroup({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 /** Renders a keyboard shortcut binding string as individual Kbd elements inside a KbdGroup. */
-function ShortcutKbd({ binding, className }: { binding: string; className?: string }) {
+function ShortcutKbd({
+  binding,
+  className,
+}: {
+  binding: string
+  className?: string
+}) {
   const parts = formatBindingParts(binding)
   if (parts.length === 0) return null
   return (
@@ -38,7 +47,13 @@ function ShortcutKbd({ binding, className }: { binding: string; className?: stri
 }
 
 /** Renders a keyboard shortcut binding as plain text (no key boxes). */
-function ShortcutText({ binding, className }: { binding: string; className?: string }) {
+function ShortcutText({
+  binding,
+  className,
+}: {
+  binding: string
+  className?: string
+}) {
   if (!binding) return null
   return <span className={className}>{formatBinding(binding)}</span>
 }

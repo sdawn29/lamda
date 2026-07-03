@@ -83,7 +83,8 @@ export function useSkillInstallJobs() {
   })
 
   // Refresh the installed list once the number of running jobs drops.
-  const runningCount = query.data?.filter((j) => j.status === "running").length ?? 0
+  const runningCount =
+    query.data?.filter((j) => j.status === "running").length ?? 0
   const prevRunning = useRef(runningCount)
   useEffect(() => {
     if (runningCount < prevRunning.current) {

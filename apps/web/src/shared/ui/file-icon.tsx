@@ -44,7 +44,10 @@ const MACCHIATO_TO_LATTE: Record<string, string> = {
 
 const LATTE_STYLE_ID = "catppuccin-icons-latte"
 
-if (typeof document !== "undefined" && !document.getElementById(LATTE_STYLE_ID)) {
+if (
+  typeof document !== "undefined" &&
+  !document.getElementById(LATTE_STYLE_ID)
+) {
   const css = Object.entries(MACCHIATO_TO_LATTE)
     .map(
       ([from, to]) =>
@@ -71,41 +74,66 @@ export function getIconName(filename: string): string {
   if (lower === "bun.lockb") return "bun-lock"
   if (lower === "dockerfile") return "docker"
   if (lower === ".dockerignore") return "docker-ignore"
-  if (lower === ".gitignore" || lower === ".gitattributes" || lower === ".gitconfig") return "git"
+  if (
+    lower === ".gitignore" ||
+    lower === ".gitattributes" ||
+    lower === ".gitconfig"
+  )
+    return "git"
   if (lower === "readme.md") return "readme"
   if (lower === "changelog.md") return "changelog"
   if (lower === "license" || lower === "licence") return "license"
   if (lower === "makefile") return "makefile"
   if (lower === ".env.example" || lower === ".env.sample") return "env"
   if (lower === ".editorconfig") return "editorconfig"
-  if (lower === ".eslintrc" || lower === ".eslintrc.json" || lower === ".eslintrc.js" || lower === ".eslintrc.cjs") return "eslint"
+  if (
+    lower === ".eslintrc" ||
+    lower === ".eslintrc.json" ||
+    lower === ".eslintrc.js" ||
+    lower === ".eslintrc.cjs"
+  )
+    return "eslint"
   if (lower === ".eslintignore") return "eslint-ignore"
-  if (lower === ".prettierrc" || lower === ".prettierrc.json" || lower === ".prettierrc.js") return "prettier"
+  if (
+    lower === ".prettierrc" ||
+    lower === ".prettierrc.json" ||
+    lower === ".prettierrc.js"
+  )
+    return "prettier"
   if (lower === ".prettierignore") return "prettier-ignore"
-  if (lower === "tailwind.config.ts" || lower === "tailwind.config.js") return "tailwind"
+  if (lower === "tailwind.config.ts" || lower === "tailwind.config.js")
+    return "tailwind"
   if (lower === "vite.config.ts" || lower === "vite.config.js") return "vite"
-  if (lower === "tsconfig.json" || lower.startsWith("tsconfig.")) return "typescript-config"
+  if (lower === "tsconfig.json" || lower.startsWith("tsconfig."))
+    return "typescript-config"
   if (lower === "cargo.toml") return "cargo"
   if (lower === "cargo.lock") return "cargo-lock"
   if (lower === "go.mod" || lower === "go.sum") return "go-mod"
   if (lower === "gemfile" || lower === "gemfile.lock") return "ruby-gem"
-  if (lower === "docker-compose.yml" || lower === "docker-compose.yaml") return "docker-compose"
+  if (lower === "docker-compose.yml" || lower === "docker-compose.yaml")
+    return "docker-compose"
   if (lower === ".nvmrc" || lower === ".node-version") return "npm"
   if (lower === "deno.json" || lower === "deno.jsonc") return "deno"
   if (lower === "deno.lock") return "deno-lock"
   if (lower === "biome.json") return "biome"
   if (lower === "turbo.json") return "turbo"
   if (lower === "nx.json") return "nx"
-  if (lower === "vitest.config.ts" || lower === "vitest.config.js") return "vitest"
+  if (lower === "vitest.config.ts" || lower === "vitest.config.js")
+    return "vitest"
   if (lower === "jest.config.ts" || lower === "jest.config.js") return "jest"
-  if (lower === "astro.config.ts" || lower === "astro.config.mjs") return "astro-config"
-  if (lower === "svelte.config.js" || lower === "svelte.config.ts") return "svelte-config"
+  if (lower === "astro.config.ts" || lower === "astro.config.mjs")
+    return "astro-config"
+  if (lower === "svelte.config.js" || lower === "svelte.config.ts")
+    return "svelte-config"
   if (lower === "nuxt.config.ts" || lower === "nuxt.config.js") return "nuxt"
   if (lower === "next.config.ts" || lower === "next.config.js") return "next"
-  if (lower === "vue.config.js" || lower === "vue.config.ts") return "vue-config"
-  if (lower === ".stylelintrc" || lower === ".stylelintrc.json") return "stylelint"
+  if (lower === "vue.config.js" || lower === "vue.config.ts")
+    return "vue-config"
+  if (lower === ".stylelintrc" || lower === ".stylelintrc.json")
+    return "stylelint"
   if (lower === ".stylelintignore") return "stylelint-ignore"
-  if (lower === ".commitlintrc" || lower === "commitlint.config.js") return "commitlint"
+  if (lower === ".commitlintrc" || lower === "commitlint.config.js")
+    return "commitlint"
   if (lower === "renovate.json") return "renovate"
   if (lower === ".npmignore") return "npm-ignore"
   if (lower === ".npmrc") return "npm"
@@ -423,22 +451,34 @@ export function getIconName(filename: string): string {
 
 type IconProps = { className?: string }
 
-export function getFileIcon(filename: string): (props: IconProps) => React.JSX.Element {
+export function getFileIcon(
+  filename: string
+): (props: IconProps) => React.JSX.Element {
   const iconName = getIconName(filename.split(/[/\\]/).pop() ?? filename)
   return ({ className }: IconProps) => (
     <Icon icon={`catppuccin:${iconName}`} className={className} />
   )
 }
 
-export function FileIcon({ filename, className }: { filename: string; className?: string }) {
+export function FileIcon({
+  filename,
+  className,
+}: {
+  filename: string
+  className?: string
+}) {
   const iconName = getIconName(filename.split(/[/\\]/).pop() ?? filename)
   return <Icon icon={`catppuccin:${iconName}`} className={className} />
 }
 
-const icons = (catppuccinData as { icons: Record<string, { body: string }> }).icons
+const icons = (catppuccinData as { icons: Record<string, { body: string }> })
+  .icons
 
 /** Build an SVG DOM element for a catppuccin icon, safe to use outside React. */
-export function buildCatppuccinSvgElement(iconName: string, className?: string): SVGSVGElement {
+export function buildCatppuccinSvgElement(
+  iconName: string,
+  className?: string
+): SVGSVGElement {
   const svgNS = "http://www.w3.org/2000/svg"
   const svg = document.createElementNS(svgNS, "svg")
   svg.setAttribute("xmlns", svgNS)

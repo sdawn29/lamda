@@ -1,4 +1,4 @@
-type Subscriber = () => void;
+import { Broadcaster } from "./lib/broadcaster.js";
 
 /**
  * Broadcasts "the set of automations changed" — one was created, edited,
@@ -10,21 +10,4 @@ type Subscriber = () => void;
  * are cheap to refetch, so a single global signal keeps every client in sync
  * without per-client bookkeeping.
  */
-class AutomationBroadcaster {
-  private subscribers = new Set<Subscriber>();
-
-  subscribe(fn: Subscriber): () => void {
-    this.subscribers.add(fn);
-    return () => this.subscribers.delete(fn);
-  }
-
-  broadcast(): void {
-    for (const fn of this.subscribers) {
-      try {
-        fn();
-      } catch {}
-    }
-  }
-}
-
-export const automationBroadcaster = new AutomationBroadcaster();
+export const automationBroadcaster = new Broadcaster();

@@ -43,12 +43,14 @@
 ### Desktop (`apps/desktop/`)
 
 Electron shell that:
+
 - Spawns the Hono server as a child process
 - Exposes native APIs (folder selection, file opening, updates)
 - Handles IPC communication with the renderer
 - Manages app lifecycle and window management
 
 **Key files:**
+
 - `src/main.ts` — Main process entry
 - `src/preload.ts` — Preload script for IPC bridge
 
@@ -56,30 +58,32 @@ Electron shell that:
 
 React 19 + Vite application with feature modules:
 
-| Module | Path | Purpose |
-|--------|------|---------|
-| Chat | `src/features/chat/` | Messaging, streaming, tool display, thread modes |
-| Git | `src/features/git/` | Diff view, hunk staging, commits, branches |
-| Terminal | `src/features/terminal/` | xterm.js with WebSocket PTY |
-| Settings | `src/features/settings/` | Provider config, API keys |
-| Workspace | `src/features/workspace/` | Workspace/thread management |
-| Main Tabs | `src/features/main-tabs/` | Tab bar for threads and open files |
-| Tasks | `src/features/tasks/` | Workspace custom shell command shortcuts |
-| LSP | `src/features/lsp/` | Language server diagnostics in the file viewer |
-| Command Palette | `src/features/command-palette/` | Keyboard-driven command and file search |
-| File Tree | `src/features/file-tree/` | Workspace file browser |
-| MCP | `src/features/mcp/` | MCP server management UI |
-| Themes | `src/features/themes/` | Theming engine: built-in/custom themes, fonts, syntax palettes |
-| Onboarding | `src/features/onboarding/` | First-run onboarding flow |
-| Electron | `src/features/electron/` | Desktop IPC wrapper |
+| Module          | Path                            | Purpose                                                        |
+| --------------- | ------------------------------- | -------------------------------------------------------------- |
+| Chat            | `src/features/chat/`            | Messaging, streaming, tool display, thread modes               |
+| Git             | `src/features/git/`             | Diff view, hunk staging, commits, branches                     |
+| Terminal        | `src/features/terminal/`        | xterm.js with WebSocket PTY                                    |
+| Settings        | `src/features/settings/`        | Provider config, API keys                                      |
+| Workspace       | `src/features/workspace/`       | Workspace/thread management                                    |
+| Main Tabs       | `src/features/main-tabs/`       | Tab bar for threads and open files                             |
+| Tasks           | `src/features/tasks/`           | Workspace custom shell command shortcuts                       |
+| LSP             | `src/features/lsp/`             | Language server diagnostics in the file viewer                 |
+| Command Palette | `src/features/command-palette/` | Keyboard-driven command and file search                        |
+| File Tree       | `src/features/file-tree/`       | Workspace file browser                                         |
+| MCP             | `src/features/mcp/`             | MCP server management UI                                       |
+| Themes          | `src/features/themes/`          | Theming engine: built-in/custom themes, fonts, syntax palettes |
+| Onboarding      | `src/features/onboarding/`      | First-run onboarding flow                                      |
+| Electron        | `src/features/electron/`        | Desktop IPC wrapper                                            |
 
 **Shared components:**
+
 - `src/shared/ui/` — shadcn/ui component library
 - `src/shared/lib/` — Utilities and helpers
 
 ### Server (`apps/server/`)
 
 Hono API server that:
+
 - Manages Pi agent sessions
 - Streams events via WebSocket
 - Handles git operations via CLI wrappers
@@ -88,6 +92,7 @@ Hono API server that:
 - Persists data to SQLite
 
 **Route modules:**
+
 - `routes/sessions.ts` — Session lifecycle, prompts, streaming events
 - `routes/threads.ts` — Thread CRUD, archive, pin, fork
 - `routes/workspaces.ts` — Workspace CRUD
@@ -104,6 +109,7 @@ Hono API server that:
 - `routes/health.ts` — Health check
 
 **Services:**
+
 - `services/session-service.ts` — Session management
 - `services/terminal-service.ts` — PTY management (persistent sessions with reattachment)
 - `services/language-service.ts` — LSP client lifecycle
@@ -121,22 +127,23 @@ Hono API server that:
 
 Drizzle ORM + SQLite persistence layer (file: `~/.lamda-code/db-v2.sqlite`):
 
-| Table | Purpose |
-|-------|---------|
-| `workspaces` | Repository metadata, path, pinned state, env vars |
-| `threads` | Conversation threads (mode, forked_from_id, pinned, archived) |
-| `message_blocks` | Messages, thinking, tool calls, abort/compaction markers |
-| `settings` | User preferences (key/value store) |
-| `workspace_files` | Indexed file tree per workspace (for search) |
-| `workspace_tasks` | User-defined shell command shortcuts per workspace |
-| `mcp_servers` | MCP server configurations (application-wide) |
-| `agent_turns` | Records of each agent turn with git checkpoint SHA |
-| `agent_turn_files` | Files touched in each turn (for revert-to-turn) |
-| `ai_usage` | Per-turn token and cost records for usage stats |
+| Table              | Purpose                                                       |
+| ------------------ | ------------------------------------------------------------- |
+| `workspaces`       | Repository metadata, path, pinned state, env vars             |
+| `threads`          | Conversation threads (mode, forked_from_id, pinned, archived) |
+| `message_blocks`   | Messages, thinking, tool calls, abort/compaction markers      |
+| `settings`         | User preferences (key/value store)                            |
+| `workspace_files`  | Indexed file tree per workspace (for search)                  |
+| `workspace_tasks`  | User-defined shell command shortcuts per workspace            |
+| `mcp_servers`      | MCP server configurations (application-wide)                  |
+| `agent_turns`      | Records of each agent turn with git checkpoint SHA            |
+| `agent_turn_files` | Files touched in each turn (for revert-to-turn)               |
+| `ai_usage`         | Per-turn token and cost records for usage stats               |
 
 ### `@lamda/git` (`packages/git/`)
 
 Git CLI wrapper functions:
+
 - Branch operations (`getCurrentBranch`, `checkoutBranch`, `createBranch`)
 - Diff operations (`gitFileDiff`, `gitDiffStat`, `gitStagedDiff`)
 - Staging operations (`gitStage`, `gitUnstage`, `gitStageAll`, hunk-level staging)
@@ -147,6 +154,7 @@ Git CLI wrapper functions:
 ### `@lamda/pi-sdk` (`packages/pi-sdk/`)
 
 Wrapper around `@mariozechner/pi-coding-agent`:
+
 - Session creation and management
 - Prompt handling with mode support (`ask`, `plan`, `agent`)
 - Event streaming
@@ -157,6 +165,7 @@ Wrapper around `@mariozechner/pi-coding-agent`:
 ### `@lamda/lsp` (`packages/lsp/`)
 
 Language Server Protocol integration:
+
 - Language server registry (TypeScript, Python, etc.)
 - Document open/close lifecycle
 - Diagnostics push (errors, warnings) for open files
@@ -165,6 +174,7 @@ Language Server Protocol integration:
 ### `@lamda/mcp` (`packages/mcp/`)
 
 Model Context Protocol client management:
+
 - MCP server connection lifecycle
 - Tool registration and invocation
 - Cleanup on server stop
@@ -243,7 +253,7 @@ New thread opened in UI
 
 ```typescript
 // store.ts
-const store = new Map<sessionId, ManagedSessionHandle>()
+const store = new Map<sessionId, ManagedSessionHandle>();
 ```
 
 Sessions are ephemeral — stored in memory and lost on server restart.
@@ -263,6 +273,7 @@ The server API and WebSocket upgrades are protected by token-based authenticatio
 ### WebSocket (Session Streaming)
 
 Used for real-time streaming from server to client:
+
 - Session events (message deltas, tool calls, thinking, context usage)
 - Thread status updates
 - Session command list
@@ -272,6 +283,7 @@ Each session has a dedicated WebSocket channel. The client reconnects automatica
 ### WebSocket (Terminal)
 
 Used for PTY terminal communication:
+
 - Client → Server: terminal input, resize events
 - Server → Client: PTY output, exit codes
 
@@ -280,12 +292,14 @@ Protocol: JSON messages with `type` field
 ### WebSocket (LSP)
 
 Used for Language Server Protocol bridging:
+
 - Client → Server: `open`, `close`, `request` messages
 - Server → Client: `response`, `diagnostics` messages
 
 ### IPC (Desktop only)
 
 Desktop main process ↔ renderer:
+
 - `electronAPI.selectFolder()` — Native folder picker
 - `electronAPI.getServerPort()` — Server port discovery
 - `electronAPI.openPath()` — Open files externally
@@ -294,21 +308,21 @@ Desktop main process ↔ renderer:
 
 Each thread operates in one of three modes, stored in the `threads.mode` column:
 
-| Mode | Description |
-|------|-------------|
+| Mode    | Description                                                 |
+| ------- | ----------------------------------------------------------- |
 | `agent` | Default — full coding agent with file read/write/edit tools |
-| `ask` | Question-answering mode — read-only tools, no file edits |
-| `plan` | Planning mode — agent proposes a plan before executing |
+| `ask`   | Question-answering mode — read-only tools, no file edits    |
+| `plan`  | Planning mode — agent proposes a plan before executing      |
 
 The mode is passed to the Pi agent via `getModePreamble()` at session start.
 
 ## Build Output
 
-| Package | Output | Format |
-|---------|--------|--------|
-| `web` | `dist/` | ESM + Vite chunks |
-| `server` | `dist/server.cjs` | CommonJS bundle |
-| `desktop` | `release/` | `.dmg`, `.zip` |
+| Package   | Output            | Format            |
+| --------- | ----------------- | ----------------- |
+| `web`     | `dist/`           | ESM + Vite chunks |
+| `server`  | `dist/server.cjs` | CommonJS bundle   |
+| `desktop` | `release/`        | `.dmg`, `.zip`    |
 
 ## Key Conventions
 

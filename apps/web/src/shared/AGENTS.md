@@ -10,12 +10,12 @@ Shared utilities and components for the lamda web application. Contains reusable
 
 Large shared module (54+ files) organized into subdirectories:
 
-| Subdirectory | Files | Purpose |
-|-------------|-------|---------|
-| `ui/` | 30 | shadcn/ui component library |
-| `components/` | 5 | App-wide components (ThemeProvider, ErrorBoundary) |
-| `hooks/` | 2 | Shared React hooks |
-| `lib/` | 12 | Utilities (API client, keyboard shortcuts, etc.) |
+| Subdirectory  | Files | Purpose                                            |
+| ------------- | ----- | -------------------------------------------------- |
+| `ui/`         | 30    | shadcn/ui component library                        |
+| `components/` | 5     | App-wide components (ThemeProvider, ErrorBoundary) |
+| `hooks/`      | 2     | Shared React hooks                                 |
+| `lib/`        | 12    | Utilities (API client, keyboard shortcuts, etc.)   |
 
 ## Architecture
 
@@ -93,6 +93,7 @@ shared/
 - **`isServerUnreachableError(error)`** — Type guard
 
 **Timeout behavior:**
+
 - Default timeout: 30 seconds
 - Parent AbortSignal combined with timeout
 - `AbortError` re-thrown as-is

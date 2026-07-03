@@ -34,7 +34,10 @@ function roles(code: CodePalette, p: ThemePalette) {
   }
 }
 
-export function buildPrismTheme(code: CodePalette, palette: ThemePalette): SyntaxTheme {
+export function buildPrismTheme(
+  code: CodePalette,
+  palette: ThemePalette
+): SyntaxTheme {
   const c = roles(code, palette)
   const base = {
     color: c.text,
@@ -115,7 +118,10 @@ export function buildPrismTheme(code: CodePalette, palette: ThemePalette): Synta
   }
 }
 
-export function buildHljsTheme(code: CodePalette, palette: ThemePalette): SyntaxTheme {
+export function buildHljsTheme(
+  code: CodePalette,
+  palette: ThemePalette
+): SyntaxTheme {
   const c = roles(code, palette)
   return {
     hljs: {

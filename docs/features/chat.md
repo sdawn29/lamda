@@ -42,13 +42,15 @@ The chat interface is the primary way to interact with the Pi coding agent. It p
 ### Multi-line Input
 
 The chat input supports multi-line messages:
+
 - Press **Shift+Enter** to add a new line
 - Press **Enter** to send the message
 
 ### Message Formatting
 
 Messages support Markdown formatting:
-- **Bold**, *italic*, `code`
+
+- **Bold**, _italic_, `code`
 - Code blocks with syntax highlighting
 - Lists and headings
 - Links and images
@@ -83,11 +85,11 @@ When the agent uses tools, you'll see:
 
 ### Tool States
 
-| State | Visual | Meaning |
-|-------|--------|---------|
-| Running | Spinner | Tool is currently executing |
-| Complete | ✓ | Tool finished successfully |
-| Error | ✗ | Tool encountered an error |
+| State    | Visual  | Meaning                     |
+| -------- | ------- | --------------------------- |
+| Running  | Spinner | Tool is currently executing |
+| Complete | ✓       | Tool finished successfully  |
+| Error    | ✗       | Tool encountered an error   |
 
 ### Collapsible Results
 
@@ -126,11 +128,11 @@ Control when thinking blocks are shown:
 
 Each thread operates in a mode that controls the agent's behaviour. Select the mode in the input bar before sending a message.
 
-| Mode | Description |
-|------|-------------|
-| **Agent** | Default. Full editing permissions — the agent reads, writes, and edits files. |
-| **Ask** | Read-only. The agent answers questions and explores code without making changes. |
-| **Plan** | The agent proposes a step-by-step plan and waits for approval before executing. |
+| Mode      | Description                                                                      |
+| --------- | -------------------------------------------------------------------------------- |
+| **Agent** | Default. Full editing permissions — the agent reads, writes, and edits files.    |
+| **Ask**   | Read-only. The agent answers questions and explores code without making changes. |
+| **Plan**  | The agent proposes a step-by-step plan and waits for approval before executing.  |
 
 The mode is stored per thread and can be changed at any time between turns.
 
@@ -174,24 +176,24 @@ Switch between different AI models:
 
 Control how deeply the agent thinks:
 
-| Level | Description |
-|-------|-------------|
-| Off | No extended thinking |
-| Minimal | Quick thoughts only |
-| Low | Light reasoning |
-| Medium | Balanced thinking |
-| High | Deep reasoning |
-| X-High | Maximum reasoning |
+| Level   | Description          |
+| ------- | -------------------- |
+| Off     | No extended thinking |
+| Minimal | Quick thoughts only  |
+| Low     | Light reasoning      |
+| Medium  | Balanced thinking    |
+| High    | Deep reasoning       |
+| X-High  | Maximum reasoning    |
 
 ## Slash Commands
 
 Quick commands for common actions:
 
-| Command | Description |
-|---------|-------------|
-| `/search <query>` | Search code across the workspace |
-| `/file <path>` | Open a specific file |
-| `/terminal <command>` | Run a terminal command |
+| Command               | Description                      |
+| --------------------- | -------------------------------- |
+| `/search <query>`     | Search code across the workspace |
+| `/file <path>`        | Open a specific file             |
+| `/terminal <command>` | Run a terminal command           |
 
 ### Using Slash Commands
 
@@ -225,19 +227,20 @@ When context gets high, the agent may auto-compact:
 3. More recent content remains detailed
 
 Manually trigger compaction:
+
 - Click the **Compact** button in the context chart
 - Or use the `/compact` slash command
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl + Enter` | Send message |
-| `Shift + Enter` | New line in input |
-| `↑` (empty input) | Recall last sent message |
-| `Cmd/Ctrl + K` | Open command palette |
-| `Cmd/Ctrl + Shift + S` | Search messages |
-| `Escape` | Cancel current operation |
+| Shortcut               | Action                   |
+| ---------------------- | ------------------------ |
+| `Cmd/Ctrl + Enter`     | Send message             |
+| `Shift + Enter`        | New line in input        |
+| `↑` (empty input)      | Recall last sent message |
+| `Cmd/Ctrl + K`         | Open command palette     |
+| `Cmd/Ctrl + Shift + S` | Search messages          |
+| `Escape`               | Cancel current operation |
 
 ## Error Handling
 
@@ -258,18 +261,19 @@ Click **Retry** to try the operation again.
 ### Non-Retryable Errors
 
 For permanent errors (e.g., invalid API key):
+
 1. Fix the underlying issue (check Settings)
 2. The message will retry automatically once fixed
 
 ## Message Types
 
-| Type | Icon | Description |
-|------|------|-------------|
-| User | 👤 | Your messages |
-| Assistant | 🤖 | Agent responses |
-| Tool | 🔧 | Tool execution |
-| Thinking | 💭 | Reasoning process |
-| Error | ⚠️ | Error messages |
+| Type      | Icon | Description       |
+| --------- | ---- | ----------------- |
+| User      | 👤   | Your messages     |
+| Assistant | 🤖   | Agent responses   |
+| Tool      | 🔧   | Tool execution    |
+| Thinking  | 💭   | Reasoning process |
+| Error     | ⚠️   | Error messages    |
 
 ## Related
 

@@ -1,22 +1,27 @@
-import { createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent"
-import { lamdaPromptTemplatePaths, lamdaSkillPaths } from "./lamda-paths.js"
-import type { SlashCommand } from "./types.js"
+import {
+  createAgentSessionServices,
+  getAgentDir,
+} from "@earendil-works/pi-coding-agent";
+import { lamdaPromptTemplatePaths, lamdaSkillPaths } from "./lamda-paths.js";
+import type { SlashCommand } from "./types.js";
 
 // Duck-typed shape for the parts of the SDK resource loader we read. Avoids a
 // direct dependency on the loader's exported types.
 type ResourceLoaderLike = {
-  getSkills(): { skills: Array<{ name: string; description?: string }> }
-  getPrompts(): { prompts: Array<{ name: string; description?: string }> }
-}
+  getSkills(): { skills: Array<{ name: string; description?: string }> };
+  getPrompts(): { prompts: Array<{ name: string; description?: string }> };
+};
 
 /**
  * Map a resource loader's skills + prompts into the flat slash-command list the
  * UI consumes. Skills carry a `skill:` prefix so the client can distinguish
  * them from prompt templates.
  */
-export function mapResourceCommands(resourceLoader: ResourceLoaderLike): SlashCommand[] {
-  const { skills } = resourceLoader.getSkills()
-  const { prompts } = resourceLoader.getPrompts()
+export function mapResourceCommands(
+  resourceLoader: ResourceLoaderLike,
+): SlashCommand[] {
+  const { skills } = resourceLoader.getSkills();
+  const { prompts } = resourceLoader.getPrompts();
   return [
     ...skills.map((s) => ({
       name: `skill:${s.name}`,
@@ -28,7 +33,7 @@ export function mapResourceCommands(resourceLoader: ResourceLoaderLike): SlashCo
       description: p.description,
       source: "prompt" as const,
     })),
-  ]
+  ];
 }
 
 /**
@@ -37,7 +42,9 @@ export function mapResourceCommands(resourceLoader: ResourceLoaderLike): SlashCo
  * loader on its own — no model, tools, or session are created — so the new-thread
  * composer can preview skills before the first thread (and its session) exists.
  */
-export async function getWorkspaceCommands(cwd: string): Promise<SlashCommand[]> {
+export async function getWorkspaceCommands(
+  cwd: string,
+): Promise<SlashCommand[]> {
   const services = await createAgentSessionServices({
     cwd,
     agentDir: getAgentDir(),
@@ -45,6 +52,6 @@ export async function getWorkspaceCommands(cwd: string): Promise<SlashCommand[]>
       additionalPromptTemplatePaths: lamdaPromptTemplatePaths(cwd),
       additionalSkillPaths: lamdaSkillPaths(cwd),
     },
-  })
-  return mapResourceCommands(services.resourceLoader as ResourceLoaderLike)
+  });
+  return mapResourceCommands(services.resourceLoader as ResourceLoaderLike);
 }

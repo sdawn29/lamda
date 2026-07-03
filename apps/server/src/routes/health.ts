@@ -19,7 +19,13 @@ export function handleGlobalEventsWs(ws: WebSocket) {
     ({ threadId, status, reason, detail }) => {
       if (ws.readyState !== 1 /* OPEN */) return;
       ws.send(
-        JSON.stringify({ type: "thread_status", threadId, status, reason, detail }),
+        JSON.stringify({
+          type: "thread_status",
+          threadId,
+          status,
+          reason,
+          detail,
+        }),
       );
     },
   );

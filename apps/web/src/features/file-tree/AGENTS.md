@@ -9,6 +9,7 @@ File tree feature module — provides collapsible file tree navigation with file
 ## Overview
 
 Simple feature module (4 files) that provides:
+
 1. **File tree visibility** — toggle open/close state via context
 2. **File tree rendering** — displays workspace file hierarchy
 3. **File search** — keyboard shortcut (Cmd+P) to search/open files

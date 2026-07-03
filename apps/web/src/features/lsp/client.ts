@@ -63,7 +63,9 @@ export class LspConnection {
           // Fire-and-forget with id 0 — responses to unknown ids are ignored.
           if (this.hasConnectedBefore) {
             for (const [filePath, content] of this.openContents) {
-              ws.send(JSON.stringify({ kind: "open", id: 0, filePath, content }))
+              ws.send(
+                JSON.stringify({ kind: "open", id: 0, filePath, content })
+              )
             }
           }
           this.hasConnectedBefore = true
@@ -90,7 +92,14 @@ export class LspConnection {
   }
 
   private handleMessage(raw: unknown) {
-    let msg: { kind: string; id?: number; result?: unknown; error?: string; filePath?: string; diagnostics?: Diagnostic[] }
+    let msg: {
+      kind: string
+      id?: number
+      result?: unknown
+      error?: string
+      filePath?: string
+      diagnostics?: Diagnostic[]
+    }
     try {
       msg = JSON.parse(String(raw))
     } catch {
@@ -189,7 +198,7 @@ export class LspConnection {
 
   async definition(
     filePath: string,
-    position: Position,
+    position: Position
   ): Promise<Location | Location[] | LocationLink[] | null> {
     return (await this.send({
       kind: "request",
@@ -201,7 +210,7 @@ export class LspConnection {
 
   async signatureHelp(
     filePath: string,
-    position: Position,
+    position: Position
   ): Promise<SignatureHelp | null> {
     return (await this.send({
       kind: "request",
@@ -211,7 +220,10 @@ export class LspConnection {
     })) as SignatureHelp | null
   }
 
-  async references(filePath: string, position: Position): Promise<Location[] | null> {
+  async references(
+    filePath: string,
+    position: Position
+  ): Promise<Location[] | null> {
     return (await this.send({
       kind: "request",
       filePath,
@@ -224,7 +236,9 @@ export class LspConnection {
     })) as Location[] | null
   }
 
-  async documentSymbols(filePath: string): Promise<DocumentSymbolResult | null> {
+  async documentSymbols(
+    filePath: string
+  ): Promise<DocumentSymbolResult | null> {
     return (await this.send({
       kind: "request",
       filePath,

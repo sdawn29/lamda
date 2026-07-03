@@ -100,7 +100,10 @@ export function MemorySection() {
   const { data: settings } = useAppSettings()
   const updateSetting = useUpdateAppSetting()
 
-  const healing = useMemo(() => parseHealing(settings?.[HEALING_KEY]), [settings])
+  const healing = useMemo(
+    () => parseHealing(settings?.[HEALING_KEY]),
+    [settings]
+  )
 
   function saveHealing(next: HealingSettings) {
     updateSetting.mutate({ key: HEALING_KEY, value: JSON.stringify(next) })
@@ -215,7 +218,10 @@ export function MemorySection() {
               max={5}
               value={healing.maxAttempts}
               onChange={(e) => {
-                const n = Math.min(5, Math.max(1, parseInt(e.target.value, 10) || 1))
+                const n = Math.min(
+                  5,
+                  Math.max(1, parseInt(e.target.value, 10) || 1)
+                )
                 saveHealing({ ...healing, maxAttempts: n })
               }}
               className="w-24 text-right"
@@ -229,7 +235,7 @@ export function MemorySection() {
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium tracking-tight">Memories</h2>
             {hasMemories && (
-              <span className="text-xs tabular-nums text-muted-foreground">
+              <span className="text-xs text-muted-foreground tabular-nums">
                 {memories.length} saved
               </span>
             )}
@@ -285,7 +291,11 @@ export function MemorySection() {
                   {(["user", "agent", "healing"] as MemorySource[])
                     .filter((s) => presentSources.has(s))
                     .map((s) => (
-                      <ToggleGroupItem key={s} value={s} className="gap-1.5 text-xs">
+                      <ToggleGroupItem
+                        key={s}
+                        value={s}
+                        className="gap-1.5 text-xs"
+                      >
                         <span
                           className={cn(
                             "size-1.5 rounded-full",
@@ -314,7 +324,7 @@ export function MemorySection() {
                       <h3 className="text-xs font-medium text-foreground">
                         {group.label}
                       </h3>
-                      <span className="text-xs tabular-nums text-muted-foreground/70">
+                      <span className="text-xs text-muted-foreground/70 tabular-nums">
                         {group.items.length}
                       </span>
                     </div>
@@ -394,13 +404,19 @@ function MemoryMeta({ memory }: { memory: MemoryItem }) {
       label: `Used ${memory.useCount}${memory.useCount === 1 ? " time" : "×"}`,
     })
     if (memory.lastUsedAt) {
-      parts.push({ icon: Clock, label: `Last used ${relativeTime(memory.lastUsedAt)}` })
+      parts.push({
+        icon: Clock,
+        label: `Last used ${relativeTime(memory.lastUsedAt)}`,
+      })
     }
   }
   // Surface confidence only when it deviates from full strength, so reinforced
   // and not-yet-confirmed memories are distinguishable at a glance.
   if (memory.confidence < 0.999) {
-    parts.push({ icon: Gauge, label: `Confidence ${Math.round(memory.confidence * 100)}%` })
+    parts.push({
+      icon: Gauge,
+      label: `Confidence ${Math.round(memory.confidence * 100)}%`,
+    })
   }
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6875rem] text-muted-foreground/80">
@@ -465,7 +481,9 @@ function MemoryCard({ memory }: { memory: MemoryItem }) {
           <Button
             size="sm"
             onClick={save}
-            disabled={updateMemory.isPending || !title.trim() || !content.trim()}
+            disabled={
+              updateMemory.isPending || !title.trim() || !content.trim()
+            }
           >
             <Check data-icon="inline-start" />
             Save
@@ -479,7 +497,7 @@ function MemoryCard({ memory }: { memory: MemoryItem }) {
     <div className="group/mem relative flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-card/30 px-3.5 py-3 transition-colors hover:border-border hover:bg-card/60">
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-sm font-medium leading-snug">
+          <span className="text-sm leading-snug font-medium">
             {memory.title}
           </span>
           {memory.pinned && (
@@ -503,7 +521,10 @@ function MemoryCard({ memory }: { memory: MemoryItem }) {
           variant="ghost"
           size="icon-sm"
           onClick={() =>
-            updateMemory.mutate({ id: memory.id, fields: { pinned: !memory.pinned } })
+            updateMemory.mutate({
+              id: memory.id,
+              fields: { pinned: !memory.pinned },
+            })
           }
           disabled={updateMemory.isPending}
           aria-label={memory.pinned ? "Unpin memory" : "Pin memory"}

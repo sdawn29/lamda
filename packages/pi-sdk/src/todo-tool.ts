@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent"
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
   insertGoal,
   countGoalsByThread,
@@ -13,34 +13,34 @@ import {
   type TodoRow,
   type GoalStatus,
   type TodoStatus,
-} from "@lamda/db"
+} from "@lamda/db";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-export const TODO_TOOL_NAME = "todo"
+export const TODO_TOOL_NAME = "todo";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
-export type { TodoStatus, GoalStatus }
+export type { TodoStatus, GoalStatus };
 
 export interface TodoItem {
-  id: string
-  goalId: string | null
-  content: string
-  status: TodoStatus
+  id: string;
+  goalId: string | null;
+  content: string;
+  status: TodoStatus;
 }
 
 export interface TodoGoal {
-  id: string
-  description: string
-  status: GoalStatus
-  tasks: TodoItem[]
+  id: string;
+  description: string;
+  status: GoalStatus;
+  tasks: TodoItem[];
 }
 
 export interface TodoResult {
-  operation: string
-  goals: TodoGoal[]
-  message?: string
+  operation: string;
+  goals: TodoGoal[];
+  message?: string;
 }
 
 // ── Serialization ─────────────────────────────────────────────────────────────
@@ -56,12 +56,14 @@ function toGoal(goal: GoalRow, tasks: TodoRow[]): TodoGoal {
       content: t.content,
       status: t.status,
     })),
-  }
+  };
 }
 
 /** Read the live DB state and serialize every goal+tasks for this thread. */
 function snapshot(threadId: string): TodoGoal[] {
-  return listGoalsWithTasks(threadId).map(({ goal, tasks }) => toGoal(goal, tasks))
+  return listGoalsWithTasks(threadId).map(({ goal, tasks }) =>
+    toGoal(goal, tasks),
+  );
 }
 
 /** Build a tool response from a pre-built goals array (used after deletion). */
@@ -69,12 +71,19 @@ function respond(
   operation: string,
   goals: TodoGoal[],
   message?: string,
-): { content: { type: "text"; text: string }[]; details: Record<string, unknown> } {
-  const payload: TodoResult = { operation, goals, ...(message ? { message } : {}) }
+): {
+  content: { type: "text"; text: string }[];
+  details: Record<string, unknown>;
+} {
+  const payload: TodoResult = {
+    operation,
+    goals,
+    ...(message ? { message } : {}),
+  };
   return {
     content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
     details: { goals },
-  }
+  };
 }
 
 /** Build a tool response from the current DB state. */
@@ -82,18 +91,21 @@ function ok(
   operation: string,
   threadId: string,
   message?: string,
-): { content: { type: "text"; text: string }[]; details: Record<string, unknown> } {
-  return respond(operation, snapshot(threadId), message)
+): {
+  content: { type: "text"; text: string }[];
+  details: Record<string, unknown>;
+} {
+  return respond(operation, snapshot(threadId), message);
 }
 
 function err(message: string): {
-  content: { type: "text"; text: string }[]
-  details: Record<string, unknown>
+  content: { type: "text"; text: string }[];
+  details: Record<string, unknown>;
 } {
   return {
     content: [{ type: "text", text: JSON.stringify({ error: message }) }],
     details: {},
-  }
+  };
 }
 
 /**
@@ -107,10 +119,13 @@ function err(message: string): {
  * Returns null when the goal still has incomplete tasks (nothing to do).
  */
 function tryFinalizeGoal(goalId: string, threadId: string): TodoGoal[] | null {
-  const remaining = listTodosByGoal(goalId)
+  const remaining = listTodosByGoal(goalId);
   // Bail if no tasks (abandoned goal) or any task is still incomplete.
-  if (remaining.length === 0 || !remaining.every((t) => t.status === "completed")) {
-    return null
+  if (
+    remaining.length === 0 ||
+    !remaining.every((t) => t.status === "completed")
+  ) {
+    return null;
   }
   // Build the response snapshot with the finishing goal marked "completed".
   // The floating TodoPanel filters completed goals out, so it disappears on
@@ -119,12 +134,16 @@ function tryFinalizeGoal(goalId: string, threadId: string): TodoGoal[] | null {
   // never set to "completed" in the DB, so we override the status here.
   const finalGoals = snapshot(threadId).map((g) =>
     g.id === goalId ? { ...g, status: "completed" as GoalStatus } : g,
-  )
+  );
   // Schedule the actual DB deletion in the background.
   setImmediate(() => {
-    try { deleteGoalWithTasks(goalId) } catch { /* ignore */ }
-  })
-  return finalGoals
+    try {
+      deleteGoalWithTasks(goalId);
+    } catch {
+      /* ignore */
+    }
+  });
+  return finalGoals;
 }
 
 // ── Tool factory ──────────────────────────────────────────────────────────────
@@ -175,16 +194,21 @@ Best practices:
         },
         goal: {
           type: "string",
-          description: "A short description of the goal (required for 'create').",
+          description:
+            "A short description of the goal (required for 'create').",
         },
         items: {
           type: "array",
-          description: "Tasks to create under the goal (required for 'create').",
+          description:
+            "Tasks to create under the goal (required for 'create').",
           items: {
             type: "object",
             required: ["content"],
             properties: {
-              content: { type: "string", description: "Description of the task." },
+              content: {
+                type: "string",
+                description: "Description of the task.",
+              },
             },
           },
         },
@@ -205,112 +229,134 @@ Best practices:
     },
 
     execute: async (_toolCallId, params, _signal, _onUpdate) => {
-      const p = (params && typeof params === "object" ? params : {}) as Record<string, unknown>
-      const operation = typeof p.operation === "string" ? p.operation : undefined
-      if (!operation) return err("Missing required parameter: operation")
+      const p = (params && typeof params === "object" ? params : {}) as Record<
+        string,
+        unknown
+      >;
+      const operation =
+        typeof p.operation === "string" ? p.operation : undefined;
+      if (!operation) return err("Missing required parameter: operation");
 
       switch (operation) {
         // ── list ────────────────────────────────────────────────────────────
         case "list": {
-          return ok("list", threadId)
+          return ok("list", threadId);
         }
 
         // ── create ──────────────────────────────────────────────────────────
         case "create": {
-          const goalDesc = typeof p.goal === "string" ? p.goal.trim() : ""
-          if (!goalDesc) return err("'create' requires a non-empty 'goal' string.")
+          const goalDesc = typeof p.goal === "string" ? p.goal.trim() : "";
+          if (!goalDesc)
+            return err("'create' requires a non-empty 'goal' string.");
 
-          const rawItems = p.items
+          const rawItems = p.items;
           if (!Array.isArray(rawItems) || rawItems.length === 0) {
-            return err("'create' requires a non-empty 'items' array.")
+            return err("'create' requires a non-empty 'items' array.");
           }
 
-          const goalSortOrder = countGoalsByThread(threadId)
-          const goalId = insertGoal(threadId, goalDesc, goalSortOrder)
+          const goalSortOrder = countGoalsByThread(threadId);
+          const goalId = insertGoal(threadId, goalDesc, goalSortOrder);
 
-          let created = 0
+          let created = 0;
           for (const item of rawItems as { content?: unknown }[]) {
-            if (typeof item.content !== "string" || !item.content.trim()) continue
-            insertTodo(threadId, item.content.trim(), goalId, created)
-            created++
+            if (typeof item.content !== "string" || !item.content.trim())
+              continue;
+            insertTodo(threadId, item.content.trim(), goalId, created);
+            created++;
           }
 
           if (created === 0) {
-            return err("No valid tasks to create. Each item needs a non-empty 'content' string.")
+            return err(
+              "No valid tasks to create. Each item needs a non-empty 'content' string.",
+            );
           }
 
           return ok(
             "create",
             threadId,
             `Goal "${goalDesc}" created with ${created} task${created === 1 ? "" : "s"}.`,
-          )
+          );
         }
 
         // ── update ──────────────────────────────────────────────────────────
         case "update": {
-          const id = typeof p.id === "string" ? p.id.trim() : null
-          if (!id) return err("'update' requires an 'id'.")
+          const id = typeof p.id === "string" ? p.id.trim() : null;
+          if (!id) return err("'update' requires an 'id'.");
 
-          const task = getTodo(id)
-          if (!task) return err(`No task with id "${id}".`)
+          const task = getTodo(id);
+          if (!task) return err(`No task with id "${id}".`);
 
-          const updates: { content?: string; status?: TodoStatus } = {}
+          const updates: { content?: string; status?: TodoStatus } = {};
 
           if (typeof p.status === "string") {
-            const s = p.status as TodoStatus
+            const s = p.status as TodoStatus;
             if (!["pending", "in_progress", "completed"].includes(s)) {
-              return err("'status' must be one of: pending, in_progress, completed.")
+              return err(
+                "'status' must be one of: pending, in_progress, completed.",
+              );
             }
-            updates.status = s
+            updates.status = s;
           }
 
           if (typeof p.content === "string" && p.content.trim()) {
-            updates.content = p.content.trim()
+            updates.content = p.content.trim();
           }
 
           if (Object.keys(updates).length === 0) {
-            return err("'update' requires at least one of 'status' or 'content'.")
+            return err(
+              "'update' requires at least one of 'status' or 'content'.",
+            );
           }
 
-          updateTodo(id, updates)
+          updateTodo(id, updates);
 
           // When the last task of a goal is marked completed, capture the
           // all-done snapshot, wipe the goal from DB, and return that snapshot
           // so the UI displays the completed state before clearing.
           if (updates.status === "completed" && task.goalId) {
-            const finalSnapshot = tryFinalizeGoal(task.goalId, threadId)
+            const finalSnapshot = tryFinalizeGoal(task.goalId, threadId);
             if (finalSnapshot) {
-              return respond("update", finalSnapshot, "All tasks done — goal cleared.")
+              return respond(
+                "update",
+                finalSnapshot,
+                "All tasks done — goal cleared.",
+              );
             }
           }
 
-          return ok("update", threadId, "Task updated.")
+          return ok("update", threadId, "Task updated.");
         }
 
         // ── delete ──────────────────────────────────────────────────────────
         case "delete": {
-          const id = typeof p.id === "string" ? p.id.trim() : null
-          if (!id) return err("'delete' requires an 'id'.")
+          const id = typeof p.id === "string" ? p.id.trim() : null;
+          if (!id) return err("'delete' requires an 'id'.");
 
-          const task = getTodo(id)
-          if (!task) return err(`No task with id "${id}".`)
+          const task = getTodo(id);
+          if (!task) return err(`No task with id "${id}".`);
 
-          deleteTodo(id)
+          deleteTodo(id);
 
           // If deleting this task leaves only completed tasks, finalize the goal.
           if (task.goalId) {
-            const finalSnapshot = tryFinalizeGoal(task.goalId, threadId)
+            const finalSnapshot = tryFinalizeGoal(task.goalId, threadId);
             if (finalSnapshot) {
-              return respond("delete", finalSnapshot, "Task deleted — goal cleared.")
+              return respond(
+                "delete",
+                finalSnapshot,
+                "Task deleted — goal cleared.",
+              );
             }
           }
 
-          return ok("delete", threadId, "Task deleted.")
+          return ok("delete", threadId, "Task deleted.");
         }
 
         default:
-          return err(`Unknown operation "${operation}". Use: create, update, delete, list.`)
+          return err(
+            `Unknown operation "${operation}". Use: create, update, delete, list.`,
+          );
       }
     },
-  }
+  };
 }

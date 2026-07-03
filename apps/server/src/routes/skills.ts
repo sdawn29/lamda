@@ -4,6 +4,7 @@
  */
 
 import { Hono } from "hono";
+import { z } from "zod";
 import {
   getInstallJobs,
   getPopularSkills,
@@ -13,8 +14,11 @@ import {
   searchSkillsRegistry,
   startSkillInstall,
 } from "../services/skills-registry-service.js";
+import { parseJsonBody } from "../lib/validate.js";
 
 const skillsRouter = new Hono();
+
+const installSkillSchema = z.object({ source: z.string().optional() });
 
 /** GET /skills/search?q=... — query the skills.sh registry. */
 skillsRouter.get("/search", async (c) => {
@@ -37,7 +41,10 @@ skillsRouter.get("/popular", async (c) => {
     return c.json({ skills });
   } catch (err) {
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to load popular skills" },
+      {
+        error:
+          err instanceof Error ? err.message : "Failed to load popular skills",
+      },
       502,
     );
   }
@@ -52,7 +59,10 @@ skillsRouter.get("/details", async (c) => {
     return c.json({ details });
   } catch (err) {
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to load skill details" },
+      {
+        error:
+          err instanceof Error ? err.message : "Failed to load skill details",
+      },
       502,
     );
   }
@@ -71,9 +81,10 @@ skillsRouter.get("/installed", (c) => {
  * /skills/install for progress.
  */
 skillsRouter.post("/install", async (c) => {
-  const body = await c.req.json<{ source?: string }>().catch(() => null);
-  const source = body?.source;
-  if (!source || typeof source !== "string") {
+  const parsed = await parseJsonBody(c, installSkillSchema);
+  if (!parsed.ok) return parsed.response;
+  const source = parsed.data.source;
+  if (!source) {
     return c.json({ error: "Missing 'source'." }, 400);
   }
   const job = startSkillInstall(source);

@@ -54,15 +54,12 @@ function DefaultErrorFallback({
         </div>
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium">Something went wrong</p>
-          <p className="max-w-sm text-xs text-muted-foreground">{error.message}</p>
+          <p className="max-w-sm text-xs text-muted-foreground">
+            {error.message}
+          </p>
         </div>
       </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={reset}
-      >
+      <Button type="button" variant="outline" size="sm" onClick={reset}>
         Try again
       </Button>
     </div>

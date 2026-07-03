@@ -62,16 +62,17 @@ npm run build -w @lamda/pi-sdk   # Build SDK package
 
 The `turbo.json` defines the build pipeline:
 
-| Task | Description |
-|------|-------------|
-| `build` | Compile TypeScript and bundle assets |
-| `dev` | Start development servers with hot reload |
-| `lint` | Run ESLint |
-| `check-types` | Run TypeScript compiler |
+| Task          | Description                               |
+| ------------- | ----------------------------------------- |
+| `build`       | Compile TypeScript and bundle assets      |
+| `dev`         | Start development servers with hot reload |
+| `lint`        | Run ESLint                                |
+| `check-types` | Run TypeScript compiler                   |
 
 ### Workspace Dependencies
 
 Tasks respect dependencies between workspaces:
+
 - `desktop` depends on `server`, `web`
 - `server` depends on `db`, `git`, `pi-sdk`
 - `web` depends on packages
@@ -94,10 +95,10 @@ PORT=3002 npm run dev -w @lamda/server
 
 ## Build Artifacts
 
-| Workspace | Output Directory | Format |
-|-----------|-----------------|--------|
-| `web` | `apps/web/dist/` | ESM + Vite chunks |
-| `server` | `apps/server/dist/` | CommonJS (`server.cjs`) |
+| Workspace | Output Directory        | Format                       |
+| --------- | ----------------------- | ---------------------------- |
+| `web`     | `apps/web/dist/`        | ESM + Vite chunks            |
+| `server`  | `apps/server/dist/`     | CommonJS (`server.cjs`)      |
 | `desktop` | `apps/desktop/release/` | `.dmg`, `.zip` (macOS arm64) |
 
 ---

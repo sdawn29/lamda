@@ -10,7 +10,12 @@ import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
 import type { ThinkingLevel } from "./components/thinking-combobox"
 
-const THINKING_LEVELS: readonly ThinkingLevel[] = ["low", "medium", "high", "xhigh"]
+const THINKING_LEVELS: readonly ThinkingLevel[] = [
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+]
 const DEFAULT_THINKING_LEVEL: ThinkingLevel = "medium"
 export const MAX_MESSAGE_HISTORY = 100
 
@@ -37,7 +42,9 @@ export const useComposerPrefsStore = create<ComposerPrefsState>()(
       // Guard against corrupt/old persisted values.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<ComposerPrefsState>
-        const thinkingLevel = THINKING_LEVELS.includes(p.thinkingLevel as ThinkingLevel)
+        const thinkingLevel = THINKING_LEVELS.includes(
+          p.thinkingLevel as ThinkingLevel
+        )
           ? (p.thinkingLevel as ThinkingLevel)
           : DEFAULT_THINKING_LEVEL
         const messageHistory = Array.isArray(p.messageHistory)

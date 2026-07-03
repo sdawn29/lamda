@@ -6,7 +6,12 @@ import { cn } from "@/shared/lib/utils"
  * (e.g. the LSP settings card's per-language icon), rather than inventing a
  * new colorful-avatar visual language for this one feature.
  */
-export function SkillAvatar({ className }: { name: string; className?: string }) {
+export function SkillAvatar({
+  className,
+}: {
+  name: string
+  className?: string
+}) {
   return (
     <div
       className={cn(

@@ -36,9 +36,9 @@
 
 lamda is a macOS application for Apple Silicon (`arm64`).
 
-| Option | Link |
-| --- | --- |
-| Latest release | **[Download from GitHub Releases](https://github.com/sdawn29/lamda/releases/latest)** |
+| Option          | Link                                                                                                                    |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Latest release  | **[Download from GitHub Releases](https://github.com/sdawn29/lamda/releases/latest)**                                   |
 | Direct download | **[lamda-0.28.0-mac-arm64.dmg](https://github.com/sdawn29/lamda/releases/download/v0.28.0/lamda-0.28.0-mac-arm64.dmg)** |
 
 Open the `.dmg` and drag lamda into your Applications folder.
@@ -53,19 +53,19 @@ Most AI coding tools give you a chat box. lamda gives you a **workspace**. Diff 
 
 ## Features
 
-| Feature | What it does |
-| --- | --- |
-| **Chat** | Real-time streaming conversations with Agent, Ask, and Plan modes per thread. |
-| **Memory** | Workspace-scoped and global memories with pinning, categories, search, and automatic prompt injection. |
-| **Self-healing** | Automatically re-prompts the agent after recoverable turn errors and stores successful recovery lessons. |
-| **Git** | Diff review, hunk-level staging, commits, branches, stashes, and side-by-side change review. |
-| **Terminal** | Embedded multi-tab shell with persistent PTY sessions, reconnects, and clickable links. |
-| **Workspaces** | Organize multiple repos, conversation threads, and workspace-level tasks. |
-| **MCP** | Connect Model Context Protocol servers to extend agent capabilities. |
-| **LSP** | Language server integration with one-click installs. |
-| **Themes** | Built-in themes, Catppuccin variants, and Google Fonts integration. |
-| **Settings** | Configure the agent model, chat behavior, providers, and memory from the app. |
-| **Usage tracking** | Token usage stats with date-range filtering and context breakdowns. |
+| Feature            | What it does                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| **Chat**           | Real-time streaming conversations with Agent, Ask, and Plan modes per thread.                            |
+| **Memory**         | Workspace-scoped and global memories with pinning, categories, search, and automatic prompt injection.   |
+| **Self-healing**   | Automatically re-prompts the agent after recoverable turn errors and stores successful recovery lessons. |
+| **Git**            | Diff review, hunk-level staging, commits, branches, stashes, and side-by-side change review.             |
+| **Terminal**       | Embedded multi-tab shell with persistent PTY sessions, reconnects, and clickable links.                  |
+| **Workspaces**     | Organize multiple repos, conversation threads, and workspace-level tasks.                                |
+| **MCP**            | Connect Model Context Protocol servers to extend agent capabilities.                                     |
+| **LSP**            | Language server integration with one-click installs.                                                     |
+| **Themes**         | Built-in themes, Catppuccin variants, and Google Fonts integration.                                      |
+| **Settings**       | Configure the agent model, chat behavior, providers, and memory from the app.                            |
+| **Usage tracking** | Token usage stats with date-range filtering and context breakdowns.                                      |
 
 ---
 
@@ -94,13 +94,13 @@ See the [Quick Start Guide](docs/quick-start.md) for a 5-minute walkthrough, or 
 
 ## Tech Stack
 
-| Layer | Technology |
-| --- | --- |
-| Desktop | Electron 41 |
-| UI | React 19 + Vite + TanStack Router + Tailwind CSS 4 |
-| Server | Hono (Node.js) |
-| Database | Drizzle ORM + SQLite (better-sqlite3) |
-| Agent | [@mariozechner/pi-coding-agent](https://github.com/badlogic/pi-mono) |
+| Layer    | Technology                                                           |
+| -------- | -------------------------------------------------------------------- |
+| Desktop  | Electron 41                                                          |
+| UI       | React 19 + Vite + TanStack Router + Tailwind CSS 4                   |
+| Server   | Hono (Node.js)                                                       |
+| Database | Drizzle ORM + SQLite (better-sqlite3)                                |
+| Agent    | [@mariozechner/pi-coding-agent](https://github.com/badlogic/pi-mono) |
 
 ## Project Structure
 
@@ -120,19 +120,19 @@ packages/
 
 ## Commands
 
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start all apps |
-| `npm run build` | Build everything |
+| Command               | Description            |
+| --------------------- | ---------------------- |
+| `npm run dev`         | Start all apps         |
+| `npm run build`       | Build everything       |
 | `npm run check-types` | TypeScript type checks |
-| `npm run lint` | Lint all packages |
-| `npm run format` | Format with Prettier |
+| `npm run lint`        | Lint all packages      |
+| `npm run format`      | Format with Prettier   |
 
 ## Configuration
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `PORT` | `3001` | Server port |
+| Variable          | Default                 | Description               |
+| ----------------- | ----------------------- | ------------------------- |
+| `PORT`            | `3001`                  | Server port               |
 | `VITE_SERVER_URL` | `http://localhost:3001` | Server URL for the web UI |
 
 See [Providers](docs/providers.md) for AI provider and API key configuration.

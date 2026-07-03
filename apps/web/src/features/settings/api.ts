@@ -22,7 +22,12 @@ export async function updateAppSetting(
 
 export type MemoryScope = "user" | "workspace"
 export type MemorySource = "agent" | "healing" | "user"
-export type MemoryKind = "fact" | "preference" | "convention" | "decision" | "episode"
+export type MemoryKind =
+  | "fact"
+  | "preference"
+  | "convention"
+  | "decision"
+  | "episode"
 
 export interface MemoryItem {
   id: string
@@ -44,8 +49,12 @@ export interface MemoryItem {
   useCount: number
 }
 
-export async function fetchMemories(signal?: AbortSignal): Promise<MemoryItem[]> {
-  const res = await apiFetch<{ memories: MemoryItem[] }>("/memories", { signal })
+export async function fetchMemories(
+  signal?: AbortSignal
+): Promise<MemoryItem[]> {
+  const res = await apiFetch<{ memories: MemoryItem[] }>("/memories", {
+    signal,
+  })
   return res.memories
 }
 
@@ -66,7 +75,12 @@ export async function createMemory(input: {
 
 export async function updateMemoryApi(
   id: string,
-  fields: { title?: string; content?: string; category?: string | null; pinned?: boolean }
+  fields: {
+    title?: string
+    content?: string
+    category?: string | null
+    pinned?: boolean
+  }
 ): Promise<void> {
   await apiFetch(`/memories/${encodeURIComponent(id)}`, {
     method: "PATCH",

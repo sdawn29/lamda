@@ -1,18 +1,24 @@
-import type { PromptOptions } from "@lamda/pi-sdk"
-import { insertUserBlock } from "@lamda/db"
-import type { AttachmentMetadata } from "@lamda/db"
-import { store } from "../store.js"
-import { ensureSessionEventHub } from "./session-service.js"
-import { withInjections } from "./prompt-injection.js"
-import { ensurePromptsFreshForText } from "./prompt-freshness.js"
+import type { PromptOptions } from "@lamda/pi-sdk";
+import { insertUserBlock } from "@lamda/db";
+import type { AttachmentMetadata } from "@lamda/db";
+import { store } from "../store.js";
+import { ensureSessionEventHub } from "./session-service.js";
+import { withInjections } from "./prompt-injection.js";
+import { ensurePromptsFreshForText } from "./prompt-freshness.js";
 
 export interface SendPromptOptions {
   /** Text persisted on the user message block. Defaults to `text`. */
-  displayText?: string
+  displayText?: string;
   /** Attachment metadata to record on the user message block. */
-  attachments?: AttachmentMetadata[]
+  attachments?: AttachmentMetadata[];
   /** Images / streaming behaviour / template-expansion flags for the agent. */
-  promptOptions?: PromptOptions
+  promptOptions?: PromptOptions;
+  /**
+   * Client-generated id for the optimistic row this prompt originated from,
+   * carried onto the persisted user block so the client can reconcile the two
+   * by identity instead of by matching content.
+   */
+  clientId?: string;
 }
 
 /**
@@ -28,20 +34,26 @@ export async function sendPrompt(
   text: string,
   opts: SendPromptOptions = {},
 ): Promise<void> {
-  const entry = store.get(sessionId)
-  if (!entry) throw new Error(`Session ${sessionId} not found`)
+  const entry = store.get(sessionId);
+  if (!entry) throw new Error(`Session ${sessionId} not found`);
 
-  ensureSessionEventHub(sessionId, entry)
+  ensureSessionEventHub(sessionId, entry);
 
-  insertUserBlock(entry.threadId, opts.displayText ?? text, opts.attachments)
+  insertUserBlock(
+    entry.threadId,
+    opts.displayText ?? text,
+    opts.attachments,
+    undefined,
+    opts.clientId,
+  );
 
-  const injected = await withInjections(entry, text)
+  const injected = await withInjections(entry, text);
   // Kept so session-level self-healing can re-send the interrupted prompt.
-  entry.lastPromptText = injected
+  entry.lastPromptText = injected;
 
   // Refresh prompt templates first when this is a `/command`, so a just-authored
   // prompt file resolves without a server restart.
-  await ensurePromptsFreshForText(entry, opts.displayText ?? text)
+  await ensurePromptsFreshForText(entry, opts.displayText ?? text);
 
-  await entry.handle.prompt(injected, opts.promptOptions)
+  await entry.handle.prompt(injected, opts.promptOptions);
 }

@@ -25,29 +25,29 @@ let configured = false
 export function ensureMonacoEnvironment() {
   if (configured) return
   configured = true
-
-  ;(self as unknown as { MonacoEnvironment?: monaco.Environment }).MonacoEnvironment =
-    {
-      getWorker(_workerId, label) {
-        switch (label) {
-          case "json":
-            return new jsonWorker()
-          case "css":
-          case "scss":
-          case "less":
-            return new cssWorker()
-          case "html":
-          case "handlebars":
-          case "razor":
-            return new htmlWorker()
-          case "typescript":
-          case "javascript":
-            return new tsWorker()
-          default:
-            return new editorWorker()
-        }
-      },
-    }
+  ;(
+    self as unknown as { MonacoEnvironment?: monaco.Environment }
+  ).MonacoEnvironment = {
+    getWorker(_workerId, label) {
+      switch (label) {
+        case "json":
+          return new jsonWorker()
+        case "css":
+        case "scss":
+        case "less":
+          return new cssWorker()
+        case "html":
+        case "handlebars":
+        case "razor":
+          return new htmlWorker()
+        case "typescript":
+        case "javascript":
+          return new tsWorker()
+        default:
+          return new editorWorker()
+      }
+    },
+  }
 
   // Our own LSP provides diagnostics; silence Monaco's bundled TS/JS language
   // service so we don't get a second, project-unaware set of markers. The

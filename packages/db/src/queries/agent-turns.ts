@@ -58,14 +58,21 @@ export function insertAgentTurn(data: {
           preStatusCode: f.preStatusCode,
           preContent: f.preContent,
           wasCreatedByTurn: f.wasCreatedByTurn,
-        }))
+        })),
       )
       .run();
   });
 }
 
 function buildTurnSummaries(
-  turns: { id: number; sessionId: string; threadId: string; startedAt: number; endedAt: number; checkpointSha: string }[]
+  turns: {
+    id: number;
+    sessionId: string;
+    threadId: string;
+    startedAt: number;
+    endedAt: number;
+    checkpointSha: string;
+  }[],
 ): AgentTurnSummary[] {
   if (turns.length === 0) return [];
 
@@ -109,7 +116,6 @@ export function listAgentTurns(threadId: string): AgentTurnSummary[] {
   return buildTurnSummaries(turns);
 }
 
-
 export function getAgentTurnFiles(turnId: number): AgentTurnFileDetail[] {
   return db
     .select()
@@ -140,11 +146,16 @@ export function getAgentTurn(turnId: number): AgentTurnSummary | null {
 // Returns all turns for a thread with id >= fromTurnId, sorted oldest first.
 // Keyed by threadId (durable) rather than sessionId (regenerated each server
 // start) so turn history survives restarts and session re-creation.
-export function getAgentTurnsFromId(threadId: string, fromTurnId: number): AgentTurnSummary[] {
+export function getAgentTurnsFromId(
+  threadId: string,
+  fromTurnId: number,
+): AgentTurnSummary[] {
   const turns = db
     .select()
     .from(agentTurns)
-    .where(and(eq(agentTurns.threadId, threadId), gte(agentTurns.id, fromTurnId)))
+    .where(
+      and(eq(agentTurns.threadId, threadId), gte(agentTurns.id, fromTurnId)),
+    )
     .orderBy(asc(agentTurns.id))
     .all();
 
@@ -154,18 +165,25 @@ export function getAgentTurnsFromId(threadId: string, fromTurnId: number): Agent
 // Deletes a turn and all subsequent turns for a thread (id >= fromTurnId).
 // Returns the distinct, non-empty checkpoint SHAs of the deleted turns so the
 // caller can drop their now-orphaned checkpoint refs.
-export function deleteAgentTurnsFrom(threadId: string, fromTurnId: number): string[] {
+export function deleteAgentTurnsFrom(
+  threadId: string,
+  fromTurnId: number,
+): string[] {
   const turns = db
     .select({ id: agentTurns.id, checkpointSha: agentTurns.checkpointSha })
     .from(agentTurns)
-    .where(and(eq(agentTurns.threadId, threadId), gte(agentTurns.id, fromTurnId)))
+    .where(
+      and(eq(agentTurns.threadId, threadId), gte(agentTurns.id, fromTurnId)),
+    )
     .all();
 
   if (turns.length === 0) return [];
 
   const turnIds = turns.map((t) => t.id);
   db.transaction(() => {
-    db.delete(agentTurnFiles).where(inArray(agentTurnFiles.turnId, turnIds)).run();
+    db.delete(agentTurnFiles)
+      .where(inArray(agentTurnFiles.turnId, turnIds))
+      .run();
     db.delete(agentTurns).where(inArray(agentTurns.id, turnIds)).run();
   });
 
@@ -185,7 +203,9 @@ export function deleteAgentTurnsForThread(threadId: string): string[] {
 
   const turnIds = turns.map((t) => t.id);
   db.transaction(() => {
-    db.delete(agentTurnFiles).where(inArray(agentTurnFiles.turnId, turnIds)).run();
+    db.delete(agentTurnFiles)
+      .where(inArray(agentTurnFiles.turnId, turnIds))
+      .run();
     db.delete(agentTurns).where(inArray(agentTurns.id, turnIds)).run();
   });
 

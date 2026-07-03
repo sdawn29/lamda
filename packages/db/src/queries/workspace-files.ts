@@ -1,38 +1,58 @@
-import { eq } from "drizzle-orm"
-import { db } from "../client.js"
-import { workspaceFiles } from "../schema.js"
+import { eq } from "drizzle-orm";
+import { db } from "../client.js";
+import { workspaceFiles } from "../schema.js";
 
 export interface WorkspaceFileEntry {
-  relativePath: string
-  name: string
-  isDirectory: boolean
+  relativePath: string;
+  name: string;
+  isDirectory: boolean;
 }
 
-const CHUNK_SIZE = 200
+const CHUNK_SIZE = 200;
 
-export function replaceWorkspaceFiles(workspaceId: string, files: WorkspaceFileEntry[]): void {
+export function replaceWorkspaceFiles(
+  workspaceId: string,
+  files: WorkspaceFileEntry[],
+): void {
   db.transaction(() => {
-    db.delete(workspaceFiles).where(eq(workspaceFiles.workspaceId, workspaceId)).run()
+    db.delete(workspaceFiles)
+      .where(eq(workspaceFiles.workspaceId, workspaceId))
+      .run();
     for (let i = 0; i < files.length; i += CHUNK_SIZE) {
-      const chunk = files.slice(i, i + CHUNK_SIZE)
+      const chunk = files.slice(i, i + CHUNK_SIZE);
       db.insert(workspaceFiles)
-        .values(chunk.map((f) => ({ workspaceId, relativePath: f.relativePath, name: f.name, isDirectory: f.isDirectory })))
+        .values(
+          chunk.map((f) => ({
+            workspaceId,
+            relativePath: f.relativePath,
+            name: f.name,
+            isDirectory: f.isDirectory,
+          })),
+        )
         .onConflictDoNothing()
-        .run()
+        .run();
     }
-  })
+  });
 }
 
-export function listWorkspaceFileEntries(workspaceId: string): WorkspaceFileEntry[] {
+export function listWorkspaceFileEntries(
+  workspaceId: string,
+): WorkspaceFileEntry[] {
   return db
-    .select({ relativePath: workspaceFiles.relativePath, name: workspaceFiles.name, isDirectory: workspaceFiles.isDirectory })
+    .select({
+      relativePath: workspaceFiles.relativePath,
+      name: workspaceFiles.name,
+      isDirectory: workspaceFiles.isDirectory,
+    })
     .from(workspaceFiles)
     .where(eq(workspaceFiles.workspaceId, workspaceId))
-    .all()
+    .all();
 }
 
 export function clearWorkspaceFileEntries(workspaceId: string): void {
-  db.delete(workspaceFiles).where(eq(workspaceFiles.workspaceId, workspaceId)).run()
+  db.delete(workspaceFiles)
+    .where(eq(workspaceFiles.workspaceId, workspaceId))
+    .run();
 }
 
 export function hasWorkspaceFileIndex(workspaceId: string): boolean {
@@ -41,6 +61,6 @@ export function hasWorkspaceFileIndex(workspaceId: string): boolean {
     .from(workspaceFiles)
     .where(eq(workspaceFiles.workspaceId, workspaceId))
     .limit(1)
-    .get()
-  return row !== undefined
+    .get();
+  return row !== undefined;
 }

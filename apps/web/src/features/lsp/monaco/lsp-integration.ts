@@ -23,11 +23,7 @@ import type {
   Range,
   SignatureHelp,
 } from ".."
-import {
-  SEVERITY_ERROR,
-  SEVERITY_WARNING,
-  SEVERITY_INFO,
-} from "../types"
+import { SEVERITY_ERROR, SEVERITY_WARNING, SEVERITY_INFO } from "../types"
 
 export interface ModelLspEntry {
   connection: LspConnection | null
@@ -268,7 +264,8 @@ function locationsToMonaco(
   return arr.map((item) => {
     const { filePath, range } = normalizeLocation(item)
     return {
-      uri: filePath === currentFilePath ? currentUri : monaco.Uri.file(filePath),
+      uri:
+        filePath === currentFilePath ? currentUri : monaco.Uri.file(filePath),
       range: {
         startLineNumber: range.start.line + 1,
         startColumn: range.start.character + 1,
@@ -374,7 +371,10 @@ function paletteFromTokens(t: ThemePalette, mode: "light" | "dark"): Palette {
     popover: hexColor(t.popover, isDark ? "161616" : "f0f0ed"),
     secondary: hexColor(t.secondary, isDark ? "222222" : "e8e8e4"),
     muted: hexColor(t.muted, isDark ? "2b2b2b" : "dcdcd8"),
-    mutedForeground: hexColor(t["muted-foreground"], isDark ? "9e9e9e" : "6b6b6b"),
+    mutedForeground: hexColor(
+      t["muted-foreground"],
+      isDark ? "9e9e9e" : "6b6b6b"
+    ),
     accent: hexColor(t.accent, isDark ? "393939" : "d0d0cb"),
     primary: hexColor(t.primary, isDark ? "3a6090" : "1a4080"),
     border: hexColor(t.border, isDark ? "1e1e1e" : "eaeae7"),

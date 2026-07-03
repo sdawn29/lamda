@@ -201,31 +201,28 @@ export function DiffLineContent({
       className={cn(
         "w-max shrink-0 whitespace-pre",
         paddingClass,
-        isSkipped &&
-          "font-mono text-3xs italic text-muted-foreground/40"
+        isSkipped && "font-mono text-3xs text-muted-foreground/40 italic"
       )}
     >
-      {isSkipped ? (
-        "⋯"
-      ) : wordDiffRanges && wordDiffRanges.length > 0 ? (
-        renderWithWordDiff(line.content, wordDiffRanges).map((part, i) =>
-          part.highlighted ? (
-            <span
-              key={i}
-              className={cn(
-                "rounded-sm",
-                isAdded ? "bg-diff-add/45" : "bg-diff-remove/45"
-              )}
-            >
-              {part.text}
-            </span>
-          ) : (
-            <span key={i}>{part.text}</span>
-          )
-        )
-      ) : (
-        renderTokens(tokens, themeStyle)
-      )}
+      {isSkipped
+        ? "⋯"
+        : wordDiffRanges && wordDiffRanges.length > 0
+          ? renderWithWordDiff(line.content, wordDiffRanges).map((part, i) =>
+              part.highlighted ? (
+                <span
+                  key={i}
+                  className={cn(
+                    "rounded-sm",
+                    isAdded ? "bg-diff-add/45" : "bg-diff-remove/45"
+                  )}
+                >
+                  {part.text}
+                </span>
+              ) : (
+                <span key={i}>{part.text}</span>
+              )
+            )
+          : renderTokens(tokens, themeStyle)}
     </span>
   )
 }

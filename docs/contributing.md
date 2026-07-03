@@ -92,6 +92,7 @@ lamda/
 > **Note**: This project currently has no automated test suite.
 
 Manual verification is expected. When adding features:
+
 - Document testing steps in PR description
 - Note any manual verification needed
 

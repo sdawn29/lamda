@@ -37,7 +37,10 @@ export function bashCommandScope(rawCommand: string): BashScope {
   const tokens = command.split(/\s+/);
   let i = 0;
   // Skip leading `VAR=value` assignments and a `sudo` prefix.
-  while (i < tokens.length && (/^\w+=/.test(tokens[i]) || tokens[i] === "sudo")) {
+  while (
+    i < tokens.length &&
+    (/^\w+=/.test(tokens[i]) || tokens[i] === "sudo")
+  ) {
     i++;
   }
 
@@ -45,6 +48,7 @@ export function bashCommandScope(rawCommand: string): BashScope {
   if (!program) return { key: command, label: command };
 
   const next = tokens[i + 1];
-  const scope = next != null && SUBCOMMAND.test(next) ? `${program} ${next}` : program;
+  const scope =
+    next != null && SUBCOMMAND.test(next) ? `${program} ${next}` : program;
   return { key: scope, label: scope };
 }

@@ -205,10 +205,13 @@ export class SessionCommandsClient {
   private handlers = new Set<MessageHandler>()
   private onConnectHandlers = new Set<ConnectionHandler>()
   private onDisconnectHandlers = new Set<ConnectionHandler>()
-  private pendingCommands = new Map<string, {
-    resolve: (value: unknown) => void
-    reject: (err: Error) => void
-  }>()
+  private pendingCommands = new Map<
+    string,
+    {
+      resolve: (value: unknown) => void
+      reject: (err: Error) => void
+    }
+  >()
 
   constructor(sessionId: string) {
     this.sessionId = sessionId
@@ -250,7 +253,9 @@ export class SessionCommandsClient {
     this.ws.onclose = () => {
       this.onDisconnectHandlers.forEach((h) => h())
       // Clear pending commands
-      this.pendingCommands.forEach((p) => p.reject(new Error("Connection closed")))
+      this.pendingCommands.forEach((p) =>
+        p.reject(new Error("Connection closed"))
+      )
       this.pendingCommands.clear()
     }
 
@@ -351,7 +356,10 @@ export class SessionCommandsClient {
   }
 
   async gitUnstage(filePath: string): Promise<void> {
-    await this.send({ type: "git:unstage", filePath } satisfies GitUnstageMessage)
+    await this.send({
+      type: "git:unstage",
+      filePath,
+    } satisfies GitUnstageMessage)
   }
 
   async gitStageAll(): Promise<void> {
@@ -367,7 +375,10 @@ export class SessionCommandsClient {
   }
 
   async gitCheckout(branch: string): Promise<void> {
-    await this.send({ type: "git:checkout", branch } satisfies GitCheckoutMessage)
+    await this.send({
+      type: "git:checkout",
+      branch,
+    } satisfies GitCheckoutMessage)
   }
 
   async gitBranch(branch: string): Promise<void> {
@@ -387,15 +398,25 @@ export class SessionCommandsClient {
   }
 
   async gitStashApply(ref: string): Promise<void> {
-    await this.send({ type: "git:stash-apply", ref } satisfies GitStashApplyMessage)
+    await this.send({
+      type: "git:stash-apply",
+      ref,
+    } satisfies GitStashApplyMessage)
   }
 
   async gitStashDrop(ref: string): Promise<void> {
-    await this.send({ type: "git:stash-drop", ref } satisfies GitStashDropMessage)
+    await this.send({
+      type: "git:stash-drop",
+      ref,
+    } satisfies GitStashDropMessage)
   }
 
   async gitRevertFile(filePath: string, raw: string): Promise<void> {
-    await this.send({ type: "git:revert-file", filePath, raw } satisfies GitRevertFileMessage)
+    await this.send({
+      type: "git:revert-file",
+      filePath,
+      raw,
+    } satisfies GitRevertFileMessage)
   }
 
   async gitInit(): Promise<void> {
@@ -404,6 +425,8 @@ export class SessionCommandsClient {
 }
 
 // Factory function for easy access
-export function createSessionCommandsClient(sessionId: string): SessionCommandsClient {
+export function createSessionCommandsClient(
+  sessionId: string
+): SessionCommandsClient {
   return new SessionCommandsClient(sessionId)
 }

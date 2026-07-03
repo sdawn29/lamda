@@ -32,7 +32,8 @@ export function useSendPrompt(sessionId: string) {
 export function useSteer(sessionId: string) {
   // WS stream handles the message delivery — no need to invalidate.
   return useMutation({
-    mutationFn: (text: string) => steer(sessionId, text),
+    mutationFn: ({ text, clientId }: { text: string; clientId?: string }) =>
+      steer(sessionId, text, clientId),
   })
 }
 
@@ -45,7 +46,8 @@ export function useSteer(sessionId: string) {
 export function useFollowUp(sessionId: string) {
   // WS stream handles the message delivery — no need to invalidate.
   return useMutation({
-    mutationFn: (text: string) => followUp(sessionId, text),
+    mutationFn: ({ text, clientId }: { text: string; clientId?: string }) =>
+      followUp(sessionId, text, clientId),
   })
 }
 
@@ -79,10 +81,16 @@ export function useRevertToMessage(
   return useMutation({
     mutationFn: (blockId: string) => revertToMessage(sessionId, blockId),
     onSuccess: ({ text }) => {
-      void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+      void queryClient.invalidateQueries({
+        queryKey: messagesQueryKey(sessionId),
+      })
       void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
-      void queryClient.invalidateQueries({ queryKey: gitKeys.status(sessionId) })
-      void queryClient.invalidateQueries({ queryKey: gitKeys.diffStat(sessionId) })
+      void queryClient.invalidateQueries({
+        queryKey: gitKeys.status(sessionId),
+      })
+      void queryClient.invalidateQueries({
+        queryKey: gitKeys.diffStat(sessionId),
+      })
       onSuccess?.(text)
     },
   })

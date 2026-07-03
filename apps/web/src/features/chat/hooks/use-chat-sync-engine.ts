@@ -161,7 +161,10 @@ class ChatSyncEngine {
   /**
    * Force immediate sync
    */
-  async forceSync(sessionId: string, fetchFn: () => Promise<Message[]>): Promise<Message[]> {
+  async forceSync(
+    sessionId: string,
+    fetchFn: () => Promise<Message[]>
+  ): Promise<Message[]> {
     try {
       this.state = { ...this.state, isSyncing: true }
       this.notifyListeners()

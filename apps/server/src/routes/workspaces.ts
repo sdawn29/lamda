@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { readFile, access } from "node:fs/promises";
 import { join, extname } from "node:path";
 import {
@@ -27,6 +28,22 @@ import { fileTreeService } from "../services/file-tree-service.js";
 import { lamdaConfigWatcher } from "../services/lamda-config-watcher.js";
 import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
 import { clearAppDataDir } from "../lib/attachments.js";
+import { parseJsonBody } from "../lib/validate.js";
+
+const createWorkspaceSchema = z.object({
+  name: z.string().optional(),
+  path: z.string().optional(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+});
+
+const openWithAppSchema = z.object({
+  appId: z.string().nullable().optional(),
+});
+
+const workspaceEnvSchema = z.object({
+  env: z.record(z.string(), z.string()).optional(),
+});
 
 /**
  * Resolves the directory a file-tree request should read from: a thread's git
@@ -239,16 +256,9 @@ async function finalizeWorkspaceCreation(
 }
 
 workspaces.post("/workspace", async (c) => {
-  const body = await c.req
-    .json<{ name?: string; path?: string; provider?: string; model?: string }>()
-    .catch(
-      (): {
-        name?: string;
-        path?: string;
-        provider?: string;
-        model?: string;
-      } => ({}),
-    );
+  const parsed = await parseJsonBody(c, createWorkspaceSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.name || !body.path)
     return c.json({ error: "name and path are required" }, 400);
 
@@ -409,23 +419,21 @@ workspaces.delete("/workspace/:id", async (c) => {
 
 workspaces.patch("/workspace/:id/open-with-app", async (c) => {
   const workspaceId = c.req.param("id");
-  const body = await c.req
-    .json<{ appId?: string | null }>()
-    .catch((): { appId?: string | null } => ({}));
+  const parsed = await parseJsonBody(c, openWithAppSchema);
+  if (!parsed.ok) return parsed.response;
   const ws = getWorkspace(workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
-  updateWorkspaceOpenWithApp(workspaceId, body.appId ?? null);
+  updateWorkspaceOpenWithApp(workspaceId, parsed.data.appId ?? null);
   return c.json({ ok: true });
 });
 
 workspaces.patch("/workspace/:id/env", async (c) => {
   const workspaceId = c.req.param("id");
-  const body = await c.req
-    .json<{ env?: Record<string, string> }>()
-    .catch((): { env?: Record<string, string> } => ({}));
+  const parsed = await parseJsonBody(c, workspaceEnvSchema);
+  if (!parsed.ok) return parsed.response;
   const ws = getWorkspace(workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
-  updateWorkspaceEnv(workspaceId, body.env ?? null);
+  updateWorkspaceEnv(workspaceId, parsed.data.env ?? null);
   return c.json({ ok: true });
 });
 

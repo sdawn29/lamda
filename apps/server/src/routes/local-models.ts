@@ -115,7 +115,10 @@ async function probeModelsEndpoint(
 async function reachabilityWarning(
   config: LocalProviderConfig,
 ): Promise<string | undefined> {
-  if (config.api !== "openai-completions" && config.api !== "openai-responses") {
+  if (
+    config.api !== "openai-completions" &&
+    config.api !== "openai-responses"
+  ) {
     return undefined;
   }
   const { baseUrl, apiKey, headers } = config;
@@ -127,7 +130,11 @@ async function reachabilityWarning(
   if (status !== null && status !== 404) return undefined;
 
   if (!baseUrl.endsWith("/v1")) {
-    const v1Status = await probeModelsEndpoint(`${baseUrl}/v1`, apiKey, headers);
+    const v1Status = await probeModelsEndpoint(
+      `${baseUrl}/v1`,
+      apiKey,
+      headers,
+    );
     if (v1Status !== null && v1Status < 400) {
       return `Saved, but ${baseUrl} did not respond while ${baseUrl}/v1 did. Set the base URL to ${baseUrl}/v1 — without it, requests hit a dead path and the model returns nothing.`;
     }
@@ -159,7 +166,11 @@ function validateProvider(body: unknown): {
     return { ok: false, error: "at least one model is required" };
   }
   for (const m of c.models) {
-    if (!m || typeof m !== "object" || typeof (m as { id?: unknown }).id !== "string") {
+    if (
+      !m ||
+      typeof m !== "object" ||
+      typeof (m as { id?: unknown }).id !== "string"
+    ) {
       return { ok: false, error: "each model requires a string id" };
     }
     const modelCompatError = validateCompat((m as { compat?: unknown }).compat);
@@ -185,7 +196,10 @@ localModels.put("/local-providers/:id", async (c) => {
     return c.json({ error: result.error ?? "invalid provider config" }, 400);
   }
 
-  const config = { ...result.config, baseUrl: normalizeBaseUrl(result.config.baseUrl) };
+  const config = {
+    ...result.config,
+    baseUrl: normalizeBaseUrl(result.config.baseUrl),
+  };
   await upsertProvider(id, config);
   invalidateModelCache();
   // Surface any schema error the SDK detects after the write, plus a

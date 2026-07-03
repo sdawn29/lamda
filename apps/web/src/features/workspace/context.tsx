@@ -58,7 +58,9 @@ const useWorkspaceUiStore = create<WorkspaceUiStore>((set) => ({
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Keep provider for tree-compatibility; no network state mirroring to avoid loops.
-  const setProviderMounted = useWorkspaceUiStore((state) => state.setProviderMounted)
+  const setProviderMounted = useWorkspaceUiStore(
+    (state) => state.setProviderMounted
+  )
   useEffect(() => {
     setProviderMounted(true)
     return () => setProviderMounted(false)
@@ -84,7 +86,10 @@ export function useWorkspace(): WorkspaceContextValue {
 
   const createWorkspace = useCallback(
     async (name: string, path: string): Promise<Workspace> => {
-      const { workspace } = await createWorkspaceMutation.mutateAsync({ name, path })
+      const { workspace } = await createWorkspaceMutation.mutateAsync({
+        name,
+        path,
+      })
       return workspace
     },
     [createWorkspaceMutation]
@@ -92,7 +97,10 @@ export function useWorkspace(): WorkspaceContextValue {
 
   const cloneRepository = useCallback(
     async (url: string, path: string): Promise<Workspace> => {
-      const clonedPath = await cloneRepositoryMutation.mutateAsync({ url, path })
+      const clonedPath = await cloneRepositoryMutation.mutateAsync({
+        url,
+        path,
+      })
       const folderName = clonedPath.split(/[/\\]/).pop() || clonedPath
       const { workspace } = await createWorkspaceMutation.mutateAsync({
         name: folderName,

@@ -1,6 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { gitStatus, gitFileDiff, gitDiffStat, gitStashList, listTurns, revertToTurn, getAheadBehind, gitLog, gitShow, gitShowFiles, gitShowFileDiff, getTurnFileDiff, getTurnDiffStat, getWorkspaceBranch, listWorkspaceBranches, workspaceGitLog, workspaceGitShowFiles, workspaceGitShowFileDiff, type TurnDiffStat } from "./api"
-import { getBranch, listBranches, listSessionWorktrees } from "@/features/chat/api"
+import {
+  gitStatus,
+  gitFileDiff,
+  gitDiffStat,
+  gitStashList,
+  listTurns,
+  revertToTurn,
+  getAheadBehind,
+  gitLog,
+  gitShow,
+  gitShowFiles,
+  gitShowFileDiff,
+  getTurnFileDiff,
+  getTurnDiffStat,
+  getWorkspaceBranch,
+  listWorkspaceBranches,
+  workspaceGitLog,
+  workspaceGitShowFiles,
+  workspaceGitShowFileDiff,
+  type TurnDiffStat,
+} from "./api"
+import {
+  getBranch,
+  listBranches,
+  listSessionWorktrees,
+} from "@/features/chat/api"
 
 const gitRootKey = ["git"] as const
 const gitSessionKey = (sessionId: string) =>
@@ -21,12 +45,10 @@ export const gitKeys = {
     [...gitSessionKey(sessionId), "branch"] as const,
   branches: (sessionId: string) =>
     [...gitSessionKey(sessionId), "branches"] as const,
-  turns: (sessionId: string) =>
-    [...gitSessionKey(sessionId), "turns"] as const,
+  turns: (sessionId: string) => [...gitSessionKey(sessionId), "turns"] as const,
   aheadBehind: (sessionId: string) =>
     [...gitSessionKey(sessionId), "ahead-behind"] as const,
-  log: (sessionId: string) =>
-    [...gitSessionKey(sessionId), "log"] as const,
+  log: (sessionId: string) => [...gitSessionKey(sessionId), "log"] as const,
   show: (sessionId: string, sha: string) =>
     [...gitSessionKey(sessionId), "show", sha] as const,
   showFiles: (sessionId: string, sha: string) =>
@@ -236,7 +258,11 @@ export function useGitShow(sessionId: string, sha: string, enabled: boolean) {
   })
 }
 
-export function useGitShowFiles(sessionId: string, sha: string, enabled: boolean) {
+export function useGitShowFiles(
+  sessionId: string,
+  sha: string,
+  enabled: boolean
+) {
   return useQuery({
     queryKey: gitKeys.showFiles(sessionId, sha),
     queryFn: () => gitShowFiles(sessionId, sha),
@@ -246,7 +272,12 @@ export function useGitShowFiles(sessionId: string, sha: string, enabled: boolean
   })
 }
 
-export function useGitShowFileDiff(sessionId: string, sha: string, filePath: string, enabled: boolean) {
+export function useGitShowFileDiff(
+  sessionId: string,
+  sha: string,
+  filePath: string,
+  enabled: boolean
+) {
   return useQuery({
     queryKey: gitKeys.showFileDiff(sessionId, sha, filePath),
     queryFn: () => gitShowFileDiff(sessionId, sha, filePath),
@@ -276,7 +307,11 @@ export function useWorkspaceGitShowFiles(
   enabled: boolean
 ) {
   return useQuery({
-    queryKey: [...gitWorkspaceKey(workspaceId ?? ""), "show-files", sha] as const,
+    queryKey: [
+      ...gitWorkspaceKey(workspaceId ?? ""),
+      "show-files",
+      sha,
+    ] as const,
     queryFn: () => workspaceGitShowFiles(workspaceId!, sha),
     enabled: enabled && !!workspaceId && !!sha,
     gcTime: 5 * 60_000,
@@ -333,8 +368,12 @@ export function useRevertToTurn(sessionId: string) {
   return useMutation({
     mutationFn: (turnId: number) => revertToTurn(sessionId, turnId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: gitKeys.status(sessionId) })
-      void queryClient.invalidateQueries({ queryKey: gitKeys.diffStat(sessionId) })
+      void queryClient.invalidateQueries({
+        queryKey: gitKeys.status(sessionId),
+      })
+      void queryClient.invalidateQueries({
+        queryKey: gitKeys.diffStat(sessionId),
+      })
       void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
     },
     onError: (error: Error) => {

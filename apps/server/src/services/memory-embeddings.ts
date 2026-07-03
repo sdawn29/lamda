@@ -1,4 +1,8 @@
-import { listMemoriesNeedingEmbedding, upsertMemoryVector, isVecAvailable } from "@lamda/db";
+import {
+  listMemoriesNeedingEmbedding,
+  upsertMemoryVector,
+  isVecAvailable,
+} from "@lamda/db";
 import { embeddingsEnabled, embedDocuments } from "@lamda/pi-sdk";
 
 const BATCH = 64;

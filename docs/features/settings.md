@@ -16,43 +16,43 @@ Press `Cmd/Ctrl + ,` to open settings.
 
 ### General
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| **Theme** | Application appearance | Dark |
-| **Font Size** | UI text size | System default |
-| **Thinking Visibility** | Show/hide thinking blocks | Show |
+| Setting                 | Description               | Default        |
+| ----------------------- | ------------------------- | -------------- |
+| **Theme**               | Application appearance    | Dark           |
+| **Font Size**           | UI text size              | System default |
+| **Thinking Visibility** | Show/hide thinking blocks | Show           |
 
 ### Terminal
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| **Theme** | Terminal appearance | Dark |
-| **Shell** | Default shell path | System default |
+| Setting   | Description         | Default        |
+| --------- | ------------------- | -------------- |
+| **Theme** | Terminal appearance | Dark           |
+| **Shell** | Default shell path  | System default |
 
 ### Advanced
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| **Retry Enabled** | Auto-retry on transient errors | Enabled |
-| **Max Retries** | Maximum retry attempts | 3 |
-| **Base Delay (ms)** | Initial retry delay | 2000 |
+| Setting             | Description                    | Default |
+| ------------------- | ------------------------------ | ------- |
+| **Retry Enabled**   | Auto-retry on transient errors | Enabled |
+| **Max Retries**     | Maximum retry attempts         | 3       |
+| **Base Delay (ms)** | Initial retry delay            | 2000    |
 
 ## AI Providers
 
 ### Supported Providers
 
-| Provider | API Key Variable | Status |
-|----------|-----------------|--------|
-| Anthropic | `ANTHROPIC_API_KEY` | ✅ Popular |
-| OpenAI | `OPENAI_API_KEY` | ✅ Popular |
-| Google Gemini | `GEMINI_API_KEY` | ✅ Popular |
-| DeepSeek | `DEEPSEEK_API_KEY` | ✅ Popular |
-| OpenRouter | `OPENROUTER_API_KEY` | ✅ Popular |
-| Groq | `GROQ_API_KEY` | ✅ Popular |
-| Mistral | `MISTRAL_API_KEY` | ✅ Popular |
-| Ollama | (local) | ✅ Local |
-| Azure OpenAI | `AZURE_OPENAI_API_KEY` | ✅ Enterprise |
-| Amazon Bedrock | - | ✅ Enterprise |
+| Provider       | API Key Variable       | Status        |
+| -------------- | ---------------------- | ------------- |
+| Anthropic      | `ANTHROPIC_API_KEY`    | ✅ Popular    |
+| OpenAI         | `OPENAI_API_KEY`       | ✅ Popular    |
+| Google Gemini  | `GEMINI_API_KEY`       | ✅ Popular    |
+| DeepSeek       | `DEEPSEEK_API_KEY`     | ✅ Popular    |
+| OpenRouter     | `OPENROUTER_API_KEY`   | ✅ Popular    |
+| Groq           | `GROQ_API_KEY`         | ✅ Popular    |
+| Mistral        | `MISTRAL_API_KEY`      | ✅ Popular    |
+| Ollama         | (local)                | ✅ Local      |
+| Azure OpenAI   | `AZURE_OPENAI_API_KEY` | ✅ Enterprise |
+| Amazon Bedrock | -                      | ✅ Enterprise |
 
 ### Adding a Provider
 
@@ -65,6 +65,7 @@ Press `Cmd/Ctrl + ,` to open settings.
 ### Provider Card
 
 Each configured provider shows:
+
 - **Status indicator** (green = connected)
 - **Model selector** — Choose which model to use
 - **API key** — Masked for security
@@ -72,12 +73,12 @@ Each configured provider shows:
 
 ### Provider Status States
 
-| State | Meaning |
-|-------|---------|
-| ✅ Configured | API key present, ready to use |
-| ⚠️ Invalid Key | API key format is incorrect |
-| ❌ Quota Exceeded | API limit reached |
-| ⏳ Checking | Verifying credentials... |
+| State             | Meaning                       |
+| ----------------- | ----------------------------- |
+| ✅ Configured     | API key present, ready to use |
+| ⚠️ Invalid Key    | API key format is incorrect   |
+| ❌ Quota Exceeded | API limit reached             |
+| ⏳ Checking       | Verifying credentials...      |
 
 ## API Keys
 
@@ -96,7 +97,7 @@ With file permissions `0600` (user read/write only).
     "key": "sk-ant-..."
   },
   "openai": {
-    "type": "api_key", 
+    "type": "api_key",
     "key": "sk-..."
   }
 }
@@ -146,6 +147,7 @@ The `!` prefix executes the command and uses its stdout.
 2. Select from available models
 
 Models are grouped by provider:
+
 ```
 Anthropic
 ├── Claude 3.5 Sonnet
@@ -179,14 +181,14 @@ Only models compatible with your configured providers appear in the selector.
 
 Control how deeply the agent thinks:
 
-| Level | Description | Token Budget |
-|-------|-------------|--------------|
-| Off | No extended thinking | 0 |
-| Minimal | Quick thoughts | ~100 |
-| Low | Light reasoning | ~500 |
-| Medium | Balanced (default) | ~2000 |
-| High | Deep reasoning | ~8000 |
-| X-High | Maximum reasoning | ~32000 |
+| Level   | Description          | Token Budget |
+| ------- | -------------------- | ------------ |
+| Off     | No extended thinking | 0            |
+| Minimal | Quick thoughts       | ~100         |
+| Low     | Light reasoning      | ~500         |
+| Medium  | Balanced (default)   | ~2000        |
+| High    | Deep reasoning       | ~8000        |
+| X-High  | Maximum reasoning    | ~32000       |
 
 ### Toggling Thinking Visibility
 
@@ -216,6 +218,7 @@ Edit in `~/.pi/agent/settings.json` directly.
 ### When Retries Happen
 
 Retries occur on transient errors:
+
 - Network timeouts
 - Rate limiting (429 responses)
 - Server errors (5xx responses)
@@ -223,20 +226,20 @@ Retries occur on transient errors:
 
 ### Retry Settings
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| **Retry Enabled** | boolean | true | Enable auto-retry |
-| **Max Retries** | number | 3 | Maximum attempts |
-| **Base Delay (ms)** | number | 2000 | Initial delay (2s, 4s, 8s...) |
+| Setting             | Type    | Default | Description                   |
+| ------------------- | ------- | ------- | ----------------------------- |
+| **Retry Enabled**   | boolean | true    | Enable auto-retry             |
+| **Max Retries**     | number  | 3       | Maximum attempts              |
+| **Base Delay (ms)** | number  | 2000    | Initial delay (2s, 4s, 8s...) |
 
 ### Provider Timeout
 
 Control how long requests wait:
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| **Provider Timeout** | number | SDK default | Per-request timeout |
-| **Max Retry Delay** | number | 60000 | Max server-requested delay |
+| Setting              | Type   | Default     | Description                |
+| -------------------- | ------ | ----------- | -------------------------- |
+| **Provider Timeout** | number | SDK default | Per-request timeout        |
+| **Max Retry Delay**  | number | 60000       | Max server-requested delay |
 
 ### Example: Long-Running Local Inference
 

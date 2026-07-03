@@ -17,7 +17,11 @@
  */
 
 import { create } from "zustand"
-import { persist, createJSONStorage, type StateStorage } from "zustand/middleware"
+import {
+  persist,
+  createJSONStorage,
+  type StateStorage,
+} from "zustand/middleware"
 import type { Message, MessageBlock, ErrorMessage } from "./types"
 import { blocksToMessages } from "./types"
 
@@ -142,7 +146,11 @@ function readThreadFromDisk(sessionId: string): StoredThreadData | null {
     if (!Array.isArray(data.blocks)) return null
     return data
   } catch (e) {
-    console.warn("[chat-cache] Failed to load blocks from storage:", sessionId, e)
+    console.warn(
+      "[chat-cache] Failed to load blocks from storage:",
+      sessionId,
+      e
+    )
     return null
   }
 }
@@ -167,8 +175,12 @@ const threadCacheStorage: StateStorage = {
   setItem: (_name, value) => {
     let threads: Record<string, StoredThreadData>
     try {
-      threads = (JSON.parse(value) as { state?: { threads?: Record<string, StoredThreadData> } })
-        .state?.threads ?? {}
+      threads =
+        (
+          JSON.parse(value) as {
+            state?: { threads?: Record<string, StoredThreadData> }
+          }
+        ).state?.threads ?? {}
     } catch {
       return
     }
@@ -240,7 +252,10 @@ const scrollMetaStorage: StateStorage = {
       if (!key?.startsWith(SCROLL_PREFIX)) continue
       try {
         const raw = localStorage.getItem(key)
-        if (raw) scroll[key.slice(SCROLL_PREFIX.length)] = JSON.parse(raw) as ScrollMeta
+        if (raw)
+          scroll[key.slice(SCROLL_PREFIX.length)] = JSON.parse(
+            raw
+          ) as ScrollMeta
       } catch {
         // ignore corrupt entry
       }
@@ -250,8 +265,12 @@ const scrollMetaStorage: StateStorage = {
   setItem: (_name, value) => {
     let scroll: Record<string, ScrollMeta>
     try {
-      scroll = (JSON.parse(value) as { state?: { scroll?: Record<string, ScrollMeta> } }).state
-        ?.scroll ?? {}
+      scroll =
+        (
+          JSON.parse(value) as {
+            state?: { scroll?: Record<string, ScrollMeta> }
+          }
+        ).state?.scroll ?? {}
     } catch {
       return
     }
@@ -341,7 +360,11 @@ function messagesToBlocks(messages: Message[]): MessageBlock[] {
 
     switch (msg.role) {
       case "user":
-        return { ...base, content: msg.content, createdAt: msg.createdAt ?? Date.now() }
+        return {
+          ...base,
+          content: msg.content,
+          createdAt: msg.createdAt ?? Date.now(),
+        }
       case "assistant":
         return {
           ...base,
@@ -359,7 +382,8 @@ function messagesToBlocks(messages: Message[]): MessageBlock[] {
           ...base,
           toolCallId: msg.toolCallId,
           toolName: msg.toolName,
-          toolArgs: typeof msg.args === "string" ? msg.args : JSON.stringify(msg.args),
+          toolArgs:
+            typeof msg.args === "string" ? msg.args : JSON.stringify(msg.args),
           toolResult: msg.result
             ? typeof msg.result === "string"
               ? msg.result
@@ -521,7 +545,9 @@ export function saveBlocksToStorage(
   serverVersion = 0,
   pagination?: { hasMore: boolean; oldestBlockIndex: number | null }
 ): void {
-  useThreadCacheStore.getState().saveBlocks(sessionId, blocks, serverVersion, pagination)
+  useThreadCacheStore
+    .getState()
+    .saveBlocks(sessionId, blocks, serverVersion, pagination)
 }
 
 export function saveMessagesToStorage(
@@ -530,10 +556,17 @@ export function saveMessagesToStorage(
   serverVersion = 0,
   pagination?: { hasMore: boolean; oldestBlockIndex: number | null }
 ): void {
-  saveBlocksToStorage(sessionId, messagesToBlocks(messages), serverVersion, pagination)
+  saveBlocksToStorage(
+    sessionId,
+    messagesToBlocks(messages),
+    serverVersion,
+    pagination
+  )
 }
 
-export function loadBlocksFromStorage(sessionId: string): StoredThreadData | null {
+export function loadBlocksFromStorage(
+  sessionId: string
+): StoredThreadData | null {
   return useThreadCacheStore.getState().getThread(sessionId)
 }
 
@@ -567,14 +600,23 @@ export function clearAllThreadsFromStorage(): void {
   useThreadCacheStore.getState().clearAll()
 }
 
-export function getStorageStats(): { threadCount: number; sizeBytes: number; sizeMB: number } {
+export function getStorageStats(): {
+  threadCount: number
+  sizeBytes: number
+  sizeMB: number
+} {
   return useThreadCacheStore.getState().getStats()
 }
 
-export function saveScrollMetaToStorage(sessionId: string, meta: ScrollMeta): void {
+export function saveScrollMetaToStorage(
+  sessionId: string,
+  meta: ScrollMeta
+): void {
   useScrollMetaStore.getState().setScroll(sessionId, meta)
 }
 
-export function loadScrollMetaFromStorage(sessionId: string): ScrollMeta | null {
+export function loadScrollMetaFromStorage(
+  sessionId: string
+): ScrollMeta | null {
   return useScrollMetaStore.getState().getScroll(sessionId)
 }

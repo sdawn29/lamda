@@ -89,6 +89,8 @@ interface AssistantMessageBlockProps {
   isLastInTurn?: boolean
   /** Footer is mounted (height reserved) but hidden — turn still streaming. */
   footerPending?: boolean
+  /** This message is the live tail of an in-flight turn — more text may land. */
+  isStreaming?: boolean
   turnMessages?: AssistantMessage[]
   errorRepeatCount?: number
   rootPath?: string
@@ -208,14 +210,22 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
   entryDelayMs = 0,
   isLastInTurn = true,
   footerPending = false,
+  isStreaming = false,
   turnMessages,
   errorRepeatCount,
   rootPath,
 }: AssistantMessageBlockProps) {
   const hasContent = message.content.length > 0
   const hasError = !!message.errorMessage
-  const displayContent = useWordReveal(message.content, isNew)
+  const { text: displayContent, isRevealing } = useWordReveal(
+    message.content,
+    isNew
+  )
   const richRendering = useRichChatRenderingSetting()
+  // The caret marks the live typing edge: shown while the typewriter is still
+  // revealing, and also while this message is the streaming tail of the turn
+  // (caught up but more deltas may land) so it doesn't flicker between chunks.
+  const showCaret = hasContent && !hasError && (isRevealing || isStreaming)
 
   if (!hasContent && !hasError) return null
 
@@ -247,7 +257,12 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
       }
     >
       {hasContent && (
-        <div className={richRendering ? chatProseClassRich : chatProseClass}>
+        <div
+          className={cn(
+            richRendering ? chatProseClassRich : chatProseClass,
+            showCaret && "chat-streaming-caret"
+          )}
+        >
           <Markdown
             remarkPlugins={remarkPlugins}
             components={getMarkdownComponents(rootPath, richRendering)}
@@ -346,30 +361,6 @@ export function getMessageKey(message: Message, index: number): string {
   return `${message.role}-i${index}`
 }
 
-export function estimateMessageSize(message: Message): number {
-  if (message.role === "tool") {
-    return message.status === "running" ? 84 : 120
-  }
-
-  if (
-    message.role === "error" ||
-    message.role === "abort" ||
-    message.role === "compaction"
-  ) {
-    return 68
-  }
-
-  if (message.role === "user") {
-    return message.content.length > 220 ? 96 : 68
-  }
-
-  const contentLength = message.content.length + message.thinking.length
-  if (contentLength > 1_200) return 320
-  if (contentLength > 400) return 220
-  if (contentLength > 120) return 144
-  return 104
-}
-
 export interface MessageRowProps {
   message: Message
   commandsByName: ReadonlyMap<string, SlashCommand>
@@ -380,6 +371,8 @@ export interface MessageRowProps {
   isLastInTurn?: boolean
   /** Footer is mounted (height reserved) but hidden — turn still streaming. */
   footerPending?: boolean
+  /** This row is the live tail of an in-flight turn (drives the typing caret). */
+  isStreaming?: boolean
   turnMessages?: AssistantMessage[]
   /** Consecutive identical assistant errors folded into this row (see message-groups.ts). */
   errorRepeatCount?: number
@@ -434,6 +427,7 @@ export const MessageRow = memo(function MessageRow({
   entryDelayMs = 0,
   isLastInTurn = true,
   footerPending = false,
+  isStreaming = false,
   turnMessages,
   errorRepeatCount,
   rootPath,
@@ -491,7 +485,9 @@ export const MessageRow = memo(function MessageRow({
         <div
           className={cn(
             "group flex flex-col items-end gap-1.5 self-end",
-            isNewMessage && "animate-chat-message-in"
+            // User bubbles mount alone (never in a WS-batched burst), so they
+            // can afford the rise-and-settle transform the shared fade avoids.
+            isNewMessage && "animate-chat-user-message-in"
           )}
           style={
             isNewMessage && entryDelayMs > 0
@@ -615,6 +611,7 @@ export const MessageRow = memo(function MessageRow({
       entryDelayMs={entryDelayMs}
       isLastInTurn={isLastInTurn}
       footerPending={footerPending}
+      isStreaming={isStreaming}
       turnMessages={turnMessages}
       errorRepeatCount={errorRepeatCount}
       rootPath={rootPath}

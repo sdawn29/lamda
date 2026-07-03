@@ -8,12 +8,12 @@ Manages the main tab bar UI for thread and file tabs, including tab ordering, ac
 
 ## Quick Reference
 
-| Action | File | Description |
-|--------|------|-------------|
-| Tab state | `store.ts` | `useMainTabsStore` — manages all tabs and active state |
-| Tab bar UI | `components/main-tab-bar.tsx` | Renders tab bar with drag-to-reorder support |
-| Thread tab | `components/tabs-empty-state.tsx` | Empty state when no tabs are open |
-| File content | `components/file-content-view.tsx` | Displays file content in a tab |
+| Action       | File                               | Description                                            |
+| ------------ | ---------------------------------- | ------------------------------------------------------ |
+| Tab state    | `store.ts`                         | `useMainTabsStore` — manages all tabs and active state |
+| Tab bar UI   | `components/main-tab-bar.tsx`      | Renders tab bar with drag-to-reorder support           |
+| Thread tab   | `components/tabs-empty-state.tsx`  | Empty state when no tabs are open                      |
+| File content | `components/file-content-view.tsx` | Displays file content in a tab                         |
 
 ## Public API
 

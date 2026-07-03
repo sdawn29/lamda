@@ -2,289 +2,30 @@ import { useEffect, useRef, useCallback } from "react"
 import { flushSync } from "react-dom"
 import { useQueryClient } from "@tanstack/react-query"
 
-import { openSessionWebSocket, listRunningTools, fetchSessionStatus } from "../api"
-import { subscribeToSessionEvents, type AgentEndMessage } from "../session-events"
-import { messagesQueryKey, chatKeys, updateLastPageMessages, type MessagesInfiniteData } from "../queries"
-import { createAssistantMessage, createErrorMessage, blockToMessage, parseErrorMessage } from "../types"
-import type { AssistantMessage, Message, ToolMessage } from "../types"
+import {
+  openSessionWebSocket,
+  listRunningTools,
+  fetchSessionStatus,
+} from "../api"
+import {
+  subscribeToSessionEvents,
+  type AgentEndMessage,
+} from "../session-events"
+import {
+  messagesQueryKey,
+  chatKeys,
+  updateLastPageMessages,
+  type MessagesInfiniteData,
+} from "../queries"
+import { createErrorMessage, blockToMessage } from "../types"
+import type { ToolMessage } from "../types"
 import { gitKeys } from "@/features/git/queries"
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-interface TurnMeta {
-  startTime: number
-  model?: string
-  provider?: string
-  thinkingLevel?: string
-}
-
-function upsertToolMessage(
-  prev: Message[],
-  toolCallId: string,
-  updater: (existing?: ToolMessage) => ToolMessage
-): Message[] {
-  const index = prev.findIndex(
-    (msg) => msg.role === "tool" && msg.toolCallId === toolCallId
-  )
-  if (index === -1) return [...prev, updater()]
-  return [...prev.slice(0, index), updater(prev[index] as ToolMessage), ...prev.slice(index + 1)]
-}
-
-function mergeRunningTools(messages: Message[], runningTools: Message[]): Message[] {
-  if (runningTools.length === 0) return messages
-
-  // Check ALL existing tool messages regardless of status — not just running ones.
-  // The async listRunningTools fetch in onAgentStart can resolve after tool_start +
-  // tool_end have already been processed (completing the tool). Filtering only for
-  // status === "running" would miss the completed entry and insert a duplicate.
-  const existingIds = new Set(
-    messages
-      .filter((m): m is ToolMessage => m.role === "tool")
-      .map((m) => m.toolCallId)
-  )
-
-  const newTools = runningTools.filter(
-    (m): m is ToolMessage => m.role === "tool" && !existingIds.has(m.toolCallId)
-  )
-
-  if (newTools.length === 0) return messages
-
-  const lastAssistantIdx = messages.reduceRight(
-    (found, msg, i) => (found === -1 && msg.role === "assistant" ? i : found),
-    -1
-  )
-
-  if (lastAssistantIdx === -1) return [...messages, ...newTools]
-
-  const insertIdx = lastAssistantIdx + 1
-  return [...messages.slice(0, insertIdx), ...newTools, ...messages.slice(insertIdx)]
-}
-
-function appendAssistantDelta(
-  prev: Message[],
-  type: "text_delta" | "thinking_delta",
-  delta: string
-): Message[] {
-  const last = prev[prev.length - 1]
-  if (last?.role !== "assistant") {
-    return [
-      ...prev,
-      type === "thinking_delta"
-        ? createAssistantMessage({ thinking: delta })
-        : createAssistantMessage({ content: delta }),
-    ]
-  }
-  if (type === "thinking_delta") {
-    return [...prev.slice(0, -1), { ...last, thinking: last.thinking + delta }]
-  }
-  return [...prev.slice(0, -1), { ...last, content: last.content + delta }]
-}
-
-function finalizeRunningTools(prev: Message[], runMessages: AgentEndMessage[]): Message[] {
-  const toolResults = new Map(
-    runMessages
-      .filter(
-        (msg): msg is Extract<AgentEndMessage, { role: "toolResult" }> =>
-          msg.role === "toolResult"
-      )
-      .map((msg) => [msg.toolCallId, msg])
-  )
-
-  const assistantFailure = [...runMessages]
-    .reverse()
-    .find(
-      (msg): msg is Extract<AgentEndMessage, { role: "assistant" }> =>
-        msg.role === "assistant" && (msg.stopReason === "aborted" || msg.stopReason === "error")
-    )
-
-  const fallbackError = assistantFailure?.errorMessage
-    ? assistantFailure.errorMessage
-    : assistantFailure?.stopReason === "aborted"
-      ? "Operation aborted"
-      : "Tool execution ended without a final result."
-
-  return prev.map((msg) => {
-    if (msg.role !== "tool" || msg.status !== "running") return msg
-    const result = toolResults.get(msg.toolCallId)
-    if (result) {
-      const duration = msg.startTime ? Date.now() - msg.startTime : msg.duration
-      return {
-        ...msg,
-        toolName: result.toolName || msg.toolName,
-        status: result.isError ? "error" : "done",
-        result: { content: result.content, details: result.details },
-        duration,
-      }
-    }
-    return {
-      ...msg,
-      status: "error",
-      result: msg.result ?? { content: [{ type: "text", text: fallbackError }] },
-      duration: msg.duration ?? (msg.startTime ? Date.now() - msg.startTime : undefined),
-    }
-  })
-}
-
-function findLastAssistantIndex(messages: Message[]): number {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "assistant") return i
-  }
-  return -1
-}
-
-// ── Queue event types ─────────────────────────────────────────────────────────
-//
-// Every WebSocket event is normalized into one of these before entering the
-// queue. The queue is drained once per animation frame, applying all events
-// in arrival order as pure transforms on the messages array, then issuing a
-// single setQueryData call and firing side-effects.
-
-type QueuedEvent =
-  | { kind: "agent_start"; runningTools: ToolMessage[] }
-  | { kind: "message_start" }
-  | { kind: "text_delta"; delta: string }
-  | { kind: "thinking_delta"; delta: string }
-  | { kind: "tool_start"; toolCallId: string; toolName: string; args: unknown; startTime: number }
-  | { kind: "tool_update"; toolCallId: string; toolName?: string; args?: unknown; partialResult: unknown }
-  | { kind: "tool_end"; toolCallId: string; toolName?: string; status: "done" | "error"; result: unknown; duration?: number }
-  | { kind: "agent_end"; agentMessages: AgentEndMessage[]; meta: TurnMeta | null }
-  | { kind: "auto_retry_start"; attempt: number; errorMessage: string }
-  | { kind: "auto_retry_end"; success: boolean; finalError?: string; lastPrompt: { text: string; thinkingLevel?: string } | null }
-  | { kind: "compaction_start"; reason: "manual" | "threshold" | "overflow" }
-  | { kind: "compaction_end"; reason: "manual" | "threshold" | "overflow"; errorMessage?: string; aborted?: boolean; willRetry?: boolean }
-  | { kind: "server_error"; message: string; lastPrompt: { text: string; thinkingLevel?: string } | null }
-  | { kind: "transport_error"; lastPrompt: { text: string; thinkingLevel?: string } | null }
-
-// Pure state transition — no side effects allowed here.
-function applyQueuedEvent(msgs: Message[], event: QueuedEvent): Message[] {
-  switch (event.kind) {
-    case "agent_start":
-      return mergeRunningTools(msgs, event.runningTools)
-
-    case "message_start":
-      return [...msgs, createAssistantMessage()]
-
-    case "text_delta":
-      return appendAssistantDelta(msgs, "text_delta", event.delta)
-
-    case "thinking_delta":
-      return appendAssistantDelta(msgs, "thinking_delta", event.delta)
-
-    case "tool_start":
-      return upsertToolMessage(msgs, event.toolCallId, (existing) => ({
-        role: "tool" as const,
-        toolCallId: event.toolCallId,
-        toolName: event.toolName ?? existing?.toolName ?? "tool",
-        args: event.args ?? existing?.args ?? {},
-        status: "running" as const,
-        result: existing?.result,
-        partialResult: existing?.partialResult,
-        duration: existing?.duration,
-        startTime: event.startTime,
-      }))
-
-    case "tool_update":
-      return upsertToolMessage(msgs, event.toolCallId, (existing) => ({
-        role: "tool" as const,
-        toolCallId: event.toolCallId,
-        toolName: event.toolName ?? existing?.toolName ?? "tool",
-        args: event.args ?? existing?.args ?? {},
-        status: "running" as const,
-        result: existing?.result,
-        partialResult: event.partialResult,
-        duration: existing?.duration,
-        startTime: existing?.startTime,
-      }))
-
-    case "tool_end": {
-      // If agent_end's finalizeRunningTools already settled this tool,
-      // skip — applying tool_end on top would cause a spurious re-render.
-      const alreadyFinalized = msgs.some(
-        (m) => m.role === "tool" &&
-          (m as ToolMessage).toolCallId === event.toolCallId &&
-          (m as ToolMessage).status !== "running"
-      )
-      if (alreadyFinalized) return msgs
-      return upsertToolMessage(msgs, event.toolCallId, (existing) => ({
-        role: "tool" as const,
-        toolCallId: event.toolCallId,
-        toolName: event.toolName ?? existing?.toolName ?? "tool",
-        args: existing?.args ?? {},
-        status: event.status,
-        result: event.result,
-        partialResult: existing?.partialResult,
-        duration: event.duration,
-        startTime: existing?.startTime,
-      }))
-    }
-
-    case "compaction_end": {
-      if (!event.errorMessage && !event.aborted) {
-        return [
-          ...msgs,
-          {
-            role: "compaction" as const,
-            id: crypto.randomUUID(),
-            reason: event.reason,
-            createdAt: Date.now(),
-          },
-        ]
-      }
-      return msgs
-    }
-
-    case "agent_end": {
-      let result = finalizeRunningTools(msgs, event.agentMessages)
-      const { meta } = event
-
-      if (meta) {
-        const lastIdx = findLastAssistantIndex(result)
-        if (lastIdx !== -1) {
-          const last = result[lastIdx] as AssistantMessage
-          result = [
-            ...result.slice(0, lastIdx),
-            {
-              ...last,
-              model: meta.model,
-              provider: meta.provider,
-              thinkingLevel: meta.thinkingLevel,
-              responseTime: Date.now() - meta.startTime,
-            },
-            ...result.slice(lastIdx + 1),
-          ]
-        }
-      }
-
-      const assistantError = [...event.agentMessages]
-        .reverse()
-        .find(
-          (msg): msg is Extract<AgentEndMessage, { role: "assistant" }> =>
-            msg.role === "assistant" && msg.stopReason === "error" && !!msg.errorMessage
-        )
-
-      if (assistantError?.errorMessage) {
-        const errorText = parseErrorMessage(assistantError.errorMessage)
-        const lastIdx = findLastAssistantIndex(result)
-        if (lastIdx !== -1) {
-          const last = result[lastIdx] as AssistantMessage
-          result = [
-            ...result.slice(0, lastIdx),
-            { ...last, errorMessage: errorText },
-            ...result.slice(lastIdx + 1),
-          ]
-        } else {
-          result = [...result, createAssistantMessage({ errorMessage: errorText })]
-        }
-      }
-
-      return result
-    }
-
-    // Side-effect-only events — messages state unchanged.
-    default:
-      return msgs
-  }
-}
+import { workspaceKeys } from "@/features/workspace/queries"
+import {
+  applyQueuedEvent,
+  type QueuedEvent,
+  type TurnMeta,
+} from "../lib/stream-reducer"
 
 // ── Per-session stream state ──────────────────────────────────────────────────
 
@@ -306,7 +47,22 @@ function getSessionDoneFlag(sessionId: string): DoneFlag {
 // turn from message_start, re-appending a duplicate assistant block each time.
 // Keying by sessionId lets the reconnect resume from the last seen event so only
 // genuinely-missed events are replayed.
+//
+// Never explicitly cleared per-session (a thread can go idle and come back), so
+// it's capped here — otherwise it grows by one entry per distinct session ever
+// visited for the life of the window.
 const sessionLastEventIds = new Map<string, string>()
+const MAX_TRACKED_SESSIONS = 50
+
+function rememberLastEventId(sessionId: string, id: string): void {
+  sessionLastEventIds.set(sessionId, id)
+  if (sessionLastEventIds.size <= MAX_TRACKED_SESSIONS) return
+  // Map iteration order is insertion order — the first key is the oldest.
+  const oldest = sessionLastEventIds.keys().next().value
+  if (oldest !== undefined && oldest !== sessionId) {
+    sessionLastEventIds.delete(oldest)
+  }
+}
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -316,17 +72,29 @@ export interface UseSessionStreamOptions {
   onMessageEnd?: () => void
   onIsLoadingChange?: (loading: boolean) => void
   onIsCompactingChange?: (compacting: boolean) => void
-  onCompactionReasonChange?: (reason: "manual" | "threshold" | "overflow" | null) => void
-  onPendingErrorChange?: (error: ReturnType<typeof createErrorMessage> | null) => void
+  onCompactionReasonChange?: (
+    reason: "manual" | "threshold" | "overflow" | null
+  ) => void
+  onPendingErrorChange?: (
+    error: ReturnType<typeof createErrorMessage> | null
+  ) => void
   onError?: () => void
   onToolExecutionEnd?: (toolName: string) => void
   onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
   /** Live count of messages waiting in the steering / follow-up queues. */
   onQueueUpdate?: (event: { steering: number; followUp: number }) => void
   /** A gated tool is paused awaiting the user's approval. */
-  onToolApprovalRequest?: (event: { toolCallId: string; toolName: string; input: Record<string, unknown>; scopeLabel: string }) => void
+  onToolApprovalRequest?: (event: {
+    toolCallId: string
+    toolName: string
+    input: Record<string, unknown>
+    scopeLabel: string
+  }) => void
   /** A pending approval was settled or cancelled. */
-  onToolApprovalResolved?: (event: { toolCallId: string; decision: "once" | "always" | "never" | "reject" }) => void
+  onToolApprovalResolved?: (event: {
+    toolCallId: string
+    decision: "once" | "always" | "never" | "reject"
+  }) => void
 }
 
 export function useSessionStream({
@@ -361,7 +129,9 @@ export function useSessionStream({
   // Updated synchronously on delta events; snapshotted into agent_end event.
   const turnMetaRef = useRef<TurnMeta | null>(null)
 
-  const lastPromptRef = useRef<{ text: string; thinkingLevel?: string } | null>(null)
+  const lastPromptRef = useRef<{ text: string; thinkingLevel?: string } | null>(
+    null
+  )
   const pendingThinkingLevelRef = useRef<string | null>(null)
 
   // True while an assistant turn is in progress (message_start → agent_end).
@@ -375,10 +145,49 @@ export function useSessionStream({
 
   // Always-current callbacks — stored in a ref so the queue processor (which
   // is stable across renders) always calls the latest versions.
-  const callbacksRef = useRef({ onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate, onToolApprovalRequest, onToolApprovalResolved })
+  const callbacksRef = useRef({
+    onMessageStart,
+    onIsLoadingChange,
+    onMessageEnd,
+    onIsCompactingChange,
+    onCompactionReasonChange,
+    onPendingErrorChange,
+    onError,
+    onToolExecutionEnd,
+    onPlanSaved,
+    onQueueUpdate,
+    onToolApprovalRequest,
+    onToolApprovalResolved,
+  })
   useEffect(() => {
-    callbacksRef.current = { onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate, onToolApprovalRequest, onToolApprovalResolved }
-  }, [onMessageStart, onIsLoadingChange, onMessageEnd, onIsCompactingChange, onCompactionReasonChange, onPendingErrorChange, onError, onToolExecutionEnd, onPlanSaved, onQueueUpdate, onToolApprovalRequest, onToolApprovalResolved])
+    callbacksRef.current = {
+      onMessageStart,
+      onIsLoadingChange,
+      onMessageEnd,
+      onIsCompactingChange,
+      onCompactionReasonChange,
+      onPendingErrorChange,
+      onError,
+      onToolExecutionEnd,
+      onPlanSaved,
+      onQueueUpdate,
+      onToolApprovalRequest,
+      onToolApprovalResolved,
+    }
+  }, [
+    onMessageStart,
+    onIsLoadingChange,
+    onMessageEnd,
+    onIsCompactingChange,
+    onCompactionReasonChange,
+    onPendingErrorChange,
+    onError,
+    onToolExecutionEnd,
+    onPlanSaved,
+    onQueueUpdate,
+    onToolApprovalRequest,
+    onToolApprovalResolved,
+  ])
 
   // ── Queue processor ───────────────────────────────────────────────────────
   //
@@ -400,13 +209,15 @@ export function useSessionStream({
     const sideEffects: Array<() => void> = []
 
     // ── 1. Pure state transitions ───────────────────────────────────────────
-    queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
-      updateLastPageMessages(prev, (msgs) => {
-        for (const event of events) {
-          msgs = applyQueuedEvent(msgs, event)
-        }
-        return msgs
-      })
+    queryClient.setQueryData<MessagesInfiniteData>(
+      messagesQueryKey(sessionId),
+      (prev) =>
+        updateLastPageMessages(prev, (msgs) => {
+          for (const event of events) {
+            msgs = applyQueuedEvent(msgs, event)
+          }
+          return msgs
+        })
     )
 
     // ── 2. Collect side-effects in event order ──────────────────────────────
@@ -435,8 +246,10 @@ export function useSessionStream({
           const hasError = event.agentMessages.some(
             (msg): boolean =>
               msg.role === "assistant" &&
-              (msg as Extract<AgentEndMessage, { role: "assistant" }>).stopReason === "error" &&
-              !!(msg as Extract<AgentEndMessage, { role: "assistant" }>).errorMessage
+              (msg as Extract<AgentEndMessage, { role: "assistant" }>)
+                .stopReason === "error" &&
+              !!(msg as Extract<AgentEndMessage, { role: "assistant" }>)
+                .errorMessage
           )
           sideEffects.push(() => {
             cb.onMessageEnd?.()
@@ -445,15 +258,23 @@ export function useSessionStream({
             // Don't invalidate the messages query — the WS stream just wrote
             // the canonical state into cache; refetching now races with the
             // server's async DB write and can briefly replay stale rows.
-            void queryClient.invalidateQueries({ queryKey: chatKeys.contextUsage(sessionId) })
-            void queryClient.invalidateQueries({ queryKey: chatKeys.sessionStats(sessionId) })
-            void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
+            void queryClient.invalidateQueries({
+              queryKey: chatKeys.contextUsage(sessionId),
+            })
+            void queryClient.invalidateQueries({
+              queryKey: chatKeys.sessionStats(sessionId),
+            })
+            void queryClient.invalidateQueries({
+              queryKey: gitKeys.turns(sessionId),
+            })
             // Skip per-file diffs (key[3] === "diff") — see use-chat-stream.ts comment.
             void queryClient.invalidateQueries({
               queryKey: gitKeys.session(sessionId),
               predicate: (query) => (query.queryKey as unknown[])[3] !== "diff",
             })
-            void queryClient.invalidateQueries({ queryKey: ["file-tree"] })
+            void queryClient.invalidateQueries({
+              queryKey: workspaceKeys.dirAll,
+            })
           })
           break
         }
@@ -478,7 +299,11 @@ export function useSessionStream({
                 createErrorMessage("Retry Failed", finalError, {
                   retryable: true,
                   action: lastPrompt
-                    ? { type: "retry", prompt: lastPrompt.text, thinkingLevel: lastPrompt.thinkingLevel }
+                    ? {
+                        type: "retry",
+                        prompt: lastPrompt.text,
+                        thinkingLevel: lastPrompt.thinkingLevel,
+                      }
                     : { type: "dismiss" },
                 })
               )
@@ -503,7 +328,9 @@ export function useSessionStream({
               cb.onIsCompactingChange?.(false)
               cb.onCompactionReasonChange?.(null)
               cb.onPendingErrorChange?.(
-                createErrorMessage("Compaction Failed", errorMessage, { action: { type: "dismiss" } })
+                createErrorMessage("Compaction Failed", errorMessage, {
+                  action: { type: "dismiss" },
+                })
               )
               cb.onError?.()
             })
@@ -512,8 +339,12 @@ export function useSessionStream({
               cb.onIsCompactingChange?.(false)
               cb.onCompactionReasonChange?.(null)
               cb.onPendingErrorChange?.(null)
-              void queryClient.invalidateQueries({ queryKey: chatKeys.contextUsage(sessionId) })
-              void queryClient.invalidateQueries({ queryKey: chatKeys.sessionStats(sessionId) })
+              void queryClient.invalidateQueries({
+                queryKey: chatKeys.contextUsage(sessionId),
+              })
+              void queryClient.invalidateQueries({
+                queryKey: chatKeys.sessionStats(sessionId),
+              })
             })
           }
           break
@@ -525,7 +356,11 @@ export function useSessionStream({
               createErrorMessage("Error", message, {
                 retryable: true,
                 action: lastPrompt
-                  ? { type: "retry", prompt: lastPrompt.text, thinkingLevel: lastPrompt.thinkingLevel }
+                  ? {
+                      type: "retry",
+                      prompt: lastPrompt.text,
+                      thinkingLevel: lastPrompt.thinkingLevel,
+                    }
                   : { type: "dismiss" },
               })
             )
@@ -544,14 +379,20 @@ export function useSessionStream({
                 "The connection to the server was lost. Please try again.",
                 {
                   action: lastPrompt
-                    ? { type: "retry", prompt: lastPrompt.text, thinkingLevel: lastPrompt.thinkingLevel }
+                    ? {
+                        type: "retry",
+                        prompt: lastPrompt.text,
+                        thinkingLevel: lastPrompt.thinkingLevel,
+                      }
                     : { type: "dismiss" },
                 }
               )
             )
             cb.onError?.()
             cb.onIsLoadingChange?.(false)
-            void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+            void queryClient.invalidateQueries({
+              queryKey: messagesQueryKey(sessionId),
+            })
           })
           break
         }
@@ -592,16 +433,22 @@ export function useSessionStream({
   }, [processQueue])
 
   // Enqueue an event and schedule a batched flush.
-  const enqueue = useCallback((event: QueuedEvent) => {
-    eventQueueRef.current.push(event)
-    scheduleFlush()
-  }, [scheduleFlush])
+  const enqueue = useCallback(
+    (event: QueuedEvent) => {
+      eventQueueRef.current.push(event)
+      scheduleFlush()
+    },
+    [scheduleFlush]
+  )
 
   // Enqueue an event and flush synchronously (no RAF delay).
-  const enqueueNow = useCallback((event: QueuedEvent) => {
-    eventQueueRef.current.push(event)
-    flushNow()
-  }, [flushNow])
+  const enqueueNow = useCallback(
+    (event: QueuedEvent) => {
+      eventQueueRef.current.push(event)
+      flushNow()
+    },
+    [flushNow]
+  )
 
   // ── Main WebSocket effect ─────────────────────────────────────────────────
 
@@ -638,7 +485,8 @@ export function useSessionStream({
       if (reconnectTimer !== null) return
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null
-        if (!doneFlag.current) connect(lastEventIdRef.current).catch(console.debug)
+        if (!doneFlag.current)
+          connect(lastEventIdRef.current).catch(console.debug)
       }, delay)
     }
 
@@ -708,229 +556,253 @@ export function useSessionStream({
       ws = socket
 
       unsubscribe = subscribeToSessionEvents(ws, {
-
-          onAgentStart: () => {
-            if (doneFlag.current) return
-            // Invalidate turns so the new in-progress turn shows up immediately
-            void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
-            void (async () => {
-              try {
-                const { runningTools: blocks } = await listRunningTools(sessionId)
-                if (blocks.length === 0 || doneFlag.current) return
-                const tools = blocks
-                  .map(blockToMessage)
-                  .filter((msg): msg is ToolMessage => msg.role === "tool" && msg.status === "running")
-                if (tools.length > 0 && !doneFlag.current) {
-                  enqueue({ kind: "agent_start", runningTools: tools })
-                }
-              } catch (e) {
-                console.warn("[session-stream] Failed to fetch running tools:", e)
+        onAgentStart: () => {
+          if (doneFlag.current) return
+          // Invalidate turns so the new in-progress turn shows up immediately
+          void queryClient.invalidateQueries({
+            queryKey: gitKeys.turns(sessionId),
+          })
+          void (async () => {
+            try {
+              const { runningTools: blocks } = await listRunningTools(sessionId)
+              if (blocks.length === 0 || doneFlag.current) return
+              const tools = blocks
+                .map(blockToMessage)
+                .filter(
+                  (msg): msg is ToolMessage =>
+                    msg.role === "tool" && msg.status === "running"
+                )
+              if (tools.length > 0 && !doneFlag.current) {
+                enqueue({ kind: "agent_start", runningTools: tools })
               }
-            })()
-          },
-
-          onMessageStart: (data) => {
-            if (doneFlag.current) return
-            if (data.message?.role !== "assistant") return
-            agentRunningRef.current = true
-            // Preserve thinkingLevel across multiple message_starts within one agent turn.
-            // pendingThinkingLevelRef is only populated for the first LLM call; subsequent
-            // calls (after tool results) must inherit the level set by the user.
-            const inheritedThinkingLevel = turnMetaRef.current?.thinkingLevel
-            turnMetaRef.current = {
-              startTime: Date.now(),
-              thinkingLevel: inheritedThinkingLevel ?? pendingThinkingLevelRef.current ?? undefined,
+            } catch (e) {
+              console.warn("[session-stream] Failed to fetch running tools:", e)
             }
-            pendingThinkingLevelRef.current = null
-            enqueue({ kind: "message_start" })
-          },
+          })()
+        },
 
-          onMessageUpdate: (data) => {
-            if (doneFlag.current) return
-            const event = data.assistantMessageEvent
-            if (
-              event == null ||
-              typeof event.delta !== "string" ||
-              (event.type !== "text_delta" && event.type !== "thinking_delta")
-            ) return
+        onMessageStart: (data) => {
+          if (doneFlag.current) return
+          if (data.message?.role !== "assistant") return
+          agentRunningRef.current = true
+          // Preserve thinkingLevel across multiple message_starts within one agent turn.
+          // pendingThinkingLevelRef is only populated for the first LLM call; subsequent
+          // calls (after tool results) must inherit the level set by the user.
+          const inheritedThinkingLevel = turnMetaRef.current?.thinkingLevel
+          turnMetaRef.current = {
+            startTime: Date.now(),
+            thinkingLevel:
+              inheritedThinkingLevel ??
+              pendingThinkingLevelRef.current ??
+              undefined,
+          }
+          pendingThinkingLevelRef.current = null
+          enqueue({ kind: "message_start" })
+        },
 
-            // Accumulate model/provider into turn meta (side-effect outside queue — only
-            // affects the agent_end snapshot, not rendered messages state).
-            if (turnMetaRef.current) {
-              if (!turnMetaRef.current.model && event.partial?.model)
-                turnMetaRef.current.model = event.partial.model
-              if (!turnMetaRef.current.provider && event.partial?.provider)
-                turnMetaRef.current.provider = event.partial.provider
-            }
+        onMessageUpdate: (data) => {
+          if (doneFlag.current) return
+          const event = data.assistantMessageEvent
+          if (
+            event == null ||
+            typeof event.delta !== "string" ||
+            (event.type !== "text_delta" && event.type !== "thinking_delta")
+          )
+            return
 
-            enqueue(
-              event.type === "thinking_delta"
-                ? { kind: "thinking_delta", delta: event.delta }
-                : { kind: "text_delta", delta: event.delta }
-            )
-          },
+          // Accumulate model/provider into turn meta (side-effect outside queue — only
+          // affects the agent_end snapshot, not rendered messages state).
+          if (turnMetaRef.current) {
+            if (!turnMetaRef.current.model && event.partial?.model)
+              turnMetaRef.current.model = event.partial.model
+            if (!turnMetaRef.current.provider && event.partial?.provider)
+              turnMetaRef.current.provider = event.partial.provider
+          }
 
-          onToolExecutionStart: (data) => {
-            if (doneFlag.current) return
-            const startTime = Date.now()
-            pendingToolStartRef.current.set(data.toolCallId, startTime)
-            enqueueNow({
-              kind: "tool_start",
-              toolCallId: data.toolCallId,
-              toolName: data.toolName,
-              args: data.args,
-              startTime,
-            })
-          },
+          enqueue(
+            event.type === "thinking_delta"
+              ? { kind: "thinking_delta", delta: event.delta }
+              : { kind: "text_delta", delta: event.delta }
+          )
+        },
 
-          onToolExecutionUpdate: (data) => {
-            if (doneFlag.current) return
-            enqueue({
-              kind: "tool_update",
-              toolCallId: data.toolCallId,
-              toolName: data.toolName,
-              args: data.args,
-              partialResult: data.partialResult,
-            })
-          },
+        onToolExecutionStart: (data) => {
+          if (doneFlag.current) return
+          const startTime = Date.now()
+          pendingToolStartRef.current.set(data.toolCallId, startTime)
+          enqueueNow({
+            kind: "tool_start",
+            toolCallId: data.toolCallId,
+            toolName: data.toolName,
+            args: data.args,
+            startTime,
+          })
+        },
 
-          onToolExecutionEnd: (data) => {
-            if (doneFlag.current) return
-            const startTime = pendingToolStartRef.current.get(data.toolCallId)
-            pendingToolStartRef.current.delete(data.toolCallId)
-            enqueue({
-              kind: "tool_end",
-              toolCallId: data.toolCallId,
-              toolName: data.toolName,
-              status: data.isError ? "error" : "done",
-              result: data.result,
-              duration: startTime ? Date.now() - startTime : undefined,
-            })
-          },
+        onToolExecutionUpdate: (data) => {
+          if (doneFlag.current) return
+          enqueue({
+            kind: "tool_update",
+            toolCallId: data.toolCallId,
+            toolName: data.toolName,
+            args: data.args,
+            partialResult: data.partialResult,
+          })
+        },
 
-          onAgentEnd: (data) => {
-            if (doneFlag.current) return
-            agentRunningRef.current = false
-            // Snapshot and clear turn meta before flushing so the agent_end
-            // event carries the final accumulated model/provider/timing.
-            const meta = turnMetaRef.current
-            turnMetaRef.current = null
-            // Use RAF-batched enqueue (not flushSync) — agent_end has no
-            // downstream race; the next startUserPrompt runs through the
-            // same queue, so ordering is preserved without forcing a
-            // synchronous commit that would block the main thread right
-            // when the assistant text is finishing its reveal.
-            enqueue({
-              kind: "agent_end",
-              agentMessages: data.messages ?? [],
-              meta,
-            })
-          },
+        onToolExecutionEnd: (data) => {
+          if (doneFlag.current) return
+          const startTime = pendingToolStartRef.current.get(data.toolCallId)
+          pendingToolStartRef.current.delete(data.toolCallId)
+          enqueue({
+            kind: "tool_end",
+            toolCallId: data.toolCallId,
+            toolName: data.toolName,
+            status: data.isError ? "error" : "done",
+            result: data.result,
+            duration: startTime ? Date.now() - startTime : undefined,
+          })
+        },
 
-          onTurnFileChanged: () => {
-            if (doneFlag.current) return
-            // Skip if a fetch is already in-flight — the response will reflect the latest state.
-            if (queryClient.getQueryState(gitKeys.turns(sessionId))?.fetchStatus === "fetching") return
-            void queryClient.invalidateQueries({ queryKey: gitKeys.turns(sessionId) })
-            void queryClient.invalidateQueries({ queryKey: gitKeys.status(sessionId) })
-            void queryClient.invalidateQueries({ queryKey: gitKeys.diffStat(sessionId) })
-          },
+        onAgentEnd: (data) => {
+          if (doneFlag.current) return
+          agentRunningRef.current = false
+          // Snapshot and clear turn meta before flushing so the agent_end
+          // event carries the final accumulated model/provider/timing.
+          const meta = turnMetaRef.current
+          turnMetaRef.current = null
+          // Use RAF-batched enqueue (not flushSync) — agent_end has no
+          // downstream race; the next startUserPrompt runs through the
+          // same queue, so ordering is preserved without forcing a
+          // synchronous commit that would block the main thread right
+          // when the assistant text is finishing its reveal.
+          enqueue({
+            kind: "agent_end",
+            agentMessages: data.messages ?? [],
+            meta,
+          })
+        },
 
-          onPlanSaved: (data) => {
-            if (doneFlag.current) return
-            callbacksRef.current.onPlanSaved?.(data)
-          },
+        onTurnFileChanged: () => {
+          if (doneFlag.current) return
+          // Skip if a fetch is already in-flight — the response will reflect the latest state.
+          if (
+            queryClient.getQueryState(gitKeys.turns(sessionId))?.fetchStatus ===
+            "fetching"
+          )
+            return
+          void queryClient.invalidateQueries({
+            queryKey: gitKeys.turns(sessionId),
+          })
+          void queryClient.invalidateQueries({
+            queryKey: gitKeys.status(sessionId),
+          })
+          void queryClient.invalidateQueries({
+            queryKey: gitKeys.diffStat(sessionId),
+          })
+        },
 
-          onMessageEnd: () => {},
-          onTurnStart: () => {},
-          onTurnEnd: () => {},
-          onQueueUpdate: (data) => {
-            if (doneFlag.current) return
-            callbacksRef.current.onQueueUpdate?.({
-              steering: data.steering.length,
-              followUp: data.followUp.length,
-            })
-          },
+        onPlanSaved: (data) => {
+          if (doneFlag.current) return
+          callbacksRef.current.onPlanSaved?.(data)
+        },
 
-          onToolApprovalRequest: (data) => {
-            if (doneFlag.current) return
-            callbacksRef.current.onToolApprovalRequest?.(data)
-          },
+        onMessageEnd: () => {},
+        onTurnStart: () => {},
+        onTurnEnd: () => {},
+        onQueueUpdate: (data) => {
+          if (doneFlag.current) return
+          callbacksRef.current.onQueueUpdate?.({
+            steering: data.steering.length,
+            followUp: data.followUp.length,
+          })
+        },
 
-          onToolApprovalResolved: (data) => {
-            if (doneFlag.current) return
-            callbacksRef.current.onToolApprovalResolved?.(data)
-          },
+        onToolApprovalRequest: (data) => {
+          if (doneFlag.current) return
+          callbacksRef.current.onToolApprovalRequest?.(data)
+        },
 
-          onAutoRetryStart: ({ attempt, errorMessage }) => {
-            if (doneFlag.current) return
-            enqueue({ kind: "auto_retry_start", attempt, errorMessage })
-          },
+        onToolApprovalResolved: (data) => {
+          if (doneFlag.current) return
+          callbacksRef.current.onToolApprovalResolved?.(data)
+        },
 
-          onAutoRetryEnd: ({ success, finalError }) => {
-            if (doneFlag.current) return
-            enqueue({
-              kind: "auto_retry_end",
-              success,
-              finalError,
-              lastPrompt: lastPromptRef.current,
-            })
-          },
+        onAutoRetryStart: ({ attempt, errorMessage }) => {
+          if (doneFlag.current) return
+          enqueue({ kind: "auto_retry_start", attempt, errorMessage })
+        },
 
-          onCompactionStart: ({ reason }) => {
-            if (doneFlag.current) return
-            enqueue({ kind: "compaction_start", reason })
-          },
+        onAutoRetryEnd: ({ success, finalError }) => {
+          if (doneFlag.current) return
+          enqueue({
+            kind: "auto_retry_end",
+            success,
+            finalError,
+            lastPrompt: lastPromptRef.current,
+          })
+        },
 
-          onCompactionEnd: ({ reason, errorMessage, aborted, willRetry }) => {
-            if (doneFlag.current) return
-            enqueue({ kind: "compaction_end", reason, errorMessage, aborted, willRetry })
-          },
+        onCompactionStart: ({ reason }) => {
+          if (doneFlag.current) return
+          enqueue({ kind: "compaction_start", reason })
+        },
 
-          onServerError: ({ message }) => {
-            if (doneFlag.current) return
-            doneFlag.current = true
-            enqueueNow({
-              kind: "server_error",
-              message,
-              lastPrompt: lastPromptRef.current,
-            })
-          },
+        onCompactionEnd: ({ reason, errorMessage, aborted, willRetry }) => {
+          if (doneFlag.current) return
+          enqueue({
+            kind: "compaction_end",
+            reason,
+            errorMessage,
+            aborted,
+            willRetry,
+          })
+        },
 
-          onEventId: (id: string) => {
-            lastEventIdRef.current = id
-            // Persist across hook re-mounts so returning to a running thread
-            // resumes the stream instead of replaying the whole turn.
-            sessionLastEventIds.set(sessionId, id)
-            // Reset the counters whenever a server event is received — consecutive
-            // failures is what we care about, not lifetime reconnects.
-            reconnectAttempts = 0
-            slowReconnectAttempts = 0
-          },
+        onServerError: ({ message }) => {
+          if (doneFlag.current) return
+          doneFlag.current = true
+          enqueueNow({
+            kind: "server_error",
+            message,
+            lastPrompt: lastPromptRef.current,
+          })
+        },
 
-          onTransportError: () => {
-            if (doneFlag.current) return
-            if (!agentRunningRef.current) {
-              // Connection dropped while idle (e.g. laptop sleep/wake).
-              // Silently reconnect without surfacing an error to the user.
-              teardownSocket()
-              scheduleReconnect(2000)
-              return
-            }
-            // Agent is running — attempt transparent reconnect using lastEventId
-            // so the stream resumes from where it dropped. After the fast
-            // attempts are exhausted, defer to the status-aware retry instead of
-            // immediately declaring the turn lost (see handleReconnectExhausted).
+        onEventId: (id: string) => {
+          lastEventIdRef.current = id
+          // Persist across hook re-mounts so returning to a running thread
+          // resumes the stream instead of replaying the whole turn.
+          rememberLastEventId(sessionId, id)
+          // Reset the counters whenever a server event is received — consecutive
+          // failures is what we care about, not lifetime reconnects.
+          reconnectAttempts = 0
+          slowReconnectAttempts = 0
+        },
+
+        onTransportError: () => {
+          if (doneFlag.current) return
+          if (!agentRunningRef.current) {
+            // Connection dropped while idle (e.g. laptop sleep/wake).
+            // Silently reconnect without surfacing an error to the user.
             teardownSocket()
-            if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-              void handleReconnectExhausted()
-              return
-            }
-            const delay = Math.min(500 * Math.pow(2, reconnectAttempts), 8000)
-            reconnectAttempts++
-            scheduleReconnect(delay)
-          },
-        })
+            scheduleReconnect(2000)
+            return
+          }
+          // Agent is running — attempt transparent reconnect using lastEventId
+          // so the stream resumes from where it dropped. After the fast
+          // attempts are exhausted, defer to the status-aware retry instead of
+          // immediately declaring the turn lost (see handleReconnectExhausted).
+          teardownSocket()
+          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            void handleReconnectExhausted()
+            return
+          }
+          const delay = Math.min(500 * Math.pow(2, reconnectAttempts), 8000)
+          reconnectAttempts++
+          scheduleReconnect(delay)
+        },
+      })
     }
 
     connect(lastEventIdRef.current).catch((err) => {
@@ -942,11 +814,16 @@ export function useSessionStream({
 
     const handleVisibilityChange = () => {
       if (document.hidden || doneFlag.current) return
-      if (!ws || (ws.readyState !== WebSocket.CONNECTING && ws.readyState !== WebSocket.OPEN)) {
+      if (
+        !ws ||
+        (ws.readyState !== WebSocket.CONNECTING &&
+          ws.readyState !== WebSocket.OPEN)
+      ) {
         teardownSocket()
         reconnectAttempts = 0
         slowReconnectAttempts = 0
-        if (reconnectTimer === null) connect(lastEventIdRef.current).catch(console.debug)
+        if (reconnectTimer === null)
+          connect(lastEventIdRef.current).catch(console.debug)
       }
     }
     document.addEventListener("visibilitychange", handleVisibilityChange)

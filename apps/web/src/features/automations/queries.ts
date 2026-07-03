@@ -10,7 +10,16 @@ import {
 import type { Automation, AutomationInput } from "./types"
 
 const automationsKey = ["automations"] as const
-const runsKey = (id: string) => ["automation-runs", id] as const
+const runsRootKey = ["automation-runs"] as const
+const runsKey = (id: string) => [...runsRootKey, id] as const
+
+export const automationKeys = {
+  all: automationsKey,
+  runs: runsKey,
+  // Matches every automation's run-history query — for a broad "something
+  // about some automation's runs changed" invalidation.
+  runsAll: runsRootKey,
+}
 
 export function useAllAutomations() {
   return useQuery({
@@ -20,7 +29,7 @@ export function useAllAutomations() {
     // Poll while any automation is running so the row settles to ok/error.
     refetchInterval: (query) =>
       (query.state.data as Automation[] | undefined)?.some(
-        (a) => a.lastStatus === "running",
+        (a) => a.lastStatus === "running"
       )
         ? 3000
         : false,
@@ -44,8 +53,13 @@ export function useCreateAutomation() {
 export function useUpdateAutomation() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<AutomationInput> }) =>
-      updateAutomation(id, updates),
+    mutationFn: ({
+      id,
+      updates,
+    }: {
+      id: string
+      updates: Partial<AutomationInput>
+    }) => updateAutomation(id, updates),
     onSuccess: () => qc.invalidateQueries({ queryKey: automationsKey }),
   })
 }

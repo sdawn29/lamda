@@ -18,6 +18,7 @@ Content-Type: application/json
 ```
 
 **Response** `201 Created`:
+
 ```json
 {
   "sessionId": "abc123"
@@ -41,6 +42,7 @@ Content-Type: application/json
 ```
 
 **Response** `202 Accepted` (fire-and-forget):
+
 ```json
 {
   "accepted": true
@@ -58,6 +60,7 @@ GET /session/:id/status
 ```
 
 **Response**:
+
 ```json
 {
   "status": "idle"
@@ -75,6 +78,7 @@ POST /session/:id/abort
 ```
 
 **Response** `200 OK`:
+
 ```json
 {
   "aborted": true
@@ -92,6 +96,7 @@ POST /session/:id/dismiss-error
 Clears the current error state without aborting the session.
 
 **Response** `200 OK`:
+
 ```json
 {
   "ok": true
@@ -136,16 +141,16 @@ Session events are streamed via WebSocket. Connect to the server's WebSocket end
 
 **Event Types:**
 
-| Event | Data | Description |
-|-------|------|-------------|
-| `agent_start` | `{ threadId }` | Agent started processing |
-| `message_delta` | `{ text, messageId }` | Streaming text delta |
-| `tool_execute` | `{ toolCallId, name, args }` | Tool execution started |
-| `tool_result` | `{ toolCallId, result, durationMs }` | Tool execution completed |
-| `thinking_block` | `{ thinking, messageId }` | Thinking output |
-| `context_usage` | `{ usage }` | Context window stats |
-| `agent_end` | `{ messageId, compact }` | Agent finished |
-| `error` | `{ message }` | Error occurred |
+| Event            | Data                                 | Description              |
+| ---------------- | ------------------------------------ | ------------------------ |
+| `agent_start`    | `{ threadId }`                       | Agent started processing |
+| `message_delta`  | `{ text, messageId }`                | Streaming text delta     |
+| `tool_execute`   | `{ toolCallId, name, args }`         | Tool execution started   |
+| `tool_result`    | `{ toolCallId, result, durationMs }` | Tool execution completed |
+| `thinking_block` | `{ thinking, messageId }`            | Thinking output          |
+| `context_usage`  | `{ usage }`                          | Context window stats     |
+| `agent_end`      | `{ messageId, compact }`             | Agent finished           |
+| `error`          | `{ message }`                        | Error occurred           |
 
 ---
 
@@ -156,6 +161,7 @@ GET /session/:id/commands
 ```
 
 **Response**:
+
 ```json
 {
   "commands": [
@@ -174,6 +180,7 @@ GET /session/:id/thinking-levels
 ```
 
 **Response**:
+
 ```json
 {
   "levels": ["off", "minimal", "low", "medium", "high", "xhigh"]
@@ -189,6 +196,7 @@ GET /session/:id/context-usage
 ```
 
 **Response**:
+
 ```json
 {
   "contextUsage": {
@@ -208,6 +216,7 @@ GET /session/:id/stats
 ```
 
 **Response**:
+
 ```json
 {
   "stats": {
@@ -229,6 +238,7 @@ POST /session/:id/compact
 ```
 
 **Response** `200 OK`:
+
 ```json
 {
   "ok": true
@@ -244,6 +254,7 @@ GET /session/:id/messages
 ```
 
 **Response**:
+
 ```json
 {
   "blocks": [
@@ -275,11 +286,20 @@ GET /session/:id/workspace-files
 Returns the indexed file list for the session's workspace.
 
 **Response**:
+
 ```json
 {
   "files": [
-    { "relativePath": "src/index.ts", "name": "index.ts", "isDirectory": false },
-    { "relativePath": "src/components", "name": "components", "isDirectory": true }
+    {
+      "relativePath": "src/index.ts",
+      "name": "index.ts",
+      "isDirectory": false
+    },
+    {
+      "relativePath": "src/components",
+      "name": "components",
+      "isDirectory": true
+    }
   ]
 }
 ```
@@ -300,6 +320,7 @@ Content-Type: application/json
 Truncates the thread history at the given message block and restores the git working tree to the checkpoint recorded at that agent turn.
 
 **Response** `200 OK`:
+
 ```json
 {
   "ok": true
@@ -322,6 +343,7 @@ Content-Type: application/json
 Creates a new thread by copying messages up to the given block, restores the git state to that checkpoint, and returns the new thread and session IDs.
 
 **Response** `200 OK`:
+
 ```json
 {
   "threadId": "thread-xyz",
@@ -352,10 +374,16 @@ GET /tasks/:workspaceId
 ```
 
 **Response**:
+
 ```json
 {
   "tasks": [
-    { "id": "task1", "icon": "🧪", "command": "npm test", "createdAt": 1716000000 }
+    {
+      "id": "task1",
+      "icon": "🧪",
+      "command": "npm test",
+      "createdAt": 1716000000
+    }
   ]
 }
 ```
@@ -375,9 +403,15 @@ Content-Type: application/json
 ```
 
 **Response** `201 Created`:
+
 ```json
 {
-  "task": { "id": "task1", "icon": "🧪", "command": "npm test", "createdAt": 1716000000 }
+  "task": {
+    "id": "task1",
+    "icon": "🧪",
+    "command": "npm test",
+    "createdAt": 1716000000
+  }
 }
 ```
 
@@ -396,6 +430,7 @@ Content-Type: application/json
 ```
 
 **Response**:
+
 ```json
 { "success": true }
 ```
@@ -409,6 +444,7 @@ DELETE /tasks/:workspaceId/:id
 ```
 
 **Response**:
+
 ```json
 { "success": true }
 ```
@@ -424,6 +460,7 @@ GET /workspaces
 ```
 
 **Response**:
+
 ```json
 {
   "workspaces": [
@@ -452,6 +489,7 @@ Content-Type: application/json
 ```
 
 **Response** `201 Created`:
+
 ```json
 {
   "workspace": {
@@ -587,6 +625,7 @@ GET /session/:id/branch
 ```
 
 **Response**:
+
 ```json
 {
   "branch": "main"
@@ -602,6 +641,7 @@ GET /session/:id/branches
 ```
 
 **Response**:
+
 ```json
 {
   "branches": ["main", "feature/login", "hotfix/payment"]
@@ -651,6 +691,7 @@ GET /session/:id/git/status
 ```
 
 **Response**:
+
 ```json
 {
   "raw": "M  file1.ts\n?? file2.ts"
@@ -666,11 +707,10 @@ GET /session/:id/git/diff-stat
 ```
 
 **Response**:
+
 ```json
 {
-  "files": [
-    { "path": "src/index.ts", "additions": 10, "deletions": 5 }
-  ],
+  "files": [{ "path": "src/index.ts", "additions": 10, "deletions": 5 }],
   "totalAdditions": 10,
   "totalDeletions": 5
 }
@@ -685,6 +725,7 @@ GET /session/:id/git/diff?file=src/index.ts&status=M
 ```
 
 **Response**:
+
 ```json
 {
   "diff": "--- a/src/index.ts\n+++ b/src/index.ts\n@@ -1,5 +1,6 @@\n..."
@@ -859,6 +900,7 @@ Content-Type: application/json
 Connect via WebSocket to `/ws/workspace/:workspaceId/lsp`.
 
 **Client → Server:**
+
 ```json
 { "kind": "open",    "id": 1, "filePath": "src/index.ts", "content": "..." }
 { "kind": "close",   "id": 2, "filePath": "src/index.ts" }
@@ -866,6 +908,7 @@ Connect via WebSocket to `/ws/workspace/:workspaceId/lsp`.
 ```
 
 **Server → Client:**
+
 ```json
 { "kind": "response",    "id": 3, "result": {...} }
 { "kind": "diagnostics", "filePath": "src/index.ts", "diagnostics": [...] }
@@ -880,6 +923,7 @@ Diagnostics are pushed for all open documents whenever the language server repor
 Connect via WebSocket to `/terminal`:
 
 **Client → Server:**
+
 ```json
 { "type": "input", "data": "ls -la\n" }
 { "type": "resize", "cols": 80, "rows": 24 }
@@ -887,6 +931,7 @@ Connect via WebSocket to `/terminal`:
 ```
 
 **Server → Client:**
+
 ```json
 { "type": "output", "data": "total 32\ndrwxr-xr-x  9 user  staff  288 Apr 28 10:00 .\n" }
 { "type": "exit", "code": 0 }
@@ -903,6 +948,7 @@ GET /settings
 ```
 
 **Response**:
+
 ```json
 {
   "settings": { "theme": "catppuccin", "...": "..." }
@@ -936,10 +982,10 @@ GET /usage?from=2026-06-01&to=2026-06-12
 
 Aggregated AI token and cost usage. Filters are mutually exclusive (`from`/`to` win over `days`):
 
-| Query Param | Description |
-|-------------|-------------|
+| Query Param   | Description                                                                 |
+| ------------- | --------------------------------------------------------------------------- |
 | `from` / `to` | Inclusive `YYYY-MM-DD` date range (local time); either bound may be omitted |
-| `days` | Last N days; omit or pass `0` for all-time |
+| `days`        | Last N days; omit or pass `0` for all-time                                  |
 
 ---
 
@@ -1002,6 +1048,7 @@ GET /health
 ```
 
 **Response**:
+
 ```json
 {
   "status": "ok",
@@ -1022,6 +1069,7 @@ All endpoints return errors in this format:
 ```
 
 With appropriate HTTP status codes:
+
 - `400` — Bad request (missing required fields)
 - `404` — Resource not found
 - `500` — Internal server error

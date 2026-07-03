@@ -70,7 +70,7 @@ export function useRepoInfo(ctx: RepoContext, enabled = true) {
 export function usePullRequests(
   ctx: RepoContext,
   state: PrState = "open",
-  enabled = true,
+  enabled = true
 ) {
   return useQuery({
     queryKey: githubKeys.prs(ctx, state),
@@ -93,7 +93,7 @@ export function useIssues(
   ctx: RepoContext,
   state: IssueState = "open",
   search?: string,
-  enabled = true,
+  enabled = true
 ) {
   return useQuery({
     queryKey: githubKeys.issues(ctx, state, search),
@@ -115,7 +115,7 @@ export function useIssue(ctx: RepoContext, number: number | null) {
 export function useChecks(
   ctx: RepoContext,
   opts: { pr?: number; ref?: string } = {},
-  enabled = true,
+  enabled = true
 ) {
   return useQuery({
     queryKey: githubKeys.checks(ctx, opts.ref, opts.pr),

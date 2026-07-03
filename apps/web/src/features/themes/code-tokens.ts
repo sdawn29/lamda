@@ -75,7 +75,10 @@ export function defaultCodePalette(mode: ResolvedMode): CodePalette {
 
 /** The default Fleet code palettes for both modes. */
 export function defaultCodePaletteSet(): CodePaletteSet {
-  return { light: defaultCodePalette("light"), dark: defaultCodePalette("dark") }
+  return {
+    light: defaultCodePalette("light"),
+    dark: defaultCodePalette("dark"),
+  }
 }
 
 /** Resolve a theme's code palette for a mode, falling back to Fleet defaults. */

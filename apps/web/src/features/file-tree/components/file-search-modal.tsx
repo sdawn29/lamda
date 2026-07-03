@@ -1,4 +1,10 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react"
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
 import { Loader2 } from "lucide-react"
 import {
   CommandDialog,
@@ -29,7 +35,9 @@ export function FileSearchModal({
 }: FileSearchModalProps) {
   const { data: workspaces = [] } = useWorkspaces()
   const { data: entries = [], isLoading } = useWorkspaceIndex(workspaceId)
-  const [ignoredFolderPrefixes, setIgnoredFolderPrefixes] = useState<string[]>([])
+  const [ignoredFolderPrefixes, setIgnoredFolderPrefixes] = useState<string[]>(
+    []
+  )
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
 
@@ -135,7 +143,9 @@ export function FileSearchModal({
               Indexing workspace
             </div>
           )}
-          {!isLoading && filteredFiles.length === 0 && <CommandEmpty>No files found.</CommandEmpty>}
+          {!isLoading && filteredFiles.length === 0 && (
+            <CommandEmpty>No files found.</CommandEmpty>
+          )}
           {!isLoading && filteredFiles.length > 0 && (
             <CommandGroup>
               {filteredFiles.map((file) => {

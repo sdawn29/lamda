@@ -176,7 +176,10 @@ function WorkspaceIcon({
     }
   }
   const luminance = useIconLuminance(src)
-  if (!src) return <FallbackIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
+  if (!src)
+    return (
+      <FallbackIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
+    )
   // Icons whose brightness is close to the sidebar background (black logo on a
   // dark theme, white logo on a light theme) get a contrasting backdrop chip.
   const needsBackdrop =
@@ -188,7 +191,10 @@ function WorkspaceIcon({
       alt=""
       className={cn(
         "size-3.5 shrink-0 rounded-[2px] object-contain",
-        needsBackdrop && (resolvedTheme === "dark" ? "bg-white/90 p-px" : "bg-zinc-800/90 p-px")
+        needsBackdrop &&
+          (resolvedTheme === "dark"
+            ? "bg-white/90 p-px"
+            : "bg-zinc-800/90 p-px")
       )}
       onError={(e) => {
         // Fallback: hide the broken image — the parent text label is still visible.
@@ -252,7 +258,15 @@ const ThreadRow = memo(function ThreadRow({
       <SidebarMenuSubItem
         ref={rowRef}
         className="group/thread"
-        style={isForked ? { marginLeft: `${depth * 12}px`, borderLeft: "1px solid hsl(var(--border) / 0.4)", paddingLeft: "4px" } : undefined}
+        style={
+          isForked
+            ? {
+                marginLeft: `${depth * 12}px`,
+                borderLeft: "1px solid hsl(var(--border) / 0.4)",
+                paddingLeft: "4px",
+              }
+            : undefined
+        }
       >
         <SidebarMenuSubButton isActive={isActive} onClick={onClick}>
           <span className="flex h-4 w-4 shrink-0 items-center justify-center">
@@ -336,7 +350,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ onResizeStart }: AppSidebarProps) {
-  const { workspaces, deleteWorkspace, pinWorkspace, unpinWorkspace } = useWorkspace()
+  const { workspaces, deleteWorkspace, pinWorkspace, unpinWorkspace } =
+    useWorkspace()
   const { handleCreateLocal, handleCreateRemote } = useCreateWorkspaceAction()
   const openPathMutation = useOpenPath()
   const openWithAppMutation = useOpenWorkspaceWithApp()
@@ -355,8 +370,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
   const envWorkspaceId = useEnvDialog((s) => s.workspaceId)
   const openEnvDialog = useEnvDialog((s) => s.openEnvDialog)
   const closeEnvDialog = useEnvDialog((s) => s.closeEnvDialog)
-  const envWorkspace =
-    workspaces.find((ws) => ws.id === envWorkspaceId) ?? null
+  const envWorkspace = workspaces.find((ws) => ws.id === envWorkspaceId) ?? null
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const navigate = useNavigate()
@@ -411,7 +425,9 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
 
   const newWorkspaceBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_WORKSPACE)
   const newThreadBinding = useShortcutBinding(SHORTCUT_ACTIONS.NEW_THREAD)
-  const openPaletteBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_COMMAND_PALETTE)
+  const openPaletteBinding = useShortcutBinding(
+    SHORTCUT_ACTIONS.OPEN_COMMAND_PALETTE
+  )
   const openSettingsBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_SETTINGS)
 
   // Collect all pinned threads across all workspaces, excluding pending ones
@@ -435,7 +451,11 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
         onClick={() => toggleWorkspaceCollapsed(ws.id)}
         tooltip={ws.name}
       >
-        <WorkspaceIcon workspaceId={ws.id} icon={ws.icon ?? null} isCollapsed={!!collapsed[ws.id]} />
+        <WorkspaceIcon
+          workspaceId={ws.id}
+          icon={ws.icon ?? null}
+          isCollapsed={!!collapsed[ws.id]}
+        />
         <span className="text-foreground/80">{ws.name}</span>
       </SidebarMenuButton>
 
@@ -450,9 +470,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
           <span className="sr-only">Workspace options</span>
         </SidebarMenuAction>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={() => openPathMutation.mutate(ws.path)}
-          >
+          <DropdownMenuItem onClick={() => openPathMutation.mutate(ws.path)}>
             <FolderOpen className="mr-2 h-4 w-4" />
             Find in Finder
           </DropdownMenuItem>
@@ -523,11 +541,14 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
         </TooltipContent>
       </Tooltip>
 
-      {!collapsed[ws.id] && (
-        ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id)).length > 0 ? (
+      {!collapsed[ws.id] &&
+        (ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id))
+          .length > 0 ? (
           <SidebarMenuSub className="animate-in duration-150 fade-in-0 slide-in-from-top-1">
             {(() => {
-              const visibleThreads = ws.threads.filter((t) => !t.isPinned && !pendingThreadIds.has(t.id))
+              const visibleThreads = ws.threads.filter(
+                (t) => !t.isPinned && !pendingThreadIds.has(t.id)
+              )
               const visibleIds = new Set(visibleThreads.map((t) => t.id))
               const childrenMap = new Map<string, Thread[]>()
               const rootThreads: Thread[] = []
@@ -541,8 +562,13 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
                 }
               }
               rootThreads.sort((a, b) => b.updatedAt - a.updatedAt)
-              const renderThread = (thread: Thread, depth: number): React.ReactNode[] => {
-                const children = (childrenMap.get(thread.id) ?? []).slice().sort((a, b) => b.updatedAt - a.updatedAt)
+              const renderThread = (
+                thread: Thread,
+                depth: number
+              ): React.ReactNode[] => {
+                const children = (childrenMap.get(thread.id) ?? [])
+                  .slice()
+                  .sort((a, b) => b.updatedAt - a.updatedAt)
                 return [
                   <ThreadRow
                     key={thread.id}
@@ -557,7 +583,9 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
                       })
                     }}
                   />,
-                  ...children.flatMap((child) => renderThread(child, depth + 1)),
+                  ...children.flatMap((child) =>
+                    renderThread(child, depth + 1)
+                  ),
                 ]
               }
               const flattened = rootThreads.flatMap((thread) =>
@@ -593,13 +621,12 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
             })()}
           </SidebarMenuSub>
         ) : (
-          <div className="animate-in mx-2 my-1 rounded-md px-2 py-1.5 text-center duration-150 fade-in-0 slide-in-from-top-1">
+          <div className="mx-2 my-1 animate-in rounded-md px-2 py-1.5 text-center duration-150 fade-in-0 slide-in-from-top-1">
             <span className="text-2xs text-muted-foreground/60">
               No threads
             </span>
           </div>
-        )
-      )}
+        ))}
     </SidebarMenuItem>
   )
 
@@ -834,7 +861,9 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
         <WorkspaceEnvDialog
           workspace={envWorkspace}
           open={!!envWorkspace}
-          onOpenChange={(open) => { if (!open) closeEnvDialog() }}
+          onOpenChange={(open) => {
+            if (!open) closeEnvDialog()
+          }}
         />
       )}
       {onResizeStart && (

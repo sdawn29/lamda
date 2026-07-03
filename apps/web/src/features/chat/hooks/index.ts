@@ -1,7 +1,11 @@
 export { useDropdownScroll } from "./use-dropdown-scroll"
 export { useSessionStream } from "./use-session-stream"
 export { useVisibleMessages } from "./use-visible-messages"
-export { useScrollMeta, useSessionErrors, usePendingError } from "./use-scroll-meta"
+export {
+  useScrollMeta,
+  useSessionErrors,
+  usePendingError,
+} from "./use-scroll-meta"
 export { usePrefetchThreadsMessages } from "./use-prefetch-messages"
 export { useFileChangeInvalidation } from "./use-file-change-invalidation"
 export { useThreadNotifications } from "./use-thread-notifications"

@@ -57,6 +57,7 @@ The settings module provides user-facing configuration UI for AI provider select
 ### Contexts
 
 - **`context.tsx`** — SettingsModal state management
+
   ```typescript
   interface SettingsModalValue {
     isOpen: boolean
@@ -108,17 +109,17 @@ export type { ConfigureProviderTab } from "./configure-provider-context"
 
 ### Supported Providers
 
-| Provider | API Key Env | Base URL |
-|----------|-------------|----------|
-| Anthropic | `ANTHROPIC_API_KEY` | `https://api.anthropic.com` |
-| OpenAI | `OPENAI_API_KEY` | `https://api.openai.com` |
-| Google Gemini | `GOOGLE_API_KEY` | `https://generativelanguage.googleapis.com` |
-| DeepSeek | `DEEPSEEK_API_KEY` | `https://api.deepseek.com` |
-| OpenRouter | `OPENROUTER_API_KEY` | `https://openrouter.ai` |
-| Ollama | (local) | `http://localhost:11434` |
-| Groq | `GROQ_API_KEY` | `https://api.groq.com` |
-| Mistral | `MISTRAL_API_KEY` | `https://api.mistral.ai` |
-| Perplexity | `PERPLEXITY_API_KEY` | `https://api.perplexity.ai` |
+| Provider      | API Key Env          | Base URL                                    |
+| ------------- | -------------------- | ------------------------------------------- |
+| Anthropic     | `ANTHROPIC_API_KEY`  | `https://api.anthropic.com`                 |
+| OpenAI        | `OPENAI_API_KEY`     | `https://api.openai.com`                    |
+| Google Gemini | `GOOGLE_API_KEY`     | `https://generativelanguage.googleapis.com` |
+| DeepSeek      | `DEEPSEEK_API_KEY`   | `https://api.deepseek.com`                  |
+| OpenRouter    | `OPENROUTER_API_KEY` | `https://openrouter.ai`                     |
+| Ollama        | (local)              | `http://localhost:11434`                    |
+| Groq          | `GROQ_API_KEY`       | `https://api.groq.com`                      |
+| Mistral       | `MISTRAL_API_KEY`    | `https://api.mistral.ai`                    |
+| Perplexity    | `PERPLEXITY_API_KEY` | `https://api.perplexity.ai`                 |
 
 ### Local Models (custom providers)
 

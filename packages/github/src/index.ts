@@ -2,6 +2,11 @@ import { execFile } from "node:child_process";
 import { basename } from "node:path";
 import { promisify } from "node:util";
 import { createCliEnv } from "@lamda/cli-env";
+import {
+  createCliRunner,
+  assertNotOption,
+  assertPositiveInt,
+} from "@lamda/cli-runner";
 
 const execFileAsync = promisify(execFile);
 
@@ -11,88 +16,26 @@ const execFileAsync = promisify(execFile);
  */
 const DEFAULT_TIMEOUT = 20000;
 
+const ghRunner = createCliRunner({
+  binary: "gh",
+  env: { GH_PROMPT_DISABLED: "1", GH_NO_UPDATE_NOTIFIER: "1" },
+  defaultTimeoutMs: DEFAULT_TIMEOUT,
+  errorName: "GhError",
+});
+
 /**
  * Raised when a `gh` command exits non-zero for a reason the caller should
  * surface (e.g. failed PR creation). "Expected" failures — gh missing, not a
  * repo, not authenticated — are handled by returning null/empty instead.
  */
-export class GhError extends Error {
-  constructor(
-    message: string,
-    readonly stderr: string,
-  ) {
-    super(message);
-    this.name = "GhError";
-  }
-}
-
-/**
- * Rejects values that `gh` would interpret as an option flag. Every call uses
- * execFile (no shell), but a leading-dash argument can still be parsed by gh as
- * an option (argument injection), e.g. a branch named `--upload-pack=...`.
- */
-function assertNotOption(value: string, label: string): void {
-  if (value.startsWith("-")) {
-    throw new Error(`Invalid ${label}: must not start with '-'`);
-  }
-}
-
-function assertPositiveInt(value: number, label: string): void {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`Invalid ${label}: must be a positive integer`);
-  }
-}
-
-interface GhRunResult {
-  stdout: string;
-  stderr: string;
-}
-
-function isExecError(
-  err: unknown,
-): err is { stdout?: string; stderr?: string; code?: number } {
-  return typeof err === "object" && err !== null;
-}
+export const GhError = ghRunner.CliError;
 
 /**
  * Runs `gh` and returns stdout/stderr. Throws GhError on non-zero exit. Callers
  * that treat failure as a soft "no" (status/list) should catch and degrade.
  */
-async function runGh(
-  args: string[],
-  cwd: string,
-  timeout = DEFAULT_TIMEOUT,
-): Promise<GhRunResult> {
-  try {
-    const { stdout, stderr } = await execFileAsync("gh", args, {
-      cwd,
-      timeout,
-      maxBuffer: 1024 * 1024 * 16,
-      env: createCliEnv({
-        GH_PROMPT_DISABLED: "1",
-        GH_NO_UPDATE_NOTIFIER: "1",
-      }),
-    });
-    return { stdout, stderr };
-  } catch (err: unknown) {
-    if (isExecError(err)) {
-      const stderr = typeof err.stderr === "string" ? err.stderr : "";
-      const message =
-        stderr.trim() || (err as Error).message || "gh command failed";
-      throw new GhError(message, stderr);
-    }
-    throw new GhError("gh command failed", "");
-  }
-}
-
-async function runGhJson<T>(
-  args: string[],
-  cwd: string,
-  timeout = DEFAULT_TIMEOUT,
-): Promise<T> {
-  const { stdout } = await runGh(args, cwd, timeout);
-  return JSON.parse(stdout) as T;
-}
+const runGh = ghRunner.run;
+const runGhJson = ghRunner.runJson;
 
 // ── Status & repo ────────────────────────────────────────────────────────────
 

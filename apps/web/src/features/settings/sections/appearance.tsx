@@ -148,10 +148,7 @@ export function AppearanceSection() {
         />
       </SettingsRow>
 
-      <SettingsRow
-        title="Code font"
-        description="Font used for code blocks."
-      >
+      <SettingsRow title="Code font" description="Font used for code blocks.">
         <GoogleFontsBrowser
           value={codeFontId}
           onChange={setCodeFont}

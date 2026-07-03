@@ -8,11 +8,11 @@ Manages custom workspace tasks — user-defined shell commands that can be run f
 
 ## Quick Reference
 
-| Action | File | Description |
-|--------|------|-------------|
-| Task state | `store.ts` | `useTasksStore` — CRUD operations per workspace |
-| Types | `types.ts` | `WorkspaceTask` interface |
-| Dialog UI | `components/tasks-dialog.tsx` | Modal for managing tasks |
+| Action     | File                          | Description                                     |
+| ---------- | ----------------------------- | ----------------------------------------------- |
+| Task state | `store.ts`                    | `useTasksStore` — CRUD operations per workspace |
+| Types      | `types.ts`                    | `WorkspaceTask` interface                       |
+| Dialog UI  | `components/tasks-dialog.tsx` | Modal for managing tasks                        |
 
 ## Public API
 

@@ -23,11 +23,13 @@ interface KbContextValue {
   resetShortcuts: () => void
 }
 
-const KeyboardShortcutsContext = React.createContext<KbContextValue | undefined>(
-  undefined
-)
+const KeyboardShortcutsContext = React.createContext<
+  KbContextValue | undefined
+>(undefined)
 
-function parseStoredShortcuts(raw: string | null | undefined): Partial<Shortcuts> {
+function parseStoredShortcuts(
+  raw: string | null | undefined
+): Partial<Shortcuts> {
   if (!raw) return {}
   try {
     return JSON.parse(raw) as Partial<Shortcuts>
@@ -36,11 +38,17 @@ function parseStoredShortcuts(raw: string | null | undefined): Partial<Shortcuts
   }
 }
 
-export function KeyboardShortcutsProvider({ children }: { children: React.ReactNode }) {
+export function KeyboardShortcutsProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const { data: settings } = useAppSettings()
   const updateSetting = useUpdateAppSetting()
 
-  const stored = parseStoredShortcuts(settings?.[APP_SETTINGS_KEYS.KEYBOARD_SHORTCUTS])
+  const stored = parseStoredShortcuts(
+    settings?.[APP_SETTINGS_KEYS.KEYBOARD_SHORTCUTS]
+  )
 
   // Memoize shortcuts to prevent creating a new object on every render.
   // This prevents the context value from changing unnecessarily.
@@ -107,7 +115,11 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
         // Bare-key shortcuts (no mod) skip when focus is in an editable element,
         // unless the action explicitly bypasses this guard.
         const hasMod = binding.includes("mod") || binding.includes("ctrl")
-        if (!hasMod && !BYPASS_EDITABLE_GUARD.has(action) && isEditableTarget(event.target)) {
+        if (
+          !hasMod &&
+          !BYPASS_EDITABLE_GUARD.has(action) &&
+          isEditableTarget(event.target)
+        ) {
           continue
         }
 
@@ -125,7 +137,13 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
   }, [])
 
   const value = React.useMemo<KbContextValue>(
-    () => ({ shortcuts, registerHandler, runAction, updateShortcut, resetShortcuts }),
+    () => ({
+      shortcuts,
+      registerHandler,
+      runAction,
+      updateShortcut,
+      resetShortcuts,
+    }),
     [shortcuts, registerHandler, runAction, updateShortcut, resetShortcuts]
   )
 
@@ -138,7 +156,10 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
 
 export function useKeyboardShortcuts(): KbContextValue {
   const ctx = React.useContext(KeyboardShortcutsContext)
-  if (!ctx) throw new Error("useKeyboardShortcuts must be used within KeyboardShortcutsProvider")
+  if (!ctx)
+    throw new Error(
+      "useKeyboardShortcuts must be used within KeyboardShortcutsProvider"
+    )
   return ctx
 }
 
@@ -146,7 +167,10 @@ export function useKeyboardShortcuts(): KbContextValue {
  * Register a handler for a keyboard shortcut action. The handler ref is kept
  * fresh so callers don't need to worry about stale closures.
  */
-export function useShortcutHandler(action: ShortcutAction, handler: HandlerFn | null) {
+export function useShortcutHandler(
+  action: ShortcutAction,
+  handler: HandlerFn | null
+) {
   const { registerHandler } = useKeyboardShortcuts()
   const handlerRef = React.useRef(handler)
 

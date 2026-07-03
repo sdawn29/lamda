@@ -488,7 +488,8 @@ const solarized: ColorTheme = {
 const catppuccin: ColorTheme = {
   id: "catppuccin",
   name: "Catppuccin",
-  description: "Soothing pastels for the high-spirited. Latte by day, Mocha by night.",
+  description:
+    "Soothing pastels for the high-spirited. Latte by day, Mocha by night.",
   group: "Built-in",
   radius: "0.625rem",
   light: {
@@ -564,7 +565,8 @@ const catppuccin: ColorTheme = {
 const cursorAnysphere: ColorTheme = {
   id: "cursor-anysphere",
   name: "Cursor Anysphere",
-  description: "Cursor's signature dark palette. Charcoal surfaces, neutral gray text, and a confident blue accent.",
+  description:
+    "Cursor's signature dark palette. Charcoal surfaces, neutral gray text, and a confident blue accent.",
   group: "Built-in",
   radius: "0.625rem",
   light: {
@@ -716,7 +718,8 @@ const tokyoNight: ColorTheme = {
 const linear: ColorTheme = {
   id: "linear",
   name: "Linear",
-  description: "Linear's product system. Layered slate surfaces, scarce lavender-blue accent.",
+  description:
+    "Linear's product system. Layered slate surfaces, scarce lavender-blue accent.",
   group: "Built-in",
   radius: "0.625rem",
   light: {

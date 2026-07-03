@@ -22,7 +22,14 @@ function toHexInput(value: string): string {
   const v = value.trim()
   if (/^#[0-9a-fA-F]{6}$/.test(v)) return v
   if (/^#[0-9a-fA-F]{3}$/.test(v)) {
-    return "#" + v.slice(1).split("").map((c) => c + c).join("")
+    return (
+      "#" +
+      v
+        .slice(1)
+        .split("")
+        .map((c) => c + c)
+        .join("")
+    )
   }
   return "#000000"
 }

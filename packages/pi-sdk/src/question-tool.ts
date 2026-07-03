@@ -1,31 +1,31 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent"
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-export const QUESTION_TOOL_NAME = "question"
+export const QUESTION_TOOL_NAME = "question";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
 export interface QuestionOption {
   /** Short label shown on the option button. */
-  label: string
+  label: string;
   /** Optional longer explanation of what the option means. */
-  description?: string
+  description?: string;
 }
 
 export interface Question {
   /** The full question to ask the user. */
-  question: string
+  question: string;
   /** Very short label rendered as a chip/tag above the question. */
-  header: string
+  header: string;
   /** When true the user may pick several options instead of just one. */
-  multiSelect?: boolean
+  multiSelect?: boolean;
   /** The available choices. The UI always adds a free-text "Other" escape hatch. */
-  options: QuestionOption[]
+  options: QuestionOption[];
 }
 
 export interface QuestionPayload {
-  questions: Question[]
+  questions: Question[];
 }
 
 /**
@@ -34,50 +34,59 @@ export interface QuestionPayload {
  * `signal` lets the host clean up if the agent turn is aborted before the user
  * answers.
  */
-export type AnswerWaiter = (toolCallId: string, signal?: AbortSignal) => Promise<string>
+export type AnswerWaiter = (
+  toolCallId: string,
+  signal?: AbortSignal,
+) => Promise<string>;
 
 // ── Validation ────────────────────────────────────────────────────────────────
 
 function err(message: string): {
-  content: { type: "text"; text: string }[]
-  details: Record<string, unknown>
+  content: { type: "text"; text: string }[];
+  details: Record<string, unknown>;
 } {
-  return { content: [{ type: "text", text: JSON.stringify({ error: message }) }], details: {} }
+  return {
+    content: [{ type: "text", text: JSON.stringify({ error: message }) }],
+    details: {},
+  };
 }
 
 function normalizeQuestions(raw: unknown): Question[] | null {
-  if (!raw || typeof raw !== "object") return null
-  const list = (raw as { questions?: unknown }).questions
-  if (!Array.isArray(list) || list.length === 0) return null
+  if (!raw || typeof raw !== "object") return null;
+  const list = (raw as { questions?: unknown }).questions;
+  if (!Array.isArray(list) || list.length === 0) return null;
 
-  const questions: Question[] = []
+  const questions: Question[] = [];
   for (const item of list) {
-    if (!item || typeof item !== "object") return null
-    const q = item as Record<string, unknown>
-    if (typeof q.question !== "string" || !q.question.trim()) return null
-    if (!Array.isArray(q.options) || q.options.length === 0) return null
+    if (!item || typeof item !== "object") return null;
+    const q = item as Record<string, unknown>;
+    if (typeof q.question !== "string" || !q.question.trim()) return null;
+    if (!Array.isArray(q.options) || q.options.length === 0) return null;
 
-    const options: QuestionOption[] = []
+    const options: QuestionOption[] = [];
     for (const opt of q.options) {
-      if (!opt || typeof opt !== "object") return null
-      const o = opt as Record<string, unknown>
-      if (typeof o.label !== "string" || !o.label.trim()) return null
+      if (!opt || typeof opt !== "object") return null;
+      const o = opt as Record<string, unknown>;
+      if (typeof o.label !== "string" || !o.label.trim()) return null;
       options.push({
         label: o.label.trim(),
         ...(typeof o.description === "string" && o.description.trim()
           ? { description: o.description.trim() }
           : {}),
-      })
+      });
     }
 
     questions.push({
       question: q.question.trim(),
-      header: typeof q.header === "string" && q.header.trim() ? q.header.trim() : "Question",
+      header:
+        typeof q.header === "string" && q.header.trim()
+          ? q.header.trim()
+          : "Question",
       multiSelect: q.multiSelect === true,
       options,
-    })
+    });
   }
-  return questions
+  return questions;
 }
 
 // ── Tool factory ────────────────────────────────────────────────────────────────
@@ -89,7 +98,9 @@ function normalizeQuestions(raw: unknown): Question[] | null {
  * arguments carry the question payload, which the web app renders as a rich
  * question view in place of the chat input box.
  */
-export function createQuestionTool(waitForAnswer: AnswerWaiter): ToolDefinition {
+export function createQuestionTool(
+  waitForAnswer: AnswerWaiter,
+): ToolDefinition {
   return {
     name: QUESTION_TOOL_NAME,
     label: "question",
@@ -117,27 +128,35 @@ Guidance:
             properties: {
               question: {
                 type: "string",
-                description: "The full question to ask. Should end with a question mark.",
+                description:
+                  "The full question to ask. Should end with a question mark.",
               },
               header: {
                 type: "string",
-                description: "A very short label (a few words) shown as a chip above the question.",
+                description:
+                  "A very short label (a few words) shown as a chip above the question.",
               },
               multiSelect: {
                 type: "boolean",
-                description: "Allow selecting multiple options instead of one. Default false.",
+                description:
+                  "Allow selecting multiple options instead of one. Default false.",
               },
               options: {
                 type: "array",
-                description: "The choices. Provide 2-4. Put any recommended option first.",
+                description:
+                  "The choices. Provide 2-4. Put any recommended option first.",
                 items: {
                   type: "object",
                   required: ["label"],
                   properties: {
-                    label: { type: "string", description: "Short text shown on the option." },
+                    label: {
+                      type: "string",
+                      description: "Short text shown on the option.",
+                    },
                     description: {
                       type: "string",
-                      description: "Optional longer explanation of the option's trade-offs.",
+                      description:
+                        "Optional longer explanation of the option's trade-offs.",
                     },
                   },
                 },
@@ -149,16 +168,18 @@ Guidance:
     },
 
     execute: async (toolCallId, params, signal) => {
-      const questions = normalizeQuestions(params)
+      const questions = normalizeQuestions(params);
       if (!questions) {
-        return err("Invalid parameters: 'questions' must be a non-empty array of { question, header, options[] }.")
+        return err(
+          "Invalid parameters: 'questions' must be a non-empty array of { question, header, options[] }.",
+        );
       }
 
-      const answer = await waitForAnswer(toolCallId, signal)
+      const answer = await waitForAnswer(toolCallId, signal);
       return {
         content: [{ type: "text", text: answer }],
         details: { questions },
-      }
+      };
     },
-  }
+  };
 }

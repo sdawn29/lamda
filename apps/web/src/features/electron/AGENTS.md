@@ -9,6 +9,7 @@ Electron feature module — provides Electron-specific integration including ser
 ## Overview
 
 The electron module (5 files) provides:
+
 1. **Server status monitoring** — track server readiness, port assignment, errors
 2. **Auto-updates** — check, download, install Electron updates
 3. **File system access** — folder selection, path opening, app launching
@@ -43,6 +44,7 @@ The electron module (5 files) provides:
 ### API (api.ts)
 
 **Server Lifecycle:**
+
 - `getElectronPlatform()` — Returns "darwin" | "win32" | "linux" or null (browser)
 - `getServerPort()` — Get assigned server port (null if not running)
 - `getServerStatus()` — Get full server status object
@@ -50,6 +52,7 @@ The electron module (5 files) provides:
 - `restartServer()` — Restart the Hono server
 
 **File Operations:**
+
 - `selectFolder(options?)` — Open folder picker dialog
 - `openPath(path)` — Open file in default app
 - `openExternal(url)` — Open URL in browser
@@ -59,6 +62,7 @@ The electron module (5 files) provides:
 - `getOpenWithAppIcon(appId)` — Get icon for app
 
 **Update Management:**
+
 - `getUpdateStatus()` — Get current update phase
 - `subscribeToUpdateStatus(callback)` — Subscribe to update status changes
 - `checkForUpdates()` — Check for new version
@@ -66,22 +70,24 @@ The electron module (5 files) provides:
 - `installUpdate()` — Install and restart
 
 **Window State:**
+
 - `getFullscreen()` — Get current fullscreen state
 - `subscribeToFullscreen(callback)` — Subscribe to fullscreen changes
 
 ### Queries (queries.ts)
 
-| Hook | Type | Description |
-|------|------|-------------|
-| `useElectronPlatform` | Query | Platform detection (cached forever) |
-| `useElectronServerPort` | Query | Server port |
-| `useElectronServerStatus` | Query | Server status with subscription |
-| `useElectronFullscreen` | Query | Fullscreen state with subscription |
-| `useOpenWithApps` | Query | List of "open with" apps |
-| `useOpenWithAppIcons` | Query | Icon data for apps (parallel queries) |
-| `useElectronUpdateStatus` | Query | Update status with subscription |
+| Hook                      | Type  | Description                           |
+| ------------------------- | ----- | ------------------------------------- |
+| `useElectronPlatform`     | Query | Platform detection (cached forever)   |
+| `useElectronServerPort`   | Query | Server port                           |
+| `useElectronServerStatus` | Query | Server status with subscription       |
+| `useElectronFullscreen`   | Query | Fullscreen state with subscription    |
+| `useOpenWithApps`         | Query | List of "open with" apps              |
+| `useOpenWithAppIcons`     | Query | Icon data for apps (parallel queries) |
+| `useElectronUpdateStatus` | Query | Update status with subscription       |
 
 **Subscriptions pattern:**
+
 ```typescript
 useEffect(() => {
   return subscribeToServerStatus((status) => {
@@ -92,15 +98,15 @@ useEffect(() => {
 
 ### Mutations (mutations.ts)
 
-| Hook | Operation |
-|------|-----------|
-| `useSelectFolder` | Open folder picker |
-| `useOpenPath` | Open file |
+| Hook                      | Operation                 |
+| ------------------------- | ------------------------- |
+| `useSelectFolder`         | Open folder picker        |
+| `useOpenPath`             | Open file                 |
 | `useOpenWorkspaceWithApp` | Launch app with workspace |
-| `useOpenExternal` | Open URL |
-| `useCheckForUpdates` | Trigger update check |
-| `useDownloadUpdate` | Download update |
-| `useInstallUpdate` | Install and restart |
+| `useOpenExternal`         | Open URL                  |
+| `useCheckForUpdates`      | Trigger update check      |
+| `useDownloadUpdate`       | Download update           |
+| `useInstallUpdate`        | Install and restart       |
 
 ### Components
 
@@ -112,13 +118,13 @@ useEffect(() => {
 
 When running in browser (not Electron), these functions return safe defaults:
 
-| Function | Browser Fallback |
-|----------|-----------------|
-| `getElectronPlatform()` | `null` |
-| `getServerPort()` | `null` |
-| `getServerStatus()` | `{ status: "ready", port: null, error: null }` |
-| `selectFolder()` | `null` |
-| All subscriptions | `() => {}` (no-op) |
+| Function                | Browser Fallback                               |
+| ----------------------- | ---------------------------------------------- |
+| `getElectronPlatform()` | `null`                                         |
+| `getServerPort()`       | `null`                                         |
+| `getServerStatus()`     | `{ status: "ready", port: null, error: null }` |
+| `selectFolder()`        | `null`                                         |
+| All subscriptions       | `() => {}` (no-op)                             |
 
 ## TypeScript Types
 

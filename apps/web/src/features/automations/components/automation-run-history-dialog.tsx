@@ -22,7 +22,7 @@ export function AutomationRunHistoryDialog({
 }: RunHistoryDialogProps) {
   const { data: runs = [], isLoading } = useAutomationRuns(
     automation?.id ?? "",
-    open && !!automation,
+    open && !!automation
   )
   const navigate = useNavigate()
 
@@ -83,7 +83,9 @@ function RunRow({
           </span>
         </span>
         {run.error ? (
-          <span className="truncate text-3xs text-destructive">{run.error}</span>
+          <span className="truncate text-3xs text-destructive">
+            {run.error}
+          </span>
         ) : (
           <span className="text-3xs text-muted-foreground/60">
             {formatDuration(run.startedAt, run.finishedAt)}
@@ -92,7 +94,7 @@ function RunRow({
       </div>
       {run.threadId && (
         <button
-          className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-3xs text-muted-foreground/60 opacity-0 transition hover:text-foreground group-hover:opacity-100"
+          className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-3xs text-muted-foreground/60 opacity-0 transition group-hover:opacity-100 hover:text-foreground"
           onClick={() => onOpenThread(run.threadId!)}
         >
           <ExternalLink className="size-3" />
@@ -103,13 +105,11 @@ function RunRow({
   )
 }
 
-export function RunStatusIcon({
-  status,
-}: {
-  status: AutomationRun["status"]
-}) {
+export function RunStatusIcon({ status }: { status: AutomationRun["status"] }) {
   if (status === "running")
-    return <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground/60" />
+    return (
+      <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground/60" />
+    )
   if (status === "ok")
     return <CheckCircle2 className="size-4 shrink-0 text-green-500" />
   return <XCircle className="size-4 shrink-0 text-red-500" />

@@ -28,10 +28,10 @@ Tasks are user-defined shell command shortcuts attached to a workspace. They pro
 2. Click **+ Add Task**
 3. Fill in the dialog:
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| **Icon** | No | Emoji shown on the button (e.g., `🧪`) |
-| **Command** | Yes | Shell command to run (e.g., `npm test`) |
+| Field       | Required | Description                             |
+| ----------- | -------- | --------------------------------------- |
+| **Icon**    | No       | Emoji shown on the button (e.g., `🧪`)  |
+| **Command** | Yes      | Shell command to run (e.g., `npm test`) |
 
 4. Click **Save**
 
@@ -51,14 +51,14 @@ Open the edit dialog and click **Delete**, or use the context menu.
 
 ## Common Examples
 
-| Icon | Command | Purpose |
-|------|---------|---------|
-| 🧪 | `npm test` | Run test suite |
-| 🔨 | `npm run build` | Build project |
-| 🚀 | `npm run dev` | Start dev server |
-| 🧹 | `npm run lint` | Lint code |
-| 🔍 | `npm run check-types` | TypeScript check |
-| 📦 | `npm install` | Install dependencies |
+| Icon | Command               | Purpose              |
+| ---- | --------------------- | -------------------- |
+| 🧪   | `npm test`            | Run test suite       |
+| 🔨   | `npm run build`       | Build project        |
+| 🚀   | `npm run dev`         | Start dev server     |
+| 🧹   | `npm run lint`        | Lint code            |
+| 🔍   | `npm run check-types` | TypeScript check     |
+| 📦   | `npm install`         | Install dependencies |
 
 ## Storage
 

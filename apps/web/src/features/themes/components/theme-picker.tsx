@@ -53,9 +53,9 @@ function ThemeSwatch({
       onClick={onSelect}
       className={cn(
         "group relative flex flex-col gap-2 rounded-lg border p-2 text-left transition-colors",
-        "focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none",
+        "focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
         selected
-          ? "border-primary ring-primary/40 ring-2"
+          ? "border-primary ring-2 ring-primary/40"
           : "border-border hover:border-muted-foreground/40"
       )}
     >
@@ -124,7 +124,7 @@ function ThemeSwatch({
       <div className="flex items-center justify-between gap-1 px-0.5">
         <span className="truncate text-sm font-medium">{theme.name}</span>
         {selected && (
-          <Check className="text-primary size-4 shrink-0" aria-hidden />
+          <Check className="size-4 shrink-0 text-primary" aria-hidden />
         )}
       </div>
     </button>

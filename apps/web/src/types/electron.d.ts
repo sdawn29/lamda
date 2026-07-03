@@ -18,7 +18,14 @@ type UpdateStatus =
   | { phase: "idle" }
   | { phase: "checking" }
   | { phase: "available"; version: string; releaseNotes: string | null }
-  | { phase: "downloading"; version: string; percent: number; bytesPerSecond: number; total: number; releaseNotes: string | null }
+  | {
+      phase: "downloading"
+      version: string
+      percent: number
+      bytesPerSecond: number
+      total: number
+      releaseNotes: string | null
+    }
   | { phase: "ready"; version: string; releaseNotes: string | null }
   | { phase: "error"; message: string }
 

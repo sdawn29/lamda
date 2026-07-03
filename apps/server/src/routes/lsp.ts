@@ -19,6 +19,7 @@
 
 import type { WebSocket } from "ws";
 import { Hono } from "hono";
+import { z } from "zod";
 import { listLanguageRegistry, isCommandOnPath } from "@lamda/lsp";
 import {
   getInstallJobs,
@@ -33,6 +34,9 @@ import {
   subscribeDiagnostics,
   uriToPath,
 } from "../services/language-service.js";
+import { parseJsonBody } from "../lib/validate.js";
+
+const installLanguageSchema = z.object({ language: z.string().optional() });
 
 interface OpenMsg {
   kind: "open";
@@ -192,7 +196,10 @@ lspRouter.get("/registry", async (c) => {
           : null,
         // Tool the user would need for the *first* recipe, shown when nothing
         // is installable so the UI can say "requires npm".
-        requiredTool: entry.install?.tool ?? entry.fallbacks.find((fb) => fb.install)?.install?.tool ?? null,
+        requiredTool:
+          entry.install?.tool ??
+          entry.fallbacks.find((fb) => fb.install)?.install?.tool ??
+          null,
       };
     }),
   );
@@ -206,9 +213,10 @@ lspRouter.get("/registry", async (c) => {
  * the job; the client polls GET /lsp/install for progress.
  */
 lspRouter.post("/install", async (c) => {
-  const body = await c.req.json<{ language?: string }>().catch(() => null);
-  const language = body?.language;
-  if (!language || typeof language !== "string") {
+  const parsed = await parseJsonBody(c, installLanguageSchema);
+  if (!parsed.ok) return parsed.response;
+  const language = parsed.data.language;
+  if (!language) {
     return c.json({ error: "Missing 'language'." }, 400);
   }
   const result = await startInstall(language);

@@ -1,62 +1,54 @@
-import { eq } from "drizzle-orm"
-import { db } from "../client.js"
-import { mcpServers } from "../schema.js"
-import type { McpServerConfig } from "@lamda/mcp"
+import { eq } from "drizzle-orm";
+import { db } from "../client.js";
+import { mcpServers } from "../schema.js";
+import type { McpServerConfig } from "@lamda/mcp";
 
 export interface DbMcpServer {
-  id: string
-  name: string
-  transport: "stdio" | "http" | "sse"
-  command: string | null
-  args: string | null
-  env: string | null
-  cwd: string | null
-  url: string | null
-  headers: string | null
-  description: string | null
-  enabled: boolean
-  createdAt: number
+  id: string;
+  name: string;
+  transport: "stdio" | "http" | "sse";
+  command: string | null;
+  args: string | null;
+  env: string | null;
+  cwd: string | null;
+  url: string | null;
+  headers: string | null;
+  description: string | null;
+  enabled: boolean;
+  createdAt: number;
 }
 
 /**
  * Get all MCP servers (application-wide)
  */
 export function getMcpServers(): DbMcpServer[] {
-  return db.select().from(mcpServers).all()
+  return db.select().from(mcpServers).all();
 }
 
 /**
  * Get enabled MCP servers (application-wide)
  */
 export function getEnabledMcpServers(): DbMcpServer[] {
-  return db
-    .select()
-    .from(mcpServers)
-    .where(eq(mcpServers.enabled, true))
-    .all()
+  return db.select().from(mcpServers).where(eq(mcpServers.enabled, true)).all();
 }
 
 /**
  * Get a single MCP server by name
  */
 export function getMcpServer(name: string): DbMcpServer | undefined {
-  return db
-    .select()
-    .from(mcpServers)
-    .where(eq(mcpServers.name, name))
-    .get()
+  return db.select().from(mcpServers).where(eq(mcpServers.name, name)).get();
 }
 
 /**
  * Create or update an MCP server
  */
 export function upsertMcpServer(
-  config: McpServerConfig & { id?: string; enabled?: boolean }
+  config: McpServerConfig & { id?: string; enabled?: boolean },
 ): void {
-  const id = config.id ?? crypto.randomUUID()
-  const createdAt = Date.now()
+  const id = config.id ?? crypto.randomUUID();
+  const createdAt = Date.now();
 
-  const transport = config.transport ?? (config.url ? "http" : "stdio")
+  const transport = config.transport ?? (config.url ? "http" : "stdio");
 
   db.insert(mcpServers)
     .values({
@@ -87,7 +79,7 @@ export function upsertMcpServer(
         enabled: config.enabled ?? true,
       },
     })
-    .run()
+    .run();
 }
 
 /**
@@ -95,14 +87,14 @@ export function upsertMcpServer(
  */
 export function saveMcpServers(configs: McpServerConfig[]): void {
   // Preserve existing enabled states before wiping
-  const existing = getMcpServers()
-  const enabledMap = new Map(existing.map((s) => [s.name, s.enabled]))
+  const existing = getMcpServers();
+  const enabledMap = new Map(existing.map((s) => [s.name, s.enabled]));
 
   // Delete existing servers
-  db.delete(mcpServers).run()
+  db.delete(mcpServers).run();
 
   // Insert new servers, restoring enabled state for servers that already existed
-  const now = Date.now()
+  const now = Date.now();
   for (const config of configs) {
     db.insert(mcpServers)
       .values({
@@ -119,7 +111,7 @@ export function saveMcpServers(configs: McpServerConfig[]): void {
         enabled: enabledMap.get(config.name) ?? true,
         createdAt: now,
       })
-      .run()
+      .run();
   }
 }
 
@@ -127,17 +119,14 @@ export function saveMcpServers(configs: McpServerConfig[]): void {
  * Delete an MCP server
  */
 export function deleteMcpServer(name: string): void {
-  db.delete(mcpServers).where(eq(mcpServers.name, name)).run()
+  db.delete(mcpServers).where(eq(mcpServers.name, name)).run();
 }
 
 /**
  * Update server enabled state
  */
 export function setMcpServerEnabled(name: string, enabled: boolean): void {
-  db.update(mcpServers)
-    .set({ enabled })
-    .where(eq(mcpServers.name, name))
-    .run()
+  db.update(mcpServers).set({ enabled }).where(eq(mcpServers.name, name)).run();
 }
 
 /**
@@ -154,5 +143,5 @@ export function dbToMcpConfig(server: DbMcpServer): McpServerConfig {
     url: server.url ?? undefined,
     headers: server.headers ? JSON.parse(server.headers) : undefined,
     description: server.description ?? undefined,
-  }
+  };
 }

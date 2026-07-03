@@ -142,8 +142,8 @@ export function ChatSection() {
         {!hasMessagePlaceholder && (
           <p className="text-xs/relaxed text-destructive" role="alert">
             Prompt must contain{" "}
-            <code className="rounded bg-muted px-1 py-0.5">{"{message}"}</code> —
-            it will be replaced with the first user message.
+            <code className="rounded bg-muted px-1 py-0.5">{"{message}"}</code>{" "}
+            — it will be replaced with the first user message.
           </p>
         )}
         <div className="flex justify-end gap-2">

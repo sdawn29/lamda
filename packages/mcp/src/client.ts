@@ -10,7 +10,13 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { resolveTransportType } from "./types.js";
-import type { McpServerConfig, McpTool, McpToolResult, McpEvent, McpEventHandler } from "./types.js";
+import type {
+  McpServerConfig,
+  McpTool,
+  McpToolResult,
+  McpEvent,
+  McpEventHandler,
+} from "./types.js";
 
 /**
  * Build the SDK transport for a server config based on its transport type.
@@ -24,18 +30,24 @@ function createTransport(config: McpServerConfig): Transport {
 
   if (transportType === "http" || transportType === "sse") {
     if (!config.url) {
-      throw new Error(`MCP server "${config.name}" is missing a url for ${transportType} transport`);
+      throw new Error(
+        `MCP server "${config.name}" is missing a url for ${transportType} transport`,
+      );
     }
 
     let url: URL;
     try {
       url = new URL(config.url);
     } catch {
-      throw new Error(`MCP server "${config.name}" has an invalid url: ${config.url}`);
+      throw new Error(
+        `MCP server "${config.name}" has an invalid url: ${config.url}`,
+      );
     }
 
     const headers = config.headers;
-    const requestInit: RequestInit | undefined = headers ? { headers } : undefined;
+    const requestInit: RequestInit | undefined = headers
+      ? { headers }
+      : undefined;
 
     if (transportType === "sse") {
       return new SSEClientTransport(url, {
@@ -46,7 +58,10 @@ function createTransport(config: McpServerConfig): Transport {
           ? {
               eventSourceInit: {
                 fetch: (input: string | URL, init?: RequestInit) =>
-                  fetch(input, { ...init, headers: { ...init?.headers, ...headers } }),
+                  fetch(input, {
+                    ...init,
+                    headers: { ...init?.headers, ...headers },
+                  }),
               },
             }
           : {}),
@@ -58,7 +73,9 @@ function createTransport(config: McpServerConfig): Transport {
 
   // stdio (default).
   if (!config.command) {
-    throw new Error(`MCP server "${config.name}" is missing a command for stdio transport`);
+    throw new Error(
+      `MCP server "${config.name}" is missing a command for stdio transport`,
+    );
   }
 
   // In a packaged Electron app, macOS provides only a minimal PATH
@@ -116,15 +133,20 @@ export class McpClient {
 
       const client = new Client(
         { name: `lambda-mcp-${config.name}`, version: "1.0.0" },
-        { capabilities: {} }
+        { capabilities: {} },
       );
 
       // Enforce a 30-second connection timeout so a hung process never blocks indefinitely
       let connectTimeoutId: ReturnType<typeof setTimeout> | undefined;
       const connectionTimeout = new Promise<never>((_, reject) => {
         connectTimeoutId = setTimeout(
-          () => reject(new Error(`Connection to MCP server "${config.name}" timed out after 30s`)),
-          30_000
+          () =>
+            reject(
+              new Error(
+                `Connection to MCP server "${config.name}" timed out after 30s`,
+              ),
+            ),
+          30_000,
         );
       });
 
@@ -132,7 +154,11 @@ export class McpClient {
         await Promise.race([client.connect(transport), connectionTimeout]);
       } catch (e) {
         clearTimeout(connectTimeoutId);
-        try { await transport.close(); } catch { /* best-effort cleanup */ }
+        try {
+          await transport.close();
+        } catch {
+          /* best-effort cleanup */
+        }
         throw e;
       }
       clearTimeout(connectTimeoutId);
@@ -151,14 +177,18 @@ export class McpClient {
 
       console.log(`MCP server "${config.name}" connected`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.emit({
         type: "server_error",
         serverName: config.name,
         error: errorMessage,
         timestamp: Date.now(),
       });
-      throw new Error(`Failed to connect to MCP server "${config.name}": ${errorMessage}`);
+      throw new Error(
+        `Failed to connect to MCP server "${config.name}": ${errorMessage}`,
+        { cause: error },
+      );
     }
   }
 
@@ -185,7 +215,10 @@ export class McpClient {
 
       console.log(`MCP server "${serverName}" disconnected`);
     } catch (error) {
-      console.error(`Error disconnecting from MCP server "${serverName}":`, error);
+      console.error(
+        `Error disconnecting from MCP server "${serverName}":`,
+        error,
+      );
     }
   }
 
@@ -213,7 +246,11 @@ export class McpClient {
             description: tool.description,
             serverName,
             originalName: tool.name,
-            inputSchema: tool.inputSchema as { type: "object"; properties?: Record<string, unknown>; required?: string[] },
+            inputSchema: tool.inputSchema as {
+              type: "object";
+              properties?: Record<string, unknown>;
+              required?: string[];
+            },
           });
         }
       } catch (error) {
@@ -227,7 +264,10 @@ export class McpClient {
   /**
    * Call an MCP tool by name (with server prefix)
    */
-  async callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
+  async callTool(
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<McpToolResult> {
     const slashIndex = name.indexOf("/");
     const serverName = slashIndex !== -1 ? name.slice(0, slashIndex) : "";
     const toolName = slashIndex !== -1 ? name.slice(slashIndex + 1) : "";
@@ -235,7 +275,12 @@ export class McpClient {
     if (!serverName || !toolName) {
       return {
         success: false,
-        content: [{ type: "text", text: `Invalid tool name: ${name}. Expected format: "serverName/toolName"` }],
+        content: [
+          {
+            type: "text",
+            text: `Invalid tool name: ${name}. Expected format: "serverName/toolName"`,
+          },
+        ],
         error: "Invalid tool name format",
       };
     }
@@ -244,7 +289,9 @@ export class McpClient {
     if (!connection) {
       return {
         success: false,
-        content: [{ type: "text", text: `MCP server "${serverName}" not connected` }],
+        content: [
+          { type: "text", text: `MCP server "${serverName}" not connected` },
+        ],
         error: `Server not connected: ${serverName}`,
       };
     }
@@ -260,7 +307,7 @@ export class McpClient {
     try {
       const result = await connection.client.callTool(
         { name: toolName, arguments: args },
-        CallToolResultSchema
+        CallToolResultSchema,
       );
 
       this.emit({
@@ -273,14 +320,22 @@ export class McpClient {
 
       // Convert MCP result to our format
       const contentItems = Array.isArray(result.content) ? result.content : [];
-      const content = this.formatToolContent(contentItems as Array<{ type: string; text?: string; data?: string; mimeType?: string }>);
+      const content = this.formatToolContent(
+        contentItems as Array<{
+          type: string;
+          text?: string;
+          data?: string;
+          mimeType?: string;
+        }>,
+      );
       return {
         success: !result.isError,
         content,
         details: result as unknown as Record<string, unknown>,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       return {
         success: false,
         content: [{ type: "text", text: errorMessage }],
@@ -293,14 +348,26 @@ export class McpClient {
    * Format tool content from MCP response
    */
   private formatToolContent(
-    content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>
-  ): Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> {
+    content: Array<{
+      type: string;
+      text?: string;
+      data?: string;
+      mimeType?: string;
+    }>,
+  ): Array<
+    | { type: "text"; text: string }
+    | { type: "image"; data: string; mimeType: string }
+  > {
     return content.map((item) => {
       if (item.type === "text" && item.text !== undefined) {
         return { type: "text" as const, text: item.text };
       }
       if (item.type === "image" && item.data && item.mimeType) {
-        return { type: "image" as const, data: item.data, mimeType: item.mimeType };
+        return {
+          type: "image" as const,
+          data: item.data,
+          mimeType: item.mimeType,
+        };
       }
       return { type: "text" as const, text: JSON.stringify(item) };
     });

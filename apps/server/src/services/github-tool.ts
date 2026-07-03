@@ -34,7 +34,9 @@ function ok(data: unknown) {
 
 function fail(message: string) {
   return {
-    content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
+    content: [
+      { type: "text" as const, text: JSON.stringify({ error: message }) },
+    ],
     details: {},
   };
 }

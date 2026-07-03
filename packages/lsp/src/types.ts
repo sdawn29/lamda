@@ -60,4 +60,12 @@ export interface DiagnosticsUpdate {
   diagnostics: Diagnostic[];
 }
 
-export type { Diagnostic, Hover, Location, DocumentSymbol, SymbolInformation, Position, SignatureHelp };
+export type {
+  Diagnostic,
+  Hover,
+  Location,
+  DocumentSymbol,
+  SymbolInformation,
+  Position,
+  SignatureHelp,
+};

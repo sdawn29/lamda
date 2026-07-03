@@ -27,11 +27,14 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
     !!(error.action as { prompt?: string }).prompt
 
   // Only auto-dismiss when there's no retry action (informational banners like "Retrying…")
-  const shouldAutoDismiss = !!error && !canRetry && error.action?.type === "dismiss"
+  const shouldAutoDismiss =
+    !!error && !canRetry && error.action?.type === "dismiss"
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onActionRef = useRef(onAction)
-  useLayoutEffect(() => { onActionRef.current = onAction })
+  useLayoutEffect(() => {
+    onActionRef.current = onAction
+  })
 
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -68,7 +71,8 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
   // Long / multi-line errors get an expand affordance so the full text is
   // reachable instead of being clamped to a single line.
   const isExpandable =
-    !!error.message && (error.message.length > 80 || error.message.includes("\n"))
+    !!error.message &&
+    (error.message.length > 80 || error.message.includes("\n"))
 
   function toggle() {
     if (!isExpandable) return
@@ -88,7 +92,7 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
     <div
       className={cn(
         "mx-auto w-full max-w-4xl px-3 pb-1",
-        "animate-in slide-in-from-bottom-2 fade-in-0 duration-200"
+        "animate-in duration-200 fade-in-0 slide-in-from-bottom-2"
       )}
     >
       <div className="overflow-hidden rounded-xl border border-destructive/20 bg-destructive/5">
@@ -107,7 +111,9 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
           >
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="flex items-baseline gap-2">
-                <span className="text-xs font-medium text-foreground">{error.title}</span>
+                <span className="text-xs font-medium text-foreground">
+                  {error.title}
+                </span>
                 {error.retryCount != null && (
                   <span className="text-3xs text-muted-foreground/60">
                     attempt {error.retryCount}
@@ -115,7 +121,7 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
                 )}
               </span>
               {error.message && !expanded && (
-                <span className="text-2xs leading-relaxed text-muted-foreground/80 line-clamp-1">
+                <span className="line-clamp-1 text-2xs leading-relaxed text-muted-foreground/80">
                   {error.message}
                 </span>
               )}

@@ -71,7 +71,10 @@ function AutoTextarea({
       onKeyDown={onKeyDown}
       placeholder={placeholder}
       rows={2}
-      className={cn("resize-none border-0 bg-transparent shadow-none focus-visible:ring-0", className)}
+      className={cn(
+        "resize-none border-0 bg-transparent shadow-none focus-visible:ring-0",
+        className
+      )}
     />
   )
 }
@@ -121,7 +124,10 @@ function WorkflowButton({
               ) : (
                 <CloudUpload className="size-3" />
               )}
-              Push {aheadCount > 0 ? `${aheadCount} commit${aheadCount === 1 ? "" : "s"}` : ""}
+              Push{" "}
+              {aheadCount > 0
+                ? `${aheadCount} commit${aheadCount === 1 ? "" : "s"}`
+                : ""}
             </Button>
           }
         />
@@ -223,8 +229,10 @@ export function CommitInputSection({
       .filter((f) => f.isStaged)
   }, [statusRaw])
 
-  const commitError = commitMutation.error instanceof Error ? commitMutation.error.message : null
-  const pushError = pushMutation.error instanceof Error ? pushMutation.error.message : null
+  const commitError =
+    commitMutation.error instanceof Error ? commitMutation.error.message : null
+  const pushError =
+    pushMutation.error instanceof Error ? pushMutation.error.message : null
   const generateError =
     generateCommitMessageMutation.error instanceof Error
       ? generateCommitMessageMutation.error.message
@@ -239,7 +247,9 @@ export function CommitInputSection({
     try {
       await commitMutation.mutateAsync(msg)
       onCommitSuccess?.()
-    } catch {}
+    } catch {
+      // Surfaced via commitError above — nothing else to do here.
+    }
   }
 
   async function handleCommitAndPush() {
@@ -256,22 +266,28 @@ export function CommitInputSection({
     }
     try {
       await pushMutation.mutateAsync()
-    } catch {}
+    } catch {
+      // Surfaced via pushError above — nothing else to do here.
+    }
   }
 
   async function handlePush() {
     pushMutation.reset()
     try {
       await pushMutation.mutateAsync()
-    } catch {}
+    } catch {
+      // Surfaced via pushError above — nothing else to do here.
+    }
   }
 
   async function handleGenerate() {
     if (generateCommitMessageMutation.isPending) return
     generateCommitMessageMutation.reset()
     try {
-      const promptTemplate = settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? undefined
-      const generated = await generateCommitMessageMutation.mutateAsync(promptTemplate)
+      const promptTemplate =
+        settings?.[APP_SETTINGS_KEYS.COMMIT_MESSAGE_PROMPT] ?? undefined
+      const generated =
+        await generateCommitMessageMutation.mutateAsync(promptTemplate)
       setMessage(generated)
     } catch {
       // Error surfaces via generateCommitMessageMutation.error → shown in Alert.
@@ -283,7 +299,12 @@ export function CommitInputSection({
   const pushing = pushMutation.isPending
 
   const canCommit =
-    !committing && !pushing && !generating && !!message.trim() && staged.length > 0 && !loading
+    !committing &&
+    !pushing &&
+    !generating &&
+    !!message.trim() &&
+    staged.length > 0 &&
+    !loading
 
   return (
     <div className="shrink-0 border-b border-border/50 p-2">
@@ -360,8 +381,8 @@ export function CommitInputSection({
           {staged.length > 0
             ? `${staged.length} file${staged.length === 1 ? "" : "s"} staged`
             : (ahead ?? 0) > 0
-            ? `${ahead} commit${ahead === 1 ? "" : "s"} ahead`
-            : "Nothing staged"}
+              ? `${ahead} commit${ahead === 1 ? "" : "s"} ahead`
+              : "Nothing staged"}
         </span>
 
         <WorkflowButton

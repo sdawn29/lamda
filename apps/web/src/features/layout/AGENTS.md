@@ -9,6 +9,7 @@ Layout feature module — provides the application title bar, panel toggle contr
 ## Overview
 
 The layout module (~640 lines) is the main header component that:
+
 1. **Title Bar** — Custom draggable title bar for Electron frameless window
 2. **Navigation** — Back/forward buttons with browser-style history tracking
 3. **Panel Controls** — Toggle buttons for terminal, diff, file tree
@@ -31,6 +32,7 @@ layout/
 ### components/title-bar.tsx
 
 **Main title bar component with:**
+
 - Custom drag region for Electron frameless window
 - Navigation controls (back/forward with history tracking)
 - Sidebar toggle with keyboard shortcut
@@ -52,6 +54,7 @@ layout/
 | Navigate forward | Browser forward |
 
 **State Management:**
+
 - Uses `useSidebar()` from shared UI for sidebar state
 - Uses `useTerminal()`, `useReviewPanel()`, `useFileTree()` for panel states
 - Uses `useWorkspace()` for thread operations
@@ -59,13 +62,16 @@ layout/
 - Uses `useRouter()`, `useNavigate()`, `useLocation()` for navigation
 
 **Drag Region:**
+
 ```typescript
 style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
 ```
+
 - Title bar is draggable for window movement
 - Child controls marked `no-drag` to remain interactive
 
 **History Tracking:**
+
 ```typescript
 const { subscribe, getSnapshot } = useMemo(() => {
   let count = 0
@@ -85,6 +91,7 @@ const { subscribe, getSnapshot } = useMemo(() => {
 ### components/open-with-button.tsx
 
 **External editor launcher for macOS:**
+
 - Discovers available code editors via Electron API
 - Shows app icons for each editor
 - Persists user's preferred editor per workspace
@@ -92,6 +99,7 @@ const { subscribe, getSnapshot } = useMemo(() => {
 - Falls back gracefully on non-macOS platforms
 
 **States:**
+
 - Hidden on non-macOS
 - Hidden when no workspace selected
 - Hidden when no editors found
@@ -99,6 +107,7 @@ const { subscribe, getSnapshot } = useMemo(() => {
 - Disabled during editor launch
 
 **Icon Handling:**
+
 - Fetches app icons via `useOpenWithAppIcons`
 - Fallback to letter avatar if icon fails to load
 - Memoized selection of last-used app

@@ -110,16 +110,21 @@ export const FileListItem = memo(function FileListItem({
   )
 
   const diff = isCommitMode
-    ? (sessionId ? commitDiff : wsCommitDiff)
+    ? sessionId
+      ? commitDiff
+      : wsCommitDiff
     : isTurnMode
       ? turnDiff
       : workDiff
   const diffLoading = isCommitMode
-    ? (sessionId ? commitDiffLoading : wsCommitDiffLoading)
+    ? sessionId
+      ? commitDiffLoading
+      : wsCommitDiffLoading
     : isTurnMode
       ? turnDiffLoading
       : workDiffLoading
-  const counts = preloadedCounts ?? (diff != null ? parseDiffCounts(diff) : null)
+  const counts =
+    preloadedCounts ?? (diff != null ? parseDiffCounts(diff) : null)
 
   const handleToggle = useCallback(
     async (e: React.MouseEvent) => {
@@ -200,7 +205,9 @@ export const FileListItem = memo(function FileListItem({
             {onRevert && (
               <IconButtonWithTooltip
                 icon={file.isUntracked ? Trash2 : Undo2}
-                label={file.isUntracked ? "Discard file (delete)" : "Revert changes"}
+                label={
+                  file.isUntracked ? "Discard file (delete)" : "Revert changes"
+                }
                 onClick={handleRevertClick}
                 variant="ghost"
                 size="icon-sm"
@@ -221,7 +228,7 @@ export const FileListItem = memo(function FileListItem({
       </div>
 
       {isExpanded && mode && (
-        <div className="animate-in px-2.5 pb-2.5 pt-0.5 duration-150 fade-in-0">
+        <div className="animate-in px-2.5 pt-0.5 pb-2.5 duration-150 fade-in-0">
           {diffLoading ? (
             <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/10 px-3 py-3 text-xs text-muted-foreground">
               <LoadingSpinner size="sm" />
@@ -276,7 +283,7 @@ export const FileRow = memo(function FileRow({
   return (
     <div
       className={cn(
-        "group/row flex w-full cursor-pointer items-center gap-2.5 border-t border-border/15 px-4 py-2 text-left first:border-t-0 transition-colors hover:bg-muted/30",
+        "group/row flex w-full cursor-pointer items-center gap-2.5 border-t border-border/15 px-4 py-2 text-left transition-colors first:border-t-0 hover:bg-muted/30",
         className
       )}
       onClick={handleClick}

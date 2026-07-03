@@ -1,6 +1,6 @@
 import { memo } from "react"
 import { FileListItem } from "./file-list-item"
-import {  type ChangedFile } from "./status-badge"
+import { type ChangedFile } from "./status-badge"
 import { type DiffMode } from "./diff-view"
 
 export const FileAccordionItem = memo(function FileAccordionItem({

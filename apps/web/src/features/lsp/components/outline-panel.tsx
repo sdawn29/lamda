@@ -37,7 +37,9 @@ const SYMBOL_KIND_NAMES: Record<number, string> = {
   26: "TypeParameter",
 }
 
-function isHierarchical(symbols: DocumentSymbolResult): symbols is DocumentSymbol[] {
+function isHierarchical(
+  symbols: DocumentSymbolResult
+): symbols is DocumentSymbol[] {
   return symbols.length > 0 && "range" in symbols[0]
 }
 
@@ -52,25 +54,39 @@ export function OutlinePanel({ symbols, onJumpToLine }: OutlinePanelProps) {
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-muted-foreground hover:bg-muted/40"
       >
-        {open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+        {open ? (
+          <ChevronDown className="size-3" />
+        ) : (
+          <ChevronRight className="size-3" />
+        )}
         <ListTree className="size-3.5" />
         <span>Outline</span>
-        <span className="ml-auto text-muted-foreground/70">{symbols.length}</span>
+        <span className="ml-auto text-muted-foreground/70">
+          {symbols.length}
+        </span>
       </button>
       {open && (
         <div className="max-h-64 overflow-auto border-t bg-background/50 py-1">
           {isHierarchical(symbols) ? (
-            <SymbolTree symbols={symbols} depth={0} onJumpToLine={onJumpToLine} />
+            <SymbolTree
+              symbols={symbols}
+              depth={0}
+              onJumpToLine={onJumpToLine}
+            />
           ) : (
             <ul>
               {symbols.map((s, i) => (
                 <li key={i}>
                   <button
                     type="button"
-                    onClick={() => onJumpToLine(s.location.range.start.line + 1)}
+                    onClick={() =>
+                      onJumpToLine(s.location.range.start.line + 1)
+                    }
                     className="flex w-full items-center gap-2 px-3 py-0.5 text-left hover:bg-muted/40"
                   >
-                    <span className="text-muted-foreground/70">{SYMBOL_KIND_NAMES[s.kind] ?? "?"}</span>
+                    <span className="text-muted-foreground/70">
+                      {SYMBOL_KIND_NAMES[s.kind] ?? "?"}
+                    </span>
                     <span>{s.name}</span>
                   </button>
                 </li>
@@ -100,7 +116,7 @@ function SymbolTree({
             type="button"
             onClick={() => onJumpToLine(s.range.start.line + 1)}
             className={cn(
-              "flex w-full items-center gap-2 px-3 py-0.5 text-left hover:bg-muted/40",
+              "flex w-full items-center gap-2 px-3 py-0.5 text-left hover:bg-muted/40"
             )}
             style={{ paddingLeft: `${depth * 12 + 12}px` }}
           >
@@ -109,7 +125,9 @@ function SymbolTree({
             </span>
             <span>{s.name}</span>
             {s.detail && (
-              <span className="ml-2 truncate text-muted-foreground/60">{s.detail}</span>
+              <span className="ml-2 truncate text-muted-foreground/60">
+                {s.detail}
+              </span>
             )}
           </button>
           {s.children && s.children.length > 0 && (

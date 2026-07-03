@@ -1,12 +1,26 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import {
   getWorkspaceTasks,
   createWorkspaceTask,
   updateWorkspaceTask,
   deleteWorkspaceTask,
 } from "@lamda/db";
+import { parseJsonBody } from "../lib/validate.js";
 
 const tasksRouter = new Hono();
+
+const createTaskSchema = z.object({
+  name: z.string().optional(),
+  icon: z.string().optional(),
+  command: z.string(),
+});
+
+const updateTaskSchema = z.object({
+  name: z.string().optional(),
+  icon: z.string().optional(),
+  command: z.string().optional(),
+});
 
 tasksRouter.get("/:workspaceId", (c) => {
   const workspaceId = c.req.param("workspaceId");
@@ -16,11 +30,9 @@ tasksRouter.get("/:workspaceId", (c) => {
 
 tasksRouter.post("/:workspaceId", async (c) => {
   const workspaceId = c.req.param("workspaceId");
-  const { name, icon, command } = await c.req.json<{
-    name?: string;
-    icon?: string;
-    command: string;
-  }>();
+  const parsed = await parseJsonBody(c, createTaskSchema);
+  if (!parsed.ok) return parsed.response;
+  const { name, icon, command } = parsed.data;
   const task = createWorkspaceTask(workspaceId, { name, icon, command });
   return c.json({ task }, 201);
 });
@@ -28,12 +40,9 @@ tasksRouter.post("/:workspaceId", async (c) => {
 tasksRouter.patch("/:workspaceId/:id", async (c) => {
   const workspaceId = c.req.param("workspaceId");
   const id = c.req.param("id");
-  const updates = await c.req.json<{
-    name?: string;
-    icon?: string;
-    command?: string;
-  }>();
-  updateWorkspaceTask(workspaceId, id, updates);
+  const parsed = await parseJsonBody(c, updateTaskSchema);
+  if (!parsed.ok) return parsed.response;
+  updateWorkspaceTask(workspaceId, id, parsed.data);
   return c.json({ success: true });
 });
 

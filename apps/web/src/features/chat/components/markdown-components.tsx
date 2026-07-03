@@ -211,8 +211,7 @@ const ROUTE_PARAM_RE = /\/(?::|\{|<)/
 // A leading-slash path whose first segment is a well-known API/web prefix.
 // Anchored to a leading slash so relative folders like `api/handlers` or
 // `v8/snapshot` are still treated as paths.
-const ROUTE_PREFIX_RE =
-  /^\/(?:api|v\d+|graphql|gql|oauth2?|webhooks?)(?:\/|$)/i
+const ROUTE_PREFIX_RE = /^\/(?:api|v\d+|graphql|gql|oauth2?|webhooks?)(?:\/|$)/i
 
 // Query string or fragment — only ever appears in URLs/routes, never in a path
 // we could open in the editor.

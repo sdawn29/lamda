@@ -1,16 +1,19 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { saveMcpSettings, testMcpConnection, startMcpServer, stopMcpServer, setMcpServerEnabled } from "./api"
+import {
+  saveMcpSettings,
+  testMcpConnection,
+  startMcpServer,
+  stopMcpServer,
+  setMcpServerEnabled,
+} from "./api"
 import type { McpServerConfig } from "./types"
 import { mcpKeys } from "./queries"
 
 export function useSaveMcpSettings() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      settings,
-    }: {
-      settings: { servers: McpServerConfig[] }
-    }) => saveMcpSettings(settings),
+    mutationFn: ({ settings }: { settings: { servers: McpServerConfig[] } }) =>
+      saveMcpSettings(settings),
     onMutate: async ({ settings }) => {
       // Optimistically update the cache
       const prev = queryClient.getQueryData(mcpKeys.settings())
@@ -67,8 +70,13 @@ export function useStopMcpServer() {
 export function useSetMcpServerEnabled() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ serverName, enabled }: { serverName: string; enabled: boolean }) =>
-      setMcpServerEnabled(serverName, enabled),
+    mutationFn: ({
+      serverName,
+      enabled,
+    }: {
+      serverName: string
+      enabled: boolean
+    }) => setMcpServerEnabled(serverName, enabled),
     onSettled: () => {
       // Refresh settings and status after toggling enabled
       queryClient.invalidateQueries({ queryKey: mcpKeys.settings() })

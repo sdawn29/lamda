@@ -155,7 +155,9 @@ export function CreatePrDialog({
                 {createPr.isPending && (
                   <Loader2 className="size-4 animate-spin" />
                 )}
-                {createPr.isPending ? "Pushing & creating" : "Create pull request"}
+                {createPr.isPending
+                  ? "Pushing & creating"
+                  : "Create pull request"}
               </Button>
             </>
           )}

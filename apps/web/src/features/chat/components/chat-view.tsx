@@ -2,20 +2,11 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
-import type { AssistantMessage, ErrorAction, UserMessage } from "../types"
+import type { AssistantMessage, ErrorAction } from "../types"
 import { WorkingBlock, type WorkingMessage } from "./working-block"
-import {
-  ArrowDownIcon,
-  PlugZapIcon,
-  MoreHorizontal,
-  Pencil,
-  Pin,
-  PinOff,
-  Copy,
-  Archive,
-  Trash2,
-} from "lucide-react"
+import { ArrowDownIcon, PlugZapIcon } from "lucide-react"
 
+import { cn } from "@/shared/lib/utils"
 import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import {
@@ -27,13 +18,7 @@ import {
 import { pendingToUploads, pendingToDisplay } from "../lib/attachments"
 import { MessageRow, getMessageKey } from "./message-row"
 import { Button } from "@/shared/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/shared/ui/dropdown-menu"
+import { MobileThreadIslands } from "./mobile-thread-islands"
 import {
   useSlashCommands,
   useSessionStats,
@@ -71,8 +56,6 @@ import { formatFileCommentContext } from "../lib/file-context"
 import {
   useTurns,
   useLastCommitAt,
-  BranchSelector,
-  WorktreeSelector,
   useThreadBranchControls,
 } from "@/features/git"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
@@ -156,14 +139,7 @@ export function ChatView({
   const navigate = useNavigate()
   const syncEngine = getChatSyncEngine()
   const showThinkingSetting = useShowThinkingSetting()
-  const {
-    workspaces,
-    setThreadTitle,
-    deleteThread,
-    archiveThread,
-    pinThread,
-    unpinThread,
-  } = useWorkspace()
+  const { workspaces } = useWorkspace()
   const activeWorkspace = workspaces.find((w) => w.id === workspaceId)
   const activeThread = activeWorkspace?.threads.find((t) => t.id === threadId)
   // Files this thread touches live in its worktree when it runs in one, so
@@ -194,55 +170,6 @@ export function ChatView({
     worktreeBranch: activeThread?.worktreeBranch ?? null,
   })
 
-  // Thread rename + options menu for the mobile floating island — mirrors
-  // the title bar's thread-name island (hidden on mobile).
-  const [isRenamingThread, setIsRenamingThread] = useState(false)
-  const [threadRenameValue, setThreadRenameValue] = useState("")
-  const threadRenameInputRef = useRef<HTMLInputElement>(null)
-
-  const startThreadRename = () => {
-    setThreadRenameValue(activeThread?.title ?? "")
-    setIsRenamingThread(true)
-    setTimeout(() => threadRenameInputRef.current?.select(), 0)
-  }
-
-  const commitThreadRename = () => {
-    if (activeWorkspace && activeThread && threadRenameValue.trim()) {
-      setThreadTitle(
-        activeWorkspace.id,
-        activeThread.id,
-        threadRenameValue.trim()
-      )
-    }
-    setIsRenamingThread(false)
-  }
-
-  const handleTogglePinThread = async () => {
-    if (!activeWorkspace || !activeThread) return
-    if (activeThread.isPinned) {
-      await unpinThread(activeWorkspace.id, activeThread.id)
-    } else {
-      await pinThread(activeWorkspace.id, activeThread.id)
-    }
-  }
-
-  const handleArchiveThisThread = async () => {
-    if (!activeWorkspace || !activeThread) return
-    await archiveThread(activeWorkspace.id, activeThread.id)
-    navigate({ to: "/" })
-  }
-
-  const handleDeleteThisThread = async () => {
-    if (!activeWorkspace || !activeThread) return
-    await deleteThread(activeWorkspace.id, activeThread.id)
-    navigate({ to: "/" })
-  }
-
-  const handleCopyThisThreadId = () => {
-    if (!activeThread) return
-    void navigator.clipboard.writeText(activeThread.id)
-  }
-
   // Height of the floating bottom bar (error alert + todo + textbox). The
   // scroll area is padded by this so messages can scroll *behind* the input
   // instead of stopping above it.
@@ -272,6 +199,10 @@ export function ChatView({
   // Dedupe plan-saved announcements by relative path so a buffered/replayed
   // event after reconnect doesn't re-toast or re-open the tab.
   const announcedPlansRef = useRef<Set<string>>(new Set())
+  // Tool calls we've seen resolved this mount. Guards the status-snapshot
+  // restore below from resurrecting an approval that a live `resolved` event
+  // already cleared (the REST snapshot can arrive after that event).
+  const resolvedApprovalsRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     announcedPlansRef.current = new Set()
     resolvedApprovalsRef.current = new Set()
@@ -297,11 +228,6 @@ export function ChatView({
     },
     [rootPath]
   )
-
-  // Tool calls we've seen resolved this mount. Guards the status-snapshot
-  // restore below from resurrecting an approval that a live `resolved` event
-  // already cleared (the REST snapshot can arrive after that event).
-  const resolvedApprovalsRef = useRef<Set<string>>(new Set())
 
   const handleToolApprovalRequest = useCallback(
     (event: {
@@ -504,9 +430,19 @@ export function ChatView({
         dismissError(id)
       } else if (action.type === "retry" && action.prompt) {
         dismissError(id)
-        startUserPrompt(action.prompt, action.thinkingLevel)
+        const clientId = crypto.randomUUID()
+        startUserPrompt(
+          action.prompt,
+          action.thinkingLevel,
+          undefined,
+          clientId
+        )
         sendPromptMutation.mutate(
-          { text: action.prompt, thinkingLevel: action.thinkingLevel },
+          {
+            text: action.prompt,
+            thinkingLevel: action.thinkingLevel,
+            clientId,
+          },
           { onError: markSendFailed }
         )
       }
@@ -815,16 +751,20 @@ export function ChatView({
       // into the current run after the active tool call finishes.
       // Attachments aren't supported on steering messages — they go with new prompts.
       if (isLoading) {
-        steerPrompt(text)
+        const clientId = crypto.randomUUID()
+        steerPrompt(text, clientId)
         pinToBottom()
-        steerMutation.mutate(text, {
-          onError: () => {
-            toast.error("Couldn't steer", {
-              description:
-                "Your message couldn't be delivered to the running agent. Try again.",
-            })
-          },
-        })
+        steerMutation.mutate(
+          { text, clientId },
+          {
+            onError: () => {
+              toast.error("Couldn't steer", {
+                description:
+                  "Your message couldn't be delivered to the running agent. Try again.",
+              })
+            },
+          }
+        )
         return
       }
 
@@ -840,12 +780,13 @@ export function ChatView({
       const displayAttachments = attachments
         ? pendingToDisplay(attachments)
         : undefined
-      startUserPrompt(text, thinkingLevel, displayAttachments)
+      const clientId = crypto.randomUUID()
+      startUserPrompt(text, thinkingLevel, displayAttachments, clientId)
       pinToBottom()
 
       const model = modelId && provider ? { provider, modelId } : undefined
       sendPromptMutation.mutate(
-        { text, model, thinkingLevel, attachments: uploads },
+        { text, model, thinkingLevel, attachments: uploads, clientId },
         { onError: markSendFailed }
       )
     },
@@ -955,118 +896,16 @@ export function ChatView({
             location. The title bar hides these on narrow screens (no room),
             so they float over the chat view instead. ─────────────────────── */}
         {isMobile && activeThread && (
-          <div className="absolute inset-x-0 top-2 z-30 flex flex-wrap justify-start gap-1.5 px-2">
-            <div className="flex max-w-full min-w-0 shrink items-center gap-1 overflow-hidden rounded-lg border border-border bg-background/70 px-2 py-1 shadow-sm backdrop-blur-md">
-              {activeWorkspace && (
-                <>
-                  <span className="hidden shrink truncate text-2xs font-medium text-muted-foreground/70 sm:inline">
-                    {activeWorkspace.name}
-                  </span>
-                  <span className="mx-0.5 hidden shrink-0 text-2xs text-muted-foreground/40 select-none sm:inline">
-                    /
-                  </span>
-                </>
-              )}
-              {isRenamingThread ? (
-                <span className="inline-grid min-w-0">
-                  <span
-                    aria-hidden
-                    className="invisible col-start-1 row-start-1 text-sm font-semibold whitespace-pre"
-                  >
-                    {threadRenameValue || " "}
-                  </span>
-                  <input
-                    ref={threadRenameInputRef}
-                    autoFocus
-                    size={1}
-                    value={threadRenameValue}
-                    onChange={(e) => setThreadRenameValue(e.target.value)}
-                    onBlur={commitThreadRename}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitThreadRename()
-                      if (e.key === "Escape") setIsRenamingThread(false)
-                    }}
-                    className="col-start-1 row-start-1 w-full min-w-0 bg-transparent text-sm font-semibold outline-none"
-                  />
-                </span>
-              ) : (
-                <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-                  {activeThread.title}
-                </span>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className="ml-0.5 shrink-0 text-muted-foreground/50"
-                    />
-                  }
-                >
-                  <MoreHorizontal className="size-3.5" />
-                  <span className="sr-only">Thread options</span>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={startThreadRename}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleTogglePinThread}>
-                    {activeThread.isPinned ? (
-                      <>
-                        <PinOff className="mr-2 h-4 w-4" />
-                        Unpin
-                      </>
-                    ) : (
-                      <>
-                        <Pin className="mr-2 h-4 w-4" />
-                        Pin
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleCopyThisThreadId}>
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy Thread ID
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleArchiveThisThread}>
-                    <Archive className="mr-2 h-4 w-4" />
-                    Archive
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={handleDeleteThisThread}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Thread
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <div className="flex shrink-0 items-center rounded-lg border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-md">
-              <BranchSelector
-                branch={branch}
-                branches={branches}
-                onBranchSelect={handleBranchSelect}
-                onGitError={handleGitError}
-                sessionId={sessionId}
-                disabled={!!activeThread.worktreeBranch}
-                disabledReason="This thread runs in a worktree — its branch is managed by the worktree selector"
-              />
-            </div>
-            <div className="flex shrink-0 items-center rounded-lg border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-md">
-              <WorktreeSelector
-                threadId={threadId}
-                sessionId={sessionId}
-                threadTitle={activeThread.title}
-                branches={branches}
-                currentBranch={branch}
-                worktreeBranch={activeThread.worktreeBranch}
-                onError={handleGitError}
-              />
-            </div>
-          </div>
+          <MobileThreadIslands
+            activeWorkspace={activeWorkspace}
+            activeThread={activeThread}
+            sessionId={sessionId}
+            threadId={threadId}
+            branch={branch}
+            branches={branches}
+            onBranchSelect={handleBranchSelect}
+            onGitError={handleGitError}
+          />
         )}
         {noProvider && (
           <div className="flex shrink-0 items-center gap-3 border-b border-amber-500/20 bg-amber-500/5 px-4 py-2.5">
@@ -1093,7 +932,13 @@ export function ChatView({
         <div
           ref={scrollContainerRef}
           onScroll={onScroll}
-          className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pt-4 pb-8"
+          className={cn(
+            "flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-8",
+            // Reserve room for the floating mobile islands (absolutely
+            // positioned above, in the relative parent) so the first message
+            // doesn't render underneath them.
+            isMobile && activeThread ? "pt-16" : "pt-4"
+          )}
         >
           <div ref={messagesContainerRef}>
             {/* Older history loads automatically as the user scrolls near the
@@ -1167,6 +1012,13 @@ export function ChatView({
                     isLoading &&
                     groupIndex === activeTurnFooterGroupIndex
                   const entryDelayMs = isNewMessage ? getEntryDelayMs(key) : 0
+                  // The trailing assistant group of an in-flight turn is the
+                  // live typing edge — it renders the streaming caret while
+                  // more deltas may still land.
+                  const isStreamingTail =
+                    isLoading &&
+                    message.role === "assistant" &&
+                    groupIndex === groupedMessages.length - 1
                   content = (
                     <div className="mx-auto w-full max-w-4xl px-3 pb-3">
                       <MessageRow
@@ -1179,6 +1031,7 @@ export function ChatView({
                         entryDelayMs={entryDelayMs}
                         isLastInTurn={isLastInTurn}
                         footerPending={footerPending}
+                        isStreaming={isStreamingTail}
                         turnMessages={turnMessages}
                         errorRepeatCount={repeatCount}
                         rootPath={rootPath}
@@ -1186,7 +1039,8 @@ export function ChatView({
                         onFork={handleFork}
                         onRevert={!isLoading ? handleRevert : undefined}
                         isReverting={
-                          revertingBlockId === (message as UserMessage).id
+                          message.role === "user" &&
+                          revertingBlockId === message.id
                         }
                         checkpoint={
                           message.role === "user" && message.id

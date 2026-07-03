@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises"
+import { mkdir } from "node:fs/promises";
 import {
   getAutomation,
   getWorkspace,
@@ -12,28 +12,28 @@ import {
   finishAutomationRun,
   hasActiveRun,
   type DbAutomation,
-} from "@lamda/db"
-import { lamdaWorktreePath, lamdaWorktreesDir } from "@lamda/pi-sdk"
+} from "@lamda/db";
+import { lamdaWorktreePath, lamdaWorktreesDir } from "@lamda/pi-sdk";
 import {
   getRepoRoot,
   getCurrentBranch,
   getRefSha,
   addWorktree,
-} from "@lamda/git"
-import { store } from "../store.js"
+} from "@lamda/git";
+import { store } from "../store.js";
 import {
   createSessionForThread,
   openSessionForThread,
   resolveThreadCwd,
   refreshWorktreeWatch,
-} from "./session-service.js"
-import { sendPrompt } from "./prompt-runner.js"
-import { automationBroadcaster } from "../automation-broadcaster.js"
+} from "./session-service.js";
+import { sendPrompt } from "./prompt-runner.js";
+import { automationBroadcaster } from "../automation-broadcaster.js";
 
 export interface RunResult {
-  status: "ok" | "error" | "skipped"
-  threadId?: string
-  error?: string
+  status: "ok" | "error" | "skipped";
+  threadId?: string;
+  error?: string;
 }
 
 /** Derive a git-branch-safe slug for an automation's dedicated worktree branch. */
@@ -41,8 +41,8 @@ function automationBranch(automation: DbAutomation): string {
   const slug = automation.name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-  return `automation/${slug || automation.id.slice(0, 8)}`
+    .replace(/(^-|-$)/g, "");
+  return `automation/${slug || automation.id.slice(0, 8)}`;
 }
 
 /**
@@ -57,24 +57,24 @@ async function ensureWorktree(
   workspacePath: string,
   workspaceName: string,
 ): Promise<string> {
-  const repoRoot = await getRepoRoot(workspacePath)
+  const repoRoot = await getRepoRoot(workspacePath);
   if (!repoRoot) {
     throw new Error(
       "Workspace is not a git repository — disable the worktree option to run locally.",
-    )
+    );
   }
-  const baseRef = await getCurrentBranch(repoRoot)
+  const baseRef = await getCurrentBranch(repoRoot);
   if (!baseRef || !(await getRefSha(repoRoot, baseRef))) {
     throw new Error(
       `Base branch "${baseRef ?? "?"}" has no commits yet — make an initial commit, or disable the worktree option.`,
-    )
+    );
   }
-  const branch = automationBranch(automation)
-  const worktreePath = lamdaWorktreePath(workspaceName, branch)
-  await mkdir(lamdaWorktreesDir(workspaceName), { recursive: true })
-  await addWorktree(repoRoot, worktreePath, branch, baseRef)
-  setThreadWorktree(threadId, worktreePath, branch, true, baseRef)
-  return worktreePath
+  const branch = automationBranch(automation);
+  const worktreePath = lamdaWorktreePath(workspaceName, branch);
+  await mkdir(lamdaWorktreesDir(workspaceName), { recursive: true });
+  await addWorktree(repoRoot, worktreePath, branch, baseRef);
+  setThreadWorktree(threadId, worktreePath, branch, true, baseRef);
+  return worktreePath;
 }
 
 /**
@@ -84,29 +84,29 @@ async function ensureWorktree(
 async function ensureThread(automation: DbAutomation): Promise<string> {
   const existing = automation.threadId
     ? getThread(automation.threadId)
-    : undefined
+    : undefined;
   if (existing) {
     // Keep the thread's mode/approval in sync with edits to the automation.
-    updateThreadMode(existing.id, automation.mode)
-    updateThreadApprovalMode(existing.id, automation.approvalMode)
-    return existing.id
+    updateThreadMode(existing.id, automation.mode);
+    updateThreadApprovalMode(existing.id, automation.approvalMode);
+    return existing.id;
   }
 
-  const ws = getWorkspace(automation.workspaceId)
-  if (!ws) throw new Error(`Workspace ${automation.workspaceId} not found`)
+  const ws = getWorkspace(automation.workspaceId);
+  if (!ws) throw new Error(`Workspace ${automation.workspaceId} not found`);
 
   const threadId = insertThread(automation.workspaceId, {
     title: automation.name,
     mode: automation.mode,
     modelId: automation.modelId,
     approvalMode: automation.approvalMode,
-  })
-  setAutomationThread(automation.id, threadId)
+  });
+  setAutomationThread(automation.id, threadId);
 
   if (automation.useWorktree) {
-    await ensureWorktree(automation, threadId, ws.path, ws.name)
+    await ensureWorktree(automation, threadId, ws.path, ws.name);
   }
-  return threadId
+  return threadId;
 }
 
 /** Get a live session for the thread, resuming or creating one as needed. */
@@ -115,11 +115,11 @@ async function ensureSession(
   workspaceId: string,
   workspacePath: string,
 ): Promise<string> {
-  const live = store.getByThreadId(threadId)
-  if (live) return live.sessionId
+  const live = store.getByThreadId(threadId);
+  if (live) return live.sessionId;
 
-  const thread = getThread(threadId)
-  const cwd = resolveThreadCwd(thread, workspacePath)
+  const thread = getThread(threadId);
+  const cwd = resolveThreadCwd(thread, workspacePath);
 
   if (thread?.sessionFile) {
     try {
@@ -128,15 +128,15 @@ async function ensureSession(
         thread.sessionFile,
         cwd,
         workspaceId,
-      )
-      const sessionId = store.create(handle, cwd, threadId, workspaceId)
-      refreshWorktreeWatch(sessionId)
-      return sessionId
+      );
+      const sessionId = store.create(handle, cwd, threadId, workspaceId);
+      refreshWorktreeWatch(sessionId);
+      return sessionId;
     } catch {
       // Corrupt/unreadable session file — fall back to a fresh session.
     }
   }
-  return createSessionForThread(threadId, cwd, workspaceId)
+  return createSessionForThread(threadId, cwd, workspaceId);
 }
 
 /**
@@ -149,55 +149,55 @@ export async function runAutomation(
   automationId: string,
   trigger: "scheduled" | "manual",
 ): Promise<RunResult> {
-  const automation = getAutomation(automationId)
-  if (!automation) return { status: "error", error: "Automation not found" }
+  const automation = getAutomation(automationId);
+  if (!automation) return { status: "error", error: "Automation not found" };
 
   if (hasActiveRun(automationId)) {
-    return { status: "skipped" }
+    return { status: "skipped" };
   }
 
-  const ws = getWorkspace(automation.workspaceId)
-  if (!ws) return { status: "error", error: "Workspace not found" }
+  const ws = getWorkspace(automation.workspaceId);
+  if (!ws) return { status: "error", error: "Workspace not found" };
 
-  let threadId: string
+  let threadId: string;
   try {
-    threadId = await ensureThread(automation)
+    threadId = await ensureThread(automation);
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err)
-    const runId = startAutomationRun(automationId, trigger, null)
-    finishAutomationRun(runId, automationId, "error", error, null)
-    automationBroadcaster.broadcast()
-    return { status: "error", error }
+    const error = err instanceof Error ? err.message : String(err);
+    const runId = startAutomationRun(automationId, trigger, null);
+    finishAutomationRun(runId, automationId, "error", error, null);
+    automationBroadcaster.broadcast();
+    return { status: "error", error };
   }
 
   // Create the session up front so the thread has a resolvable sessionId the
   // moment we announce the run. Otherwise clients open the freshly-created
   // thread before its session exists and are stuck on a skeleton loader (the
   // thread route renders a skeleton whenever thread.sessionId is null).
-  let sessionId: string
+  let sessionId: string;
   try {
-    sessionId = await ensureSession(threadId, ws.id, ws.path)
+    sessionId = await ensureSession(threadId, ws.id, ws.path);
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err)
-    const runId = startAutomationRun(automationId, trigger, threadId)
-    finishAutomationRun(runId, automationId, "error", error, threadId)
-    automationBroadcaster.broadcast()
-    return { status: "error", threadId, error }
+    const error = err instanceof Error ? err.message : String(err);
+    const runId = startAutomationRun(automationId, trigger, threadId);
+    finishAutomationRun(runId, automationId, "error", error, threadId);
+    automationBroadcaster.broadcast();
+    return { status: "error", threadId, error };
   }
 
-  const runId = startAutomationRun(automationId, trigger, threadId)
+  const runId = startAutomationRun(automationId, trigger, threadId);
   // Notify clients: the run is now active and a dedicated thread (with its
   // session) may have just been created, so the sidebar/thread tree refreshes.
-  automationBroadcaster.broadcast()
+  automationBroadcaster.broadcast();
   try {
-    await sendPrompt(sessionId, automation.prompt)
-    finishAutomationRun(runId, automationId, "ok", null, threadId)
-    automationBroadcaster.broadcast()
-    return { status: "ok", threadId }
+    await sendPrompt(sessionId, automation.prompt);
+    finishAutomationRun(runId, automationId, "ok", null, threadId);
+    automationBroadcaster.broadcast();
+    return { status: "ok", threadId };
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err)
-    finishAutomationRun(runId, automationId, "error", error, threadId)
-    automationBroadcaster.broadcast()
-    return { status: "error", threadId, error }
+    const error = err instanceof Error ? err.message : String(err);
+    finishAutomationRun(runId, automationId, "error", error, threadId);
+    automationBroadcaster.broadcast();
+    return { status: "error", threadId, error };
   }
 }

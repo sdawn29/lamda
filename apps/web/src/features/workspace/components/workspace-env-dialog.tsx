@@ -42,13 +42,19 @@ interface WorkspaceEnvDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function WorkspaceEnvDialog({ workspace, open, onOpenChange }: WorkspaceEnvDialogProps) {
+export function WorkspaceEnvDialog({
+  workspace,
+  open,
+  onOpenChange,
+}: WorkspaceEnvDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[90vh] w-[90vw] max-w-[90vw] flex-col sm:max-w-[90vw]">
         {/* Remounts each time the dialog opens so state is seeded from the
             current workspace env without a synchronizing effect. */}
-        {open && <EnvDialogBody workspace={workspace} onOpenChange={onOpenChange} />}
+        {open && (
+          <EnvDialogBody workspace={workspace} onOpenChange={onOpenChange} />
+        )}
       </DialogContent>
     </Dialog>
   )
@@ -70,7 +76,9 @@ function EnvDialogBody({
   }
 
   function updateRow(index: number, field: "key" | "value", val: string) {
-    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: val } : r)))
+    setRows((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, [field]: val } : r))
+    )
   }
 
   function removeRow(index: number) {
@@ -189,25 +197,32 @@ function EnvDialogBody({
         >
           {rows.length > 0 && (
             <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-0.5 pb-0.5">
-              <span className="text-xs font-medium text-muted-foreground">Key</span>
-              <span className="text-xs font-medium text-muted-foreground">Value</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                Key
+              </span>
+              <span className="text-xs font-medium text-muted-foreground">
+                Value
+              </span>
               <span />
             </div>
           )}
           {rows.map((row, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+            <div
+              key={i}
+              className="grid grid-cols-[1fr_1fr_auto] items-center gap-2"
+            >
               <Input
                 value={row.key}
                 onChange={(e) => updateRow(i, "key", e.target.value)}
                 placeholder="VARIABLE_NAME"
-                className="font-mono text-xs h-8"
+                className="h-8 font-mono text-xs"
                 spellCheck={false}
               />
               <Input
                 value={row.value}
                 onChange={(e) => updateRow(i, "value", e.target.value)}
                 placeholder="value"
-                className="font-mono text-xs h-8"
+                className="h-8 font-mono text-xs"
                 spellCheck={false}
               />
               <Button
@@ -231,11 +246,16 @@ function EnvDialogBody({
           </Button>
         </TabsContent>
 
-        <TabsContent value="editor" className="flex min-h-0 flex-1 flex-col py-1">
+        <TabsContent
+          value="editor"
+          className="flex min-h-0 flex-1 flex-col py-1"
+        >
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={"# Paste your .env file here\nKEY=value\nANOTHER_KEY=another value"}
+            placeholder={
+              "# Paste your .env file here\nKEY=value\nANOTHER_KEY=another value"
+            }
             className="min-h-0 flex-1 resize-none font-mono text-xs leading-relaxed"
             spellCheck={false}
           />

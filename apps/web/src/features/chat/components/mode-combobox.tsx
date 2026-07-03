@@ -203,6 +203,7 @@ function dynamicModeIcon(name: IconName): LucideIcon {
   if (cached) return cached
   const iconName: IconName = name
   const Component = React.forwardRef<SVGSVGElement, LucideProps>(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude `name` from the spread below
     ({ name: _svgName, ...props }, ref) => (
       <DynamicIcon
         {...props}

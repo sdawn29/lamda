@@ -1,18 +1,22 @@
-import { createAgentSession, ModelRegistry, SessionManager } from "@earendil-works/pi-coding-agent"
-import { buildAuthStorage } from "./auth.js"
-import type { SdkConfig } from "./types.js"
+import {
+  createAgentSession,
+  ModelRegistry,
+  SessionManager,
+} from "@earendil-works/pi-coding-agent";
+import { buildAuthStorage } from "./auth.js";
+import type { SdkConfig } from "./types.js";
 
 /** A memory the reflection pass proposes extracting from a thread transcript. */
 export interface MemoryProposal {
-  kind: "fact" | "preference" | "convention" | "decision" | "episode"
-  scope: "user" | "workspace"
-  title: string
-  content: string
-  filePaths?: string[]
-  confidence?: number
+  kind: "fact" | "preference" | "convention" | "decision" | "episode";
+  scope: "user" | "workspace";
+  title: string;
+  content: string;
+  filePaths?: string[];
+  confidence?: number;
 }
 
-const MAX_PROPOSALS = 5
+const MAX_PROPOSALS = 5;
 
 const REFLECTION_SYSTEM = `You analyse a coding-assistant conversation and extract durable memories worth keeping for future sessions. You are precise and conservative: most turns of a conversation produce NOTHING worth remembering.
 
@@ -31,37 +35,40 @@ Rules:
 - Return AT MOST ${MAX_PROPOSALS} memories. If nothing qualifies, return an empty array.
 
 Respond with ONLY a JSON array (no prose, no code fences) of objects:
-[{"kind": "...", "scope": "user|workspace", "title": "...", "content": "...", "filePaths": ["..."], "confidence": 0.0-1.0}]`
+[{"kind": "...", "scope": "user|workspace", "title": "...", "content": "...", "filePaths": ["..."], "confidence": 0.0-1.0}]`;
 
 /** Strip a leading/trailing ```json fence if the model added one. */
 function stripFences(text: string): string {
-  const t = text.trim()
-  if (!t.startsWith("```")) return t
+  const t = text.trim();
+  if (!t.startsWith("```")) return t;
   return t
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "")
-    .trim()
+    .trim();
 }
 
 function coerceProposals(raw: unknown): MemoryProposal[] {
-  if (!Array.isArray(raw)) return []
-  const kinds = ["fact", "preference", "convention", "decision", "episode"]
-  const out: MemoryProposal[] = []
+  if (!Array.isArray(raw)) return [];
+  const kinds = ["fact", "preference", "convention", "decision", "episode"];
+  const out: MemoryProposal[] = [];
   for (const item of raw) {
-    if (!item || typeof item !== "object") continue
-    const o = item as Record<string, unknown>
-    const kind = typeof o.kind === "string" && kinds.includes(o.kind) ? o.kind : "fact"
-    const scope = o.scope === "user" ? "user" : "workspace"
-    const title = typeof o.title === "string" ? o.title.trim() : ""
-    const content = typeof o.content === "string" ? o.content.trim() : ""
-    if (!title || !content) continue
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const kind =
+      typeof o.kind === "string" && kinds.includes(o.kind) ? o.kind : "fact";
+    const scope = o.scope === "user" ? "user" : "workspace";
+    const title = typeof o.title === "string" ? o.title.trim() : "";
+    const content = typeof o.content === "string" ? o.content.trim() : "";
+    if (!title || !content) continue;
     const filePaths = Array.isArray(o.filePaths)
-      ? o.filePaths.filter((p): p is string => typeof p === "string" && p.trim().length > 0)
-      : undefined
+      ? o.filePaths.filter(
+          (p): p is string => typeof p === "string" && p.trim().length > 0,
+        )
+      : undefined;
     const confidence =
       typeof o.confidence === "number" && o.confidence >= 0 && o.confidence <= 1
         ? o.confidence
-        : undefined
+        : undefined;
     out.push({
       kind: kind as MemoryProposal["kind"],
       scope,
@@ -69,10 +76,10 @@ function coerceProposals(raw: unknown): MemoryProposal[] {
       content,
       ...(filePaths && filePaths.length ? { filePaths } : {}),
       ...(confidence !== undefined ? { confidence } : {}),
-    })
-    if (out.length >= MAX_PROPOSALS) break
+    });
+    if (out.length >= MAX_PROPOSALS) break;
   }
-  return out
+  return out;
 }
 
 /**
@@ -94,21 +101,23 @@ export async function generateMemoryProposals(
   existingTitles: string[],
   config: SdkConfig = {},
 ): Promise<MemoryProposal[] | null> {
-  if (!transcript.trim()) return []
+  if (!transcript.trim()) return [];
 
-  const authStorage = buildAuthStorage(config)
-  const modelRegistry = ModelRegistry.create(authStorage)
-  const sessionManager = SessionManager.inMemory(config.cwd ?? process.cwd())
+  const authStorage = buildAuthStorage(config);
+  const modelRegistry = ModelRegistry.create(authStorage);
+  const sessionManager = SessionManager.inMemory(config.cwd ?? process.cwd());
   const model =
-    config.provider && config.model ? modelRegistry.find(config.provider, config.model) : undefined
+    config.provider && config.model
+      ? modelRegistry.find(config.provider, config.model)
+      : undefined;
 
   const existing =
     existingTitles.length > 0
       ? `EXISTING MEMORIES (do not duplicate):\n${existingTitles.map((t) => `- ${t}`).join("\n")}\n\n`
-      : ""
-  const prompt = `${REFLECTION_SYSTEM}\n\n${existing}CONVERSATION:\n${transcript}`
+      : "";
+  const prompt = `${REFLECTION_SYSTEM}\n\n${existing}CONVERSATION:\n${transcript}`;
 
-  let answer = ""
+  let answer = "";
   try {
     const { session } = await createAgentSession({
       authStorage,
@@ -116,29 +125,32 @@ export async function generateMemoryProposals(
       sessionManager,
       tools: [],
       model,
-    })
+    });
     const unsubscribe = session.subscribe((event) => {
-      if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
-        answer += event.assistantMessageEvent.delta
+      if (
+        event.type === "message_update" &&
+        event.assistantMessageEvent.type === "text_delta"
+      ) {
+        answer += event.assistantMessageEvent.delta;
       }
-    })
+    });
     try {
-      await session.prompt(prompt)
+      await session.prompt(prompt);
     } finally {
-      unsubscribe()
-      session.dispose()
+      unsubscribe();
+      session.dispose();
     }
   } catch {
     // The model call failed — signal that so the caller doesn't advance its
     // watermark past a transcript it never actually got to analyse.
-    return null
+    return null;
   }
 
   try {
-    return coerceProposals(JSON.parse(stripFences(answer)))
+    return coerceProposals(JSON.parse(stripFences(answer)));
   } catch {
     // The model responded but produced unparseable output — treat as "nothing
     // worth keeping" rather than a failure; the window has been considered.
-    return []
+    return [];
   }
 }

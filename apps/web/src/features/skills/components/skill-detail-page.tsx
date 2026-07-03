@@ -33,11 +33,14 @@ export function SkillDetailPage({ source }: { source: string }) {
   const remove = useRemoveSkill()
 
   const installedSkill = installed.find((s) => s.source === source)
-  const runningJob = jobs.find((j) => j.source === source && j.status === "running")
+  const runningJob = jobs.find(
+    (j) => j.source === source && j.status === "running"
+  )
   const installing = install.isPending || runningJob?.status === "running"
 
   const [owner, repo] = source.split("/")
-  const registryUrl = owner && repo ? `https://skills.sh/${owner}/${repo}` : null
+  const registryUrl =
+    owner && repo ? `https://skills.sh/${owner}/${repo}` : null
 
   const handleInstall = () => {
     install.mutate(source, {
@@ -70,7 +73,8 @@ export function SkillDetailPage({ source }: { source: string }) {
             <Alert variant="destructive">
               <AlertCircle />
               <AlertDescription>
-                Couldn't load this skill. It may have been removed from the registry.
+                Couldn't load this skill. It may have been removed from the
+                registry.
               </AlertDescription>
             </Alert>
           )}

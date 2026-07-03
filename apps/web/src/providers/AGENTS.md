@@ -22,15 +22,15 @@ export function AppProviders({ children }: AppProvidersProps) {
 
 ## Re-exports
 
-| Export | Source | Type |
-|--------|--------|------|
-| `useThreadStatus`, `useSetThreadStatus` | `@/features/chat` | hook |
-| `useErrorToast` | `@/features/chat` | hook |
-| `useSettingsModal`, `useConfigureProvider` | `@/features/settings` | hook |
-| `useCommandPalette` | `@/features/command-palette` | hook |
-| `ThreadStatus` | `@/features/chat` | type |
-| `ErrorMessage` | `@/features/chat` | type |
-| `ConfigureProviderTab` | `@/features/settings` | type |
+| Export                                     | Source                       | Type |
+| ------------------------------------------ | ---------------------------- | ---- |
+| `useThreadStatus`, `useSetThreadStatus`    | `@/features/chat`            | hook |
+| `useErrorToast`                            | `@/features/chat`            | hook |
+| `useSettingsModal`, `useConfigureProvider` | `@/features/settings`        | hook |
+| `useCommandPalette`                        | `@/features/command-palette` | hook |
+| `ThreadStatus`                             | `@/features/chat`            | type |
+| `ErrorMessage`                             | `@/features/chat`            | type |
+| `ConfigureProviderTab`                     | `@/features/settings`        | type |
 
 ## Conventions
 

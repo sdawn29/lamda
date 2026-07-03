@@ -134,9 +134,9 @@ export function AutomationFormDialog({
         models.reduce<Record<string, typeof models>>((acc, m) => {
           ;(acc[m.provider] ??= []).push(m)
           return acc
-        }, {}),
+        }, {})
       ),
-    [models],
+    [models]
   )
 
   const selectedModel = useMemo(() => {
@@ -164,7 +164,7 @@ export function AutomationFormDialog({
         useWorktree,
         enabled,
       },
-      workspaceId,
+      workspaceId
     )
     onOpenChange(false)
   }
@@ -184,7 +184,7 @@ export function AutomationFormDialog({
       >
         {/* Header */}
         <DialogHeader className="flex-row items-center gap-3 space-y-0 border-b border-border/70 px-6 py-4">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15 ring-inset">
             <CalendarClock className="size-4" />
           </div>
           <div className="flex flex-col gap-0.5">
@@ -323,9 +323,11 @@ export function AutomationFormDialog({
                 </div>
               )}
 
-              <div className="flex items-center gap-2.5 rounded-lg bg-primary/5 px-3 py-2 ring-1 ring-inset ring-primary/10">
+              <div className="flex items-center gap-2.5 rounded-lg bg-primary/5 px-3 py-2 ring-1 ring-primary/10 ring-inset">
                 <CalendarClock className="size-3.5 shrink-0 text-primary/70" />
-                <span className="text-xs font-medium">{describeCron(cron)}</span>
+                <span className="text-xs font-medium">
+                  {describeCron(cron)}
+                </span>
                 <span className="ml-auto shrink-0 font-mono text-3xs text-muted-foreground/50">
                   {cron}
                 </span>
@@ -368,8 +370,8 @@ export function AutomationFormDialog({
 
               {approvalMode === "ask" && (
                 <Callout>
-                  No one is present during a scheduled run, so “Ask” will block on
-                  the first approval. Choose an auto-approve mode.
+                  No one is present during a scheduled run, so “Ask” will block
+                  on the first approval. Choose an auto-approve mode.
                 </Callout>
               )}
             </Card>
@@ -463,7 +465,7 @@ function Segmented({
   options: { value: string; label: string }[]
 }) {
   return (
-    <div className="flex gap-1 rounded-lg bg-background/60 p-1 ring-1 ring-inset ring-border/60">
+    <div className="flex gap-1 rounded-lg bg-background/60 p-1 ring-1 ring-border/60 ring-inset">
       {options.map((o) => {
         const active = o.value === value
         return (
@@ -475,7 +477,7 @@ function Segmented({
               "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-all",
               active
                 ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
             {o.label}
@@ -543,7 +545,7 @@ function ToggleRow({
           "flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors",
           checked
             ? "bg-primary/10 text-primary"
-            : "bg-muted text-muted-foreground/60",
+            : "bg-muted text-muted-foreground/60"
         )}
       >
         <Icon className="size-3.5" />

@@ -18,7 +18,9 @@ import {
 export const THEME_STYLE_ELEMENT_ID = "lamda-theme-vars"
 
 function paletteToDeclarations(palette: ThemePalette): string {
-  return THEME_COLOR_KEYS.map((key) => `  --${key}: ${palette[key]};`).join("\n")
+  return THEME_COLOR_KEYS.map((key) => `  --${key}: ${palette[key]};`).join(
+    "\n"
+  )
 }
 
 /**

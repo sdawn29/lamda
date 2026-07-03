@@ -1,7 +1,4 @@
-import {
-  AuthStorage,
-  ModelRegistry,
-} from "@earendil-works/pi-coding-agent";
+import { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import type { ModelInfo } from "./types.js";
 

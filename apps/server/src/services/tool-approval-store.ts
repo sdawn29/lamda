@@ -55,7 +55,9 @@ function load(cwd: string): ToolApprovalsFile {
   let data: ToolApprovalsFile = { version: VERSION, tools: {} };
   if (mtimeMs !== -1) {
     try {
-      const parsed = JSON.parse(readFileSync(path, "utf-8")) as ToolApprovalsFile;
+      const parsed = JSON.parse(
+        readFileSync(path, "utf-8"),
+      ) as ToolApprovalsFile;
       if (parsed && typeof parsed === "object" && parsed.tools) {
         data = { version: VERSION, tools: { ...parsed.tools } };
       }
@@ -68,7 +70,10 @@ function load(cwd: string): ToolApprovalsFile {
 }
 
 /** Look up a remembered decision for a tool in this workspace, if any. */
-export function getToolDecision(cwd: string, toolName: string): ToolDecision | null {
+export function getToolDecision(
+  cwd: string,
+  toolName: string,
+): ToolDecision | null {
   return load(cwd).tools[toolName] ?? null;
 }
 

@@ -6,26 +6,26 @@ lamda has a full theming engine that controls the entire app's appearance — UI
 
 Appearance is controlled by two independent settings:
 
-| Axis | Options | What it does |
-|------|---------|--------------|
-| **Mode** | Light, Dark, System | Toggles the light/dark variant of the active theme |
-| **Color Theme** | Any built-in or custom theme | Picks the palette that fills the design tokens |
+| Axis            | Options                      | What it does                                       |
+| --------------- | ---------------------------- | -------------------------------------------------- |
+| **Mode**        | Light, Dark, System          | Toggles the light/dark variant of the active theme |
+| **Color Theme** | Any built-in or custom theme | Picks the palette that fills the design tokens     |
 
 Both are persisted to the app settings store, so they survive restarts and apply everywhere.
 
 ## Built-in Themes
 
-| Theme | Notes |
-|-------|-------|
-| **Jellybeans** | Default |
-| **Graphite** | |
-| **macOS** | System-like look with matching corner radius |
-| **Nord** | |
-| **Rosé Pine** | |
-| **Solarized** | |
-| **Catppuccin** | Macchiato in dark mode, Latte in light mode |
-| **Cursor Anysphere** | |
-| **Tokyo Night** | |
+| Theme                | Notes                                        |
+| -------------------- | -------------------------------------------- |
+| **Jellybeans**       | Default                                      |
+| **Graphite**         |                                              |
+| **macOS**            | System-like look with matching corner radius |
+| **Nord**             |                                              |
+| **Rosé Pine**        |                                              |
+| **Solarized**        |                                              |
+| **Catppuccin**       | Macchiato in dark mode, Latte in light mode  |
+| **Cursor Anysphere** |                                              |
+| **Tokyo Night**      |                                              |
 
 Pick a theme from the swatch grid in **Settings** → **Appearance**.
 

@@ -5,7 +5,7 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 /** Build a 5-field cron expression from the form's preset controls. */
 export function buildCron(
   preset: SchedulePreset,
-  opts: { minute?: number; hour?: number; weekday?: number; custom?: string },
+  opts: { minute?: number; hour?: number; weekday?: number; custom?: string }
 ): string {
   const minute = clamp(opts.minute ?? 0, 0, 59)
   const hour = clamp(opts.hour ?? 9, 0, 23)
@@ -53,7 +53,13 @@ export function parseCron(cron: string): {
       return { preset: "daily", minute: m, hour: h, weekday: 1, custom: cron }
     }
   }
-  if (dom === "*" && mon === "*" && numeric(dow) && numeric(min) && numeric(hr)) {
+  if (
+    dom === "*" &&
+    mon === "*" &&
+    numeric(dow) &&
+    numeric(min) &&
+    numeric(hr)
+  ) {
     return { preset: "weekly", minute: m, hour: h, weekday: wd, custom: cron }
   }
   return fallback
@@ -99,7 +105,10 @@ export function describeCron(cron: string): string {
   }
 }
 
-export const WEEKDAY_OPTIONS = WEEKDAYS.map((label, value) => ({ label, value }))
+export const WEEKDAY_OPTIONS = WEEKDAYS.map((label, value) => ({
+  label,
+  value,
+}))
 
 function clamp(n: number, lo: number, hi: number): number {
   if (Number.isNaN(n)) return lo

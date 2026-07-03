@@ -20,7 +20,11 @@ const useCommandPaletteStore = create<CommandPaletteStore>((set) => ({
   setInitialized: (value) => set({ initialized: value }),
 }))
 
-export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
+export function CommandPaletteProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const setInitialized = useCommandPaletteStore((state) => state.setInitialized)
   useEffect(() => {
     setInitialized(true)
@@ -34,6 +38,9 @@ export function useCommandPalette() {
   const open = useCommandPaletteStore((state) => state.open)
   const openPalette = useCommandPaletteStore((state) => state.openPalette)
   const closePalette = useCommandPaletteStore((state) => state.closePalette)
-  if (!initialized) throw new Error("useCommandPalette must be used within CommandPaletteProvider")
+  if (!initialized)
+    throw new Error(
+      "useCommandPalette must be used within CommandPaletteProvider"
+    )
   return { open, openPalette, closePalette }
 }

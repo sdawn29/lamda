@@ -46,11 +46,11 @@ export function FileHeader({
   return (
     <div className="flex h-9 min-w-0 items-center gap-1 px-3">
       {/* File icon + breadcrumb */}
-      <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+      <div className="flex min-w-0 flex-1 scrollbar-none items-center gap-1.5 overflow-x-auto">
         {pathParts.map((part, i) => (
           <span key={i} className="flex shrink-0 items-center gap-1">
             {i > 0 && (
-              <span className="select-none text-muted-foreground/40">›</span>
+              <span className="text-muted-foreground/40 select-none">›</span>
             )}
             {i === pathParts.length - 1 && (
               <Icon

@@ -52,6 +52,7 @@ The terminal module integrates `@xterm/xterm` for terminal emulation and communi
 ### TerminalPanel (components/terminal-panel.tsx)
 
 **Props:**
+
 ```typescript
 interface TerminalPanelProps {
   cwd: string  // Current working directory for the workspace
@@ -59,11 +60,13 @@ interface TerminalPanelProps {
 ```
 
 **State Management:**
+
 - WebSocket messages for PTY input/output
 - xterm.js Terminal instance per tab
 - FitAddon for auto-resize on panel resize
 
 **WebSocket Protocol:**
+
 ```typescript
 // Server → Client
 { type: "output", data: string }           // PTY output
@@ -77,11 +80,13 @@ interface TerminalPanelProps {
 ```
 
 **Theme Configuration:**
+
 - Dark theme: navy cursor (#5e5ce6), dark background (#08090a)
 - Light theme: indigo cursor (#5856d6), light background (#fbfbfc)
 - Inherits from `useTheme()` for dark/light mode detection
 
 **Performance:**
+
 - `TERMINAL_OUTPUT_FLUSH_MS = 16` — 60fps render loop
 - `TERMINAL_IMMEDIATE_FLUSH_THRESHOLD = 8192` — immediate write for large output
 

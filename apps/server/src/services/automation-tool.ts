@@ -1,35 +1,37 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent"
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
   createAutomation,
   type AutomationApprovalMode,
   type CreateAutomationInput,
-} from "@lamda/db"
-import { registerAutomation, isValidCron } from "./automation-scheduler.js"
-import { automationBroadcaster } from "../automation-broadcaster.js"
+} from "@lamda/db";
+import { registerAutomation, isValidCron } from "./automation-scheduler.js";
+import { automationBroadcaster } from "../automation-broadcaster.js";
 
-export const CREATE_AUTOMATION_TOOL_NAME = "create_automation"
+export const CREATE_AUTOMATION_TOOL_NAME = "create_automation";
 
 const APPROVAL_MODES: AutomationApprovalMode[] = [
   "ask",
   "edits_allowed",
   "all_allowed",
-]
+];
 
 function toolError(message: string) {
   return {
-    content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
+    content: [
+      { type: "text" as const, text: JSON.stringify({ error: message }) },
+    ],
     details: {},
-  }
+  };
 }
 
 /** Concise name derived from the prompt, mirroring the web form's generator. */
 function deriveName(prompt: string): string {
-  const first = prompt.trim().split(/\r?\n/)[0]?.trim() ?? ""
-  if (!first) return "Untitled automation"
-  const words = first.split(/\s+/)
-  let name = words.slice(0, 7).join(" ")
-  if (name.length > 52) name = name.slice(0, 52).trimEnd()
-  return name.charAt(0).toUpperCase() + name.slice(1)
+  const first = prompt.trim().split(/\r?\n/)[0]?.trim() ?? "";
+  if (!first) return "Untitled automation";
+  const words = first.split(/\s+/);
+  let name = words.slice(0, 7).join(" ");
+  if (name.length > 52) name = name.slice(0, 52).trimEnd();
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 /**
@@ -99,22 +101,24 @@ Notes:
     },
 
     execute: async (_toolCallId, params) => {
-      const p = (params ?? {}) as Record<string, unknown>
-      const prompt = typeof p.prompt === "string" ? p.prompt.trim() : ""
-      const cron = typeof p.cron === "string" ? p.cron.trim() : ""
+      const p = (params ?? {}) as Record<string, unknown>;
+      const prompt = typeof p.prompt === "string" ? p.prompt.trim() : "";
+      const cron = typeof p.cron === "string" ? p.cron.trim() : "";
 
-      if (!prompt) return toolError("`prompt` is required.")
-      if (!cron) return toolError("`cron` is required.")
+      if (!prompt) return toolError("`prompt` is required.");
+      if (!cron) return toolError("`cron` is required.");
       if (!isValidCron(cron)) {
         return toolError(
           `"${cron}" is not a valid 5-field cron expression (minute hour day month weekday).`,
-        )
+        );
       }
-      if (p.approvalMode !== undefined &&
-        !APPROVAL_MODES.includes(p.approvalMode as AutomationApprovalMode)) {
+      if (
+        p.approvalMode !== undefined &&
+        !APPROVAL_MODES.includes(p.approvalMode as AutomationApprovalMode)
+      ) {
         return toolError(
           'approvalMode must be "ask", "edits_allowed", or "all_allowed".',
-        )
+        );
       }
 
       const input: CreateAutomationInput = {
@@ -125,22 +129,26 @@ Notes:
         prompt,
         cron,
         modelId: typeof p.modelId === "string" ? p.modelId : null,
-        mode: typeof p.mode === "string" && p.mode.trim() ? p.mode.trim() : "agent",
-        approvalMode: (p.approvalMode as AutomationApprovalMode) ?? "all_allowed",
-        useWorktree: p.useWorktree === undefined ? true : p.useWorktree === true,
+        mode:
+          typeof p.mode === "string" && p.mode.trim() ? p.mode.trim() : "agent",
+        approvalMode:
+          (p.approvalMode as AutomationApprovalMode) ?? "all_allowed",
+        useWorktree:
+          p.useWorktree === undefined ? true : p.useWorktree === true,
         enabled: p.enabled === undefined ? true : p.enabled === true,
-      }
+      };
 
-      let automation
+      let automation;
       try {
-        automation = createAutomation(workspaceId, input)
+        automation = createAutomation(workspaceId, input);
       } catch (err) {
         return toolError(
           err instanceof Error ? err.message : "Failed to create automation.",
-        )
+        );
       }
-      if (automation.enabled) registerAutomation(automation.id, automation.cron)
-      automationBroadcaster.broadcast()
+      if (automation.enabled)
+        registerAutomation(automation.id, automation.cron);
+      automationBroadcaster.broadcast();
 
       return {
         content: [
@@ -160,7 +168,7 @@ Notes:
           cron: automation.cron,
           prompt: automation.prompt,
         },
-      }
+      };
     },
-  }
+  };
 }

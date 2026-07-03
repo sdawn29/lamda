@@ -7,6 +7,7 @@
  */
 
 import { Hono } from "hono";
+import { z } from "zod";
 import {
   getMcpSettings,
   saveMcpSettings,
@@ -18,8 +19,34 @@ import {
   setServerEnabled,
 } from "../services/mcp-service.js";
 import { refreshAllSessionTools } from "../services/session-service.js";
+import { parseJsonBody } from "../lib/validate.js";
 
 const mcpRouter = new Hono();
+
+const mcpServerConfigSchema = z.object({
+  name: z.string(),
+  transport: z.enum(["stdio", "http", "sse"]).optional(),
+  command: z.string().optional(),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  cwd: z.string().optional(),
+  url: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+});
+
+const mcpSettingsSchema = z.object({
+  settings: z.object({
+    servers: z.array(
+      mcpServerConfigSchema.extend({
+        description: z.string().optional(),
+      }),
+    ),
+  }),
+});
+
+const testConnectionSchema = z.object({ server: mcpServerConfigSchema });
+
+const setEnabledSchema = z.object({ enabled: z.boolean() });
 
 /**
  * GET /mcp/settings
@@ -35,23 +62,10 @@ mcpRouter.get("/settings", async (c) => {
  * Save MCP settings
  */
 mcpRouter.put("/settings", async (c) => {
-  const { settings } = await c.req.json<{
-    settings: {
-      servers: Array<{
-        name: string;
-        transport?: "stdio" | "http" | "sse";
-        command?: string;
-        args?: string[];
-        env?: Record<string, string>;
-        cwd?: string;
-        url?: string;
-        headers?: Record<string, string>;
-        description?: string;
-      }>;
-    };
-  }>();
+  const parsed = await parseJsonBody(c, mcpSettingsSchema);
+  if (!parsed.ok) return parsed.response;
 
-  saveMcpSettings(settings);
+  saveMcpSettings(parsed.data.settings);
   await refreshAllSessionTools();
   return c.json({ success: true });
 });
@@ -79,20 +93,10 @@ mcpRouter.get("/tools", async (c) => {
  * Test connecting to an MCP server
  */
 mcpRouter.post("/test-connection", async (c) => {
-  const { server } = await c.req.json<{
-    server: {
-      name: string;
-      transport?: "stdio" | "http" | "sse";
-      command?: string;
-      args?: string[];
-      env?: Record<string, string>;
-      cwd?: string;
-      url?: string;
-      headers?: Record<string, string>;
-    };
-  }>();
+  const parsed = await parseJsonBody(c, testConnectionSchema);
+  if (!parsed.ok) return parsed.response;
 
-  const result = await testMcpConnection(server);
+  const result = await testMcpConnection(parsed.data.server);
   return c.json(result);
 });
 
@@ -126,9 +130,10 @@ mcpRouter.post("/stop/:serverName", async (c) => {
  */
 mcpRouter.patch("/enabled/:serverName", async (c) => {
   const serverName = c.req.param("serverName");
-  const { enabled } = await c.req.json<{ enabled: boolean }>();
+  const parsed = await parseJsonBody(c, setEnabledSchema);
+  if (!parsed.ok) return parsed.response;
 
-  setServerEnabled(serverName, enabled);
+  setServerEnabled(serverName, parsed.data.enabled);
   await refreshAllSessionTools();
   return c.json({ success: true });
 });

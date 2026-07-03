@@ -78,7 +78,10 @@ export interface ToolApprovalDecision {
  * cancelled before the user responds.
  */
 export interface ToolApprovalBridge {
-  decide(req: ToolApprovalRequest, signal?: AbortSignal): Promise<ToolApprovalDecision>;
+  decide(
+    req: ToolApprovalRequest,
+    signal?: AbortSignal,
+  ): Promise<ToolApprovalDecision>;
 }
 
 export interface SdkConfig {
@@ -144,24 +147,24 @@ export interface ContextBreakdown {
 }
 
 export interface SessionTokenStats {
-  input: number
-  output: number
-  cacheRead: number
-  cacheWrite: number
-  total: number
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  total: number;
 }
 
 export interface ManagedSessionStats {
-  sessionFile: string | null
-  sessionId: string
-  userMessages: number
-  assistantMessages: number
-  toolCalls: number
-  toolResults: number
-  totalMessages: number
-  tokens: SessionTokenStats
-  cost: number
-  contextUsage?: ContextUsage
+  sessionFile: string | null;
+  sessionId: string;
+  userMessages: number;
+  assistantMessages: number;
+  toolCalls: number;
+  toolResults: number;
+  totalMessages: number;
+  tokens: SessionTokenStats;
+  cost: number;
+  contextUsage?: ContextUsage;
 }
 
 export interface ManagedSessionHandle {
@@ -175,82 +178,84 @@ export interface ManagedSessionHandle {
    * @param text - The prompt text
    * @param options - Optional settings for the prompt
    */
-  prompt(text: string, options?: PromptOptions): Promise<void>
+  prompt(text: string, options?: PromptOptions): Promise<void>;
   /**
    * Queue a steering message while the agent is running.
    * Delivered after the current assistant turn finishes its tool calls.
    * Useful for redirecting mid-task.
    */
-  steer(text: string): Promise<void>
+  steer(text: string): Promise<void>;
   /**
    * Queue a follow-up message to be processed after the agent finishes.
    * Only delivered when agent has no more tool calls or steering messages.
    */
-  followUp(text: string): Promise<void>
+  followUp(text: string): Promise<void>;
   /** Switch the model used for subsequent prompts. */
-  setModel(provider: string, modelId: string): Promise<void>
+  setModel(provider: string, modelId: string): Promise<void>;
   /** Set the thinking/reasoning effort level. Only affects reasoning-capable models. */
-  setThinkingLevel(level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh"): void
+  setThinkingLevel(
+    level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh",
+  ): void;
   /** Path to the persisted session file, or undefined for in-memory sessions. */
-  readonly sessionFile: string | undefined
+  readonly sessionFile: string | undefined;
   /** Working directory currently used by the agent runtime and its built-in tools. */
-  getCwd(): string
+  getCwd(): string;
   /**
    * Rebuild cwd-bound runtime services around the persisted conversation.
    * This keeps the managed handle stable while moving subsequent agent work.
    */
-  relocateCwd(cwd: string): Promise<void>
+  relocateCwd(cwd: string): Promise<void>;
   /**
    * Set a user-defined display name for the session. Persisted to the session
    * file (via a `session_info` entry) so resumed/listed sessions show the name.
    */
-  setName(name: string): void
+  setName(name: string): void;
   /** Get the current user-defined session display name, or undefined if unset. */
-  getName(): string | undefined
+  getName(): string | undefined;
   /** Abort the current agent turn. */
-  abort(): Promise<void>
+  abort(): Promise<void>;
   /** Dispose the session and free resources. */
-  dispose(): void
+  dispose(): void;
   /**
    * Returns an async generator that yields all session events.
    * The generator stays alive across multiple prompts.
    * Breaking out of the loop or calling return() cleans up the subscription.
    */
-  events(): AsyncGenerator<SessionEvent>
+  events(): AsyncGenerator<SessionEvent>;
   /** List available slash commands (skills) for the current workspace. */
-  getCommands(): SlashCommand[]
+  getCommands(): SlashCommand[];
   /**
    * Re-read skills and prompt templates from disk into the session's resource
    * loader. Lets prompt files added or edited after the session started take
    * effect (slash-command list + prompt expansion) without restarting the
    * server. Does not rebuild the runtime or disturb active tools/extensions.
    */
-  reloadResources(): Promise<void>
+  reloadResources(): Promise<void>;
   /** Get current context window usage. Returns undefined if unavailable. */
-  getContextUsage(): ContextUsage | undefined
+  getContextUsage(): ContextUsage | undefined;
   /** Compact the context window by summarizing conversation history. */
-  compact(): Promise<void>
+  compact(): Promise<void>;
   /** Get the thinking/effort levels available for the current model. */
-  getAvailableThinkingLevels(): string[]
+  getAvailableThinkingLevels(): string[];
   /** Get detailed session statistics including token usage and cost. */
-  getSessionStats(): ManagedSessionStats
+  getSessionStats(): ManagedSessionStats;
   /**
    * Replace the custom tools registered with this session.
    * New tools are immediately activated; removed tools are dropped.
    * Takes effect on the next agent turn.
    */
-  setCustomTools(tools: ToolDefinition[]): void
+  setCustomTools(tools: ToolDefinition[]): void;
   /**
    * Switch the agent mode. Re-applies the mode's base tool set (merged with any
    * workspace-supplied custom tools). Takes effect on the next agent turn.
    */
-  setMode(mode: Mode): void
+  setMode(mode: Mode): void;
   /**
    * Branch the conversation at the Nth user message (0-indexed among user messages).
    * Returns the path of the new session JSONL file.
    * The caller is responsible for creating a new thread and opening the forked session.
    */
-  fork(userMessageIndex: number): Promise<string>
+  fork(userMessageIndex: number): Promise<string>;
 }
 
 /**
@@ -260,21 +265,21 @@ export interface ManagedSessionHandle {
 export type HistoryBlock =
   | { role: "user"; content: string; createdAt: number }
   | {
-      role: "assistant"
-      content: string
-      thinking: string
-      model: string
-      provider: string
-      errorMessage?: string
-      createdAt: number
+      role: "assistant";
+      content: string;
+      thinking: string;
+      model: string;
+      provider: string;
+      errorMessage?: string;
+      createdAt: number;
     }
   | {
-      role: "tool"
-      toolCallId: string
-      toolName: string
-      toolArgs: string
-      toolResult: string
-      isError: boolean
-      createdAt: number
+      role: "tool";
+      toolCallId: string;
+      toolName: string;
+      toolArgs: string;
+      toolResult: string;
+      isError: boolean;
+      createdAt: number;
     }
-  | { role: "compaction"; createdAt: number }
+  | { role: "compaction"; createdAt: number };

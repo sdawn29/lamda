@@ -37,14 +37,17 @@ export interface PendingError {
   message: string
   retryable?: boolean
   retryCount?: number
-  action?: {
-    type: "retry"
-    prompt?: string
-  } | {
-    type: "dismiss"
-  } | {
-    type: "continue"
-  }
+  action?:
+    | {
+        type: "retry"
+        prompt?: string
+      }
+    | {
+        type: "dismiss"
+      }
+    | {
+        type: "continue"
+      }
 }
 
 export function usePendingError(sessionId: string) {
@@ -73,7 +76,12 @@ export function getScrollMeta(
  * Set scroll meta in cache
  */
 export function setScrollMeta(
-  queryClient: { setQueryData: <T>(key: readonly unknown[], value: T | ((old: T | undefined) => T)) => void },
+  queryClient: {
+    setQueryData: <T>(
+      key: readonly unknown[],
+      value: T | ((old: T | undefined) => T)
+    ) => void
+  },
   sessionId: string,
   meta: ScrollMeta
 ) {
@@ -94,21 +102,31 @@ export function getSessionErrors(
  * Add a session-level error
  */
 export function addSessionError(
-  queryClient: { setQueryData: <T>(key: readonly unknown[], value: T | ((old: T | undefined) => T)) => void },
+  queryClient: {
+    setQueryData: <T>(
+      key: readonly unknown[],
+      value: T | ((old: T | undefined) => T)
+    ) => void
+  },
   sessionId: string,
   error: Message
 ) {
-  queryClient.setQueryData(chatKeys.errors(sessionId), (old: Message[] | undefined) => [
-    ...(old ?? []),
-    error,
-  ])
+  queryClient.setQueryData(
+    chatKeys.errors(sessionId),
+    (old: Message[] | undefined) => [...(old ?? []), error]
+  )
 }
 
 /**
  * Clear session-level errors (called when messages are reloaded)
  */
 export function clearSessionErrors(
-  queryClient: { setQueryData: <T>(key: readonly unknown[], value: T | ((old: T | undefined) => T)) => void },
+  queryClient: {
+    setQueryData: <T>(
+      key: readonly unknown[],
+      value: T | ((old: T | undefined) => T)
+    ) => void
+  },
   sessionId: string
 ) {
   queryClient.setQueryData(chatKeys.errors(sessionId), [])
@@ -118,7 +136,12 @@ export function clearSessionErrors(
  * Set pending error
  */
 export function setPendingError(
-  queryClient: { setQueryData: <T>(key: readonly unknown[], value: T | ((old: T | undefined) => T)) => void },
+  queryClient: {
+    setQueryData: <T>(
+      key: readonly unknown[],
+      value: T | ((old: T | undefined) => T)
+    ) => void
+  },
   sessionId: string,
   error: PendingError | null
 ) {

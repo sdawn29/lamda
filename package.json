@@ -8,6 +8,7 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
+    "test": "turbo run test",
     "release": "node scripts/release.mjs && npm run build",
     "release:dry-run": "node scripts/release.mjs --dry-run"
   },

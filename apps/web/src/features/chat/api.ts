@@ -1,4 +1,9 @@
-import { apiFetch, appendToken, apiUrl, getServerWsUrl } from "@/shared/lib/client"
+import {
+  apiFetch,
+  appendToken,
+  apiUrl,
+  getServerWsUrl,
+} from "@/shared/lib/client"
 import type { MessageBlock } from "./types"
 
 /**
@@ -44,20 +49,32 @@ async function openWebSocketWithRetry(
           reject(new Error("Connection timeout"))
         }, 5000)
 
-        ws.addEventListener("open", () => {
-          clearTimeout(timeout)
-          resolve(ws)
-        }, { once: true })
+        ws.addEventListener(
+          "open",
+          () => {
+            clearTimeout(timeout)
+            resolve(ws)
+          },
+          { once: true }
+        )
 
-        ws.addEventListener("error", () => {
-          clearTimeout(timeout)
-          reject(new Error("WebSocket error"))
-        }, { once: true })
+        ws.addEventListener(
+          "error",
+          () => {
+            clearTimeout(timeout)
+            reject(new Error("WebSocket error"))
+          },
+          { once: true }
+        )
 
-        ws.addEventListener("close", () => {
-          clearTimeout(timeout)
-          reject(new Error("WebSocket closed"))
-        }, { once: true })
+        ws.addEventListener(
+          "close",
+          () => {
+            clearTimeout(timeout)
+            reject(new Error("WebSocket closed"))
+          },
+          { once: true }
+        )
       })
 
       return result
@@ -141,7 +158,10 @@ export function dismissSessionError(id: string): Promise<void> {
   return apiFetch<void>(`/session/${id}/dismiss-error`, { method: "POST" })
 }
 
-export async function openSessionWebSocket(id: string, lastEventId?: string): Promise<WebSocket | null> {
+export async function openSessionWebSocket(
+  id: string,
+  lastEventId?: string
+): Promise<WebSocket | null> {
   const base = await getServerWsUrl()
   const url = lastEventId
     ? `${base}/ws/session/${id}/events?lastEventId=${encodeURIComponent(lastEventId)}`
@@ -162,6 +182,12 @@ export interface SendPromptParams {
   images?: ImageContent[]
   streamingBehavior?: "steer" | "followUp"
   expandPromptTemplates?: boolean
+  /**
+   * Id of the optimistic user row this prompt originated from. Persisted onto
+   * the server's user block so the client can reconcile the optimistic row
+   * with the persisted one by identity instead of by matching content.
+   */
+  clientId?: string
 }
 
 export function sendPrompt(
@@ -180,6 +206,7 @@ export function sendPrompt(
       images: params.images,
       streamingBehavior: params.streamingBehavior,
       expandPromptTemplates: params.expandPromptTemplates,
+      clientId: params.clientId,
     }),
   })
 }
@@ -190,12 +217,13 @@ export function sendPrompt(
  */
 export function steer(
   id: string,
-  text: string
+  text: string,
+  clientId?: string
 ): Promise<SendPromptResponse> {
   return apiFetch<SendPromptResponse>(`/session/${id}/steer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, clientId }),
   })
 }
 
@@ -205,12 +233,13 @@ export function steer(
  */
 export function followUp(
   id: string,
-  text: string
+  text: string,
+  clientId?: string
 ): Promise<SendPromptResponse> {
   return apiFetch<SendPromptResponse>(`/session/${id}/follow-up`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, clientId }),
   })
 }
 
@@ -292,9 +321,7 @@ export interface RunningToolsResponse {
 export function listRunningTools(
   sessionId: string
 ): Promise<RunningToolsResponse> {
-  return apiFetch<RunningToolsResponse>(
-    `/session/${sessionId}/running-tools`
-  )
+  return apiFetch<RunningToolsResponse>(`/session/${sessionId}/running-tools`)
 }
 
 // ── Title ─────────────────────────────────────────────────────────────────────
@@ -550,11 +577,14 @@ export function revertToMessage(
   sessionId: string,
   blockId: string
 ): Promise<RevertToMessageResponse> {
-  return apiFetch<RevertToMessageResponse>(`/session/${sessionId}/revert-to-message`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ blockId }),
-  })
+  return apiFetch<RevertToMessageResponse>(
+    `/session/${sessionId}/revert-to-message`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ blockId }),
+    }
+  )
 }
 
 // ── Workspace files ────────────────────────────────────────────────────────

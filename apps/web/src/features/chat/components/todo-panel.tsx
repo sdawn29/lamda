@@ -32,12 +32,14 @@ function extractGoals(msg: ToolMessage): TodoGoal[] | null {
   if (typeof raw === "string") {
     text = raw
   } else if (typeof raw === "object" && raw !== null) {
-    const parts = (
-      (raw as Record<string, unknown>).content as
+    const parts =
+      ((raw as Record<string, unknown>).content as
         | { type: string; text?: string }[]
-        | undefined
-    ) ?? []
-    text = parts.filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
+        | undefined) ?? []
+    text = parts
+      .filter((p) => p.type === "text")
+      .map((p) => p.text ?? "")
+      .join("")
   }
 
   if (!text) return null
@@ -111,7 +113,7 @@ export interface CompletedGoalList {
  * lands at the turn where the whole list wrapped up.
  */
 export function deriveCompletedGoalLists(
-  messages: Message[],
+  messages: Message[]
 ): CompletedGoalList[] {
   // Union-find over goal ids.
   const parent = new Map<string, string>()
@@ -192,7 +194,13 @@ export function deriveCompletedGoalLists(
 
 // ── Checkbox ──────────────────────────────────────────────────────────────────
 
-function Checkbox({ status, isLive }: { status: TodoStatus; isLive?: boolean }) {
+function Checkbox({
+  status,
+  isLive,
+}: {
+  status: TodoStatus
+  isLive?: boolean
+}) {
   // Minimal status glyphs, all on a fixed 3.5×3.5 box so rows align:
   //   • in_progress → filled accent dot (pulsing while live)
   //   • completed   → small check
@@ -203,7 +211,7 @@ function Checkbox({ status, isLive }: { status: TodoStatus; isLive?: boolean }) 
         <span
           className={cn(
             "h-1.5 w-1.5 rounded-full",
-            isLive ? "animate-pulse bg-primary" : "bg-muted-foreground/50",
+            isLive ? "animate-pulse bg-primary" : "bg-muted-foreground/50"
           )}
         />
       </span>
@@ -213,7 +221,10 @@ function Checkbox({ status, isLive }: { status: TodoStatus; isLive?: boolean }) 
   if (status === "completed") {
     return (
       <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-        <CheckIcon className="h-3 w-3 text-muted-foreground/45" strokeWidth={2.5} />
+        <CheckIcon
+          className="h-3 w-3 text-muted-foreground/45"
+          strokeWidth={2.5}
+        />
       </span>
     )
   }
@@ -239,27 +250,32 @@ function GoalSection({
   // A goal arrives as "completed" in the final snapshot returned just before
   // it is deleted from the DB — show everything checked off.
   const isDone = goal.status === "completed"
-  const completedCount = goal.tasks.filter((t) => t.status === "completed").length
+  const completedCount = goal.tasks.filter(
+    (t) => t.status === "completed"
+  ).length
   const total = goal.tasks.length
-  const activeTask = !isDone && goal.tasks.find((t) => t.status === "in_progress")
+  const activeTask =
+    !isDone && goal.tasks.find((t) => t.status === "in_progress")
 
   return (
-    <div className={cn("px-2.5 py-1.5", !isLast && "border-b border-border/30")}>
+    <div
+      className={cn("px-2.5 py-1.5", !isLast && "border-b border-border/30")}
+    >
       {/* Goal header */}
       <div className="mb-1 flex items-center gap-1.5">
         <span
           className={cn(
-            "flex-1 truncate text-2xs font-medium uppercase tracking-wide",
+            "flex-1 truncate text-2xs font-medium tracking-wide uppercase",
             isDone
               ? "text-muted-foreground/40 line-through"
               : isLive && activeTask
                 ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
-                : "text-muted-foreground/55",
+                : "text-muted-foreground/55"
           )}
         >
           {goal.description}
         </span>
-        <span className="shrink-0 text-2xs tabular-nums text-muted-foreground/35">
+        <span className="shrink-0 text-2xs text-muted-foreground/35 tabular-nums">
           {completedCount}/{total}
         </span>
       </div>
@@ -281,7 +297,7 @@ function GoalSection({
                       ? isLive
                         ? "animate-thinking-shimmer bg-linear-to-r from-primary/70 via-foreground to-primary/70 bg-size-[200%_100%] bg-clip-text font-medium text-transparent"
                         : "font-medium text-foreground/90"
-                      : "text-muted-foreground/65",
+                      : "text-muted-foreground/65"
                 )}
               >
                 {task.content}
@@ -318,7 +334,7 @@ function TodoListCard({
       (g.status === "completed"
         ? g.tasks.length
         : g.tasks.filter((t) => t.status === "completed").length),
-    0,
+    0
   )
   const allDone = totalTasks > 0 && completedTasks === totalTasks
 
@@ -337,7 +353,7 @@ function TodoListCard({
             "flex-1 text-2xs font-medium",
             isLive && !allDone
               ? "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
-              : "text-muted-foreground/80",
+              : "text-muted-foreground/80"
           )}
         >
           {allDone
@@ -348,7 +364,7 @@ function TodoListCard({
         <ChevronRightIcon
           className={cn(
             "h-3 w-3 shrink-0 text-muted-foreground/30 transition-transform duration-200",
-            expanded && "rotate-90",
+            expanded && "rotate-90"
           )}
         />
       </button>
@@ -357,7 +373,7 @@ function TodoListCard({
       <div
         className={cn(
           "grid transition-all duration-300 ease-in-out",
-          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
         )}
       >
         <div className="overflow-hidden">
@@ -391,7 +407,7 @@ interface TodoPanelProps {
 export const TodoPanel = memo(function TodoPanel({ messages }: TodoPanelProps) {
   const { goals, isLive } = useMemo(
     () => deriveGoalsFromMessages(messages),
-    [messages],
+    [messages]
   )
 
   if (goals.length === 0) return null

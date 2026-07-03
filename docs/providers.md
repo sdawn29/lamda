@@ -8,29 +8,29 @@ This document describes the supported providers and models in the application.
 
 The following providers support API key authentication. Configure them in the Settings → Configure Provider → API Keys tab.
 
-| Provider ID | Provider Name | API Key Environment Variable | Placeholder |
-|-------------|---------------|------------------------------|-------------|
-| `anthropic` | Anthropic | `ANTHROPIC_API_KEY` | `sk-ant-...` |
-| `openai` | OpenAI | `OPENAI_API_KEY` | `sk-...` |
-| `deepseek` | DeepSeek | `DEEPSEEK_API_KEY` | `sk-...` |
-| `google` | Google Gemini | `GEMINI_API_KEY` | `AIza...` |
-| `google-vertex` | Google Vertex AI | - | `...` |
-| `amazon-bedrock` | Amazon Bedrock | - | `...` |
-| `mistral` | Mistral | `MISTRAL_API_KEY` | `...` |
-| `groq` | Groq | `GROQ_API_KEY` | `gsk_...` |
-| `cerebras` | Cerebras | `CEREBRAS_API_KEY` | `...` |
-| `xai` | xAI | `XAI_API_KEY` | `xai-...` |
-| `openrouter` | OpenRouter | `OPENROUTER_API_KEY` | `sk-or-...` |
-| `vercel-ai-gateway` | Vercel AI Gateway | `AI_GATEWAY_API_KEY` | `...` |
-| `huggingface` | Hugging Face | `HF_TOKEN` | `hf_...` |
-| `fireworks` | Fireworks | `FIREWORKS_API_KEY` | `fw_...` |
-| `kimi-coding` | Kimi For Coding | `KIMI_API_KEY` | `...` |
-| `minimax` | MiniMax | `MINIMAX_API_KEY` | `...` |
-| `minimax-cn` | MiniMax (China) | `MINIMAX_CN_API_KEY` | `...` |
-| `zai` | ZAI | `ZAI_API_KEY` | `...` |
-| `opencode` | OpenCode Zen | `OPENCODE_API_KEY` | `...` |
-| `opencode-go` | OpenCode Go | `OPENCODE_API_KEY` | `...` |
-| `azure-openai-responses` | Azure OpenAI | `AZURE_OPENAI_API_KEY` | `...` |
+| Provider ID              | Provider Name     | API Key Environment Variable | Placeholder  |
+| ------------------------ | ----------------- | ---------------------------- | ------------ |
+| `anthropic`              | Anthropic         | `ANTHROPIC_API_KEY`          | `sk-ant-...` |
+| `openai`                 | OpenAI            | `OPENAI_API_KEY`             | `sk-...`     |
+| `deepseek`               | DeepSeek          | `DEEPSEEK_API_KEY`           | `sk-...`     |
+| `google`                 | Google Gemini     | `GEMINI_API_KEY`             | `AIza...`    |
+| `google-vertex`          | Google Vertex AI  | -                            | `...`        |
+| `amazon-bedrock`         | Amazon Bedrock    | -                            | `...`        |
+| `mistral`                | Mistral           | `MISTRAL_API_KEY`            | `...`        |
+| `groq`                   | Groq              | `GROQ_API_KEY`               | `gsk_...`    |
+| `cerebras`               | Cerebras          | `CEREBRAS_API_KEY`           | `...`        |
+| `xai`                    | xAI               | `XAI_API_KEY`                | `xai-...`    |
+| `openrouter`             | OpenRouter        | `OPENROUTER_API_KEY`         | `sk-or-...`  |
+| `vercel-ai-gateway`      | Vercel AI Gateway | `AI_GATEWAY_API_KEY`         | `...`        |
+| `huggingface`            | Hugging Face      | `HF_TOKEN`                   | `hf_...`     |
+| `fireworks`              | Fireworks         | `FIREWORKS_API_KEY`          | `fw_...`     |
+| `kimi-coding`            | Kimi For Coding   | `KIMI_API_KEY`               | `...`        |
+| `minimax`                | MiniMax           | `MINIMAX_API_KEY`            | `...`        |
+| `minimax-cn`             | MiniMax (China)   | `MINIMAX_CN_API_KEY`         | `...`        |
+| `zai`                    | ZAI               | `ZAI_API_KEY`                | `...`        |
+| `opencode`               | OpenCode Zen      | `OPENCODE_API_KEY`           | `...`        |
+| `opencode-go`            | OpenCode Go       | `OPENCODE_API_KEY`           | `...`        |
+| `azure-openai-responses` | Azure OpenAI      | `AZURE_OPENAI_API_KEY`       | `...`        |
 
 ### OAuth Providers
 
@@ -58,14 +58,15 @@ DeepSeek uses the `DEEPSEEK_API_KEY` environment variable or the `deepseek` key 
 ### Available Models
 
 DeepSeek V4 series includes:
+
 - `deepseek-chat` - General purpose chat model
 - `deepseek-reasoner` - Advanced reasoning model
 - Plus various specialized variants
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
+| Variable           | Description           |
+| ------------------ | --------------------- |
 | `DEEPSEEK_API_KEY` | Your DeepSeek API key |
 
 ## API Keys
@@ -100,7 +101,10 @@ The `key` field supports three formats:
   ```
 - **Shell command:** Executes and uses stdout (cached for process lifetime)
   ```json
-  { "type": "api_key", "key": "!security find-generic-password -ws 'anthropic'" }
+  {
+    "type": "api_key",
+    "key": "!security find-generic-password -ws 'anthropic'"
+  }
   ```
 
 ## Local Model Providers

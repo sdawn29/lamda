@@ -41,7 +41,7 @@ export function StashInputBar({
           if (e.key === "Escape") onCancel()
         }}
         placeholder="Stash message (optional) — Enter to confirm"
-        className="min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-xs shadow-none placeholder:text-muted-foreground/40 focus-visible:ring-0 h-auto"
+        className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-xs shadow-none placeholder:text-muted-foreground/40 focus-visible:ring-0"
       />
       {stashing ? (
         <LoadingSpinner size="sm" />

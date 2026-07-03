@@ -9,7 +9,8 @@
     "build": "node build.mjs",
     "start": "node dist/server.cjs",
     "check-types": "tsc --noEmit",
-    "postinstall": "node -e \"const{existsSync,chmodSync}=require('fs'),p=require.resolve('node-pty/prebuilds/darwin-arm64/spawn-helper');if(existsSync(p))chmodSync(p,'755');\""
+    "postinstall": "node -e \"const{existsSync,chmodSync}=require('fs'),p=require.resolve('node-pty/prebuilds/darwin-arm64/spawn-helper');if(existsSync(p))chmodSync(p,'755');\"",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.5",
@@ -25,12 +26,17 @@
     "croner": "^10.0.1",
     "hono": "^4.12.26",
     "node-pty": "^1.1.0",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.0.0",
     "esbuild": "^0.28.1",
+    "eslint": "^10.5.0",
+    "globals": "^17.6.0",
     "tsx": "4.21.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.61.1"
   }
 }

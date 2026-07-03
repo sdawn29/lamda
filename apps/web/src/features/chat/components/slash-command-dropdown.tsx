@@ -1,9 +1,5 @@
 import * as React from "react"
-import {
-  ContainerIcon,
-  FileTextIcon,
-  type LucideIcon,
-} from "lucide-react"
+import { ContainerIcon, FileTextIcon, type LucideIcon } from "lucide-react"
 
 import {
   Command,
@@ -68,10 +64,7 @@ export function SlashCommandDropdown({
   noSkillsHint?: boolean
   onSelect: (item: ChatSlashItem) => void
 }) {
-  const flat = React.useMemo(
-    () => groups.flatMap((g) => g.items),
-    [groups]
-  )
+  const flat = React.useMemo(() => groups.flatMap((g) => g.items), [groups])
   const listRef = React.useRef<HTMLDivElement>(null)
 
   // Scroll the highlighted item into view ourselves: cmdk only auto-scrolls on

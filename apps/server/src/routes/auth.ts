@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { randomUUID } from "crypto";
+import { z } from "zod";
 import type { WebSocket } from "ws";
 import {
   sharedAuthStorage,
@@ -10,8 +11,18 @@ import {
   type ActiveLogin,
 } from "../services/auth-service.js";
 import { invalidateModelCache } from "@lamda/pi-sdk";
+import { parseJsonBody } from "../lib/validate.js";
 
 const auth = new Hono();
+
+const oauthRespondSchema = z.object({
+  promptId: z.string().optional(),
+  value: z.string().optional(),
+});
+
+const providersSchema = z.object({
+  providers: z.record(z.string(), z.string()).optional(),
+});
 
 // ── OAuth ─────────────────────────────────────────────────────────────────────
 
@@ -117,9 +128,9 @@ auth.post("/auth/oauth/:loginId/respond", async (c) => {
   const login = activeLogins.get(loginId);
   if (!login) return c.json({ error: "Login session not found" }, 404);
 
-  const body = await c.req
-    .json<{ promptId?: string; value?: string }>()
-    .catch((): { promptId?: string; value?: string } => ({}));
+  const parsed = await parseJsonBody(c, oauthRespondSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.promptId) return c.json({ error: "promptId is required" }, 400);
 
   // A pending request is either a free-text prompt or an interactive selector.
@@ -176,9 +187,9 @@ auth.get("/providers", async (c) => {
 });
 
 auth.put("/providers", async (c) => {
-  const body = await c.req
-    .json<{ providers?: Record<string, string> }>()
-    .catch((): { providers?: Record<string, string> } => ({}));
+  const parsed = await parseJsonBody(c, providersSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.providers) return c.json({ error: "providers is required" }, 400);
 
   const authData = await readAuthJson();

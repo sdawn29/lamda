@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useId, useMemo, useRef } from "react"
 import Editor, { type BeforeMount, type OnMount } from "@monaco-editor/react"
-import type { editor as MonacoEditor, IDisposable, languages as MonacoLanguages } from "monaco-editor"
+import type {
+  editor as MonacoEditor,
+  IDisposable,
+  languages as MonacoLanguages,
+} from "monaco-editor"
 import { useTheme } from "@/shared/components/theme-provider"
 import { ensureMonacoEnvironment } from "@/features/lsp/monaco/monaco-environment"
 import {
@@ -251,7 +255,10 @@ export default function ConflictEditor({
             )
             return { lenses, dispose: () => {} }
           },
-          resolveCodeLens: (_model: MonacoEditor.ITextModel, lens: MonacoLanguages.CodeLens) => lens,
+          resolveCodeLens: (
+            _model: MonacoEditor.ITextModel,
+            lens: MonacoLanguages.CodeLens
+          ) => lens,
         }
       )
 

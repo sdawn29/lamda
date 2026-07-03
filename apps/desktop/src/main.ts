@@ -57,6 +57,17 @@ const SERVER_AUTH_TOKEN = randomBytes(32).toString("hex");
 
 app.setName(APP_NAME);
 
+// In dev the renderer loads from the Vite dev server, whose module URLs are
+// versioned per dependency-optimization run (`?v=<browserHash>`). Electron's
+// Chromium HTTP cache persists across app restarts, so after the dep graph
+// changes (npm install → Vite re-optimizes) a cached page can execute modules
+// from mixed optimization runs — which duplicates React and crashes with
+// "Invalid hook call". Vite serves everything from memory locally, so the
+// cache buys nothing in dev; disable it outright.
+if (isDev) {
+  app.commandLine.appendSwitch("disable-http-cache");
+}
+
 console.log(`Running in ${isDev ? "development" : "production"} mode`);
 
 type ServerStatus = {
@@ -206,7 +217,10 @@ async function spawnServer(): Promise<number> {
       ? ([
           "node",
           [
-            path.join(DEV_MONOREPO_ROOT, "scripts/run-with-compatible-node.mjs"),
+            path.join(
+              DEV_MONOREPO_ROOT,
+              "scripts/run-with-compatible-node.mjs",
+            ),
             require.resolve("tsx/cli"),
             path.join(__dirname, "../../server/src/index.ts"),
           ],

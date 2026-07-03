@@ -1,5 +1,6 @@
 import { memo } from "react"
 import ReactMarkdown from "react-markdown"
+import { cn } from "@/shared/lib/utils"
 import {
   chatProseClass,
   markdownComponents,
@@ -14,11 +15,13 @@ export const ThinkingBlock = memo(function ThinkingBlock({
   thinking: string
   isNew?: boolean
 }) {
-  const displayContent = useWordReveal(thinking, isNew)
+  const { text: displayContent, isRevealing } = useWordReveal(thinking, isNew)
 
   return (
     <div className="opacity-50">
-      <div className={chatProseClass}>
+      <div
+        className={cn(chatProseClass, isRevealing && "chat-streaming-caret")}
+      >
         <ReactMarkdown
           remarkPlugins={remarkPlugins}
           components={markdownComponents}

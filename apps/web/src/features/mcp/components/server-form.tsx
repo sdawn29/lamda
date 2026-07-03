@@ -41,10 +41,22 @@ import {
   FieldLabel,
 } from "@/shared/ui/field"
 import { cn } from "@/shared/lib/utils"
-import type { McpServerConfig, McpTransportType, ServerFormState } from "../types"
-import { createEmptyServerForm, formStateToConfig, configToFormState } from "../types"
+import type {
+  McpServerConfig,
+  McpTransportType,
+  ServerFormState,
+} from "../types"
+import {
+  createEmptyServerForm,
+  formStateToConfig,
+  configToFormState,
+} from "../types"
 import { useMcpSettings } from "../queries"
-import { useSaveMcpSettings, useTestMcpConnection, useSetMcpServerEnabled } from "../mutations"
+import {
+  useSaveMcpSettings,
+  useTestMcpConnection,
+  useSetMcpServerEnabled,
+} from "../mutations"
 
 // ── Environment Variable Row ──────────────────────────────────────────────────
 
@@ -88,7 +100,9 @@ function EnvVarRow({
         placeholder={keyPlaceholder}
         className="h-6 flex-1 font-mono text-xs"
       />
-      <span className="shrink-0 select-none text-xs text-muted-foreground">{separator}</span>
+      <span className="shrink-0 text-xs text-muted-foreground select-none">
+        {separator}
+      </span>
       <Input
         value={envVar.value}
         onChange={(e) => onChange("value", e.target.value)}
@@ -129,7 +143,9 @@ function JsonImport({ onImport }: JsonImportProps) {
         setExpanded(false)
         setError("")
       } else {
-        setError("Config must include 'name' and either 'command' (stdio) or 'url' (http)")
+        setError(
+          "Config must include 'name' and either 'command' (stdio) or 'url' (http)"
+        )
       }
     } catch {
       setError("Invalid JSON format")
@@ -153,7 +169,10 @@ function JsonImport({ onImport }: JsonImportProps) {
           Import from JSON config
         </div>
         <ChevronDown
-          className={cn("h-3.5 w-3.5 transition-transform duration-200", expanded && "rotate-180")}
+          className={cn(
+            "h-3.5 w-3.5 transition-transform duration-200",
+            expanded && "rotate-180"
+          )}
         />
       </button>
 
@@ -165,13 +184,19 @@ function JsonImport({ onImport }: JsonImportProps) {
               setJsonText(e.target.value)
               setError("")
             }}
-            placeholder={'{\n  "name": "my-server",\n  "command": "npx",\n  "args": ["-y", "package-name"]\n}\n\n// or HTTP:\n{\n  "name": "remote",\n  "transport": "http",\n  "url": "https://example.com/mcp"\n}'}
+            placeholder={
+              '{\n  "name": "my-server",\n  "command": "npx",\n  "args": ["-y", "package-name"]\n}\n\n// or HTTP:\n{\n  "name": "remote",\n  "transport": "http",\n  "url": "https://example.com/mcp"\n}'
+            }
             className="min-h-[96px] resize-none font-mono text-xs"
             rows={5}
           />
           {error && <p className="text-xs text-destructive">{error}</p>}
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handleImport} disabled={!jsonText.trim()}>
+            <Button
+              size="sm"
+              onClick={handleImport}
+              disabled={!jsonText.trim()}
+            >
               Import
             </Button>
             {jsonText && (
@@ -204,7 +229,13 @@ interface TransportOptionProps {
   onClick: () => void
 }
 
-function TransportOption({ active, icon, label, hint, onClick }: TransportOptionProps) {
+function TransportOption({
+  active,
+  icon,
+  label,
+  hint,
+  onClick,
+}: TransportOptionProps) {
   return (
     <button
       type="button"
@@ -248,7 +279,10 @@ function ServerFormFields({
     () => formState.envVars.length > 0 || formState.headers.length > 0
   )
 
-  function updateField<K extends keyof ServerFormState>(key: K, value: ServerFormState[K]) {
+  function updateField<K extends keyof ServerFormState>(
+    key: K,
+    value: ServerFormState[K]
+  ) {
     setFormState({ ...formState, [key]: value })
     const next = { ...formErrors }
     delete (next as Record<string, string>)[key as string]
@@ -266,7 +300,9 @@ function ServerFormFields({
   function updateEnvVar(index: number, field: "key" | "value", value: string) {
     setFormState({
       ...formState,
-      envVars: formState.envVars.map((v, i) => (i === index ? { ...v, [field]: value } : v)),
+      envVars: formState.envVars.map((v, i) =>
+        i === index ? { ...v, [field]: value } : v
+      ),
     })
   }
 
@@ -287,7 +323,9 @@ function ServerFormFields({
   function updateHeader(index: number, field: "key" | "value", value: string) {
     setFormState({
       ...formState,
-      headers: formState.headers.map((v, i) => (i === index ? { ...v, [field]: value } : v)),
+      headers: formState.headers.map((v, i) =>
+        i === index ? { ...v, [field]: value } : v
+      ),
     })
   }
 
@@ -310,12 +348,16 @@ function ServerFormFields({
   const canTest = isHttp
     ? Boolean(formState.name.trim() && formState.url.trim())
     : Boolean(formState.name.trim() && formState.command.trim())
-  const advancedCount = isHttp ? formState.headers.length : formState.envVars.length
+  const advancedCount = isHttp
+    ? formState.headers.length
+    : formState.envVars.length
 
   return (
     <div className="space-y-5">
       {/* JSON Quick Import */}
-      <JsonImport onImport={(config) => setFormState(configToFormState(config))} />
+      <JsonImport
+        onImport={(config) => setFormState(configToFormState(config))}
+      />
 
       {/* Transport selector */}
       <Field>
@@ -355,7 +397,9 @@ function ServerFormFields({
           <FieldLabel htmlFor="server-name">
             Name <span className="text-destructive">*</span>
           </FieldLabel>
-          <FieldDescription>Unique identifier for this server.</FieldDescription>
+          <FieldDescription>
+            Unique identifier for this server.
+          </FieldDescription>
           <Input
             id="server-name"
             value={formState.name}
@@ -391,7 +435,9 @@ function ServerFormFields({
               <FieldLabel htmlFor="server-command">
                 Command <span className="text-destructive">*</span>
               </FieldLabel>
-              <FieldDescription>Executable to run — e.g. npx, uvx.</FieldDescription>
+              <FieldDescription>
+                Executable to run — e.g. npx, uvx.
+              </FieldDescription>
               <Input
                 id="server-command"
                 value={formState.command}
@@ -399,7 +445,9 @@ function ServerFormFields({
                 placeholder="npx"
                 className="mt-1.5 font-mono"
               />
-              {formErrors.command && <FieldError>{formErrors.command}</FieldError>}
+              {formErrors.command && (
+                <FieldError>{formErrors.command}</FieldError>
+              )}
             </Field>
 
             <Field>
@@ -420,7 +468,7 @@ function ServerFormFields({
             {formState.command && (
               <div className="rounded-md bg-muted/50 px-3 py-2.5">
                 <SectionLabel className="mb-1 block">Preview</SectionLabel>
-                <code className="break-all font-mono text-xs">
+                <code className="font-mono text-xs break-all">
                   {formState.command}
                   {formState.args && ` ${formState.args}`}
                 </code>
@@ -431,7 +479,9 @@ function ServerFormFields({
 
         <Field>
           <FieldLabel htmlFor="server-description">Description</FieldLabel>
-          <FieldDescription>Short summary of what this server provides.</FieldDescription>
+          <FieldDescription>
+            Short summary of what this server provides.
+          </FieldDescription>
           <Input
             id="server-description"
             value={formState.description}
@@ -479,7 +529,8 @@ function ServerFormFields({
                   <div>
                     <p className="text-xs font-medium">HTTP Headers</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Sent with every request — e.g. an Authorization bearer token.
+                      Sent with every request — e.g. an Authorization bearer
+                      token.
                     </p>
                   </div>
                   <Button
@@ -503,7 +554,9 @@ function ServerFormFields({
                         keyPlaceholder="Authorization"
                         valuePlaceholder="Bearer"
                         separator=":"
-                        onChange={(field, value) => updateHeader(index, field, value)}
+                        onChange={(field, value) =>
+                          updateHeader(index, field, value)
+                        }
                         onRemove={() => removeHeader(index)}
                       />
                     ))}
@@ -519,7 +572,9 @@ function ServerFormFields({
             ) : (
               <>
                 <Field>
-                  <FieldLabel htmlFor="server-cwd">Working Directory</FieldLabel>
+                  <FieldLabel htmlFor="server-cwd">
+                    Working Directory
+                  </FieldLabel>
                   <FieldDescription>
                     Directory where the server process is launched.
                   </FieldDescription>
@@ -537,9 +592,12 @@ function ServerFormFields({
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-medium">Environment Variables</p>
+                      <p className="text-xs font-medium">
+                        Environment Variables
+                      </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        API keys, tokens, and secrets passed to the server process.
+                        API keys, tokens, and secrets passed to the server
+                        process.
                       </p>
                     </div>
                     <Button
@@ -560,7 +618,9 @@ function ServerFormFields({
                           key={index}
                           envVar={envVar}
                           index={index}
-                          onChange={(field, value) => updateEnvVar(index, field, value)}
+                          onChange={(field, value) =>
+                            updateEnvVar(index, field, value)
+                          }
                           onRemove={() => removeEnvVar(index)}
                         />
                       ))}
@@ -613,7 +673,7 @@ function ServerFormFields({
           <div className="border-t">
             <Alert
               variant={testConnection.data.success ? "default" : "destructive"}
-              className="animate-in fade-in-50 rounded-none rounded-b-lg border-0"
+              className="animate-in rounded-none rounded-b-lg border-0 fade-in-50"
             >
               {testConnection.data.success ? (
                 <CheckCircle className="text-green-500" />
@@ -623,17 +683,23 @@ function ServerFormFields({
               <AlertDescription>
                 {testConnection.data.success ? (
                   <div>
-                    <p className="font-medium text-foreground">Connection successful</p>
+                    <p className="font-medium text-foreground">
+                      Connection successful
+                    </p>
                     {testConnection.data.toolCount > 0 ? (
                       <p className="mt-0.5">
                         {testConnection.data.toolCount} tool
-                        {testConnection.data.toolCount !== 1 ? "s" : ""} available
-                        {testConnection.data.tools && testConnection.data.tools.length > 0 && (
-                          <span className="text-muted-foreground">
-                            {" — "}
-                            {testConnection.data.tools.map((t) => t.name).join(", ")}
-                          </span>
-                        )}
+                        {testConnection.data.toolCount !== 1 ? "s" : ""}{" "}
+                        available
+                        {testConnection.data.tools &&
+                          testConnection.data.tools.length > 0 && (
+                            <span className="text-muted-foreground">
+                              {" — "}
+                              {testConnection.data.tools
+                                .map((t) => t.name)
+                                .join(", ")}
+                            </span>
+                          )}
                       </p>
                     ) : (
                       <p className="mt-0.5">No tools exposed by this server.</p>
@@ -642,7 +708,9 @@ function ServerFormFields({
                 ) : (
                   <div>
                     <p className="font-medium">Connection failed</p>
-                    <p className="mt-0.5 break-all">{testConnection.data.error}</p>
+                    <p className="mt-0.5 break-all">
+                      {testConnection.data.error}
+                    </p>
                   </div>
                 )}
               </AlertDescription>
@@ -727,7 +795,7 @@ export function ServerFormPage({ serverName }: ServerFormPageProps) {
           <Terminal className="h-4 w-4 text-primary" />
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="text-base font-semibold leading-tight tracking-tight">
+          <h1 className="text-base leading-tight font-semibold tracking-tight">
             {server ? "Edit MCP Server" : "Add MCP Server"}
           </h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -751,7 +819,10 @@ export function ServerFormPage({ serverName }: ServerFormPageProps) {
         <Button variant="outline" onClick={goBack}>
           Cancel
         </Button>
-        <Button onClick={handleSave} disabled={!canSave || saveSettings.isPending}>
+        <Button
+          onClick={handleSave}
+          disabled={!canSave || saveSettings.isPending}
+        >
           {saveSettings.isPending ? (
             <>
               <Loader2 className="animate-spin" />
@@ -772,7 +843,12 @@ export function ServerFormPage({ serverName }: ServerFormPageProps) {
 
 interface ServerListItemProps {
   server: McpServerConfig
-  status?: { connected: boolean; toolCount: number; error?: string; enabled?: boolean }
+  status?: {
+    connected: boolean
+    toolCount: number
+    error?: string
+    enabled?: boolean
+  }
   tools?: Array<{ name: string; description?: string }>
   onEdit: () => void
   onDelete: () => void
@@ -820,7 +896,9 @@ export function ServerListItem({
         {/* Identity */}
         <div className={cn("min-w-0 flex-1", !checked && "opacity-50")}>
           <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-medium leading-tight">{server.name}</p>
+            <p className="truncate text-sm leading-tight font-medium">
+              {server.name}
+            </p>
             {statusLabel && (
               <span
                 className={cn(
@@ -839,7 +917,9 @@ export function ServerListItem({
               : `${server.command ?? ""}${server.args?.length ? ` ${server.args.join(" ")}` : ""}`}
           </code>
           {checked && status?.error && (
-            <p className="mt-1 truncate text-2xs text-destructive">{status.error}</p>
+            <p className="mt-1 truncate text-2xs text-destructive">
+              {status.error}
+            </p>
           )}
         </div>
 
@@ -941,8 +1021,11 @@ export function DeleteConfirmDialog({
           </div>
           <DialogTitle>Remove server?</DialogTitle>
           <DialogDescription>
-            <code className="font-mono font-medium text-foreground">{serverName}</code> will be
-            disconnected and its tools removed from the agent. This cannot be undone.
+            <code className="font-mono font-medium text-foreground">
+              {serverName}
+            </code>{" "}
+            will be disconnected and its tools removed from the agent. This
+            cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

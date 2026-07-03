@@ -1,8 +1,5 @@
 import { createRootRoute } from "@tanstack/react-router"
-import {
-  ServerUnavailable,
-  useElectronServerStatus,
-} from "@/features/electron"
+import { ServerUnavailable, useElectronServerStatus } from "@/features/electron"
 import { WorkspaceProvider } from "@/features/workspace"
 import { WorkspaceLayout } from "@/features/layout"
 import { useThreadNotifications } from "@/features/chat"
@@ -20,7 +17,8 @@ function RootLayoutInner() {
 function RootLayoutGate() {
   const { data: serverStatus } = useElectronServerStatus()
 
-  if (!serverStatus || serverStatus.status === "starting") return <SplashScreen />
+  if (!serverStatus || serverStatus.status === "starting")
+    return <SplashScreen />
   if (serverStatus.status !== "ready") {
     return <ServerUnavailable status={serverStatus} />
   }

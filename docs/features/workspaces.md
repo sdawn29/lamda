@@ -27,6 +27,7 @@ Workspaces are the top-level organizational unit in lamda. Each workspace repres
 ## What is a Workspace?
 
 A workspace contains:
+
 - **Path**: Local folder on your machine
 - **Name**: Derived from the folder name
 - **Threads**: Multiple conversation threads
@@ -35,6 +36,7 @@ A workspace contains:
 ## What is a Thread?
 
 A thread is a conversation about a specific task:
+
 - Has its own chat history
 - Can use a different AI model
 - Tracks its own context and state
@@ -128,6 +130,7 @@ See [Chat Interface](chat.md) for full details.
 ### Switching Threads
 
 Click any thread in the sidebar to switch to it:
+
 - Chat history loads automatically
 - Git status updates to workspace state
 - Terminal starts in workspace directory
@@ -169,6 +172,7 @@ Tasks are persisted per workspace in the SQLite database.
 ### Per-Workspace Preferences
 
 Right-click on a workspace for options:
+
 - **Open with App** — Choose external editor
 - **Reindex Files** — Rebuild file index for search
 - **Delete Workspace** — Remove from lamda
@@ -198,6 +202,7 @@ Launch files in your preferred editor:
 ### Sidebar Navigation
 
 Click any workspace in the sidebar to switch to it:
+
 - Workspace expands to show threads
 - Thread list loads
 - Last active thread is opened
@@ -205,6 +210,7 @@ Click any workspace in the sidebar to switch to it:
 ### Quick Switch
 
 Press the keyboard shortcut for sidebar toggle, then:
+
 - Use arrow keys to navigate
 - Press Enter to select
 
@@ -212,14 +218,14 @@ Press the keyboard shortcut for sidebar toggle, then:
 
 ### What Gets Stored
 
-| Data | Location |
-|------|----------|
-| Workspace metadata | SQLite |
-| Thread history | SQLite |
-| Chat messages | SQLite |
-| MCP configurations | SQLite |
-| API keys | `~/.pi/agent/auth.json` |
-| Settings | `~/.pi/agent/settings.json` |
+| Data               | Location                    |
+| ------------------ | --------------------------- |
+| Workspace metadata | SQLite                      |
+| Thread history     | SQLite                      |
+| Chat messages      | SQLite                      |
+| MCP configurations | SQLite                      |
+| API keys           | `~/.pi/agent/auth.json`     |
+| Settings           | `~/.pi/agent/settings.json` |
 
 ### Database Location
 
@@ -228,6 +234,7 @@ SQLite database stored at: `~/.lamda-code/db-v2.sqlite`
 ### Exporting Data
 
 Thread export functionality:
+
 1. Right-click on thread
 2. Select **Export Thread**
 3. Choose format (JSON, Markdown)
@@ -265,6 +272,7 @@ Workspace: docs-site
 ### "Workspace not found"
 
 If lamda can't find a workspace folder:
+
 1. The folder may have been moved or deleted
 2. Right-click → **Remove Missing Workspace**
 3. Optionally re-create by opening the folder again
@@ -272,6 +280,7 @@ If lamda can't find a workspace folder:
 ### "Git repository not initialized"
 
 Workspaces don't require git, but operations fail without it:
+
 1. Open the terminal in that workspace
 2. Run `git init` to initialize
 3. Or clone a git repository when creating
@@ -279,6 +288,7 @@ Workspaces don't require git, but operations fail without it:
 ### High Memory Usage
 
 Many workspaces can use memory:
+
 - Each thread maintains its own chat context
 - Close completed threads you don't need
 - Archive threads instead of keeping them active

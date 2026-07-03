@@ -9,6 +9,7 @@ Command palette feature module — provides a keyboard-driven command interface 
 ## Overview
 
 Simple feature module (3 files, ~400 lines) that provides:
+
 1. **Command palette UI** — Modal overlay with searchable command list
 2. **File navigation** — Quick-open files from workspace index
 3. **Thread switching** — Jump to any thread across workspaces
@@ -46,12 +47,14 @@ interface CommandPaletteContextValue {
 **Main command palette component:**
 
 **Search Groups:**
+
 1. **Files** — Searchable file list from workspace index (up to 5 results)
 2. **Go to thread** — All threads across workspaces
 3. **Layout** — Panel toggle commands
 4. **Actions** — Create thread, settings, theme, source control
 
 **Features:**
+
 - Uses `@/shared/ui/command` (cmdk-based)
 - Keyboard shortcut: `OPEN_COMMAND_PALETTE` action
 - Lazy-loaded workspace file index (only when open)
@@ -61,6 +64,7 @@ interface CommandPaletteContextValue {
 - Debounced search with 50ms debounce on actions
 
 **File Search:**
+
 ```typescript
 const { data: fileEntries = [], isLoading: filesLoading } = useWorkspaceIndex(
   activeWorkspace?.id,
@@ -74,6 +78,7 @@ const files = (
 ```
 
 **Thread Navigation:**
+
 ```typescript
 const allThreads = workspaces.flatMap((ws) =>
   ws.threads.map((t) => ({ ...t, workspaceName: ws.name }))
@@ -81,6 +86,7 @@ const allThreads = workspaces.flatMap((ws) =>
 ```
 
 **Action Handling:**
+
 ```typescript
 const run = useCallback(
   (fn: () => void) => {

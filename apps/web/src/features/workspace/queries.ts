@@ -26,7 +26,8 @@ export const BUILTIN_MODE_DTOS: ModeDto[] = [
   {
     id: "plan",
     label: "Plan",
-    description: "Research and propose a plan. Saves the plan to .lamda/plans/.",
+    description:
+      "Research and propose a plan. Saves the plan to .lamda/plans/.",
     color: "amber",
     icon: "list-todo",
     source: "builtin",
@@ -41,6 +42,12 @@ export const BUILTIN_MODE_DTOS: ModeDto[] = [
   },
 ]
 
+export const modeKeys = {
+  all: ["modes"] as const,
+  list: (workspaceId: string | undefined) =>
+    ["modes", workspaceId ?? null] as const,
+}
+
 /**
  * Modes available to a workspace: the built-ins plus any custom modes defined in
  * `~/.lamda/modes` (global) or the workspace's `.lamda/modes` (local). Falls back
@@ -48,7 +55,7 @@ export const BUILTIN_MODE_DTOS: ModeDto[] = [
  */
 export function useModes(workspaceId: string | undefined) {
   return useQuery({
-    queryKey: ["modes", workspaceId ?? null] as const,
+    queryKey: modeKeys.list(workspaceId),
     queryFn: async (): Promise<ModeDto[]> => {
       const { modes } = await listModes(workspaceId)
       return modes
@@ -58,15 +65,30 @@ export function useModes(workspaceId: string | undefined) {
   })
 }
 
+const workspaceFilesRootKey = ["workspace-files"] as const
+const workspaceDirRootKey = ["workspace-dir"] as const
+
 export const workspaceKeys = {
   all: ["workspaces"] as const,
-  files: (workspaceId: string) => ["workspace-files", workspaceId] as const,
+  files: (workspaceId: string) =>
+    [...workspaceFilesRootKey, workspaceId] as const,
+  // Matches every workspace-files query regardless of workspace id — for a
+  // broad "something changed, refresh whichever workspace's index is mounted"
+  // invalidation.
+  filesAll: workspaceFilesRootKey,
   // Keyed by the effective root directory (workspace path, or a worktree path
   // when the active thread runs in one) rather than the workspace id, so the
   // tree's worktree and workspace views of the same relative path stay distinct
   // and the `workspace_dir_changed` event (which carries `root`) matches.
   dir: (root: string, relPath: string) =>
-    ["workspace-dir", root, relPath] as const,
+    [...workspaceDirRootKey, root, relPath] as const,
+  // Matches every directory query regardless of root/relPath — this is what
+  // backs the rendered file tree, so invalidating this prefix refreshes it.
+  dirAll: workspaceDirRootKey,
+}
+
+export const threadKeys = {
+  archived: ["threads", "archived"] as const,
 }
 
 export const workspacesQueryKey = workspaceKeys.all
@@ -84,9 +106,14 @@ export function useWorkspaces() {
 
 export { type WorkspaceFileEntry }
 
-export function useWorkspaceIndex(workspaceId: string | undefined, enabled = true) {
+export function useWorkspaceIndex(
+  workspaceId: string | undefined,
+  enabled = true
+) {
   return useQuery({
-    queryKey: workspaceId ? workspaceKeys.files(workspaceId) : (["workspace-files-none"] as const),
+    queryKey: workspaceId
+      ? workspaceKeys.files(workspaceId)
+      : (["workspace-files-none"] as const),
     queryFn: async (): Promise<WorkspaceFileEntry[]> => {
       const { files } = await listWorkspaceIndexFiles(workspaceId!)
       return files

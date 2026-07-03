@@ -45,7 +45,8 @@ function installCandidates(entry: {
   fallbacks: LspServerCommand[];
 }): InstallCandidate[] {
   const candidates: InstallCandidate[] = [];
-  if (entry.install) candidates.push({ target: entry.command, spec: entry.install });
+  if (entry.install)
+    candidates.push({ target: entry.command, spec: entry.install });
   for (const fb of entry.fallbacks) {
     if (fb.install) candidates.push({ target: fb.command, spec: fb.install });
   }
@@ -125,8 +126,12 @@ export async function startInstall(
       job.status = "success";
     } else {
       job.status = "error";
-      const reason = signal ? `terminated by ${signal}` : `exited with code ${code}`;
-      job.output = (job.output + `\n${job.commandLine}: ${reason}`).slice(-OUTPUT_CAP);
+      const reason = signal
+        ? `terminated by ${signal}`
+        : `exited with code ${code}`;
+      job.output = (job.output + `\n${job.commandLine}: ${reason}`).slice(
+        -OUTPUT_CAP,
+      );
     }
     job.finishedAt = Date.now();
     console.log(`[lsp-install] ${language} (${target}): ${job.status}`);

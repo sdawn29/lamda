@@ -1,12 +1,23 @@
 import { useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useWorkspaces } from "@/features/workspace"
-import { messagesQueryKey, MESSAGES_PAGE_SIZE, type MessagesInfiniteData } from "../queries"
+import {
+  messagesQueryKey,
+  MESSAGES_PAGE_SIZE,
+  type MessagesInfiniteData,
+} from "../queries"
 import { listMessages } from "../api"
-import { getChatSyncEngine, loadThreadFromStorage } from "./use-chat-sync-engine"
+import {
+  getChatSyncEngine,
+  loadThreadFromStorage,
+} from "./use-chat-sync-engine"
 import { blocksToMessages, type MessageBlock } from "../types"
 
-function makeInfiniteSeed(messages: ReturnType<typeof blocksToMessages>, hasMore: boolean, oldestBlockIndex: number | null): MessagesInfiniteData {
+function makeInfiniteSeed(
+  messages: ReturnType<typeof blocksToMessages>,
+  hasMore: boolean,
+  oldestBlockIndex: number | null
+): MessagesInfiniteData {
   return {
     pages: [{ messages, hasMore, oldestBlockIndex }],
     pageParams: [undefined],
@@ -30,33 +41,62 @@ export function usePrefetchThreadsMessages() {
         const sessionId = thread.sessionId
 
         // Skip if the cache already has the correct InfiniteData shape.
-        const cached = queryClient.getQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId))
+        const cached = queryClient.getQueryData<MessagesInfiniteData>(
+          messagesQueryKey(sessionId)
+        )
         if (cached?.pages) continue
 
-        // Seed from localStorage immediately (no network round-trip).
+        // Seed from localStorage immediately (no network round-trip). Use the
+        // stored pagination as-is (not re-derived from a truncated slice) so
+        // hasPreviousPage / oldestBlockIndex stay correct and older history the
+        // user already paged in isn't dropped.
         const localData = loadThreadFromStorage(sessionId)
         if (localData?.messages?.length) {
-          const msgs = localData.messages.slice(-MESSAGES_PAGE_SIZE)
           queryClient.setQueryData(
             messagesQueryKey(sessionId),
-            makeInfiniteSeed(msgs, localData.messages.length > MESSAGES_PAGE_SIZE, null)
+            makeInfiniteSeed(
+              localData.messages,
+              localData.hasMore,
+              localData.oldestBlockIndex
+            ),
+            // Seeded from disk, not the network — mark it already-stale so the
+            // background sync below (and the mount refetch in useInfiniteMessages)
+            // aren't suppressed by staleTime.
+            { updatedAt: 0 }
           )
 
           // Sync from server in the background so the next mount gets fresh data.
           void (async () => {
             try {
-              const { blocks, hasMore } = await listMessages(sessionId, { limit: MESSAGES_PAGE_SIZE })
+              const { blocks, hasMore } = await listMessages(sessionId, {
+                limit: MESSAGES_PAGE_SIZE,
+              })
               if (!active) return
               const serverMessages = blocksToMessages(blocks as MessageBlock[])
-              const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
-              syncEngine.saveMessages(sessionId, serverMessages, { hasMore, oldestBlockIndex })
+              const oldestBlockIndex =
+                blocks.length > 0
+                  ? (blocks[0] as MessageBlock).blockIndex
+                  : null
+              syncEngine.saveMessages(sessionId, serverMessages, {
+                hasMore,
+                oldestBlockIndex,
+              })
               const currentWs = workspacesRef.current
-              if (currentWs.some((w) => w.threads.some((t) => t.sessionId === sessionId))) {
+              if (
+                currentWs.some((w) =>
+                  w.threads.some((t) => t.sessionId === sessionId)
+                )
+              ) {
                 // Guard: don't overwrite if the WS stream or a live refetch has already
                 // written more messages than what the server snapshot contains.
                 // (Same guard as the "no local data" path below.)
-                const existingCached = queryClient.getQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId))
-                const existingCount = (existingCached?.pages ?? []).flatMap((p) => p.messages).length
+                const existingCached =
+                  queryClient.getQueryData<MessagesInfiniteData>(
+                    messagesQueryKey(sessionId)
+                  )
+                const existingCount = (existingCached?.pages ?? []).flatMap(
+                  (p) => p.messages
+                ).length
                 if (existingCount > serverMessages.length) return
                 queryClient.setQueryData(
                   messagesQueryKey(sessionId),
@@ -74,19 +114,34 @@ export function usePrefetchThreadsMessages() {
         void (async () => {
           try {
             if (!active) return
-            const { blocks, hasMore } = await listMessages(sessionId, { limit: MESSAGES_PAGE_SIZE })
+            const { blocks, hasMore } = await listMessages(sessionId, {
+              limit: MESSAGES_PAGE_SIZE,
+            })
             if (!active) return
             const messages = blocksToMessages(blocks as MessageBlock[])
-            const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
-            syncEngine.saveMessages(sessionId, messages, { hasMore, oldestBlockIndex })
+            const oldestBlockIndex =
+              blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
+            syncEngine.saveMessages(sessionId, messages, {
+              hasMore,
+              oldestBlockIndex,
+            })
             const currentWs = workspacesRef.current
-            if (currentWs.some((w) => w.threads.some((t) => t.sessionId === sessionId))) {
+            if (
+              currentWs.some((w) =>
+                w.threads.some((t) => t.sessionId === sessionId)
+              )
+            ) {
               // Guard: re-check the cache before writing. If an optimistic message was
               // seeded while this fetch was in-flight (e.g. new-thread-view seeds the
               // user message before navigating), the server response may be empty or
               // stale and must not overwrite the optimistic data.
-              const existingCached = queryClient.getQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId))
-              const existingCount = (existingCached?.pages ?? []).flatMap((p) => p.messages).length
+              const existingCached =
+                queryClient.getQueryData<MessagesInfiniteData>(
+                  messagesQueryKey(sessionId)
+                )
+              const existingCount = (existingCached?.pages ?? []).flatMap(
+                (p) => p.messages
+              ).length
               if (existingCount > messages.length) return
               queryClient.setQueryData(
                 messagesQueryKey(sessionId),
@@ -100,6 +155,8 @@ export function usePrefetchThreadsMessages() {
       }
     }
 
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [workspaces, queryClient, syncEngine])
 }

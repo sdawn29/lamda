@@ -31,9 +31,7 @@ export interface ModeDto {
   source: "builtin" | "local" | "global"
 }
 
-export function listModes(
-  workspaceId?: string
-): Promise<{ modes: ModeDto[] }> {
+export function listModes(workspaceId?: string): Promise<{ modes: ModeDto[] }> {
   const qs = workspaceId
     ? `?workspaceId=${encodeURIComponent(workspaceId)}`
     : ""

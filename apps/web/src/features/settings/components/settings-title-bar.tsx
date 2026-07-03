@@ -93,7 +93,9 @@ export function SettingsTitleBar() {
           />
           <TooltipContent>
             Back to threads
-            {closeBinding && <ShortcutKbd binding={closeBinding} className="ml-1" />}
+            {closeBinding && (
+              <ShortcutKbd binding={closeBinding} className="ml-1" />
+            )}
           </TooltipContent>
         </Tooltip>
       </div>

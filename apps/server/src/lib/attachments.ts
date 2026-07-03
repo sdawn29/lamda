@@ -83,7 +83,7 @@ export async function writeAttachment(
   mediaType: string,
   data: string,
   kind: "image" | "text" | "file",
-  attachmentId?: string
+  attachmentId?: string,
 ): Promise<AttachmentMetadata & { path: string }> {
   const id = attachmentId || randomUUID();
   const ext = deriveExtension(filename, mediaType);
@@ -115,13 +115,13 @@ export async function writeAttachment(
  */
 export async function findAttachmentFile(
   threadId: string,
-  attachmentId: string
+  attachmentId: string,
 ): Promise<string | null> {
   try {
     const dir = threadAttachmentDir(threadId);
     const entries = await readdir(dir);
     const match = entries.find(
-      (name) => name === attachmentId || name.startsWith(`${attachmentId}.`)
+      (name) => name === attachmentId || name.startsWith(`${attachmentId}.`),
     );
     return match ? join(dir, match) : null;
   } catch {

@@ -4,51 +4,51 @@ Welcome to **lamda**, a local-first desktop coding workspace for running Pi codi
 
 ## 📚 Documentation Guide
 
-| Category | Document | Description |
-|----------|----------|-------------|
-| **Getting Started** | | |
-| Quick Start | [Quick Start Guide](quick-start.md) | Get up and running in 5 minutes |
-| Installation | [Getting Started](getting-started.md) | Detailed installation and setup |
-| **Features** | | |
-| Workspaces | [Workspaces Guide](features/workspaces.md) | Managing projects and threads |
-| Chat | [Chat Guide](features/chat.md) | Communicating with the AI agent |
-| Git | [Git Guide](features/git.md) | Version control workflow |
-| Terminal | [Terminal Guide](features/terminal.md) | Embedded shell access |
-| Tasks | [Tasks Guide](features/tasks.md) | Workspace shell command shortcuts |
-| Settings | [Settings Guide](features/settings.md) | Configuration and preferences |
-| Themes | [Themes Guide](features/themes.md) | Color themes and fonts |
-| MCP | [MCP Guide](features/mcp.md) | Model Context Protocol servers |
-| **Reference** | | |
-| API | [API Reference](api.md) | Server REST API endpoints |
-| Providers | [Providers](providers.md) | AI provider configuration |
-| CLI | [CLI Reference](cli.md) | Command-line commands |
-| Architecture | [Architecture](architecture.md) | Technical architecture overview |
-| **Contributing** | | |
-| Contributing | [Contributing Guide](contributing.md) | How to contribute to the project |
+| Category            | Document                                   | Description                       |
+| ------------------- | ------------------------------------------ | --------------------------------- |
+| **Getting Started** |                                            |                                   |
+| Quick Start         | [Quick Start Guide](quick-start.md)        | Get up and running in 5 minutes   |
+| Installation        | [Getting Started](getting-started.md)      | Detailed installation and setup   |
+| **Features**        |                                            |                                   |
+| Workspaces          | [Workspaces Guide](features/workspaces.md) | Managing projects and threads     |
+| Chat                | [Chat Guide](features/chat.md)             | Communicating with the AI agent   |
+| Git                 | [Git Guide](features/git.md)               | Version control workflow          |
+| Terminal            | [Terminal Guide](features/terminal.md)     | Embedded shell access             |
+| Tasks               | [Tasks Guide](features/tasks.md)           | Workspace shell command shortcuts |
+| Settings            | [Settings Guide](features/settings.md)     | Configuration and preferences     |
+| Themes              | [Themes Guide](features/themes.md)         | Color themes and fonts            |
+| MCP                 | [MCP Guide](features/mcp.md)               | Model Context Protocol servers    |
+| **Reference**       |                                            |                                   |
+| API                 | [API Reference](api.md)                    | Server REST API endpoints         |
+| Providers           | [Providers](providers.md)                  | AI provider configuration         |
+| CLI                 | [CLI Reference](cli.md)                    | Command-line commands             |
+| Architecture        | [Architecture](architecture.md)            | Technical architecture overview   |
+| **Contributing**    |                                            |                                   |
+| Contributing        | [Contributing Guide](contributing.md)      | How to contribute to the project  |
 
 ---
 
 ## 🎯 Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **Chat Interface** | Real-time streaming conversations with the Pi coding agent |
-| **Thread Modes** | Agent, Ask, and Plan modes control agent behaviour per thread |
-| **Thread Forking** | Branch any conversation at any earlier message |
-| **Git Integration** | View diffs, hunk-level staging, commit, branches, stashes, and revert |
-| **Review Panel** | Side-by-side diff viewer with last-turn file change tracking |
-| **Embedded Terminal** | Multi-tab terminal with WebSocket PTY backend |
-| **File Tabs** | Open source files in tabs alongside chat threads |
-| **Command Palette** | Keyboard-driven command and file search (`Cmd/Ctrl + K`) |
-| **Workspaces** | Organize multiple repositories with multiple conversation threads |
-| **Workspace Tasks** | One-click shell command shortcuts per workspace |
-| **LSP Integration** | Live diagnostics in the file viewer, with one-click language server installs |
-| **MCP Support** | Connect to Model Context Protocol servers for extended capabilities |
-| **Themes & Fonts** | Built-in color themes (Catppuccin, Nord, Tokyo Night, …), custom themes, and Google Fonts |
-| **Usage Tracking** | AI token and cost stats with date-range filtering |
-| **Local Models** | Manage local inference providers alongside cloud APIs |
-| **Local-First** | All data stored locally in SQLite (`~/.lamda-code/db-v2.sqlite`) |
-| **Multiple Providers** | Support for Anthropic, OpenAI, DeepSeek, Google Gemini, and more |
+| Feature                | Description                                                                               |
+| ---------------------- | ----------------------------------------------------------------------------------------- |
+| **Chat Interface**     | Real-time streaming conversations with the Pi coding agent                                |
+| **Thread Modes**       | Agent, Ask, and Plan modes control agent behaviour per thread                             |
+| **Thread Forking**     | Branch any conversation at any earlier message                                            |
+| **Git Integration**    | View diffs, hunk-level staging, commit, branches, stashes, and revert                     |
+| **Review Panel**       | Side-by-side diff viewer with last-turn file change tracking                              |
+| **Embedded Terminal**  | Multi-tab terminal with WebSocket PTY backend                                             |
+| **File Tabs**          | Open source files in tabs alongside chat threads                                          |
+| **Command Palette**    | Keyboard-driven command and file search (`Cmd/Ctrl + K`)                                  |
+| **Workspaces**         | Organize multiple repositories with multiple conversation threads                         |
+| **Workspace Tasks**    | One-click shell command shortcuts per workspace                                           |
+| **LSP Integration**    | Live diagnostics in the file viewer, with one-click language server installs              |
+| **MCP Support**        | Connect to Model Context Protocol servers for extended capabilities                       |
+| **Themes & Fonts**     | Built-in color themes (Catppuccin, Nord, Tokyo Night, …), custom themes, and Google Fonts |
+| **Usage Tracking**     | AI token and cost stats with date-range filtering                                         |
+| **Local Models**       | Manage local inference providers alongside cloud APIs                                     |
+| **Local-First**        | All data stored locally in SQLite (`~/.lamda-code/db-v2.sqlite`)                          |
+| **Multiple Providers** | Support for Anthropic, OpenAI, DeepSeek, Google Gemini, and more                          |
 
 ---
 
@@ -176,6 +176,7 @@ Extend the agent's capabilities:
 ### Common Issues
 
 **Application won't start**
+
 ```sh
 # Check Node.js version (requires 18+)
 node --version
@@ -186,15 +187,18 @@ npm install
 ```
 
 **API key not working**
+
 - Verify your API key is valid
 - Check that the provider is correctly configured in Settings
 - Ensure no firewall is blocking requests
 
 **Terminal not connecting**
+
 - The server must be running for terminal WebSocket connection
 - Check that port 3001 is not in use by another application
 
 **Git operations failing**
+
 - Ensure Git is installed (`git --version`)
 - Verify the workspace path is correct
 - Check that you have proper file permissions

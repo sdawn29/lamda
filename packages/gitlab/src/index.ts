@@ -2,70 +2,26 @@ import { execFile } from "node:child_process";
 import { basename } from "node:path";
 import { promisify } from "node:util";
 import { createCliEnv } from "@lamda/cli-env";
+import {
+  createCliRunner,
+  assertNotOption,
+  assertPositiveInt,
+} from "@lamda/cli-runner";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT = 20000;
 
-export class GlabError extends Error {
-  constructor(
-    message: string,
-    readonly stderr: string,
-  ) {
-    super(message);
-    this.name = "GlabError";
-  }
-}
+const glabRunner = createCliRunner({
+  binary: "glab",
+  env: { GLAB_NO_PROMPT: "1" },
+  defaultTimeoutMs: DEFAULT_TIMEOUT,
+  errorName: "GlabError",
+});
 
-function assertNotOption(value: string, label: string): void {
-  if (value.startsWith("-")) {
-    throw new Error(`Invalid ${label}: must not start with '-'`);
-  }
-}
+export const GlabError = glabRunner.CliError;
 
-function assertPositiveInt(value: number, label: string): void {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`Invalid ${label}: must be a positive integer`);
-  }
-}
-
-function isExecError(
-  err: unknown,
-): err is { stdout?: string; stderr?: string; code?: number } {
-  return typeof err === "object" && err !== null;
-}
-
-async function runGlab(
-  args: string[],
-  cwd: string,
-  timeout = DEFAULT_TIMEOUT,
-): Promise<{ stdout: string; stderr: string }> {
-  try {
-    const { stdout, stderr } = await execFileAsync("glab", args, {
-      cwd,
-      timeout,
-      maxBuffer: 1024 * 1024 * 16,
-      env: createCliEnv({ GLAB_NO_PROMPT: "1" }),
-    });
-    return { stdout, stderr };
-  } catch (err: unknown) {
-    if (isExecError(err)) {
-      const stderr = typeof err.stderr === "string" ? err.stderr : "";
-      const message =
-        stderr.trim() || (err as Error).message || "glab command failed";
-      throw new GlabError(message, stderr);
-    }
-    throw new GlabError("glab command failed", "");
-  }
-}
-
-async function runGlabJson<T>(
-  args: string[],
-  cwd: string,
-  timeout = DEFAULT_TIMEOUT,
-): Promise<T> {
-  const { stdout } = await runGlab(args, cwd, timeout);
-  return JSON.parse(stdout) as T;
-}
+const runGlab = glabRunner.run;
+const runGlabJson = glabRunner.runJson;
 
 async function runGit(
   args: string[],

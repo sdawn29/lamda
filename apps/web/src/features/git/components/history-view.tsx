@@ -80,9 +80,9 @@ function CommitRow({
               <button
                 type="button"
                 onClick={() => setExpanded((v) => !v)}
-                className="group w-full rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="group w-full rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
               >
-                <p className="truncate text-xs font-medium leading-snug text-foreground/85 group-hover:text-foreground">
+                <p className="truncate text-xs leading-snug font-medium text-foreground/85 group-hover:text-foreground">
                   {entry.subject || "(no message)"}
                 </p>
                 <div className="mt-0.5 flex items-center gap-1 text-2xs text-muted-foreground/45">
@@ -103,7 +103,7 @@ function CommitRow({
                 {entry.subject || "(no message)"}
               </p>
               {entry.body && (
-                <p className="whitespace-pre-wrap break-words text-muted-foreground">
+                <p className="break-words whitespace-pre-wrap text-muted-foreground">
                   {entry.body}
                 </p>
               )}
@@ -112,7 +112,7 @@ function CommitRow({
         </Tooltip>
 
         {expanded && (
-          <div className="animate-in fade-in-0 mt-1.5 overflow-hidden rounded-md border border-border/40 duration-150">
+          <div className="mt-1.5 animate-in overflow-hidden rounded-md border border-border/40 duration-150 fade-in-0">
             {isLoading ? (
               <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
                 <Loader2 className="size-3 animate-spin" />
@@ -182,7 +182,9 @@ export const HistoryView = memo(function HistoryView({
           <GitCommit className="h-5 w-5 text-muted-foreground/40" />
         </div>
         <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground/60">No commits yet</p>
+          <p className="text-xs font-medium text-muted-foreground/60">
+            No commits yet
+          </p>
           <p className="text-3xs text-muted-foreground/40">
             Commits will appear here once you start committing
           </p>

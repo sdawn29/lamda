@@ -1,5 +1,11 @@
 import { useState } from "react"
-import { Bot, CheckCircle2, GitBranch, Settings, SquareTerminal } from "lucide-react"
+import {
+  Bot,
+  CheckCircle2,
+  GitBranch,
+  Settings,
+  SquareTerminal,
+} from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 
 import { Button } from "@/shared/ui/button"

@@ -10,7 +10,8 @@
     }
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@lamda/cli-env": "*",
@@ -18,7 +19,11 @@
     "vscode-languageserver-protocol": "^3.18.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.0.0",
-    "typescript": "~6.0.3"
+    "eslint": "^10.5.0",
+    "globals": "^17.6.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.61.1"
   }
 }

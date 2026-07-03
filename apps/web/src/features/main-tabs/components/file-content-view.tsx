@@ -81,12 +81,16 @@ const rehypeSourcePositions: Plugin<[], Root> = () => {
       if (node.type === "element" && node.position) {
         const element = node as HastElement
         element.properties ??= {}
-        element.properties.dataSourceStartLine = String(node.position.start.line)
+        element.properties.dataSourceStartLine = String(
+          node.position.start.line
+        )
         element.properties.dataSourceStartColumn = String(
           node.position.start.column
         )
         element.properties.dataSourceEndLine = String(node.position.end.line)
-        element.properties.dataSourceEndColumn = String(node.position.end.column)
+        element.properties.dataSourceEndColumn = String(
+          node.position.end.column
+        )
       }
       if ("children" in node) {
         for (const child of node.children) visit(child)
@@ -113,9 +117,7 @@ function findSelectionLineRangeFromSource(
   for (let start = 0; start < lines.length; start++) {
     let windowText = ""
     for (let end = start; end < Math.min(lines.length, start + 80); end++) {
-      windowText = windowText
-        ? `${windowText}\n${lines[end]}`
-        : lines[end]
+      windowText = windowText ? `${windowText}\n${lines[end]}` : lines[end]
       if (normalizeSelectionText(windowText).includes(selected)) {
         const line = start + 1
         const endLine = end + 1
@@ -129,11 +131,13 @@ function findSelectionLineRangeFromSource(
 
 function getSourcePositionElement(node: Node | null): HTMLElement | null {
   const element =
-    node instanceof HTMLElement ? node : node?.parentElement ?? null
+    node instanceof HTMLElement ? node : (node?.parentElement ?? null)
   return element?.closest<HTMLElement>("[data-source-start-line]") ?? null
 }
 
-function readSourcePosition(element: HTMLElement | null): SelectionRange | null {
+function readSourcePosition(
+  element: HTMLElement | null
+): SelectionRange | null {
   if (!element) return null
   const line = Number(element.dataset.sourceStartLine)
   const startColumn = Number(element.dataset.sourceStartColumn)
@@ -178,7 +182,9 @@ function findSelectionLineRange(
   selectedText: string,
   domRange: Range
 ): SelectionRange {
-  const commonElement = getSourcePositionElement(domRange.commonAncestorContainer)
+  const commonElement = getSourcePositionElement(
+    domRange.commonAncestorContainer
+  )
   const preciseRange = findSelectionRangeInElementSource(
     source,
     selectedText,
@@ -189,7 +195,9 @@ function findSelectionLineRange(
   const start = readSourcePosition(
     getSourcePositionElement(domRange.startContainer)
   )
-  const end = readSourcePosition(getSourcePositionElement(domRange.endContainer))
+  const end = readSourcePosition(
+    getSourcePositionElement(domRange.endContainer)
+  )
 
   if (start && end) {
     return {
@@ -317,11 +325,7 @@ function MarkdownSelectionActions({
   }
 
   return (
-    <div
-      ref={rootRef}
-      onMouseUp={updateSelection}
-      onKeyUp={updateSelection}
-    >
+    <div ref={rootRef} onMouseUp={updateSelection} onKeyUp={updateSelection}>
       {children}
       {selection && (
         <Button
@@ -464,7 +468,9 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
       onDoubleClick={resetView}
-      style={{ cursor: isZoomed ? (isDragging ? "grabbing" : "grab") : "default" }}
+      style={{
+        cursor: isZoomed ? (isDragging ? "grabbing" : "grab") : "default",
+      }}
     >
       <img
         src={src}
@@ -603,7 +609,10 @@ export const FileContentView = memo(function FileContentView({
   const lsp = useLspConnection(workspaceId)
 
   const [fileRefreshKey, setFileRefreshKey] = useState(0)
-  const incrementRefreshKey = useCallback(() => setFileRefreshKey(k => k + 1), [])
+  const incrementRefreshKey = useCallback(
+    () => setFileRefreshKey((k) => k + 1),
+    []
+  )
   useEffect(() => {
     if (!workspaceId) return
     return subscribeToWorkspaceFileUpdates((id) => {
@@ -800,7 +809,8 @@ export const FileContentView = memo(function FileContentView({
         }
 
         const response = await fetch(
-          sourceUrl ?? appendToken(`${url}/file?path=${encodeURIComponent(filePath)}`)
+          sourceUrl ??
+            appendToken(`${url}/file?path=${encodeURIComponent(filePath)}`)
         )
         if (!response.ok) {
           throw new Error(`Failed to load file: ${response.statusText}`)

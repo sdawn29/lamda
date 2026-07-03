@@ -1,15 +1,21 @@
-export { db, dbPath, closeDb, isVecAvailable, MEMORY_EMBEDDING_DIM } from "./client.js"
-export * from "./schema.js"
-export * from "./queries/settings.js"
-export * from "./queries/workspaces.js"
-export * from "./queries/threads.js"
-export * from "./queries/messages.js"
-export * from "./queries/message-blocks.js"
-export * from "./queries/workspace-files.js"
-export * from "./queries/mcp-servers.js"
-export * from "./queries/agent-turns.js"
-export * from "./queries/ai-usage.js"
-export * from "./queries/workspace-tasks.js"
-export * from "./queries/automations.js"
-export * from "./queries/todos.js"
-export * from "./queries/memories.js"
+export {
+  db,
+  dbPath,
+  closeDb,
+  isVecAvailable,
+  MEMORY_EMBEDDING_DIM,
+} from "./client.js";
+export * from "./schema.js";
+export * from "./queries/settings.js";
+export * from "./queries/workspaces.js";
+export * from "./queries/threads.js";
+export * from "./queries/messages.js";
+export * from "./queries/message-blocks.js";
+export * from "./queries/workspace-files.js";
+export * from "./queries/mcp-servers.js";
+export * from "./queries/agent-turns.js";
+export * from "./queries/ai-usage.js";
+export * from "./queries/workspace-tasks.js";
+export * from "./queries/automations.js";
+export * from "./queries/todos.js";
+export * from "./queries/memories.js";

@@ -16,12 +16,16 @@ import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 export interface LspToolHelpers {
   /** Ensure a server is running for this file and the file is openDoc-ed. Returns false if no server available. */
   prepare(filePath: string): Promise<boolean>;
-  diagnostics(filePath: string): Promise<Array<{ message: string; severity?: number; range: unknown }>>;
+  diagnostics(
+    filePath: string,
+  ): Promise<Array<{ message: string; severity?: number; range: unknown }>>;
 }
 
 function textResult(payload: unknown) {
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+    content: [
+      { type: "text" as const, text: JSON.stringify(payload, null, 2) },
+    ],
     details: {},
   };
 }
@@ -31,7 +35,9 @@ function noServerResult() {
     content: [
       {
         type: "text" as const,
-        text: JSON.stringify({ error: "No language server available for this file type" }),
+        text: JSON.stringify({
+          error: "No language server available for this file type",
+        }),
       },
     ],
     details: {},
@@ -40,7 +46,9 @@ function noServerResult() {
 
 export function buildLspTools(helpers: LspToolHelpers): ToolDefinition[] {
   const fileOnlyParams = Type.Object({
-    file: Type.String({ description: "Workspace-relative or absolute file path." }),
+    file: Type.String({
+      description: "Workspace-relative or absolute file path.",
+    }),
   }) as ToolDefinition["parameters"];
 
   return [

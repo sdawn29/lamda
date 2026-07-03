@@ -15,11 +15,7 @@ export interface AppProvidersProps {
 }
 
 export function AppProviders({ children }: AppProvidersProps) {
-  return (
-    <ErrorToastProvider>
-      {children}
-    </ErrorToastProvider>
-  )
+  return <ErrorToastProvider>{children}</ErrorToastProvider>
 }
 
 // Re-export hooks for convenience

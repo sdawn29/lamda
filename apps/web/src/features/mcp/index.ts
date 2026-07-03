@@ -2,7 +2,12 @@
 export { McpSettingsCard } from "./components/mcp-settings-card"
 
 // Shared UI components
-export { ServerListItem, ServerFormPage, DeleteConfirmDialog, validateForm } from "./components/server-form"
+export {
+  ServerListItem,
+  ServerFormPage,
+  DeleteConfirmDialog,
+  validateForm,
+} from "./components/server-form"
 
 // Types
 export type {
@@ -18,7 +23,12 @@ export {
 } from "./types"
 
 // Queries
-export { useMcpSettings, useMcpServerStatus, useMcpTools, mcpKeys } from "./queries"
+export {
+  useMcpSettings,
+  useMcpServerStatus,
+  useMcpTools,
+  mcpKeys,
+} from "./queries"
 
 // Mutations
 export {

@@ -38,8 +38,7 @@ export const MONO_FONTS: FontOption[] = [
   {
     id: "system-mono",
     label: "System Mono",
-    value:
-      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+    value: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
   },
 ]
 
@@ -62,7 +61,10 @@ export function resolveAnyFontValue(
 }
 
 /** Returns the human-readable label for any font ID. */
-export function resolveFontLabel(id: string, bundledOptions: FontOption[]): string {
+export function resolveFontLabel(
+  id: string,
+  bundledOptions: FontOption[]
+): string {
   if (id.startsWith("gf:")) return id.slice(3)
   return getFontById(bundledOptions, id).label
 }

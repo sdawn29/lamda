@@ -1,6 +1,6 @@
 /**
  * MCP Integration for pi-coding-agent
- * 
+ *
  * This package provides MCP (Model Context Protocol) support for the pi coding agent.
  * It allows connecting to MCP servers and exposing their tools as pi tools.
  */

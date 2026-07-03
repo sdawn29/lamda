@@ -68,14 +68,14 @@ The button appears next to the "Open with" and "Commit" buttons.
 
 ### Supported MCP Servers
 
-| Server | Package | Description |
-|--------|---------|-------------|
-| Filesystem | `@modelcontextprotocol/server-filesystem` | Local file operations |
-| GitHub | `@modelcontextprotocol/server-github` | GitHub API integration |
-| Brave Search | `@modelcontextprotocol/server-brave-search` | Web search |
-| SQLite | `@modelcontextprotocol/server-sqlite` | SQLite database |
-| Slack | `@modelcontextprotocol/server-slack` | Slack messaging |
-| Puppeteer | `@modelcontextprotocol/server-puppeteer` | Browser automation |
+| Server       | Package                                     | Description            |
+| ------------ | ------------------------------------------- | ---------------------- |
+| Filesystem   | `@modelcontextprotocol/server-filesystem`   | Local file operations  |
+| GitHub       | `@modelcontextprotocol/server-github`       | GitHub API integration |
+| Brave Search | `@modelcontextprotocol/server-brave-search` | Web search             |
+| SQLite       | `@modelcontextprotocol/server-sqlite`       | SQLite database        |
+| Slack        | `@modelcontextprotocol/server-slack`        | Slack messaging        |
+| Puppeteer    | `@modelcontextprotocol/server-puppeteer`    | Browser automation     |
 
 ### Configuration Fields
 
@@ -88,23 +88,23 @@ The button appears next to the "Open with" and "Commit" buttons.
 
 ## Server Status Indicators
 
-| Status | Icon | Meaning |
-|--------|------|---------|
-| Loading | Spinner | Status is being fetched |
-| Connected | Green circle | Server is running, tools available |
-| Disconnected | Gray circle | Server not connected |
+| Status       | Icon         | Meaning                            |
+| ------------ | ------------ | ---------------------------------- |
+| Loading      | Spinner      | Status is being fetched            |
+| Connected    | Green circle | Server is running, tools available |
+| Disconnected | Gray circle  | Server not connected               |
 
 ## API Endpoints
 
 The UI expects these server endpoints:
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/mcp/settings/:workspaceId` | GET | Fetch MCP settings |
-| `/mcp/settings/:workspaceId` | PUT | Save MCP settings |
-| `/mcp/status/:workspaceId` | GET | Get server connection status |
-| `/mcp/tools/:workspaceId` | GET | List available tools |
-| `/mcp/test-connection` | POST | Test server connectivity |
+| Endpoint                     | Method | Purpose                      |
+| ---------------------------- | ------ | ---------------------------- |
+| `/mcp/settings/:workspaceId` | GET    | Fetch MCP settings           |
+| `/mcp/settings/:workspaceId` | PUT    | Save MCP settings            |
+| `/mcp/status/:workspaceId`   | GET    | Get server connection status |
+| `/mcp/tools/:workspaceId`    | GET    | List available tools         |
+| `/mcp/test-connection`       | POST   | Test server connectivity     |
 
 ## Usage
 
@@ -115,15 +115,15 @@ import { McpDialog } from "@/features/mcp"
 
 function MyComponent() {
   const [open, setOpen] = useState(false)
-  
+
   return (
     <>
       <Button onClick={() => setOpen(true)}>
         <Settings className="rotate-45" />
         MCP
       </Button>
-      <McpDialog 
-        open={open} 
+      <McpDialog
+        open={open}
         onOpenChange={setOpen}
         workspaceId="optional"
       />
@@ -151,7 +151,7 @@ function MyComponent() {
   const settings = useMcpSettings("my-workspace-id")
   const status = useMcpServerStatus("my-workspace-id")
   const tools = useMcpTools("my-workspace-id")
-  
+
   // ...
 }
 ```

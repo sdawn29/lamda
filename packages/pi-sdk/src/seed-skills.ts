@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { lamdaGlobalSkillsDir } from "./lamda-paths.js"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { lamdaGlobalSkillsDir } from "./lamda-paths.js";
 
 /**
  * Bundled skills lamda seeds into `~/.lamda/skills/<name>/SKILL.md` on startup.
@@ -11,9 +11,9 @@ import { lamdaGlobalSkillsDir } from "./lamda-paths.js"
  */
 interface SeedSkill {
   /** Skill id; becomes the directory name and the `/skill:<name>` command. */
-  name: string
+  name: string;
   /** Full `SKILL.md` contents (frontmatter + instruction body). */
-  content: string
+  content: string;
 }
 
 const CREATE_PROMPT_SKILL = `---
@@ -65,7 +65,7 @@ the user can run as \`/<name>\`.
 
 5. **Confirm.** Tell the user the file path and that they can now run \`/<name>\`.
    New prompt files are picked up automatically — no restart needed.
-`
+`;
 
 const CREATE_MODE_SKILL = `---
 name: create-mode
@@ -123,12 +123,12 @@ prepended to the user's messages while that mode is selected.
 
 6. **Confirm.** Tell the user the file path and that the new mode now appears in
    the mode picker.
-`
+`;
 
 const SEED_SKILLS: readonly SeedSkill[] = [
   { name: "create-prompt", content: CREATE_PROMPT_SKILL },
   { name: "create-mode", content: CREATE_MODE_SKILL },
-]
+];
 
 /**
  * Seed lamda's bundled skills into `~/.lamda/skills/<name>/SKILL.md` when they
@@ -140,12 +140,12 @@ const SEED_SKILLS: readonly SeedSkill[] = [
  */
 export function ensureSkillFiles(): void {
   for (const skill of SEED_SKILLS) {
-    const dir = join(lamdaGlobalSkillsDir(), skill.name)
-    const path = join(dir, "SKILL.md")
-    if (existsSync(path)) continue
+    const dir = join(lamdaGlobalSkillsDir(), skill.name);
+    const path = join(dir, "SKILL.md");
+    if (existsSync(path)) continue;
     try {
-      mkdirSync(dir, { recursive: true })
-      writeFileSync(path, skill.content, "utf8")
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path, skill.content, "utf8");
     } catch {
       // Seeding is best-effort; the skill simply won't be available this run.
     }

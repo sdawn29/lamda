@@ -73,7 +73,10 @@ export const useReviewPanelStore = create<ReviewPanelStore>()((set) => ({
       let workspaceTabs = s.workspaceTabs
       if (s.currentWorkspacePath) {
         const fileTabs = newTabs.filter((t) => t.type === "file")
-        workspaceTabs = { ...s.workspaceTabs, [s.currentWorkspacePath]: fileTabs }
+        workspaceTabs = {
+          ...s.workspaceTabs,
+          [s.currentWorkspacePath]: fileTabs,
+        }
       }
 
       return { tabs: newTabs, activeTabId: id, pendingTabId: id, workspaceTabs }
@@ -87,7 +90,10 @@ export const useReviewPanelStore = create<ReviewPanelStore>()((set) => ({
       const newTabs = s.tabs.filter((t) => t.id !== id)
 
       if (newTabs.length === 0) {
-        return { tabs: [SOURCE_CONTROL_TAB], activeTabId: SOURCE_CONTROL_TAB.id }
+        return {
+          tabs: [SOURCE_CONTROL_TAB],
+          activeTabId: SOURCE_CONTROL_TAB.id,
+        }
       }
 
       let newActiveTabId = s.activeTabId
@@ -99,7 +105,10 @@ export const useReviewPanelStore = create<ReviewPanelStore>()((set) => ({
       let workspaceTabs = s.workspaceTabs
       if (s.currentWorkspacePath) {
         const fileTabs = newTabs.filter((t) => t.type === "file")
-        workspaceTabs = { ...s.workspaceTabs, [s.currentWorkspacePath]: fileTabs }
+        workspaceTabs = {
+          ...s.workspaceTabs,
+          [s.currentWorkspacePath]: fileTabs,
+        }
       }
 
       return { tabs: newTabs, activeTabId: newActiveTabId, workspaceTabs }
@@ -120,7 +129,10 @@ export const useReviewPanelStore = create<ReviewPanelStore>()((set) => ({
       if (s.currentWorkspacePath) {
         const fileTabs = s.tabs.filter((t) => t.type === "file")
         if (fileTabs.length > 0) {
-          workspaceTabs = { ...s.workspaceTabs, [s.currentWorkspacePath]: fileTabs }
+          workspaceTabs = {
+            ...s.workspaceTabs,
+            [s.currentWorkspacePath]: fileTabs,
+          }
         }
       }
 

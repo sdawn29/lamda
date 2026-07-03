@@ -23,14 +23,8 @@ import {
   getCurrentBranch,
   listBranches,
   gitStatus,
-  gitStashList,
-  gitStagedDiff,
 } from "@lamda/git";
-import {
-  generateCommitMessage,
-  type PromptOptions,
-  type ImageContent,
-} from "@lamda/pi-sdk";
+import { type PromptOptions, type ImageContent } from "@lamda/pi-sdk";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { ensureSessionEventHub, gitCwd } from "../services/session-service.js";
@@ -48,18 +42,14 @@ import {
   type GitCommandMessage,
   type GitStageMessage,
   type GitUnstageMessage,
-  type GitStageAllMessage,
-  type GitUnstageAllMessage,
   type GitCommitMessage,
   type GitCheckoutMessage,
   type GitBranchMessage,
-  type GitPushMessage,
   type GitStashMessage,
   type GitStashPopMessage,
   type GitStashApplyMessage,
   type GitStashDropMessage,
   type GitRevertFileMessage,
-  type GitInitMessage,
 } from "./types.js";
 
 function parseGitError(err: unknown, fallback: string): string {

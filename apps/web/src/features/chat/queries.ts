@@ -1,4 +1,8 @@
-import { useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useQuery,
+  useInfiniteQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import type { InfiniteData } from "@tanstack/react-query"
 import {
   listMessages,
@@ -10,7 +14,12 @@ import {
   fetchSessionStats,
   fetchSessionStatus,
 } from "./api"
-import { blocksToMessages, type MessageBlock, type Message, type ToolMessage } from "./types"
+import {
+  blocksToMessages,
+  type MessageBlock,
+  type Message,
+  type ToolMessage,
+} from "./types"
 import {
   getChatSyncEngine,
   loadThreadFromStorage,
@@ -62,7 +71,10 @@ export interface MessagesPage {
   oldestBlockIndex: number | null
 }
 
-export type MessagesInfiniteData = InfiniteData<MessagesPage, number | undefined>
+export type MessagesInfiniteData = InfiniteData<
+  MessagesPage,
+  number | undefined
+>
 
 /** Apply a transform to only the last (most-recent) page in the infinite cache. */
 export function updateLastPageMessages(
@@ -73,7 +85,10 @@ export function updateLastPageMessages(
   const { pages, pageParams } = data
   const last = pages[pages.length - 1]
   return {
-    pages: [...pages.slice(0, -1), { ...last, messages: updater(last.messages) }],
+    pages: [
+      ...pages.slice(0, -1),
+      { ...last, messages: updater(last.messages) },
+    ],
     pageParams,
   }
 }
@@ -87,7 +102,9 @@ export function updateLastPageMessages(
  * persisted blocks already contain duplicate tool rows. Both cause React key
  * collisions in WorkingBlock, so dedup runs even for a single page.
  */
-export function getMessagesFromInfinite(data: MessagesInfiniteData | undefined): Message[] {
+export function getMessagesFromInfinite(
+  data: MessagesInfiniteData | undefined
+): Message[] {
   if (!data) return []
   const flat = data.pages.flatMap((p) => p.messages)
 
@@ -100,7 +117,9 @@ export function getMessagesFromInfinite(data: MessagesInfiniteData | undefined):
 
   // If every tool call id is unique there's nothing to filter.
   const hasDupes = flat.some(
-    (m, i) => m.role === "tool" && toolLastIndex.get((m as ToolMessage).toolCallId) !== i
+    (m, i) =>
+      m.role === "tool" &&
+      toolLastIndex.get((m as ToolMessage).toolCallId) !== i
   )
   if (!hasDupes) return flat
 
@@ -129,20 +148,31 @@ export function useInfiniteMessages(sessionId: string) {
         before: pageParam,
       })
       const messages = blocksToMessages(blocks as MessageBlock[])
-      const oldestBlockIndex = blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
+      const oldestBlockIndex =
+        blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
 
       if (pageParam === undefined) {
         // Initial (most-recent) page — persist it immediately.
-        syncEngine.saveMessages(sessionId, messages, { hasMore, oldestBlockIndex })
+        syncEngine.saveMessages(sessionId, messages, {
+          hasMore,
+          oldestBlockIndex,
+        })
       } else {
         // An older page was just loaded (fetchPreviousPage). Persist the full
         // set — this page + the already-cached newer pages — so that after a
         // refresh the user sees all previously-loaded blocks, not just the
         // most-recent 100.
-        const existing = queryClient.getQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId))
-        const newerMessages = existing ? existing.pages.flatMap((p) => p.messages) : []
+        const existing = queryClient.getQueryData<MessagesInfiniteData>(
+          messagesQueryKey(sessionId)
+        )
+        const newerMessages = existing
+          ? existing.pages.flatMap((p) => p.messages)
+          : []
         const allMessages = [...messages, ...newerMessages]
-        syncEngine.saveMessages(sessionId, allMessages, { hasMore, oldestBlockIndex })
+        syncEngine.saveMessages(sessionId, allMessages, {
+          hasMore,
+          oldestBlockIndex,
+        })
       }
 
       return { messages, hasMore, oldestBlockIndex }
@@ -158,24 +188,29 @@ export function useInfiniteMessages(sessionId: string) {
     //
     // We restore ALL stored messages in one page so that after a refresh
     // the user sees their full history without having to scroll/click.
-    // The server refetch (triggered automatically because initialData is
-    // always considered stale) will replace the last page with fresh DB
-    // content; if there are blocks older than what's stored, the
-    // "Load earlier messages" button will appear then.
+    // initialDataUpdatedAt: 0 below is what makes the server refetch actually
+    // fire on mount — without it react-query stamps this seed as fresh *now*
+    // and, combined with staleTime, would serve stale/incomplete localStorage
+    // data for up to `staleTime` on every thread switch. The refetch then
+    // replaces the last page with fresh DB content; if there are blocks older
+    // than what's stored, the "Load earlier messages" affordance appears then.
     initialData: (): MessagesInfiniteData => {
       const stored = loadThreadFromStorage(sessionId)
       const storedMsgs = stored?.messages ?? []
       return {
-        pages: [{
-          messages: storedMsgs,
-          // Use stored hasMore / oldestBlockIndex so that pagination can resume
-          // immediately (the button shows up before the server responds).
-          hasMore: stored?.hasMore ?? false,
-          oldestBlockIndex: stored?.oldestBlockIndex ?? null,
-        }],
+        pages: [
+          {
+            messages: storedMsgs,
+            // Use stored hasMore / oldestBlockIndex so that pagination can resume
+            // immediately (the button shows up before the server responds).
+            hasMore: stored?.hasMore ?? false,
+            oldestBlockIndex: stored?.oldestBlockIndex ?? null,
+          },
+        ],
         pageParams: [undefined],
       }
     },
+    initialDataUpdatedAt: 0,
     gcTime: 30 * 60 * 1000,
     staleTime: 5 * 60 * 1000,
     // Default mount behavior respects staleTime — paired with the WS stream

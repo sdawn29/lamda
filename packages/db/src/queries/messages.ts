@@ -1,14 +1,14 @@
-import { randomUUID } from "node:crypto"
-import { eq, asc } from "drizzle-orm"
-import { db } from "../client.js"
-import { messages } from "../schema.js"
+import { randomUUID } from "node:crypto";
+import { eq, asc } from "drizzle-orm";
+import { db } from "../client.js";
+import { messages } from "../schema.js";
 
 export interface StoredMessage {
-  id: string
-  threadId: string
-  role: "user" | "assistant" | "tool"
-  content: string
-  createdAt: number
+  id: string;
+  threadId: string;
+  role: "user" | "assistant" | "tool";
+  content: string;
+  createdAt: number;
 }
 
 export function listMessages(threadId: string): StoredMessage[] {
@@ -17,7 +17,7 @@ export function listMessages(threadId: string): StoredMessage[] {
     .from(messages)
     .where(eq(messages.threadId, threadId))
     .orderBy(asc(messages.createdAt))
-    .all() as StoredMessage[]
+    .all() as StoredMessage[];
 }
 
 export function insertMessage(
@@ -25,9 +25,9 @@ export function insertMessage(
   role: "user" | "assistant" | "tool",
   content: string,
 ): string {
-  const id = randomUUID()
+  const id = randomUUID();
   db.insert(messages)
     .values({ id, threadId, role, content, createdAt: Date.now() })
-    .run()
-  return id
+    .run();
+  return id;
 }

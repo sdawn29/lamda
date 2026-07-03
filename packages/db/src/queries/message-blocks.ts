@@ -38,6 +38,8 @@ export interface MessageBlock {
   toolDuration: number | null;
   toolStartTime: number | null;
   attachments: string | null;
+  /** Client-generated id for a user block — see schema.ts's column comment. */
+  clientId: string | null;
   createdAt: number;
 }
 
@@ -75,11 +77,14 @@ export interface MessageBlocksPage {
 export function listMessageBlocksPage(
   threadId: string,
   limit: number,
-  before?: number
+  before?: number,
 ): MessageBlocksPage {
   const condition =
     before !== undefined
-      ? and(eq(messageBlocks.threadId, threadId), lt(messageBlocks.blockIndex, before))
+      ? and(
+          eq(messageBlocks.threadId, threadId),
+          lt(messageBlocks.blockIndex, before),
+        )
       : eq(messageBlocks.threadId, threadId);
 
   // Fetch one extra to detect whether older pages exist.
@@ -117,7 +122,8 @@ export function insertUserBlock(
   threadId: string,
   content: string,
   attachments?: AttachmentMetadata[],
-  createdAt?: number
+  createdAt?: number,
+  clientId?: string,
 ): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);
@@ -129,6 +135,7 @@ export function insertUserBlock(
       role: "user",
       content,
       attachments: attachments ? JSON.stringify(attachments) : null,
+      clientId: clientId ?? null,
       createdAt: createdAt ?? Date.now(),
     })
     .run();
@@ -138,7 +145,10 @@ export function insertUserBlock(
 /**
  * Insert an assistant message block (starts the streaming block)
  */
-export function insertAssistantStartBlock(threadId: string, createdAt?: number): string {
+export function insertAssistantStartBlock(
+  threadId: string,
+  createdAt?: number,
+): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);
   db.insert(messageBlocks)
@@ -161,7 +171,7 @@ export function insertToolBlock(
   toolCallId: string,
   toolName: string,
   toolArgs: string,
-  createdAt?: number
+  createdAt?: number,
 ): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);
@@ -192,22 +202,23 @@ export function updateAssistantBlockContent(
   thinking?: string,
   model?: string,
   provider?: string,
-  thinkingLevel?: string
+  thinkingLevel?: string,
 ): void {
   const updates: Partial<MessageBlock> = { content };
-  
+
   if (thinking !== undefined) updates.thinking = thinking;
   if (model !== undefined) updates.model = model;
   if (provider !== undefined) updates.provider = provider;
   if (thinkingLevel !== undefined) updates.thinkingLevel = thinkingLevel;
-  
+
   const setClause: Record<string, unknown> = {};
   if (updates.content !== undefined) setClause.content = updates.content;
   if (updates.thinking !== undefined) setClause.thinking = updates.thinking;
   if (updates.model !== undefined) setClause.model = updates.model;
   if (updates.provider !== undefined) setClause.provider = updates.provider;
-  if (updates.thinkingLevel !== undefined) setClause.thinkingLevel = updates.thinkingLevel;
-  
+  if (updates.thinkingLevel !== undefined)
+    setClause.thinkingLevel = updates.thinkingLevel;
+
   db.update(messageBlocks)
     .set(setClause)
     .where(eq(messageBlocks.id, blockId))
@@ -223,7 +234,7 @@ export function appendAssistantTextDelta(blockId: string, delta: string): void {
     .from(messageBlocks)
     .where(eq(messageBlocks.id, blockId))
     .get();
-  
+
   const newContent = (existing?.content ?? "") + delta;
   db.update(messageBlocks)
     .set({ content: newContent })
@@ -234,13 +245,16 @@ export function appendAssistantTextDelta(blockId: string, delta: string): void {
 /**
  * Append thinking delta to assistant block
  */
-export function appendAssistantThinkingDelta(blockId: string, delta: string): void {
+export function appendAssistantThinkingDelta(
+  blockId: string,
+  delta: string,
+): void {
   const existing = db
     .select({ thinking: messageBlocks.thinking })
     .from(messageBlocks)
     .where(eq(messageBlocks.id, blockId))
     .get();
-  
+
   const newThinking = (existing?.thinking ?? "") + delta;
   db.update(messageBlocks)
     .set({ thinking: newThinking })
@@ -259,15 +273,18 @@ export function finalizeAssistantBlock(
     provider?: string;
     thinkingLevel?: string;
     errorMessage?: string;
-  }
+  },
 ): void {
   const setClause: Record<string, unknown> = {};
-  if (metadata.responseTime !== undefined) setClause.responseTime = metadata.responseTime;
+  if (metadata.responseTime !== undefined)
+    setClause.responseTime = metadata.responseTime;
   if (metadata.model !== undefined) setClause.model = metadata.model;
   if (metadata.provider !== undefined) setClause.provider = metadata.provider;
-  if (metadata.thinkingLevel !== undefined) setClause.thinkingLevel = metadata.thinkingLevel;
-  if (metadata.errorMessage !== undefined) setClause.errorMessage = metadata.errorMessage;
-  
+  if (metadata.thinkingLevel !== undefined)
+    setClause.thinkingLevel = metadata.thinkingLevel;
+  if (metadata.errorMessage !== undefined)
+    setClause.errorMessage = metadata.errorMessage;
+
   db.update(messageBlocks)
     .set(setClause)
     .where(eq(messageBlocks.id, blockId))
@@ -283,7 +300,7 @@ export function updateToolBlockResult(
     status: "done" | "error";
     result: string;
     duration?: number;
-  }
+  },
 ): void {
   const updates: Record<string, unknown> = {
     toolStatus: result.status,
@@ -292,7 +309,7 @@ export function updateToolBlockResult(
   if (result.duration !== undefined) {
     updates.toolDuration = result.duration;
   }
-  
+
   db.update(messageBlocks)
     .set(updates)
     .where(eq(messageBlocks.id, blockId))
@@ -305,7 +322,7 @@ export function updateToolBlockResult(
  */
 export function updateToolBlockPartialResult(
   blockId: string,
-  partialResult: string
+  partialResult: string,
 ): void {
   db.update(messageBlocks)
     .set({ toolResult: partialResult })
@@ -331,9 +348,17 @@ export function deleteThreadBlocks(threadId: string): void {
  * Delete all message blocks at or after the given blockIndex (inclusive).
  * Used when reverting the conversation to a specific point.
  */
-export function deleteMessageBlocksFrom(threadId: string, fromBlockIndex: number): void {
+export function deleteMessageBlocksFrom(
+  threadId: string,
+  fromBlockIndex: number,
+): void {
   db.delete(messageBlocks)
-    .where(and(eq(messageBlocks.threadId, threadId), gte(messageBlocks.blockIndex, fromBlockIndex)))
+    .where(
+      and(
+        eq(messageBlocks.threadId, threadId),
+        gte(messageBlocks.blockIndex, fromBlockIndex),
+      ),
+    )
     .run();
 }
 
@@ -361,8 +386,8 @@ export function listRunningToolBlocks(threadId: string): MessageBlock[] {
       and(
         eq(messageBlocks.threadId, threadId),
         eq(messageBlocks.role, "tool"),
-        eq(messageBlocks.toolStatus, "running")
-      )
+        eq(messageBlocks.toolStatus, "running"),
+      ),
     )
     .orderBy(asc(messageBlocks.blockIndex))
     .all()
@@ -376,7 +401,7 @@ export function listRunningToolBlocks(threadId: string): MessageBlock[] {
 export function insertCompactionBlock(
   threadId: string,
   reason: "manual" | "threshold" | "overflow",
-  createdAt?: number
+  createdAt?: number,
 ): string {
   const id = randomUUID();
   const blockIndex = getNextBlockIndex(threadId);

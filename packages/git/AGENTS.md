@@ -8,8 +8,8 @@ Git operations utility — provides async functions for detecting git repositori
 
 ## Quick Reference
 
-| Action    | Command                                |
-| --------- | -------------------------------------- |
+| Action    | Command                             |
+| --------- | ----------------------------------- |
 | Typecheck | `npm run check-types -w @lamda/git` |
 
 ## Architecture
@@ -22,13 +22,13 @@ Single-file package (`src/index.ts`) that wraps `git` CLI commands via `child_pr
 
 ## Public API
 
-| Function                      | Returns                   | Description                                                 |
-| ----------------------------- | ------------------------- | ----------------------------------------------------------- |
-| `getCurrentBranch(cwd)`       | `Promise<string | null>` | Current branch name via `git rev-parse --abbrev-ref HEAD`   |
-| `getRepoRoot(cwd)`            | `Promise<string | null>` | Absolute repo root path via `git rev-parse --show-toplevel` |
-| `isGitRepo(cwd)`              | `Promise<boolean>`        | Whether cwd is inside a git repository                      |
-| `listBranches(cwd)`           | `Promise<string[]>`       | All local branch names via `git branch --format`            |
-| `checkoutBranch(cwd, branch)` | `Promise<void>`           | Checkout a branch (throws on failure)                       |
+| Function                      | Returns             | Description                                      |
+| ----------------------------- | ------------------- | ------------------------------------------------ | ----------------------------------------------------------- |
+| `getCurrentBranch(cwd)`       | `Promise<string     | null>`                                           | Current branch name via `git rev-parse --abbrev-ref HEAD`   |
+| `getRepoRoot(cwd)`            | `Promise<string     | null>`                                           | Absolute repo root path via `git rev-parse --show-toplevel` |
+| `isGitRepo(cwd)`              | `Promise<boolean>`  | Whether cwd is inside a git repository           |
+| `listBranches(cwd)`           | `Promise<string[]>` | All local branch names via `git branch --format` |
+| `checkoutBranch(cwd, branch)` | `Promise<void>`     | Checkout a branch (throws on failure)            |
 
 ## Conventions
 

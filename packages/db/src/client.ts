@@ -69,6 +69,27 @@ export function closeDb(): void {
   }
 }
 
+// Bumped whenever a new migration is appended below. Existing installs report
+// `user_version = 0` (SQLite's default), so on first run after an upgrade the
+// whole gated block below runs once and then never again — instead of on
+// every app startup, which is what it did before this version gate existed.
+const SCHEMA_VERSION = 2;
+
+function getTableColumns(sqlite: Database.Database, table: string): string[] {
+  const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as {
+    name: string;
+  }[];
+  return rows.map((r) => r.name);
+}
+
+function hasColumn(
+  sqlite: Database.Database,
+  table: string,
+  column: string,
+): boolean {
+  return getTableColumns(sqlite, table).includes(column);
+}
+
 function createDb() {
   const sqlite = new Database(dbPath, { timeout: 10000 });
   sqliteHandle = sqlite;
@@ -302,376 +323,353 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS agent_memories_scope_idx ON agent_memories(scope, workspace_id);
   `);
 
-  // Migration: Add env column to workspaces table.
-  try {
-    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as {
-      name: string;
-    }[];
-    if (!wsCols.some((col) => col.name === "env")) {
-      sqlite.exec(`ALTER TABLE workspaces ADD COLUMN env TEXT`);
-    }
-  } catch {
-    // Safe to ignore — column may already exist.
-  }
+  // Every ALTER TABLE below is idempotent (guarded by a column check), so each
+  // block is safe to re-run — but gating on SCHEMA_VERSION means it actually
+  // only runs once per install instead of on every app startup. Each version
+  // bump appends a new `if (currentVersion < N)` block below rather than
+  // extending an existing one, so an install already past that version skips
+  // straight past it instead of re-running migrations it has already applied.
+  const currentVersion = sqlite.pragma("user_version", {
+    simple: true,
+  }) as number;
 
-  // Migration: Add is_pinned column to workspaces table.
-  try {
-    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as {
-      name: string;
-    }[];
-    if (!wsCols.some((col) => col.name === "is_pinned")) {
-      sqlite.exec(
-        `ALTER TABLE workspaces ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0`,
-      );
+  if (currentVersion < 1) {
+    // Migration: Add env column to workspaces table.
+    try {
+      if (!hasColumn(sqlite, "workspaces", "env")) {
+        sqlite.exec(`ALTER TABLE workspaces ADD COLUMN env TEXT`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
     }
-  } catch {
-    // Safe to ignore — column may already exist.
-  }
 
-  // Migration: Add worktree columns to threads table.
-  try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
-      name: string;
-    }[];
-    if (!threadCols.some((col) => col.name === "worktree_path")) {
-      sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_path TEXT`);
-    }
-    if (!threadCols.some((col) => col.name === "worktree_branch")) {
-      sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_branch TEXT`);
-    }
-    if (!threadCols.some((col) => col.name === "owns_worktree_branch")) {
-      sqlite.exec(
-        `ALTER TABLE threads ADD COLUMN owns_worktree_branch INTEGER NOT NULL DEFAULT 0`,
-      );
-    }
-    if (!threadCols.some((col) => col.name === "worktree_base_branch")) {
-      sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_base_branch TEXT`);
-    }
-    if (!threadCols.some((col) => col.name === "worktree_merge_in_progress")) {
-      sqlite.exec(
-        `ALTER TABLE threads ADD COLUMN worktree_merge_in_progress INTEGER NOT NULL DEFAULT 0`,
-      );
-    }
-    if (!threadCols.some((col) => col.name === "worktree_merge_head_sha")) {
-      sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_merge_head_sha TEXT`);
-    }
-  } catch {
-    // Safe to ignore — columns may already exist.
-  }
-
-  // Migration: Add checkpoint_sha column to agent_turns table.
-  try {
-    const turnCols = sqlite.prepare("PRAGMA table_info(agent_turns)").all() as {
-      name: string;
-    }[];
-    if (!turnCols.some((col) => col.name === "checkpoint_sha")) {
-      sqlite.exec(
-        `ALTER TABLE agent_turns ADD COLUMN checkpoint_sha TEXT NOT NULL DEFAULT ''`,
-      );
-    }
-  } catch {
-    // Safe to ignore — column may already exist.
-  }
-
-  // Migration: Add name column to workspace_tasks table.
-  try {
-    const taskCols = sqlite
-      .prepare("PRAGMA table_info(workspace_tasks)")
-      .all() as { name: string }[];
-    if (!taskCols.some((col) => col.name === "name")) {
-      sqlite.exec(`ALTER TABLE workspace_tasks ADD COLUMN name TEXT`);
-    }
-  } catch {
-    // Safe to ignore — column may already exist.
-  }
-
-  // Migration: Add forked_from_id column to threads table.
-  try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
-      name: string;
-    }[];
-    if (!threadCols.some((col) => col.name === "forked_from_id")) {
-      sqlite.exec(`ALTER TABLE threads ADD COLUMN forked_from_id TEXT`);
-    }
-  } catch {
-    // Safe to ignore — column may already exist.
-  }
-
-  // Migration: Add base_checkpoint_sha column to threads table (fork snapshot).
-  try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
-      name: string;
-    }[];
-    if (!threadCols.some((col) => col.name === "base_checkpoint_sha")) {
-      sqlite.exec(`ALTER TABLE threads ADD COLUMN base_checkpoint_sha TEXT`);
-    }
-  } catch {
-    // Safe to ignore — column may already exist.
-  }
-
-  // Migration: Add mode column to threads table.
-  try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
-      name: string;
-    }[];
-    if (!threadCols.some((col) => col.name === "mode")) {
-      sqlite.exec(
-        `ALTER TABLE threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'agent'`,
-      );
-    }
-    sqlite.exec(`UPDATE threads SET mode = 'agent' WHERE mode = 'code'`);
-  } catch {
-    // Safe to ignore — column may already exist.
-  }
-
-  // Migration: Add approval_mode column to threads table (tool-approval gating).
-  try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
-      name: string;
-    }[];
-    if (!threadCols.some((col) => col.name === "approval_mode")) {
-      sqlite.exec(
-        `ALTER TABLE threads ADD COLUMN approval_mode TEXT NOT NULL DEFAULT 'ask'`,
-      );
-    }
-  } catch {
-    // Safe to ignore — column may already exist.
-  }
-
-  // Migration: Add last_reflected_at column to threads (memory-reflection watermark).
-  try {
-    const threadCols = sqlite.prepare("PRAGMA table_info(threads)").all() as {
-      name: string;
-    }[];
-    if (!threadCols.some((col) => col.name === "last_reflected_at")) {
-      sqlite.exec(`ALTER TABLE threads ADD COLUMN last_reflected_at INTEGER`);
-    }
-  } catch {
-    // Safe to ignore — column may already exist.
-  }
-
-  // Migration: Update message_blocks CHECK constraint to include 'abort' and 'compaction' roles.
-  // SQLite doesn't support ALTER TABLE for CHECK constraints, so we recreate the table when needed.
-  try {
-    const result = sqlite
-      .prepare(
-        "SELECT sql FROM sqlite_master WHERE type='table' AND name='message_blocks'",
-      )
-      .get() as { sql: string } | undefined;
-    if (result && !result.sql.includes("'compaction'")) {
-      const columns = [
-        "id",
-        "thread_id",
-        "block_index",
-        "role",
-        "content",
-        "thinking",
-        "model",
-        "provider",
-        "thinking_level",
-        "response_time",
-        "error_message",
-        "tool_call_id",
-        "tool_name",
-        "tool_args",
-        "tool_result",
-        "tool_status",
-        "tool_duration",
-        "tool_start_time",
-        "created_at",
-      ];
-      const colList = columns.join(", ");
-      sqlite.exec(`
-        CREATE TABLE IF NOT EXISTS message_blocks_new (
-          id              TEXT PRIMARY KEY,
-          thread_id       TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
-          block_index     INTEGER NOT NULL,
-          role            TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'tool', 'abort', 'compaction')),
-          content         TEXT,
-          thinking        TEXT,
-          model           TEXT,
-          provider        TEXT,
-          thinking_level  TEXT,
-          response_time   INTEGER,
-          error_message   TEXT,
-          tool_call_id    TEXT,
-          tool_name       TEXT,
-          tool_args       TEXT,
-          tool_result     TEXT,
-          tool_status     TEXT CHECK(tool_status IN ('running', 'done', 'error')),
-          tool_duration   INTEGER,
-          tool_start_time INTEGER,
-          created_at      INTEGER NOT NULL
+    // Migration: Add is_pinned column to workspaces table.
+    try {
+      if (!hasColumn(sqlite, "workspaces", "is_pinned")) {
+        sqlite.exec(
+          `ALTER TABLE workspaces ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0`,
         );
-        INSERT INTO message_blocks_new (${colList}) SELECT ${colList} FROM message_blocks;
-        DROP TABLE message_blocks;
-        ALTER TABLE message_blocks_new RENAME TO message_blocks;
-      `);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
     }
-  } catch (e) {
-    // Migration may fail if table already has correct schema or on first run — safe to ignore.
-  }
 
-  // Migration: Add goal_id column to thread_todos table.
-  try {
-    const todoCols = sqlite
-      .prepare("PRAGMA table_info(thread_todos)")
-      .all() as { name: string }[];
-    if (!todoCols.some((col) => col.name === "goal_id")) {
-      sqlite.exec(`ALTER TABLE thread_todos ADD COLUMN goal_id TEXT`);
-    }
-  } catch {
-    // Safe to ignore — column may already exist or table doesn't exist yet.
-  }
-
-  // Migration: Add icon column to workspaces table.
-  try {
-    const wsCols = sqlite.prepare("PRAGMA table_info(workspaces)").all() as {
-      name: string;
-    }[];
-    if (!wsCols.some((col) => col.name === "icon")) {
-      sqlite.exec(`ALTER TABLE workspaces ADD COLUMN icon TEXT`);
-    }
-  } catch {
-    // Safe to ignore — column may already exist.
-  }
-
-  // Migration: MCP servers are now scoped application-wide instead of
-  // per-workspace. Drop the workspace_id column and deduplicate by name,
-  // keeping the most recently created server for any duplicated name.
-  try {
-    const mcpCols = sqlite.prepare("PRAGMA table_info(mcp_servers)").all() as {
-      name: string;
-    }[];
-    if (mcpCols.some((col) => col.name === "workspace_id")) {
-      sqlite.exec(`
-        DROP INDEX IF EXISTS mcp_servers_workspace_idx;
-
-        CREATE TABLE mcp_servers_new (
-          id           TEXT PRIMARY KEY,
-          name         TEXT NOT NULL UNIQUE,
-          command      TEXT NOT NULL,
-          args         TEXT,
-          env          TEXT,
-          cwd          TEXT,
-          description  TEXT,
-          enabled      INTEGER NOT NULL DEFAULT 1,
-          created_at   INTEGER NOT NULL
+    // Migration: Add worktree columns to threads table.
+    try {
+      if (!hasColumn(sqlite, "threads", "worktree_path")) {
+        sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_path TEXT`);
+      }
+      if (!hasColumn(sqlite, "threads", "worktree_branch")) {
+        sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_branch TEXT`);
+      }
+      if (!hasColumn(sqlite, "threads", "owns_worktree_branch")) {
+        sqlite.exec(
+          `ALTER TABLE threads ADD COLUMN owns_worktree_branch INTEGER NOT NULL DEFAULT 0`,
         );
-
-        INSERT INTO mcp_servers_new (id, name, command, args, env, cwd, description, enabled, created_at)
-        SELECT id, name, command, args, env, cwd, description, enabled, created_at
-        FROM mcp_servers
-        WHERE id IN (
-          SELECT id FROM mcp_servers AS m
-          WHERE created_at = (SELECT MAX(created_at) FROM mcp_servers WHERE name = m.name)
-          GROUP BY name
+      }
+      if (!hasColumn(sqlite, "threads", "worktree_base_branch")) {
+        sqlite.exec(`ALTER TABLE threads ADD COLUMN worktree_base_branch TEXT`);
+      }
+      if (!hasColumn(sqlite, "threads", "worktree_merge_in_progress")) {
+        sqlite.exec(
+          `ALTER TABLE threads ADD COLUMN worktree_merge_in_progress INTEGER NOT NULL DEFAULT 0`,
         );
-
-        DROP TABLE mcp_servers;
-        ALTER TABLE mcp_servers_new RENAME TO mcp_servers;
-      `);
-    }
-  } catch (e) {
-    // Migration may fail on first run or if already migrated — safe to ignore.
-  }
-
-  // Migration: Add HTTP/SSE transport support to mcp_servers. Adds transport/
-  // url/headers columns and relaxes command to nullable (remote servers have no
-  // command). SQLite can't drop a NOT NULL constraint via ALTER, so when the new
-  // `transport` column is absent we recreate the table preserving existing rows
-  // (all pre-existing rows are stdio servers with a command).
-  try {
-    const mcpCols = sqlite.prepare("PRAGMA table_info(mcp_servers)").all() as {
-      name: string;
-    }[];
-    if (
-      mcpCols.length > 0 &&
-      !mcpCols.some((col) => col.name === "transport")
-    ) {
-      sqlite.exec(`
-        CREATE TABLE mcp_servers_new (
-          id           TEXT PRIMARY KEY,
-          name         TEXT NOT NULL UNIQUE,
-          transport    TEXT NOT NULL DEFAULT 'stdio',
-          command      TEXT,
-          args         TEXT,
-          env          TEXT,
-          cwd          TEXT,
-          url          TEXT,
-          headers      TEXT,
-          description  TEXT,
-          enabled      INTEGER NOT NULL DEFAULT 1,
-          created_at   INTEGER NOT NULL
+      }
+      if (!hasColumn(sqlite, "threads", "worktree_merge_head_sha")) {
+        sqlite.exec(
+          `ALTER TABLE threads ADD COLUMN worktree_merge_head_sha TEXT`,
         );
-
-        INSERT INTO mcp_servers_new (id, name, transport, command, args, env, cwd, description, enabled, created_at)
-        SELECT id, name, 'stdio', command, args, env, cwd, description, enabled, created_at
-        FROM mcp_servers;
-
-        DROP TABLE mcp_servers;
-        ALTER TABLE mcp_servers_new RENAME TO mcp_servers;
-      `);
+      }
+    } catch {
+      // Safe to ignore — columns may already exist.
     }
-  } catch (e) {
-    // Migration may fail on first run or if already migrated — safe to ignore.
+
+    // Migration: Add checkpoint_sha column to agent_turns table.
+    try {
+      if (!hasColumn(sqlite, "agent_turns", "checkpoint_sha")) {
+        sqlite.exec(
+          `ALTER TABLE agent_turns ADD COLUMN checkpoint_sha TEXT NOT NULL DEFAULT ''`,
+        );
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
+
+    // Migration: Add name column to workspace_tasks table.
+    try {
+      if (!hasColumn(sqlite, "workspace_tasks", "name")) {
+        sqlite.exec(`ALTER TABLE workspace_tasks ADD COLUMN name TEXT`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
+
+    // Migration: Add forked_from_id column to threads table.
+    try {
+      if (!hasColumn(sqlite, "threads", "forked_from_id")) {
+        sqlite.exec(`ALTER TABLE threads ADD COLUMN forked_from_id TEXT`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
+
+    // Migration: Add base_checkpoint_sha column to threads table (fork snapshot).
+    try {
+      if (!hasColumn(sqlite, "threads", "base_checkpoint_sha")) {
+        sqlite.exec(`ALTER TABLE threads ADD COLUMN base_checkpoint_sha TEXT`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
+
+    // Migration: Add mode column to threads table.
+    try {
+      if (!hasColumn(sqlite, "threads", "mode")) {
+        sqlite.exec(
+          `ALTER TABLE threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'agent'`,
+        );
+      }
+      sqlite.exec(`UPDATE threads SET mode = 'agent' WHERE mode = 'code'`);
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
+
+    // Migration: Add approval_mode column to threads table (tool-approval gating).
+    try {
+      if (!hasColumn(sqlite, "threads", "approval_mode")) {
+        sqlite.exec(
+          `ALTER TABLE threads ADD COLUMN approval_mode TEXT NOT NULL DEFAULT 'ask'`,
+        );
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
+
+    // Migration: Add last_reflected_at column to threads (memory-reflection watermark).
+    try {
+      if (!hasColumn(sqlite, "threads", "last_reflected_at")) {
+        sqlite.exec(`ALTER TABLE threads ADD COLUMN last_reflected_at INTEGER`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
+
+    // Migration: Update message_blocks CHECK constraint to include 'abort' and 'compaction' roles.
+    // SQLite doesn't support ALTER TABLE for CHECK constraints, so we recreate the table when needed.
+    try {
+      const result = sqlite
+        .prepare(
+          "SELECT sql FROM sqlite_master WHERE type='table' AND name='message_blocks'",
+        )
+        .get() as { sql: string } | undefined;
+      if (result && !result.sql.includes("'compaction'")) {
+        const columns = [
+          "id",
+          "thread_id",
+          "block_index",
+          "role",
+          "content",
+          "thinking",
+          "model",
+          "provider",
+          "thinking_level",
+          "response_time",
+          "error_message",
+          "tool_call_id",
+          "tool_name",
+          "tool_args",
+          "tool_result",
+          "tool_status",
+          "tool_duration",
+          "tool_start_time",
+          "created_at",
+        ];
+        const colList = columns.join(", ");
+        sqlite.exec(`
+          CREATE TABLE IF NOT EXISTS message_blocks_new (
+            id              TEXT PRIMARY KEY,
+            thread_id       TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+            block_index     INTEGER NOT NULL,
+            role            TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'tool', 'abort', 'compaction')),
+            content         TEXT,
+            thinking        TEXT,
+            model           TEXT,
+            provider        TEXT,
+            thinking_level  TEXT,
+            response_time   INTEGER,
+            error_message   TEXT,
+            tool_call_id    TEXT,
+            tool_name       TEXT,
+            tool_args       TEXT,
+            tool_result     TEXT,
+            tool_status     TEXT CHECK(tool_status IN ('running', 'done', 'error')),
+            tool_duration   INTEGER,
+            tool_start_time INTEGER,
+            created_at      INTEGER NOT NULL
+          );
+          INSERT INTO message_blocks_new (${colList}) SELECT ${colList} FROM message_blocks;
+          DROP TABLE message_blocks;
+          ALTER TABLE message_blocks_new RENAME TO message_blocks;
+        `);
+      }
+    } catch {
+      // Migration may fail if table already has correct schema or on first run — safe to ignore.
+    }
+
+    // Migration: Add goal_id column to thread_todos table.
+    try {
+      if (!hasColumn(sqlite, "thread_todos", "goal_id")) {
+        sqlite.exec(`ALTER TABLE thread_todos ADD COLUMN goal_id TEXT`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist or table doesn't exist yet.
+    }
+
+    // Migration: Add icon column to workspaces table.
+    try {
+      if (!hasColumn(sqlite, "workspaces", "icon")) {
+        sqlite.exec(`ALTER TABLE workspaces ADD COLUMN icon TEXT`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
+
+    // Migration: MCP servers are now scoped application-wide instead of
+    // per-workspace. Drop the workspace_id column and deduplicate by name,
+    // keeping the most recently created server for any duplicated name.
+    try {
+      if (hasColumn(sqlite, "mcp_servers", "workspace_id")) {
+        sqlite.exec(`
+          DROP INDEX IF EXISTS mcp_servers_workspace_idx;
+
+          CREATE TABLE mcp_servers_new (
+            id           TEXT PRIMARY KEY,
+            name         TEXT NOT NULL UNIQUE,
+            command      TEXT NOT NULL,
+            args         TEXT,
+            env          TEXT,
+            cwd          TEXT,
+            description  TEXT,
+            enabled      INTEGER NOT NULL DEFAULT 1,
+            created_at   INTEGER NOT NULL
+          );
+
+          INSERT INTO mcp_servers_new (id, name, command, args, env, cwd, description, enabled, created_at)
+          SELECT id, name, command, args, env, cwd, description, enabled, created_at
+          FROM mcp_servers
+          WHERE id IN (
+            SELECT id FROM mcp_servers AS m
+            WHERE created_at = (SELECT MAX(created_at) FROM mcp_servers WHERE name = m.name)
+            GROUP BY name
+          );
+
+          DROP TABLE mcp_servers;
+          ALTER TABLE mcp_servers_new RENAME TO mcp_servers;
+        `);
+      }
+    } catch {
+      // Migration may fail on first run or if already migrated — safe to ignore.
+    }
+
+    // Migration: Add HTTP/SSE transport support to mcp_servers. Adds transport/
+    // url/headers columns and relaxes command to nullable (remote servers have no
+    // command). SQLite can't drop a NOT NULL constraint via ALTER, so when the new
+    // `transport` column is absent we recreate the table preserving existing rows
+    // (all pre-existing rows are stdio servers with a command).
+    try {
+      const mcpCols = getTableColumns(sqlite, "mcp_servers");
+      if (mcpCols.length > 0 && !mcpCols.includes("transport")) {
+        sqlite.exec(`
+          CREATE TABLE mcp_servers_new (
+            id           TEXT PRIMARY KEY,
+            name         TEXT NOT NULL UNIQUE,
+            transport    TEXT NOT NULL DEFAULT 'stdio',
+            command      TEXT,
+            args         TEXT,
+            env          TEXT,
+            cwd          TEXT,
+            url          TEXT,
+            headers      TEXT,
+            description  TEXT,
+            enabled      INTEGER NOT NULL DEFAULT 1,
+            created_at   INTEGER NOT NULL
+          );
+
+          INSERT INTO mcp_servers_new (id, name, transport, command, args, env, cwd, description, enabled, created_at)
+          SELECT id, name, 'stdio', command, args, env, cwd, description, enabled, created_at
+          FROM mcp_servers;
+
+          DROP TABLE mcp_servers;
+          ALTER TABLE mcp_servers_new RENAME TO mcp_servers;
+        `);
+      }
+    } catch {
+      // Migration may fail on first run or if already migrated — safe to ignore.
+    }
+
+    // Migration: Add pinned column to agent_memories table (always-on core set).
+    try {
+      if (!hasColumn(sqlite, "agent_memories", "pinned")) {
+        sqlite.exec(
+          `ALTER TABLE agent_memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`,
+        );
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
+
+    // Migration: Add kind/thread_id/file_paths/confidence/superseded_by columns to
+    // agent_memories (taxonomy + episodic links + reinforcement). Each guarded so a
+    // partially-migrated DB still converges.
+    try {
+      if (!hasColumn(sqlite, "agent_memories", "kind")) {
+        sqlite.exec(
+          `ALTER TABLE agent_memories ADD COLUMN kind TEXT NOT NULL DEFAULT 'fact' CHECK(kind IN ('fact', 'preference', 'convention', 'decision', 'episode'))`,
+        );
+      }
+      if (!hasColumn(sqlite, "agent_memories", "thread_id")) {
+        sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN thread_id TEXT`);
+      }
+      if (!hasColumn(sqlite, "agent_memories", "file_paths")) {
+        sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN file_paths TEXT`);
+      }
+      if (!hasColumn(sqlite, "agent_memories", "confidence")) {
+        sqlite.exec(
+          `ALTER TABLE agent_memories ADD COLUMN confidence REAL NOT NULL DEFAULT 1`,
+        );
+      }
+      if (!hasColumn(sqlite, "agent_memories", "superseded_by")) {
+        sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN superseded_by TEXT`);
+      }
+    } catch {
+      // Safe to ignore — columns may already exist.
+    }
+
+    // Migration: Add attachments column to message_blocks table for persisting file attachments.
+    try {
+      if (!hasColumn(sqlite, "message_blocks", "attachments")) {
+        sqlite.exec(`ALTER TABLE message_blocks ADD COLUMN attachments TEXT`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
+    }
   }
 
-  // Migration: Add pinned column to agent_memories table (always-on core set).
-  try {
-    const memCols = sqlite
-      .prepare("PRAGMA table_info(agent_memories)")
-      .all() as { name: string }[];
-    if (!memCols.some((col) => col.name === "pinned")) {
-      sqlite.exec(
-        `ALTER TABLE agent_memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`,
-      );
+  if (currentVersion < 2) {
+    // Migration: Add client_id column to message_blocks. Lets the client
+    // reconcile an optimistic user message with its persisted row by identity
+    // instead of by matching content (see the column comment in schema.ts).
+    try {
+      if (!hasColumn(sqlite, "message_blocks", "client_id")) {
+        sqlite.exec(`ALTER TABLE message_blocks ADD COLUMN client_id TEXT`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
     }
-  } catch {
-    // Safe to ignore — column may already exist.
   }
 
-  // Migration: Add kind/thread_id/file_paths/confidence/superseded_by columns to
-  // agent_memories (taxonomy + episodic links + reinforcement). Each guarded so a
-  // partially-migrated DB still converges.
-  try {
-    const memCols = sqlite
-      .prepare("PRAGMA table_info(agent_memories)")
-      .all() as { name: string }[];
-    const has = (name: string) => memCols.some((col) => col.name === name);
-    if (!has("kind")) {
-      sqlite.exec(
-        `ALTER TABLE agent_memories ADD COLUMN kind TEXT NOT NULL DEFAULT 'fact' CHECK(kind IN ('fact', 'preference', 'convention', 'decision', 'episode'))`,
-      );
-    }
-    if (!has("thread_id")) {
-      sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN thread_id TEXT`);
-    }
-    if (!has("file_paths")) {
-      sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN file_paths TEXT`);
-    }
-    if (!has("confidence")) {
-      sqlite.exec(
-        `ALTER TABLE agent_memories ADD COLUMN confidence REAL NOT NULL DEFAULT 1`,
-      );
-    }
-    if (!has("superseded_by")) {
-      sqlite.exec(`ALTER TABLE agent_memories ADD COLUMN superseded_by TEXT`);
-    }
-  } catch {
-    // Safe to ignore — columns may already exist.
-  }
-
-  // Migration: Add attachments column to message_blocks table for persisting file attachments.
-  try {
-    const msgBlockCols = sqlite
-      .prepare("PRAGMA table_info(message_blocks)")
-      .all() as { name: string }[];
-    if (!msgBlockCols.some((col) => col.name === "attachments")) {
-      sqlite.exec(`ALTER TABLE message_blocks ADD COLUMN attachments TEXT`);
-    }
-  } catch {
-    // Safe to ignore — column may already exist.
+  if (currentVersion < SCHEMA_VERSION) {
+    sqlite.pragma(`user_version = ${SCHEMA_VERSION}`);
   }
 
   // Memory retrieval: FTS5 index over agent_memories for BM25-ranked retrieval,

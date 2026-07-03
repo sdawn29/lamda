@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -77,6 +78,7 @@
     "prettier-plugin-tailwindcss": "^0.8.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.61.1",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vitest": "^3.2.6"
   }
 }

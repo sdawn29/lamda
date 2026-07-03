@@ -2,11 +2,7 @@ import { useState, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Loader2Icon, SparklesIcon } from "lucide-react"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/shared/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 import { Button } from "@/shared/ui/button"
 import { SectionLabel } from "@/shared/ui/section-label"
 import type { ContextBreakdown, ContextUsage, SessionStats } from "../api"
@@ -37,8 +33,16 @@ function formatCost(n: number): string {
 const CONTEXT_SEGMENTS = [
   { key: "cacheRead", label: "Cached", color: "bg-sky-500 dark:bg-sky-400" },
   { key: "input", label: "Input", color: "bg-violet-500 dark:bg-violet-400" },
-  { key: "output", label: "Output", color: "bg-emerald-500 dark:bg-emerald-400" },
-  { key: "cacheWrite", label: "Cache write", color: "bg-indigo-500 dark:bg-indigo-400" },
+  {
+    key: "output",
+    label: "Output",
+    color: "bg-emerald-500 dark:bg-emerald-400",
+  },
+  {
+    key: "cacheWrite",
+    label: "Cache write",
+    color: "bg-indigo-500 dark:bg-indigo-400",
+  },
   { key: "pending", label: "Pending", color: "bg-amber-500 dark:bg-amber-400" },
 ] as const satisfies ReadonlyArray<{
   key: keyof ContextBreakdown
@@ -122,7 +126,7 @@ export function ContextChart({
   const breakdown = display.breakdown
   const segments = breakdown
     ? CONTEXT_SEGMENTS.map((s) => ({ ...s, value: breakdown[s.key] })).filter(
-        (s) => s.value > 0,
+        (s) => s.value > 0
       )
     : []
   const hasSegments = segments.length > 0
@@ -132,11 +136,18 @@ export function ContextChart({
     setIsCompacting(true)
     try {
       await compactSession(sessionId)
-      void queryClient.invalidateQueries({ queryKey: chatKeys.contextUsage(sessionId) })
-      void queryClient.invalidateQueries({ queryKey: chatKeys.sessionStats(sessionId) })
+      void queryClient.invalidateQueries({
+        queryKey: chatKeys.contextUsage(sessionId),
+      })
+      void queryClient.invalidateQueries({
+        queryKey: chatKeys.sessionStats(sessionId),
+      })
     } catch (err) {
       toast.error("Compaction failed", {
-        description: err instanceof Error ? err.message : "Could not compact context. Please try again.",
+        description:
+          err instanceof Error
+            ? err.message
+            : "Could not compact context. Please try again.",
       })
     } finally {
       setIsCompacting(false)
@@ -187,16 +198,19 @@ export function ContextChart({
         }
       />
 
-      <PopoverContent side="top" align="end" className="w-64 p-0 overflow-hidden">
-
+      <PopoverContent
+        side="top"
+        align="end"
+        className="w-64 overflow-hidden p-0"
+      >
         {/* ── Context window (hero) ─────────────────────────────────────── */}
         <div className="px-3.5 pt-3.5 pb-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Context window</SectionLabel>
             <span
               className={cn(
-                "rounded-full px-1.5 py-0.5 text-3xs font-medium leading-none",
-                status.pill,
+                "rounded-full px-1.5 py-0.5 text-3xs leading-none font-medium",
+                status.pill
               )}
             >
               {status.label}
@@ -207,8 +221,8 @@ export function ContextChart({
             <div className="flex items-baseline gap-0.5">
               <span
                 className={cn(
-                  "text-[2rem] font-semibold leading-none tracking-tight tabular-nums",
-                  pctTextColor,
+                  "text-[2rem] leading-none font-semibold tracking-tight tabular-nums",
+                  pctTextColor
                 )}
               >
                 {pct != null ? Math.round(pct) : "—"}
@@ -221,10 +235,10 @@ export function ContextChart({
             </div>
             {display.tokens != null && (
               <div className="flex flex-col items-end leading-none">
-                <span className="text-2xs font-medium tabular-nums text-foreground/80">
+                <span className="text-2xs font-medium text-foreground/80 tabular-nums">
                   {usedLabel}
                 </span>
-                <span className="mt-0.5 text-3xs tabular-nums text-muted-foreground/60">
+                <span className="mt-0.5 text-3xs text-muted-foreground/60 tabular-nums">
                   of {totalLabel}
                 </span>
               </div>
@@ -239,9 +253,11 @@ export function ContextChart({
                   key={s.key}
                   className={cn(
                     "h-full rounded-full transition-all duration-500 first:rounded-l-full last:rounded-r-full",
-                    s.color,
+                    s.color
                   )}
-                  style={{ width: `${(s.value / display.contextWindow) * 100}%` }}
+                  style={{
+                    width: `${(s.value / display.contextWindow) * 100}%`,
+                  }}
                   title={`${s.label}: ${formatTokens(s.value)}`}
                 />
               ))
@@ -249,7 +265,7 @@ export function ContextChart({
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-500",
-                  barColor,
+                  barColor
                 )}
                 style={{ width: `${Math.min(fill * 100, 100)}%` }}
               />
@@ -261,9 +277,13 @@ export function ContextChart({
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
               {segments.map((s) => (
                 <div key={s.key} className="flex items-center gap-1.5">
-                  <span className={cn("size-1.5 shrink-0 rounded-full", s.color)} />
-                  <span className="text-3xs text-muted-foreground">{s.label}</span>
-                  <span className="ml-auto text-3xs font-medium tabular-nums text-foreground/80">
+                  <span
+                    className={cn("size-1.5 shrink-0 rounded-full", s.color)}
+                  />
+                  <span className="text-3xs text-muted-foreground">
+                    {s.label}
+                  </span>
+                  <span className="ml-auto text-3xs font-medium text-foreground/80 tabular-nums">
                     {formatTokens(s.value)}
                   </span>
                 </div>
@@ -279,11 +299,11 @@ export function ContextChart({
               <div className="flex items-center justify-between">
                 <SectionLabel>Session total</SectionLabel>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xs font-semibold tabular-nums text-foreground">
+                  <span className="text-2xs font-semibold text-foreground tabular-nums">
                     {formatTokens(tokens.total)}
                   </span>
                   {hasCost && (
-                    <span className="text-3xs tabular-nums text-muted-foreground/60">
+                    <span className="text-3xs text-muted-foreground/60 tabular-nums">
                       {formatCost(cost)}
                     </span>
                   )}
@@ -297,8 +317,11 @@ export function ContextChart({
                   { label: "Assistant", value: sessionStats.assistantMessages },
                   { label: "Tools", value: sessionStats.toolCalls },
                 ].map((stat) => (
-                  <div key={stat.label} className="flex flex-col items-center gap-0.5 rounded-md bg-background/60 py-1.5">
-                    <span className="text-2xs font-semibold tabular-nums text-foreground/90">
+                  <div
+                    key={stat.label}
+                    className="flex flex-col items-center gap-0.5 rounded-md bg-background/60 py-1.5"
+                  >
+                    <span className="text-2xs font-semibold text-foreground/90 tabular-nums">
                       {stat.value}
                     </span>
                     <span className="text-3xs text-muted-foreground/60">
@@ -319,7 +342,7 @@ export function ContextChart({
               variant="ghost"
               onClick={handleCompact}
               disabled={isCompacting}
-              className="w-full h-7 gap-1.5 text-2xs text-muted-foreground hover:text-foreground"
+              className="h-7 w-full gap-1.5 text-2xs text-muted-foreground hover:text-foreground"
             >
               {isCompacting ? (
                 <>
@@ -335,7 +358,6 @@ export function ContextChart({
             </Button>
           </div>
         )}
-
       </PopoverContent>
     </Popover>
   )

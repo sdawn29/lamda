@@ -59,6 +59,7 @@ Click the **Terminal** toggle button in the title bar to show/hide the terminal 
 ### Tab Names
 
 Tabs display:
+
 - Shell name (e.g., `bash`, `zsh`)
 - Current working directory (truncated)
 
@@ -97,14 +98,14 @@ git log --oneline -10
 
 ### Terminal Controls
 
-| Control | Action |
-|---------|--------|
+| Control    | Action                 |
+| ---------- | ---------------------- |
 | `Ctrl + C` | Cancel current command |
-| `Ctrl + Z` | Suspend process |
-| `Ctrl + D` | End of input (EOF) |
-| `Ctrl + L` | Clear screen |
-| `Tab` | Auto-complete |
-| `↑` / `↓` | Command history |
+| `Ctrl + Z` | Suspend process        |
+| `Ctrl + D` | End of input (EOF)     |
+| `Ctrl + L` | Clear screen           |
+| `Tab`      | Auto-complete          |
+| `↑` / `↓`  | Command history        |
 
 ## Themes
 
@@ -131,6 +132,7 @@ git log --oneline -10
 ### Auto-Resize
 
 The terminal automatically resizes to fill its panel:
+
 - Adjusts on panel resize
 - Maintains proper aspect ratio
 - Fits content to available space
@@ -138,6 +140,7 @@ The terminal automatically resizes to fill its panel:
 ### Manual Resize
 
 Drag the panel borders to resize:
+
 - Horizontal resize changes terminal width
 - Vertical resize changes terminal height
 
@@ -165,6 +168,7 @@ URLs in terminal output are detected automatically — `Cmd/Ctrl + Click` a link
 ## Shell Selection
 
 The terminal uses your system's default shell:
+
 - macOS/Linux: `$SHELL` environment variable or `/bin/bash`
 - Can be overridden in Settings
 
@@ -218,12 +222,14 @@ If the terminal shows "Connecting..." indefinitely:
 ### "WebSocket Failed"
 
 WebSocket connection failure:
+
 1. Server may have crashed — restart with `npm run dev -w @lamda/server`
 2. Port 3001 may be in use — check with `lsof -i :3001`
 
 ### Slow Rendering
 
 For large outputs:
+
 - Terminal uses 60fps flush rate for smooth rendering
 - Large outputs (>8KB) bypass buffering for immediate display
 - Performance optimized for typical usage
@@ -231,6 +237,7 @@ For large outputs:
 ### Shell Not Found
 
 If terminal fails to start:
+
 1. Check that `/bin/bash` exists
 2. Verify `SHELL` environment variable is set
 3. In Settings, specify a valid shell path
@@ -240,6 +247,7 @@ If terminal fails to start:
 ### Multiple Terminals
 
 Keep multiple terminal tabs for different tasks:
+
 - One for running the dev server
 - One for running tests
 - One for git operations
@@ -248,6 +256,7 @@ Keep multiple terminal tabs for different tasks:
 ### Command History
 
 Use arrow keys to navigate command history:
+
 - `↑` — Previous command
 - `↓` — Next command
 - `Ctrl + R` — Search history

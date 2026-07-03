@@ -197,7 +197,9 @@ function getResultImages(msg: ToolMessage): ResultImage[] {
       if (typeof src.media_type === "string") mime = src.media_type
     }
     if (!data) continue
-    const dataUrl = data.startsWith("data:") ? data : `data:${mime};base64,${data}`
+    const dataUrl = data.startsWith("data:")
+      ? data
+      : `data:${mime};base64,${data}`
     images.push({ dataUrl, alt: `${toolDisplayName(msg.toolName)} screenshot` })
   }
   return images
@@ -374,7 +376,9 @@ function parseSkillFrontmatter(text: string | null): SkillFrontmatter {
   if (!m) return { description: null, tools: null, body: stripped.trim() }
   const [, frontmatter, body] = m
   const field = (key: string): string | null => {
-    const v = frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, "im"))?.[1]?.trim()
+    const v = frontmatter
+      .match(new RegExp(`^${key}:\\s*(.+)$`, "im"))?.[1]
+      ?.trim()
     return v ? v.replace(/^["']|["']$/g, "") : null
   }
   return {
@@ -1082,22 +1086,26 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               )}
 
             {/* Running: partial result for read / other tools */}
-            {msg.status === "running" && !isWrite && (resultText || resultImages.length > 0) && (
-              <div className="flex flex-col gap-2">
-                {skill && <SkillView skill={skill} />}
-                {!skill && isRead && readFilePath && resultText && (
-                  <ReadView
-                    text={resultText}
-                    filePath={readFilePath}
-                    live={true}
-                  />
-                )}
-                {!isRead && resultText && <LivePre text={resultText} live={true} />}
-                {!isRead && resultImages.length > 0 && (
-                  <ImageView images={resultImages} />
-                )}
-              </div>
-            )}
+            {msg.status === "running" &&
+              !isWrite &&
+              (resultText || resultImages.length > 0) && (
+                <div className="flex flex-col gap-2">
+                  {skill && <SkillView skill={skill} />}
+                  {!skill && isRead && readFilePath && resultText && (
+                    <ReadView
+                      text={resultText}
+                      filePath={readFilePath}
+                      live={true}
+                    />
+                  )}
+                  {!isRead && resultText && (
+                    <LivePre text={resultText} live={true} />
+                  )}
+                  {!isRead && resultImages.length > 0 && (
+                    <ImageView images={resultImages} />
+                  )}
+                </div>
+              )}
 
             {/* Done state */}
             {msg.status === "done" && (

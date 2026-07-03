@@ -2,7 +2,7 @@ import { apiFetch } from "@/shared/lib/client"
 import type { Automation, AutomationInput, AutomationRun } from "./types"
 
 export async function fetchAllAutomations(
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<Automation[]> {
   const res = await apiFetch<{ automations: Automation[] }>("/automations", {
     signal,
@@ -12,7 +12,7 @@ export async function fetchAllAutomations(
 
 export async function createAutomation(
   workspaceId: string,
-  input: AutomationInput,
+  input: AutomationInput
 ): Promise<Automation> {
   const res = await apiFetch<{ automation: Automation }>(
     `/automations/${encodeURIComponent(workspaceId)}`,
@@ -20,14 +20,14 @@ export async function createAutomation(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    },
+    }
   )
   return res.automation
 }
 
 export async function updateAutomation(
   id: string,
-  updates: Partial<AutomationInput>,
+  updates: Partial<AutomationInput>
 ): Promise<Automation> {
   const res = await apiFetch<{ automation: Automation }>(
     `/automations/${encodeURIComponent(id)}`,
@@ -35,7 +35,7 @@ export async function updateAutomation(
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
-    },
+    }
   )
   return res.automation
 }
@@ -53,11 +53,11 @@ export async function runAutomation(id: string): Promise<void> {
 
 export async function fetchAutomationRuns(
   id: string,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<AutomationRun[]> {
   const res = await apiFetch<{ runs: AutomationRun[] }>(
     `/automations/${encodeURIComponent(id)}/runs`,
-    { signal },
+    { signal }
   )
   return res.runs
 }

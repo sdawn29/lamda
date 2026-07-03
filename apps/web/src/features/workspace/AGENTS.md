@@ -9,6 +9,7 @@ Workspace feature module — manages workspace/thread lifecycle, sidebar navigat
 ## Overview
 
 The workspace module is a core application feature (9 files, ~1200 lines) that manages:
+
 1. **Workspace CRUD** — create, delete, list workspaces
 2. **Thread management** — create, delete, archive, pin threads within workspaces
 3. **Repository cloning** — git clone integration with workspace creation
@@ -93,18 +94,18 @@ The workspace module is a core application feature (9 files, ~1200 lines) that m
 
 All mutations update the `workspacesQueryKey` cache optimistically:
 
-| Hook | Operation | Cache Update |
-|------|-----------|--------------|
-| `useCreateWorkspace` | POST | `upsertWorkspace` |
-| `useDeleteWorkspace` | DELETE | Filter + remove session queries |
-| `useCloneRepository` | git clone | Creates workspace after clone |
-| `useCreateThread` | POST | Append to workspace threads |
-| `useDeleteThread` | DELETE | Filter + remove session queries |
-| `useUpdateThreadTitle` | PATCH | Optimistic update + rollback on error |
-| `useArchiveThread` | PATCH | Filter from list, invalidate archived |
-| `usePinThread` | PATCH | Optimistic update |
-| `useUnpinThread` | PATCH | Optimistic update |
-| `useResetAll` | DELETE | Clear all queries |
+| Hook                   | Operation | Cache Update                          |
+| ---------------------- | --------- | ------------------------------------- |
+| `useCreateWorkspace`   | POST      | `upsertWorkspace`                     |
+| `useDeleteWorkspace`   | DELETE    | Filter + remove session queries       |
+| `useCloneRepository`   | git clone | Creates workspace after clone         |
+| `useCreateThread`      | POST      | Append to workspace threads           |
+| `useDeleteThread`      | DELETE    | Filter + remove session queries       |
+| `useUpdateThreadTitle` | PATCH     | Optimistic update + rollback on error |
+| `useArchiveThread`     | PATCH     | Filter from list, invalidate archived |
+| `usePinThread`         | PATCH     | Optimistic update                     |
+| `useUnpinThread`       | PATCH     | Optimistic update                     |
+| `useResetAll`          | DELETE    | Clear all queries                     |
 
 ### Components
 

@@ -36,16 +36,19 @@ export interface LspInstallJob {
 }
 
 export async function fetchLspRegistry(
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<LspRegistryEntry[]> {
-  const res = await apiFetch<{ languages: LspRegistryEntry[] }>("/lsp/registry", {
-    signal,
-  })
+  const res = await apiFetch<{ languages: LspRegistryEntry[] }>(
+    "/lsp/registry",
+    {
+      signal,
+    }
+  )
   return res.languages
 }
 
 export async function fetchLspInstallJobs(
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<LspInstallJob[]> {
   const res = await apiFetch<{ jobs: LspInstallJob[] }>("/lsp/install", {
     signal,
@@ -53,7 +56,9 @@ export async function fetchLspInstallJobs(
   return res.jobs
 }
 
-export async function installLspServer(language: string): Promise<LspInstallJob> {
+export async function installLspServer(
+  language: string
+): Promise<LspInstallJob> {
   const res = await apiFetch<{ job: LspInstallJob }>("/lsp/install", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

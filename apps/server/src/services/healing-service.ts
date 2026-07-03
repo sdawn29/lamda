@@ -80,7 +80,10 @@ function onAgentTurnEnd(info: AgentTurnEndInfo): void {
     const prior = turnState.get(threadId);
     if (prior && prior.attempts > 0) {
       recordHealingSuccess(sessionId, prior.lastError);
-      sessionEvents.emitHealingStatus(sessionId, { type: "auto_retry_end", success: true });
+      sessionEvents.emitHealingStatus(sessionId, {
+        type: "auto_retry_end",
+        success: true,
+      });
     }
     turnState.delete(threadId);
     return;
@@ -124,7 +127,10 @@ function onAgentTurnEnd(info: AgentTurnEndInfo): void {
     const handle = store.get(sessionId)?.handle;
     if (!handle) return;
     handle.prompt(buildHealingPrompt(message)).catch((err: unknown) => {
-      sessionEvents.emitError(sessionId, err instanceof Error ? err.message : String(err));
+      sessionEvents.emitError(
+        sessionId,
+        err instanceof Error ? err.message : String(err),
+      );
     });
   }, HEALING_DELAY_MS);
 }
@@ -166,7 +172,9 @@ function recordHealingSuccess(sessionId: string, error: string): void {
 function onSessionCrash(info: SessionCrashInfo): void {
   const cfg = getHealingConfig();
   const resendText =
-    cfg.enabled && info.wasRunning ? store.get(info.sessionId)?.lastPromptText : undefined;
+    cfg.enabled && info.wasRunning
+      ? store.get(info.sessionId)?.lastPromptText
+      : undefined;
   void recoverSession(info.sessionId, { resendText });
 }
 
@@ -180,7 +188,8 @@ export async function recoverSession(
   opts: { resendText?: string } = {},
 ): Promise<boolean> {
   if (recoveryInFlight.has(sessionId)) return false;
-  if (Date.now() - (lastRecoveryAt.get(sessionId) ?? 0) < RECOVERY_COOLDOWN_MS) return false;
+  if (Date.now() - (lastRecoveryAt.get(sessionId) ?? 0) < RECOVERY_COOLDOWN_MS)
+    return false;
 
   const entry = store.get(sessionId);
   if (!entry) return false;
@@ -202,14 +211,18 @@ export async function recoverSession(
     if (opts.resendText) {
       // The user block already exists from the original prompt — don't re-insert.
       await newHandle.prompt(opts.resendText).catch((err: unknown) => {
-        sessionEvents.emitError(sessionId, err instanceof Error ? err.message : String(err));
+        sessionEvents.emitError(
+          sessionId,
+          err instanceof Error ? err.message : String(err),
+        );
       });
     }
     return true;
   } catch (err) {
     sessionEvents.emitError(
       sessionId,
-      "Session recovery failed: " + (err instanceof Error ? err.message : String(err)),
+      "Session recovery failed: " +
+        (err instanceof Error ? err.message : String(err)),
     );
     return false;
   } finally {

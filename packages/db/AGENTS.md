@@ -33,12 +33,12 @@ Single-file database client (`client.ts`) that:
 
 ## Database Schema
 
-| Table        | Columns                                                                                           |
-| ------------ | ------------------------------------------------------------------------------------------------- |
-| `workspaces` | `id` (TEXT PK), `name`, `path`, `open_with_app_id`, `created_at`                                   |
+| Table        | Columns                                                                                                                                                           |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workspaces` | `id` (TEXT PK), `name`, `path`, `open_with_app_id`, `created_at`                                                                                                  |
 | `threads`    | `id` (TEXT PK), `workspace_id` (FK → workspaces), `title`, `session_file`, `model_id`, `is_stopped`, `is_archived`, `is_pinned`, `last_accessed_at`, `created_at` |
-| `messages`   | `id` (TEXT PK), `thread_id` (FK → threads), `role` (user/assistant/tool), `content`, `created_at` |
-| `settings`   | `key` (TEXT PK), `value`                                                                         |
+| `messages`   | `id` (TEXT PK), `thread_id` (FK → threads), `role` (user/assistant/tool), `content`, `created_at`                                                                 |
+| `settings`   | `key` (TEXT PK), `value`                                                                                                                                          |
 
 All IDs are UUIDs. Timestamps are Unix epoch integers. Foreign keys cascade on delete.
 

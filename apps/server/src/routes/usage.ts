@@ -25,8 +25,10 @@ usage.get("/usage", (c) => {
     // local-time day bucketing used by the daily aggregation.
     const sinceMs = from ? new Date(`${from}T00:00:00`).getTime() : undefined;
     const untilMs = to ? new Date(`${to}T23:59:59.999`).getTime() : undefined;
-    if ((sinceMs !== undefined && Number.isNaN(sinceMs)) ||
-        (untilMs !== undefined && Number.isNaN(untilMs))) {
+    if (
+      (sinceMs !== undefined && Number.isNaN(sinceMs)) ||
+      (untilMs !== undefined && Number.isNaN(untilMs))
+    ) {
       return c.json({ error: "from/to must be valid dates" }, 400);
     }
     return c.json(getAiUsageStats(sinceMs, untilMs));
@@ -37,7 +39,8 @@ usage.get("/usage", (c) => {
   if (!Number.isFinite(days) || days < 0) {
     return c.json({ error: "days must be a non-negative number" }, 400);
   }
-  const sinceMs = days > 0 ? Date.now() - days * 24 * 60 * 60 * 1000 : undefined;
+  const sinceMs =
+    days > 0 ? Date.now() - days * 24 * 60 * 60 * 1000 : undefined;
   return c.json(getAiUsageStats(sinceMs));
 });
 

@@ -12,11 +12,7 @@ export {
 } from "./font-options"
 export { GoogleFontsBrowser } from "./components/google-fonts-browser"
 export { useSyntaxTheme } from "./use-syntax-theme"
-export {
-  BUILT_IN_THEMES,
-  DEFAULT_THEME_ID,
-  getThemeById,
-} from "./registry"
+export { BUILT_IN_THEMES, DEFAULT_THEME_ID, getThemeById } from "./registry"
 export { applyColorTheme, buildThemeCss } from "./apply-theme"
 export { buildSyntaxThemeSet } from "./syntax-builder"
 export {

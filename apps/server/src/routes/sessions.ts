@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { join, relative } from "path";
 import { readdir, stat } from "fs/promises";
 import { createReadStream } from "node:fs";
@@ -65,7 +66,7 @@ const ATTACHMENT_MIME_TYPES: Record<string, string> = {
   csv: "text/csv; charset=utf-8",
   pdf: "application/pdf",
 };
-import type { PromptOptions, SdkConfig } from "@lamda/pi-sdk";
+import type { PromptOptions } from "@lamda/pi-sdk";
 import { promises as fs } from "node:fs";
 import {
   gitUnstage,
@@ -75,15 +76,25 @@ import {
   gitStashCreate,
   gitWriteCheckpointRef,
 } from "@lamda/git";
+import { parseJsonBody } from "../lib/validate.js";
 
 const EXCLUDED_DIRS = new Set([".git"]);
 
 const sessions = new Hono();
 
+// Only the fields this route actually reads from SdkConfig — not the SDK's
+// full shape, which includes internal fields this endpoint never touches.
+const createSessionSchema = z.object({
+  cwd: z.string().optional(),
+  anthropicApiKey: z.string().optional(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+});
+
 sessions.post("/session", async (c) => {
-  const body = await c.req
-    .json<Partial<SdkConfig>>()
-    .catch((): Partial<SdkConfig> => ({}));
+  const parsed = await parseJsonBody(c, createSessionSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const resolvedCwd = body.cwd ?? process.cwd();
   const workspaceId = insertWorkspace("Untitled", resolvedCwd);
   const threadId = insertThread(workspaceId);
@@ -137,38 +148,60 @@ sessions.get("/session/:id/status", (c) => {
   return c.json(sessionEvents.getStatus(id));
 });
 
-interface AttachmentUpload {
-  id: string;
-  filename: string;
-  mediaType: string;
-  size: number;
-  kind: "image" | "text" | "file";
-  data: string; // base64-encoded
-}
+const attachmentUploadSchema = z.object({
+  id: z.string(),
+  filename: z.string(),
+  mediaType: z.string(),
+  size: z.number(),
+  kind: z.enum(["image", "text", "file"]),
+  data: z.string(),
+});
 
-interface PromptRequestBody {
-  text?: string;
-  provider?: string;
-  model?: string;
-  thinkingLevel?: string;
-  /** File attachments (images and text files) */
-  attachments?: AttachmentUpload[];
-  /** Image attachments for the prompt (legacy, prefer attachments) */
-  images?: PromptOptions["images"];
-  /** How to queue when agent is streaming: "steer" (interrupt) or "followUp" (wait) */
-  streamingBehavior?: PromptOptions["streamingBehavior"];
-  /** Whether to expand file-based prompt templates (default: true) */
-  expandPromptTemplates?: PromptOptions["expandPromptTemplates"];
-}
+const imageContentSchema = z.object({
+  type: z.literal("image"),
+  data: z.string(),
+  mimeType: z.string(),
+});
+
+const promptRequestSchema = z.object({
+  text: z.string().optional(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  thinkingLevel: z.string().optional(),
+  attachments: z.array(attachmentUploadSchema).optional(),
+  images: z.array(imageContentSchema).optional(),
+  // Kept as a plain string (not a zod enum) — this route only checks
+  // truthiness, it never validates specific values.
+  streamingBehavior: z.string().optional(),
+  expandPromptTemplates: z.boolean().optional(),
+  // Client-generated id for the optimistic row this prompt originated from —
+  // carried onto the persisted user block so the client can reconcile the two
+  // by identity instead of by matching content.
+  clientId: z.string().optional(),
+});
+
+const textMessageSchema = z.object({
+  text: z.string().optional(),
+  clientId: z.string().optional(),
+});
+const answerSchema = z.object({
+  toolCallId: z.string().optional(),
+  answer: z.string().optional(),
+});
+const toolApprovalSchema = z.object({
+  toolCallId: z.string().optional(),
+  decision: z.string().optional(),
+});
+const blockIdSchema = z.object({ blockId: z.string().optional() });
 
 sessions.post("/session/:id/prompt", async (c) => {
   const id = c.req.param("id");
   const entry = store.get(id);
   if (!entry) return c.json({ error: "Not found" }, 404);
 
-  const body = await c.req
-    .json<PromptRequestBody>()
-    .catch((): PromptRequestBody => ({}));
+  const parsed = await parseJsonBody(c, promptRequestSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   // Allow attachment-only sends: require text OR at least one attachment.
   if (!body.text && !(body.attachments && body.attachments.length > 0)) {
     return c.json({ error: "text or attachments required" }, 400);
@@ -182,7 +215,10 @@ sessions.post("/session/:id/prompt", async (c) => {
   // disrupts the genuinely-running turn. Reject cleanly instead; to interleave a
   // message the client must pass streamingBehavior ("steer"/"followUp").
   if (!body.streamingBehavior && sessionEvents.getStatus(id).isRunning) {
-    return c.json({ error: "Agent is already processing", isRunning: true }, 409);
+    return c.json(
+      { error: "Agent is already processing", isRunning: true },
+      409,
+    );
   }
 
   // Recover before running tools if this session's worktree was removed
@@ -268,7 +304,10 @@ sessions.post("/session/:id/prompt", async (c) => {
       body.expandPromptTemplates !== undefined
         ? {
             images: allImages.length > 0 ? allImages : undefined,
-            streamingBehavior: body.streamingBehavior,
+            streamingBehavior: body.streamingBehavior as
+              | "steer"
+              | "followUp"
+              | undefined,
             expandPromptTemplates: body.expandPromptTemplates,
           }
         : undefined;
@@ -279,6 +318,7 @@ sessions.post("/session/:id/prompt", async (c) => {
       displayText: body.text || "",
       attachments: attachmentMetadata,
       promptOptions,
+      clientId: body.clientId,
     });
   };
   run().catch((err: unknown) => {
@@ -301,15 +341,21 @@ sessions.post("/session/:id/steer", async (c) => {
   const entry = store.get(id);
   if (!entry) return c.json({ error: "Not found" }, 404);
 
-  const body = await c.req
-    .json<{ text?: string }>()
-    .catch((): { text?: string } => ({}));
+  const parsed = await parseJsonBody(c, textMessageSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.text) return c.json({ error: "text is required" }, 400);
 
   ensureSessionEventHub(id, entry);
 
   // Store user message as a block in the database (without the mode preamble)
-  insertUserBlock(entry.threadId, body.text);
+  insertUserBlock(
+    entry.threadId,
+    body.text,
+    undefined,
+    undefined,
+    body.clientId,
+  );
 
   const text = await withInjections(entry, body.text);
 
@@ -332,15 +378,21 @@ sessions.post("/session/:id/follow-up", async (c) => {
   const entry = store.get(id);
   if (!entry) return c.json({ error: "Not found" }, 404);
 
-  const body = await c.req
-    .json<{ text?: string }>()
-    .catch((): { text?: string } => ({}));
+  const parsed = await parseJsonBody(c, textMessageSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.text) return c.json({ error: "text is required" }, 400);
 
   ensureSessionEventHub(id, entry);
 
   // Store user message as a block in the database (without the mode preamble)
-  insertUserBlock(entry.threadId, body.text);
+  insertUserBlock(
+    entry.threadId,
+    body.text,
+    undefined,
+    undefined,
+    body.clientId,
+  );
 
   const text = await withInjections(entry, body.text);
 
@@ -362,9 +414,9 @@ sessions.post("/session/:id/answer", async (c) => {
   const id = c.req.param("id");
   if (!store.has(id)) return c.json({ error: "Not found" }, 404);
 
-  const body = await c.req
-    .json<{ toolCallId?: string; answer?: string }>()
-    .catch((): { toolCallId?: string; answer?: string } => ({}));
+  const parsed = await parseJsonBody(c, answerSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.toolCallId || typeof body.answer !== "string") {
     return c.json({ error: "toolCallId and answer are required" }, 400);
   }
@@ -384,9 +436,9 @@ sessions.post("/session/:id/tool-approval", async (c) => {
   const id = c.req.param("id");
   if (!store.has(id)) return c.json({ error: "Not found" }, 404);
 
-  const body = await c.req
-    .json<{ toolCallId?: string; decision?: string }>()
-    .catch((): { toolCallId?: string; decision?: string } => ({}));
+  const parsed = await parseJsonBody(c, toolApprovalSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (
     !body.toolCallId ||
     (body.decision !== "once" &&
@@ -538,9 +590,9 @@ sessions.get("/session/:id/workspace-files", async (c) => {
  */
 sessions.post("/session/:id/revert-to-message", async (c) => {
   const sessionId = c.req.param("id");
-  const body = await c.req
-    .json<{ blockId?: string }>()
-    .catch((): { blockId?: string } => ({}));
+  const parsed = await parseJsonBody(c, blockIdSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.blockId) return c.json({ error: "blockId is required" }, 400);
 
   const entry = store.get(sessionId);
@@ -691,9 +743,9 @@ sessions.post("/session/:id/revert-to-message", async (c) => {
  */
 sessions.post("/session/:id/fork", async (c) => {
   const sessionId = c.req.param("id");
-  const body = await c.req
-    .json<{ blockId?: string }>()
-    .catch((): { blockId?: string } => ({}));
+  const parsed = await parseJsonBody(c, blockIdSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   if (!body.blockId) return c.json({ error: "blockId is required" }, 400);
 
   const entry = store.get(sessionId);
@@ -729,7 +781,7 @@ sessions.post("/session/:id/fork", async (c) => {
   // the new branch records its own divergence point, independent of the parent's
   // turn checkpoints (which may later be reverted or pruned). Best-effort: an
   // empty sha (clean tree / non-git / timeout) just means no snapshot to anchor.
-  let baseCheckpointSha = "";
+  let baseCheckpointSha: string;
   try {
     baseCheckpointSha = await gitStashCreate(entry.cwd);
     if (baseCheckpointSha)

@@ -32,7 +32,4 @@ export {
   SEVERITY_HINT,
 } from "./types"
 export { useLspRegistry, lspKeys } from "./queries"
-export type {
-  LspRegistryEntry,
-  LspRegistryFallback,
-} from "./api"
+export type { LspRegistryEntry, LspRegistryFallback } from "./api"

@@ -48,7 +48,9 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
 
   addThreadTab: (threadId, title, pending = false) =>
     set((s) => {
-      const existing = s.tabs.find((t) => t.type === "thread" && t.threadId === threadId)
+      const existing = s.tabs.find(
+        (t) => t.type === "thread" && t.threadId === threadId
+      )
       if (existing) return { activeTabId: existing.id }
       const id = `thread-${threadId}`
       const newTab: ThreadMainTab = { id, type: "thread", threadId, title }
@@ -61,13 +63,19 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
   addFileTab: (tab) => {
     useRightSidebarStore.getState().open()
     set((s) => {
-      const existing = s.tabs.find((t) => t.type === "file" && t.filePath === tab.filePath)
+      const existing = s.tabs.find(
+        (t) => t.type === "file" && t.filePath === tab.filePath
+      )
       if (existing) {
         return {
           activeTabId: existing.id,
           tabs: s.tabs.map((item) =>
             item.id === existing.id && item.type === "file"
-              ? { ...item, scrollToLine: tab.scrollToLine, sourceUrl: tab.sourceUrl }
+              ? {
+                  ...item,
+                  scrollToLine: tab.scrollToLine,
+                  sourceUrl: tab.sourceUrl,
+                }
               : item
           ),
         }
@@ -104,7 +112,9 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
       const activeStillExists = newTabs.some((t) => t.id === s.activeTabId)
       return {
         tabs: newTabs,
-        activeTabId: activeStillExists ? s.activeTabId : (newTabs[newTabs.length - 1]?.id ?? null),
+        activeTabId: activeStillExists
+          ? s.activeTabId
+          : (newTabs[newTabs.length - 1]?.id ?? null),
       }
     }),
 
@@ -121,7 +131,9 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
 
   updateThreadTitle: (threadId, title) =>
     set((s) => {
-      const existing = s.tabs.find((t) => t.type === "thread" && t.threadId === threadId)
+      const existing = s.tabs.find(
+        (t) => t.type === "thread" && t.threadId === threadId
+      )
       if (!existing || existing.title === title) return s
       return {
         tabs: s.tabs.map((t) =>
@@ -139,7 +151,13 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
       const targetIdx = without.findIndex((t) => t.id === targetId)
       if (targetIdx === -1) return s
       const insertAt = before ? targetIdx : targetIdx + 1
-      return { tabs: [...without.slice(0, insertAt), dragged, ...without.slice(insertAt)] }
+      return {
+        tabs: [
+          ...without.slice(0, insertAt),
+          dragged,
+          ...without.slice(insertAt),
+        ],
+      }
     }),
 }))
 

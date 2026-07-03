@@ -41,11 +41,15 @@ function withModePreamble(entry: StoredSession, userText: string): string {
  * facts remain available even though we only inject the newly-relevant ones now.
  * The DB always stores the clean user text without the block.
  */
-async function withMemoryPreamble(entry: StoredSession, userText: string): Promise<string> {
+async function withMemoryPreamble(
+  entry: StoredSession,
+  userText: string,
+): Promise<string> {
   // Embed the prompt for semantic retrieval. Best-effort and timeout-guarded:
   // returns null (→ FTS-only) when no embedding provider is configured or the
   // call is slow/fails, so the hot path never blocks on it.
-  const queryVector = (await embedQuery(userText).catch(() => null)) ?? undefined;
+  const queryVector =
+    (await embedQuery(userText).catch(() => null)) ?? undefined;
 
   const candidates = selectMemoriesForPrompt(
     userText,
@@ -73,6 +77,9 @@ async function withMemoryPreamble(entry: StoredSession, userText: string): Promi
  * the mode preamble stays outermost (stored text = mode preamble + memory block
  * + user text), matching the strip order used when seeding forked threads.
  */
-export async function withInjections(entry: StoredSession, userText: string): Promise<string> {
+export async function withInjections(
+  entry: StoredSession,
+  userText: string,
+): Promise<string> {
   return withModePreamble(entry, await withMemoryPreamble(entry, userText));
 }

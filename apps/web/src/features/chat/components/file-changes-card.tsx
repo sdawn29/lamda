@@ -1,13 +1,31 @@
 import { memo, useState, useMemo, useCallback, useEffect, useRef } from "react"
-import { GitCompare, ChevronRight, Undo2, Loader2, Eye, ExternalLink, Files } from "lucide-react"
+import {
+  GitCompare,
+  ChevronRight,
+  Undo2,
+  Loader2,
+  Eye,
+  ExternalLink,
+  Files,
+} from "lucide-react"
 import { openFileWithApp } from "@/features/electron/api"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
 import { Button } from "@/shared/ui/button"
-import { useRevertToTurn, useGitFileDiff, DiffView, DiffStat, parseDiffCounts } from "@/features/git"
+import {
+  useRevertToTurn,
+  useGitFileDiff,
+  DiffView,
+  DiffStat,
+  parseDiffCounts,
+} from "@/features/git"
 import { useRightSidebar } from "@/features/layout"
 import { useMainTabs } from "@/features/main-tabs"
 import { useGitRevertFile } from "@/features/git/mutations"
-import { StatusBadge, type ChangedFile, parseStatusLine } from "@/features/git/components/status-badge"
+import {
+  StatusBadge,
+  type ChangedFile,
+  parseStatusLine,
+} from "@/features/git/components/status-badge"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
 import {
@@ -23,7 +41,6 @@ import {
 } from "@/shared/ui/alert-dialog"
 import { cn } from "@/shared/lib/utils"
 import type { TurnSummary } from "@/features/git/api"
-
 
 const ChangedFileItem = memo(function ChangedFileItem({
   file,
@@ -66,7 +83,8 @@ const ChangedFileItem = memo(function ChangedFileItem({
 
   const pathParts = file.filePath.split("/")
   const fileName = pathParts[pathParts.length - 1] ?? file.filePath
-  const dirPath = pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : null
+  const dirPath =
+    pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : null
 
   const handleRevert = useCallback(
     async (e: React.MouseEvent) => {
@@ -108,7 +126,7 @@ const ChangedFileItem = memo(function ChangedFileItem({
           />
           <span className="min-w-0 flex-1 overflow-hidden">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate font-mono text-2xs font-medium leading-4 text-foreground/80">
+              <span className="truncate font-mono text-2xs leading-4 font-medium text-foreground/80">
                 {fileName}
               </span>
               {counts != null && (counts.added > 0 || counts.removed > 0) && (
@@ -130,7 +148,11 @@ const ChangedFileItem = memo(function ChangedFileItem({
               const absPath = rootPath
                 ? `${rootPath.replace(/\/$/, "")}/${file.filePath}`
                 : file.filePath
-              addFileTab({ filePath: absPath, title: fileName, workspacePath: rootPath })
+              addFileTab({
+                filePath: absPath,
+                title: fileName,
+                workspacePath: rootPath,
+              })
             }}
             aria-label="Open in file tab"
             className="flex size-6 items-center justify-center rounded-md text-muted-foreground/45 transition-colors hover:bg-background hover:text-foreground"
@@ -167,10 +189,12 @@ const ChangedFileItem = memo(function ChangedFileItem({
             </button>
           )}
         </div>
-        <ChevronRight className={cn(
-          "h-3.5 w-3.5 shrink-0 text-muted-foreground/35 transition-transform duration-150",
-          expanded && "rotate-90"
-        )} />
+        <ChevronRight
+          className={cn(
+            "h-3.5 w-3.5 shrink-0 text-muted-foreground/35 transition-transform duration-150",
+            expanded && "rotate-90"
+          )}
+        />
       </div>
 
       {expanded && (
@@ -181,7 +205,13 @@ const ChangedFileItem = memo(function ChangedFileItem({
               Loading diff
             </div>
           ) : diff != null ? (
-            <DiffView diff={diff} filePath={file.filePath} mode="inline" maxHeight="16rem" className="border-border/30" />
+            <DiffView
+              diff={diff}
+              filePath={file.filePath}
+              mode="inline"
+              maxHeight="16rem"
+              className="border-border/30"
+            />
           ) : null}
         </div>
       )}
@@ -247,7 +277,12 @@ export const FileChangesCard = memo(function FileChangesCard({
       <div className="mx-auto mb-3 w-full max-w-4xl px-3 py-2">
         <div className="overflow-hidden rounded-lg border border-border/60 bg-card/75 shadow-sm shadow-black/[0.03] dark:bg-card/60 dark:shadow-black/20">
           {/* Header */}
-          <div className={cn("flex items-center gap-3 px-3 py-3", expanded && "border-b border-border/40")}>
+          <div
+            className={cn(
+              "flex items-center gap-3 px-3 py-3",
+              expanded && "border-b border-border/40"
+            )}
+          >
             {/* Left: icon + label + count — clickable to expand */}
             <div
               className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5"
@@ -265,7 +300,7 @@ export const FileChangesCard = memo(function FileChangesCard({
                 <Files className="h-3.5 w-3.5" />
               </div>
               <span className="min-w-0 flex-1">
-                <span className="block text-xs font-medium leading-4 text-foreground/85">
+                <span className="block text-xs leading-4 font-medium text-foreground/85">
                   Files changed
                 </span>
                 <span className="flex min-w-0 items-center gap-1.5 text-3xs leading-3 text-muted-foreground/60">
@@ -317,10 +352,12 @@ export const FileChangesCard = memo(function FileChangesCard({
                 className="flex size-7 items-center justify-center rounded-md text-muted-foreground/45 transition-colors hover:bg-muted hover:text-foreground"
                 aria-label={expanded ? "Collapse" : "Expand"}
               >
-                <ChevronRight className={cn(
-                  "h-3.5 w-3.5 transition-transform duration-200",
-                  expanded && "rotate-90"
-                )} />
+                <ChevronRight
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform duration-200",
+                    expanded && "rotate-90"
+                  )}
+                />
               </button>
             </div>
           </div>

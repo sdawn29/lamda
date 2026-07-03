@@ -34,6 +34,7 @@ import {
   createBranch,
   initializeGitRepository,
 } from "@/features/chat/api"
+import { workspaceKeys } from "@/features/workspace/queries"
 async function invalidateGitSession(
   queryClient: QueryClient,
   sessionId: string
@@ -42,7 +43,7 @@ async function invalidateGitSession(
 }
 
 async function invalidateWorkspaceFiles(queryClient: QueryClient) {
-  await queryClient.invalidateQueries({ queryKey: ["workspace-files"] })
+  await queryClient.invalidateQueries({ queryKey: workspaceKeys.filesAll })
 }
 
 // ── Commit ────────────────────────────────────────────────────────────────────

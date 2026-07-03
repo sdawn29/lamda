@@ -66,7 +66,7 @@ interface FlatRow {
 /** Walks the loaded directory map from the root, emitting one flat row per visible node. */
 function flattenTree(
   dirMap: Map<string, WorkspaceFileEntry[]>,
-  expanded: Set<string>,
+  expanded: Set<string>
 ): FlatRow[] {
   const rows: FlatRow[] = []
   const walk = (relPath: string, depth: number) => {
@@ -167,7 +167,7 @@ const TreeRow = memo(function TreeRow({
       {status ? (
         <span
           className={cn(
-            "ml-auto shrink-0 font-mono text-3xs font-semibold leading-none",
+            "ml-auto shrink-0 font-mono text-3xs leading-none font-semibold",
             status.className
           )}
         >
@@ -198,7 +198,7 @@ const SKELETON_ROWS = [
 
 function FileTreeSkeleton() {
   return (
-    <div className="space-y-0 p-1 animate-in fade-in duration-200">
+    <div className="animate-in space-y-0 p-1 duration-200 fade-in">
       {SKELETON_ROWS.map((row, i) => (
         <div
           key={i}
@@ -309,6 +309,7 @@ export function FileTree({
 
   const rows = isFiltering ? searchRows : treeRows
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- @tanstack/react-virtual returns a mutable object by design; not memoizable
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollParentRef.current,
@@ -360,13 +361,13 @@ export function FileTree({
       <SidebarHeader className="gap-1 border-b bg-sidebar/95 px-1.5 py-1.5">
         <div className="flex items-center gap-1">
           <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-sidebar-foreground/40" />
+            <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-sidebar-foreground/40" />
             <Input
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
               placeholder="Filter files"
               aria-label="Filter files"
-              className="h-7 border-sidebar-border/70 bg-sidebar-accent/35 pl-7 pr-7 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-foreground/40 focus-visible:border-sidebar-border focus-visible:ring-0"
+              className="h-7 border-sidebar-border/70 bg-sidebar-accent/35 pr-7 pl-7 text-xs text-sidebar-foreground shadow-none placeholder:text-sidebar-foreground/40 focus-visible:border-sidebar-border focus-visible:ring-0"
             />
             {filter && (
               <Button
@@ -374,7 +375,7 @@ export function FileTree({
                 size="icon-xs"
                 onClick={() => setFilter("")}
                 aria-label="Clear file filter"
-                className="absolute right-1 top-1/2 size-5 -translate-y-1/2 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                className="absolute top-1/2 right-1 size-5 -translate-y-1/2 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground"
               >
                 <X className="size-3" />
               </Button>
@@ -387,7 +388,9 @@ export function FileTree({
             disabled={showSpinner}
             className="size-7 shrink-0 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
-            <RefreshCw className={`size-3.5 ${showSpinner ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`size-3.5 ${showSpinner ? "animate-spin" : ""}`}
+            />
             <span className="sr-only">Refresh</span>
           </Button>
         </div>
@@ -425,7 +428,7 @@ export function FileTree({
                 <div
                   key={row.entry.relativePath}
                   data-index={virtualRow.index}
-                  className="absolute left-0 top-0 w-full"
+                  className="absolute top-0 left-0 w-full"
                   style={{ transform: `translateY(${virtualRow.start}px)` }}
                 >
                   <TreeRow

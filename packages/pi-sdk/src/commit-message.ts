@@ -10,8 +10,7 @@ import type { SdkConfig } from "./types.js";
  * Default prompt template for commit message generation.
  * `{diff}` is replaced with the staged diff output.
  */
-export const DEFAULT_COMMIT_PROMPT =
-  `Generate a git commit message for the following staged diff. Follow the conventional commits format (e.g. "feat: ...", "fix: ...", "refactor: ..."). Use an imperative verb. Be concise — the subject line should be under 72 characters. If needed, add a blank line followed by a short body. Reply with ONLY the commit message, no extra explanation.\n\n{diff}`;
+export const DEFAULT_COMMIT_PROMPT = `Generate a git commit message for the following staged diff. Follow the conventional commits format (e.g. "feat: ...", "fix: ...", "refactor: ..."). Use an imperative verb. Be concise — the subject line should be under 72 characters. If needed, add a blank line followed by a short body. Reply with ONLY the commit message, no extra explanation.\n\n{diff}`;
 
 /**
  * Maximum number of characters of diff to send to the model. Large staged
@@ -42,7 +41,7 @@ function truncateDiff(diff: string): string {
 export async function generateCommitMessage(
   diff: string,
   config: SdkConfig = {},
-  promptTemplate?: string
+  promptTemplate?: string,
 ): Promise<string> {
   const template = promptTemplate ?? DEFAULT_COMMIT_PROMPT;
   const prompt = template.replace("{diff}", truncateDiff(diff));

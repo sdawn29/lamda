@@ -32,24 +32,18 @@ import {
 import { Input } from "@/shared/ui/input"
 import { Separator } from "@/shared/ui/separator"
 import { Skeleton } from "@/shared/ui/skeleton"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/shared/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import {
   listArchivedThreads,
   unarchiveThread,
   deleteThread,
   type ArchivedThreadDto,
 } from "../api"
-import { workspacesQueryKey } from "../queries"
-
-const archivedQueryKey = ["threads", "archived"] as const
+import { workspacesQueryKey, threadKeys } from "../queries"
 
 function useArchivedThreads() {
   return useQuery({
-    queryKey: archivedQueryKey,
+    queryKey: threadKeys.archived,
     queryFn: async () => {
       const { threads } = await listArchivedThreads()
       return threads
@@ -89,8 +83,12 @@ function EmptyState({ query }: { query: string }) {
       </div>
       {query ? (
         <>
-          <p className="text-xs font-medium">No results for &ldquo;{query}&rdquo;</p>
-          <p className="text-xs text-muted-foreground">Try a different search term.</p>
+          <p className="text-xs font-medium">
+            No results for &ldquo;{query}&rdquo;
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Try a different search term.
+          </p>
         </>
       ) : (
         <>
@@ -138,7 +136,7 @@ function ArchivedThreadItem({
         <Archive className="size-3.5" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-medium leading-5 text-foreground">
+        <p className="truncate text-xs leading-5 font-medium text-foreground">
           {thread.title}
         </p>
         <div className="flex items-center gap-1 text-[0.65rem] text-muted-foreground">
@@ -180,7 +178,7 @@ export function ArchivedThreadsDialog({
   const [isDeletingAll, setIsDeletingAll] = useState(false)
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey: archivedQueryKey })
+    queryClient.invalidateQueries({ queryKey: threadKeys.archived })
     queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
   }
 
@@ -221,7 +219,7 @@ export function ArchivedThreadsDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="gap-0 p-0 sm:max-w-lg">
-          <DialogHeader className="px-4 pb-3 pt-4">
+          <DialogHeader className="px-4 pt-4 pb-3">
             <div className="flex items-center gap-2">
               <DialogTitle>Archived Threads</DialogTitle>
               {!isLoading && threads.length > 0 && (
@@ -237,7 +235,7 @@ export function ArchivedThreadsDialog({
 
           <div className="px-3 py-2">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search by title or workspace"
                 value={search}
@@ -333,7 +331,9 @@ export function ArchivedThreadsDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingAll}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingAll}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               disabled={isDeletingAll}

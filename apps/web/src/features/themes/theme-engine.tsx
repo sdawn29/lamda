@@ -104,9 +104,9 @@ type ThemeProviderState = {
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)"
 const THEME_VALUES: ThemeMode[] = ["dark", "light", "system"]
 
-const ThemeProviderContext = React.createContext<ThemeProviderState | undefined>(
-  undefined
-)
+const ThemeProviderContext = React.createContext<
+  ThemeProviderState | undefined
+>(undefined)
 
 function isThemeMode(value: string | null | undefined): value is ThemeMode {
   return (
@@ -151,7 +151,8 @@ export function ThemeProvider({
   const storedTheme = settings?.[APP_SETTINGS_KEYS.THEME]
   const theme: ThemeMode = isThemeMode(storedTheme) ? storedTheme : defaultTheme
 
-  const colorTheme = settings?.[APP_SETTINGS_KEYS.COLOR_THEME] ?? DEFAULT_THEME_ID
+  const colorTheme =
+    settings?.[APP_SETTINGS_KEYS.COLOR_THEME] ?? DEFAULT_THEME_ID
   const isCustomActive = colorTheme === CUSTOM_THEME_ID
 
   // Custom palettes live in settings as JSON; reconstruct them (seeding from the
@@ -169,7 +170,9 @@ export function ThemeProvider({
     [customData]
   )
 
-  const activeColorTheme = isCustomActive ? customTheme : getThemeById(colorTheme)
+  const activeColorTheme = isCustomActive
+    ? customTheme
+    : getThemeById(colorTheme)
 
   const colorThemes = React.useMemo(
     () => [...BUILT_IN_THEMES, customTheme],
@@ -235,24 +238,31 @@ export function ThemeProvider({
   )
 
   const uiFontId = settings?.[APP_SETTINGS_KEYS.UI_FONT] ?? DEFAULT_UI_FONT_ID
-  const chatFontId = settings?.[APP_SETTINGS_KEYS.CHAT_FONT] ?? DEFAULT_CHAT_FONT_ID
-  const monoFontId = settings?.[APP_SETTINGS_KEYS.MONO_FONT] ?? DEFAULT_MONO_FONT_ID
-  const codeFontId = settings?.[APP_SETTINGS_KEYS.CODE_FONT] ?? DEFAULT_CODE_FONT_ID
+  const chatFontId =
+    settings?.[APP_SETTINGS_KEYS.CHAT_FONT] ?? DEFAULT_CHAT_FONT_ID
+  const monoFontId =
+    settings?.[APP_SETTINGS_KEYS.MONO_FONT] ?? DEFAULT_MONO_FONT_ID
+  const codeFontId =
+    settings?.[APP_SETTINGS_KEYS.CODE_FONT] ?? DEFAULT_CODE_FONT_ID
 
   const setUiFont = React.useCallback(
-    (id: string) => updateSetting.mutate({ key: APP_SETTINGS_KEYS.UI_FONT, value: id }),
+    (id: string) =>
+      updateSetting.mutate({ key: APP_SETTINGS_KEYS.UI_FONT, value: id }),
     [updateSetting]
   )
   const setChatFont = React.useCallback(
-    (id: string) => updateSetting.mutate({ key: APP_SETTINGS_KEYS.CHAT_FONT, value: id }),
+    (id: string) =>
+      updateSetting.mutate({ key: APP_SETTINGS_KEYS.CHAT_FONT, value: id }),
     [updateSetting]
   )
   const setMonoFont = React.useCallback(
-    (id: string) => updateSetting.mutate({ key: APP_SETTINGS_KEYS.MONO_FONT, value: id }),
+    (id: string) =>
+      updateSetting.mutate({ key: APP_SETTINGS_KEYS.MONO_FONT, value: id }),
     [updateSetting]
   )
   const setCodeFont = React.useCallback(
-    (id: string) => updateSetting.mutate({ key: APP_SETTINGS_KEYS.CODE_FONT, value: id }),
+    (id: string) =>
+      updateSetting.mutate({ key: APP_SETTINGS_KEYS.CODE_FONT, value: id }),
     [updateSetting]
   )
 

@@ -528,7 +528,6 @@ export const WorkingBlock = memo(function WorkingBlock({
         <DisclosureChevron expanded={expanded} />
       </button>
 
-
       {/* Collapsible content — flush, no left rule or indent (unlike nested blocks) */}
       <CollapsibleBody open={expanded}>
         <div className="mt-1.5 flex flex-col gap-1">

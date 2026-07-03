@@ -77,7 +77,7 @@ export function CiChecksBadge({
       className={cn(
         "inline-flex items-center gap-1 text-[0.6875rem] font-medium",
         tone,
-        className,
+        className
       )}
     >
       {icon}

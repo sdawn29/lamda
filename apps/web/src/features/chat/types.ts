@@ -91,7 +91,7 @@ export interface ToolMessage {
   args: unknown
   status: "running" | "done" | "error"
   result?: unknown
-  partialResult?: unknown  // Partial result during execution (e.g., write tool progress)
+  partialResult?: unknown // Partial result during execution (e.g., write tool progress)
   duration?: number
   startTime?: number
   createdAt?: number
@@ -117,15 +117,23 @@ export type ErrorAction =
 export function createErrorMessage(
   title: string,
   message: string,
-  options: { retryable?: boolean; retryCount?: number; action?: ErrorAction } = {}
+  options: {
+    retryable?: boolean
+    retryCount?: number
+    action?: ErrorAction
+  } = {}
 ): ErrorMessage {
   return {
     role: "error",
     id: crypto.randomUUID(),
     title,
     message,
-    ...(options.retryable !== undefined ? { retryable: options.retryable } : {}),
-    ...(options.retryCount !== undefined ? { retryCount: options.retryCount } : {}),
+    ...(options.retryable !== undefined
+      ? { retryable: options.retryable }
+      : {}),
+    ...(options.retryCount !== undefined
+      ? { retryCount: options.retryCount }
+      : {}),
     ...(options.action !== undefined ? { action: options.action } : {}),
   }
 }
@@ -149,7 +157,13 @@ export interface CompactionMessage {
 
 // ── Union Type ─────────────────────────────────────────────────────────────────
 
-export type Message = UserMessage | AssistantMessage | ToolMessage | ErrorMessage | AbortMessage | CompactionMessage
+export type Message =
+  | UserMessage
+  | AssistantMessage
+  | ToolMessage
+  | ErrorMessage
+  | AbortMessage
+  | CompactionMessage
 
 // ── Database Block Types ─────────────────────────────────────────────────────
 
@@ -177,6 +191,8 @@ export interface MessageBlock {
   toolDuration: number | null
   toolStartTime: number | null
   attachments: string | null // JSON array of attachment metadata
+  /** Client-generated id for a user block, carried from the optimistic row. */
+  clientId: string | null
   createdAt: number
 }
 
@@ -199,16 +215,23 @@ export interface StoredMessageDto {
 export function parseErrorMessage(raw: string): string {
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>
-    if (parsed?.error && typeof (parsed.error as Record<string, unknown>)?.message === "string")
+    if (
+      parsed?.error &&
+      typeof (parsed.error as Record<string, unknown>)?.message === "string"
+    )
       return (parsed.error as Record<string, unknown>).message as string
     if (typeof parsed?.error === "string") return parsed.error
   } catch {
     const jsonStart = raw.indexOf("{")
     if (jsonStart > 0) {
       try {
-        const inner = (JSON.parse(raw.slice(jsonStart)) as Record<string, unknown>)?.error as Record<string, unknown> | undefined
+        const inner = (
+          JSON.parse(raw.slice(jsonStart)) as Record<string, unknown>
+        )?.error as Record<string, unknown> | undefined
         if (typeof inner?.message === "string") return inner.message
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
     }
   }
   return raw
@@ -234,6 +257,7 @@ export function blockToMessage(block: MessageBlock): Message {
         id: block.id,
         content: block.content ?? "",
         attachments,
+        clientId: block.clientId ?? undefined,
         createdAt: block.createdAt,
       }
     }
@@ -248,7 +272,9 @@ export function blockToMessage(block: MessageBlock): Message {
         provider: block.provider ?? undefined,
         thinkingLevel: block.thinkingLevel ?? undefined,
         responseTime: block.responseTime ?? undefined,
-        errorMessage: block.errorMessage ? parseErrorMessage(block.errorMessage) : undefined,
+        errorMessage: block.errorMessage
+          ? parseErrorMessage(block.errorMessage)
+          : undefined,
         createdAt: block.createdAt,
       }
 
@@ -295,7 +321,10 @@ export function blockToMessage(block: MessageBlock): Message {
       return {
         role: "compaction",
         id: block.id,
-        reason: (block.content ?? "threshold") as "manual" | "threshold" | "overflow",
+        reason: (block.content ?? "threshold") as
+          | "manual"
+          | "threshold"
+          | "overflow",
         createdAt: block.createdAt,
       }
 

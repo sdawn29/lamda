@@ -11,8 +11,8 @@ resolves the repo from its git remote.
 
 ## Quick Reference
 
-| Action    | Command                              |
-| --------- | ------------------------------------ |
+| Action    | Command                                |
+| --------- | -------------------------------------- |
 | Typecheck | `npm run check-types -w @lamda/github` |
 
 ## Architecture

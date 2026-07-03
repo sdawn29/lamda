@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import {
   listMemories,
   insertMemory,
@@ -7,8 +8,24 @@ import {
   deleteMemory,
   type MemoryScope,
 } from "@lamda/db";
+import { parseJsonBody } from "../lib/validate.js";
 
 const memories = new Hono();
+
+const createMemorySchema = z.object({
+  scope: z.string().optional(),
+  workspaceId: z.string().optional(),
+  title: z.string().optional(),
+  content: z.string().optional(),
+  category: z.string().optional(),
+});
+
+const updateMemorySchema = z.object({
+  title: z.string().optional(),
+  content: z.string().optional(),
+  category: z.string().nullable().optional(),
+  pinned: z.boolean().optional(),
+});
 
 function parseScope(value: string | undefined): MemoryScope | undefined {
   return value === "user" || value === "workspace" ? value : undefined;
@@ -21,23 +38,21 @@ memories.get("/memories", (c) => {
 });
 
 memories.post("/memories", async (c) => {
-  const body = await c.req
-    .json<{
-      scope?: string;
-      workspaceId?: string;
-      title?: string;
-      content?: string;
-      category?: string;
-    }>()
-    .catch(() => ({}) as Record<string, never>);
+  const parsed = await parseJsonBody(c, createMemorySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const scope = parseScope(body.scope);
-  if (!scope) return c.json({ error: "scope must be 'user' or 'workspace'" }, 400);
+  if (!scope)
+    return c.json({ error: "scope must be 'user' or 'workspace'" }, 400);
   if (!body.title?.trim() || !body.content?.trim()) {
     return c.json({ error: "title and content are required" }, 400);
   }
   if (scope === "workspace" && !body.workspaceId) {
-    return c.json({ error: "workspaceId is required for workspace scope" }, 400);
+    return c.json(
+      { error: "workspaceId is required for workspace scope" },
+      400,
+    );
   }
 
   const id = insertMemory({
@@ -55,9 +70,9 @@ memories.patch("/memories/:id", async (c) => {
   const id = c.req.param("id");
   if (!getMemory(id)) return c.json({ error: "Not found" }, 404);
 
-  const body = await c.req
-    .json<{ title?: string; content?: string; category?: string | null; pinned?: boolean }>()
-    .catch(() => ({}) as Record<string, never>);
+  const parsed = await parseJsonBody(c, updateMemorySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const updates: {
     title?: string;
@@ -65,11 +80,13 @@ memories.patch("/memories/:id", async (c) => {
     category?: string | null;
     pinned?: boolean;
   } = {};
-  if (typeof body.title === "string" && body.title.trim()) updates.title = body.title.trim();
+  if (typeof body.title === "string" && body.title.trim())
+    updates.title = body.title.trim();
   if (typeof body.content === "string" && body.content.trim())
     updates.content = body.content.trim();
   if (body.category !== undefined) {
-    updates.category = typeof body.category === "string" ? body.category.trim() || null : null;
+    updates.category =
+      typeof body.category === "string" ? body.category.trim() || null : null;
   }
   if (typeof body.pinned === "boolean") updates.pinned = body.pinned;
   if (Object.keys(updates).length === 0) {

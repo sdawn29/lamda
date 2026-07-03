@@ -74,11 +74,7 @@ class FileTreeService {
    * workspace path, or a worktree path when the active thread runs in one), and
    * is broadcast so the renderer invalidates the matching root-scoped query.
    */
-  watchDir(
-    workspaceId: string,
-    rootDir: string,
-    relPath: string,
-  ): void {
+  watchDir(workspaceId: string, rootDir: string, relPath: string): void {
     const key = `${rootDir}\0${relPath}`;
     const existing = this.watches.get(key);
     if (existing) {
@@ -121,7 +117,9 @@ class FileTreeService {
     if (w.timer) clearTimeout(w.timer);
     try {
       w.watcher.close();
-    } catch {}
+    } catch {
+      // Watcher may already be closed — nothing else to do here.
+    }
     this.watches.delete(key);
   }
 }

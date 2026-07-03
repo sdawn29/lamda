@@ -297,12 +297,7 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
 
       // a, b, c, … toggle the matching option for the visible question
       // (ignored while typing and when a modifier is held, e.g. ⌘A).
-      if (
-        /^[a-z]$/i.test(e.key) &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        !e.altKey
-      ) {
+      if (/^[a-z]$/i.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const q = activeQuestion
         const idx = OPTION_KEYS.indexOf(e.key.toLowerCase())
         if (idx >= 0 && idx < q.options.length) {

@@ -69,14 +69,14 @@ Click the **MCP** button (gear icon with rotation) in the title bar to open the 
 
 ### Official MCP Servers
 
-| Server | Package | Description | Capabilities |
-|--------|---------|-------------|--------------|
-| **Filesystem** | `@modelcontextprotocol/server-filesystem` | Local file operations | Read/write files, list directories |
-| **GitHub** | `@modelcontextprotocol/server-github` | GitHub API | Issues, PRs, repos, search |
-| **Brave Search** | `@modelcontextprotocol/server-brave-search` | Web search | Search the web |
-| **SQLite** | `@modelcontextprotocol/server-sqlite` | Database operations | Query SQLite databases |
-| **Slack** | `@modelcontextprotocol/server-slack` | Slack messaging | Send messages, list channels |
-| **Puppeteer** | `@modelcontextprotocol/server-puppeteer` | Browser automation | Control a browser |
+| Server           | Package                                     | Description           | Capabilities                       |
+| ---------------- | ------------------------------------------- | --------------------- | ---------------------------------- |
+| **Filesystem**   | `@modelcontextprotocol/server-filesystem`   | Local file operations | Read/write files, list directories |
+| **GitHub**       | `@modelcontextprotocol/server-github`       | GitHub API            | Issues, PRs, repos, search         |
+| **Brave Search** | `@modelcontextprotocol/server-brave-search` | Web search            | Search the web                     |
+| **SQLite**       | `@modelcontextprotocol/server-sqlite`       | Database operations   | Query SQLite databases             |
+| **Slack**        | `@modelcontextprotocol/server-slack`        | Slack messaging       | Send messages, list channels       |
+| **Puppeteer**    | `@modelcontextprotocol/server-puppeteer`    | Browser automation    | Control a browser                  |
 
 ### Community Servers
 
@@ -131,14 +131,14 @@ Many community MCP servers are available. Search for "mcp-server" on npm or GitH
 
 ### Configuration Fields
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| **Name** | Yes | Unique identifier for this server |
-| **Command** | Yes | Command to run (e.g., `npx`, `node`) |
-| **Arguments** | Yes | Arguments for the command |
-| **Working Directory** | No | Directory to run the command in |
-| **Environment Variables** | No | API keys, tokens, etc. |
-| **Description** | No | Human-readable description |
+| Field                     | Required | Description                          |
+| ------------------------- | -------- | ------------------------------------ |
+| **Name**                  | Yes      | Unique identifier for this server    |
+| **Command**               | Yes      | Command to run (e.g., `npx`, `node`) |
+| **Arguments**             | Yes      | Arguments for the command            |
+| **Working Directory**     | No       | Directory to run the command in      |
+| **Environment Variables** | No       | API keys, tokens, etc.               |
+| **Description**           | No       | Human-readable description           |
 
 ### Common Configurations
 
@@ -181,12 +181,12 @@ Environment: BRAVE_API_KEY=your_api_key_here
 
 ### Server Status
 
-| Status | Icon | Meaning |
-|--------|------|---------|
-| **Connected** | Green dot | Server is running, tools available |
-| **Disconnected** | Gray dot | Server not connected |
-| **Error** | Red dot | Connection failed |
-| **Loading** | Spinner | Checking status |
+| Status           | Icon      | Meaning                            |
+| ---------------- | --------- | ---------------------------------- |
+| **Connected**    | Green dot | Server is running, tools available |
+| **Disconnected** | Gray dot  | Server not connected               |
+| **Error**        | Red dot   | Connection failed                  |
+| **Loading**      | Spinner   | Checking status                    |
 
 ### Testing Connection
 

@@ -85,11 +85,7 @@ export function getAiUsageStats(
 ): AiUsageStats {
   const where = rangeFilter(sinceMs, untilMs);
 
-  const totals = db
-    .select(totalsColumns)
-    .from(aiUsage)
-    .where(where)
-    .get() ?? {
+  const totals = db.select(totalsColumns).from(aiUsage).where(where).get() ?? {
     requests: 0,
     inputTokens: 0,
     outputTokens: 0,

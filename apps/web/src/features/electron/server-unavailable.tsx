@@ -42,7 +42,9 @@ export function ServerUnavailable({ status }: Props) {
     <div className="flex h-svh w-full items-center justify-center bg-background p-6">
       <div className="w-full max-w-xl rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className={`mt-0.5 ${isFailed ? "text-destructive" : "text-muted-foreground"}`}>
+          <div
+            className={`mt-0.5 ${isFailed ? "text-destructive" : "text-muted-foreground"}`}
+          >
             {isFailed ? (
               <AlertCircle className="size-5" />
             ) : (
@@ -64,7 +66,7 @@ export function ServerUnavailable({ status }: Props) {
         </div>
 
         {isFailed && status.error ? (
-          <pre className="mt-4 max-h-64 overflow-auto rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap wrap-break-word">
+          <pre className="mt-4 max-h-64 overflow-auto rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed wrap-break-word whitespace-pre-wrap text-muted-foreground">
             {status.error}
           </pre>
         ) : null}

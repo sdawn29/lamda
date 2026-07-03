@@ -125,7 +125,10 @@ export function saveMcpSettings(settings: McpSettings): void {
       entry.client
         .disconnectAll()
         .catch((e) =>
-          console.error(`[MCP] error disconnecting removed server "${name}":`, e),
+          console.error(
+            `[MCP] error disconnecting removed server "${name}":`,
+            e,
+          ),
         );
     } else {
       // Reset manuallyStopped so re-saved servers reconnect on next use
@@ -247,7 +250,10 @@ export async function getMcpServerStatus() {
           entry.client
             .connect(config)
             .catch((e) =>
-              console.warn(`[MCP] background connect error for "${s.name}":`, e),
+              console.warn(
+                `[MCP] background connect error for "${s.name}":`,
+                e,
+              ),
             );
           return {
             name: s.name,

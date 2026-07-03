@@ -156,7 +156,8 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
     icon: "list-todo",
     source: "builtin",
     label: "Plan",
-    description: "Research and propose a plan. Saves the plan to .lamda/plans/.",
+    description:
+      "Research and propose a plan. Saves the plan to .lamda/plans/.",
     preamble:
       "Plan mode — produce exactly one implementation-ready plan for the user's request, saved under `.lamda/plans/`.\n\n" +
       "Investigate first (read-only): use `read`, `grep`, `find`, `ls`, read-only `bash`, and any available custom tools (memory, LSP, MCP) to trace the real code paths, data models, and call sites. Plan against the code, not assumptions. Use the `plan` tool to manage plans: `plan` with operation `list` to see existing plans, `read` to revisit one, and `write` to save. Don't modify source, config, tests, or docs — the only file you write is the plan, via `plan` (operation `write`), at `.lamda/plans/<2-5-word-kebab-slug>.md`. To revise an existing plan, write to its existing name.\n\n" +
@@ -169,7 +170,15 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "- A clear definition of done.\n\n" +
       "End the plan with a `## Todos` section as the very last section: a GitHub-style checklist (`- [ ] …`) of the concrete, ordered, actionable steps from the plan, each one short enough to be a single unit of work. This is what the agent will work through when implementing.\n\n" +
       "After the `plan` write succeeds, stop and wait for review — implement nothing in this mode.",
-    allowedBuiltins: ["read", "grep", "find", "ls", "bash", "plan", QUESTION_TOOL_NAME],
+    allowedBuiltins: [
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "bash",
+      "plan",
+      QUESTION_TOOL_NAME,
+    ],
     allowCustomTools: true,
   },
   agent: {
@@ -185,7 +194,17 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "- Verify before finishing: run the relevant tests, type-checks, or build, and fix what you broke. Don't leave the workspace half-migrated — if you can't finish, say what remains.\n" +
       "- Track multi-step work (beyond 2–3 steps) with the `todo` tool so the user sees progress; skip it for trivial tasks.\n" +
       "- Clarify with `question` before coding only when blocked on a decision that is genuinely the user's and would change what you build (scope, approach, trade-offs, conflicting requirements). Pick obvious defaults yourself, mention them, and proceed.",
-    allowedBuiltins: ["read", "bash", "edit", "write", "todo", "grep", "find", "ls", QUESTION_TOOL_NAME],
+    allowedBuiltins: [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "todo",
+      "grep",
+      "find",
+      "ls",
+      QUESTION_TOOL_NAME,
+    ],
     allowCustomTools: true,
   },
 };
@@ -248,7 +267,8 @@ function parseModeFile(raw: string): ParsedModeFile {
     if (key === "name") frontmatter.label = unquote(value);
     else if (key === "description") frontmatter.description = unquote(value);
     else if (key === "tools") frontmatter.allowedBuiltins = parseList(value);
-    else if (key === "allowCustomTools") frontmatter.allowCustomTools = value === "true";
+    else if (key === "allowCustomTools")
+      frontmatter.allowCustomTools = value === "true";
     else if (key === "color") frontmatter.color = unquote(value);
     else if (key === "icon") frontmatter.icon = unquote(value);
   }
@@ -347,7 +367,11 @@ export function getModeConfig(mode: Mode, cwd?: string): ModeConfig {
   try {
     const stat = statSync(resolved.path);
     const cached = configCache.get(cacheKey);
-    if (cached && cached.path === resolved.path && cached.mtimeMs === stat.mtimeMs) {
+    if (
+      cached &&
+      cached.path === resolved.path &&
+      cached.mtimeMs === stat.mtimeMs
+    ) {
       return cached.config;
     }
 
@@ -360,12 +384,17 @@ export function getModeConfig(mode: Mode, cwd?: string): ModeConfig {
       description: frontmatter.description ?? defaults.description,
       preamble: body.length > 0 ? body : defaults.preamble,
       allowedBuiltins: frontmatter.allowedBuiltins ?? defaults.allowedBuiltins,
-      allowCustomTools: frontmatter.allowCustomTools ?? defaults.allowCustomTools,
+      allowCustomTools:
+        frontmatter.allowCustomTools ?? defaults.allowCustomTools,
       color: normalizeColor(frontmatter.color) ?? defaults.color,
       icon: frontmatter.icon ?? defaults.icon,
       source: resolved.source,
     };
-    configCache.set(cacheKey, { path: resolved.path, mtimeMs: stat.mtimeMs, config });
+    configCache.set(cacheKey, {
+      path: resolved.path,
+      mtimeMs: stat.mtimeMs,
+      config,
+    });
     return config;
   } catch {
     return defaults;
@@ -474,7 +503,8 @@ export function createModePreambleStripper(
 ): (text: string) => string {
   const preambles = new Set<string>();
   for (const config of listModes(cwd)) preambles.add(config.preamble);
-  for (const mode of BUILTIN_MODES) preambles.add(DEFAULT_MODE_CONFIG[mode].preamble);
+  for (const mode of BUILTIN_MODES)
+    preambles.add(DEFAULT_MODE_CONFIG[mode].preamble);
   const prefixes = [...preambles]
     .filter((preamble) => preamble.length > 0)
     .map((preamble) => preamble + PREAMBLE_SEPARATOR);

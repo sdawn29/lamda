@@ -13,10 +13,17 @@ const sizeClasses = {
   lg: "h-5 w-5",
 }
 
-export function LoadingSpinner({ className, size = "md" }: LoadingSpinnerProps) {
+export function LoadingSpinner({
+  className,
+  size = "md",
+}: LoadingSpinnerProps) {
   return (
     <Loader2
-      className={cn(sizeClasses[size], "shrink-0 animate-spin text-muted-foreground", className)}
+      className={cn(
+        sizeClasses[size],
+        "shrink-0 animate-spin text-muted-foreground",
+        className
+      )}
     />
   )
 }

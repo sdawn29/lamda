@@ -40,8 +40,11 @@ const OUTPUT_CAP = 8 * 1024;
  * happened, suitable for a toast description rather than a terminal.
  */
 function cleanCliOutput(raw: string): string {
-  // eslint-disable-next-line no-control-regex -- stripping ANSI/control codes requires matching them
-  const plain = raw.replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][\s\S]*?(?:\x07|\x1b\\)|[\x00-\x08\x0b-\x1f]/g, "");
+  const plain = raw.replace(
+    // eslint-disable-next-line no-control-regex -- stripping ANSI/control codes requires matching them
+    /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][\s\S]*?(?:\x07|\x1b\\)|[\x00-\x08\x0b-\x1f]/g,
+    "",
+  );
   const lines = plain
     .split("\n")
     .map((l) => l.replace(/^[\s│◇◆●○■├╭╰─]+/, "").trim())
@@ -119,11 +122,20 @@ export async function searchSkillsRegistry(
 // of broad seed queries, merge the unique results, and sort by install count.
 // Cached briefly so opening the page repeatedly doesn't refetch every time.
 
-const POPULAR_SEED_QUERIES = ["skill", "agent", "code", "design", "git", "review"];
+const POPULAR_SEED_QUERIES = [
+  "skill",
+  "agent",
+  "code",
+  "design",
+  "git",
+  "review",
+];
 const POPULAR_CACHE_TTL_MS = 15 * 60 * 1000;
 let popularCache: { at: number; skills: SkillSearchResult[] } | null = null;
 
-export async function getPopularSkills(limit = 12): Promise<SkillSearchResult[]> {
+export async function getPopularSkills(
+  limit = 12,
+): Promise<SkillSearchResult[]> {
   if (popularCache && Date.now() - popularCache.at < POPULAR_CACHE_TTL_MS) {
     return popularCache.skills.slice(0, limit);
   }
@@ -161,7 +173,10 @@ function parseSkillMd(raw: string): {
     const idx = line.indexOf(":");
     if (idx === -1) continue;
     const key = line.slice(0, idx).trim();
-    const value = line.slice(idx + 1).trim().replace(/^["']|["']$/g, "");
+    const value = line
+      .slice(idx + 1)
+      .trim()
+      .replace(/^["']|["']$/g, "");
     if (key === "name") fm.name = value;
     else if (key === "description") fm.description = value;
   }
@@ -169,9 +184,10 @@ function parseSkillMd(raw: string): {
 }
 
 /** Minimal frontmatter read — only `name`/`description` are needed here. */
-function readSkillFrontmatter(
-  skillMdPath: string,
-): { name?: string; description?: string } {
+function readSkillFrontmatter(skillMdPath: string): {
+  name?: string;
+  description?: string;
+} {
   let raw: string;
   try {
     raw = readFileSync(skillMdPath, "utf8");
@@ -311,7 +327,9 @@ function isPathSafe(base: string, child: string): boolean {
 
 async function installSkillFromRegistry(
   source: string,
-): Promise<{ success: true; skill: InstalledSkill } | { success: false; error: string }> {
+): Promise<
+  { success: true; skill: InstalledSkill } | { success: false; error: string }
+> {
   // Registry ids look like "owner/repo/skillId" (and bare "owner/repo" also
   // resolves to every skill in that repo) — reject anything else so it can't
   // be used to smuggle CLI flags into the spawned argv.
@@ -367,7 +385,9 @@ async function installSkillFromRegistry(
           resolvePromise(0);
           return;
         }
-        const reason = signal ? `terminated by ${signal}` : `exited with code ${code}`;
+        const reason = signal
+          ? `terminated by ${signal}`
+          : `exited with code ${code}`;
         reject(new Error(cleanCliOutput(output) || `npx skills add ${reason}`));
       });
     });
@@ -375,13 +395,19 @@ async function installSkillFromRegistry(
 
     const installedDir = join(tempDir, ".pi", "skills");
     if (!existsSync(installedDir)) {
-      return { success: false, error: "Install finished but no skill was written." };
+      return {
+        success: false,
+        error: "Install finished but no skill was written.",
+      };
     }
     const installedNames = readdirSync(installedDir, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => e.name);
     if (installedNames.length === 0) {
-      return { success: false, error: "Install finished but no skill was written." };
+      return {
+        success: false,
+        error: "Install finished but no skill was written.",
+      };
     }
 
     const globalDir = lamdaGlobalSkillsDir();
@@ -405,7 +431,10 @@ async function installSkillFromRegistry(
       };
     }
     if (!installed) {
-      return { success: false, error: "Install finished but no skill was written." };
+      return {
+        success: false,
+        error: "Install finished but no skill was written.",
+      };
     }
     return { success: true, skill: installed };
   } catch (err) {

@@ -5,14 +5,7 @@
  *
  * Monaco virtualizes rendering, so large files stay smooth.
  */
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react"
 import type { editor as MonacoEditor, IDisposable } from "monaco-editor"
 import { useTheme } from "@/shared/components/theme-provider"
@@ -66,9 +59,7 @@ const MARKER_OWNER = "lsp"
 const COMPOSER_HEIGHT = 188
 
 function targetLineNumber(target: MonacoEditor.IMouseTarget): number | null {
-  return (
-    target.position?.lineNumber ?? target.range?.startLineNumber ?? null
-  )
+  return target.position?.lineNumber ?? target.range?.startLineNumber ?? null
 }
 
 /** Convert a CSS font-size ("0.75rem", "12px", "13") to a Monaco px number. */
@@ -239,7 +230,9 @@ export default function MonacoCodeViewer({
       monacoRef.current = monaco
 
       syncModelRegistration()
-      disposablesRef.current.push(editor.onDidChangeModel(syncModelRegistration))
+      disposablesRef.current.push(
+        editor.onDidChangeModel(syncModelRegistration)
+      )
 
       const editorDomNode = editor.getDomNode()
       const clearFindCloseTooltip = () => {
@@ -298,7 +291,8 @@ export default function MonacoCodeViewer({
           const line = targetLineNumber(e.target)
           if (
             commentEnabledRef.current &&
-            e.target.type === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS &&
+            e.target.type ===
+              monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS &&
             line
           ) {
             openComposer(line)

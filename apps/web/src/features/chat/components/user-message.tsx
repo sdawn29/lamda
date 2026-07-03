@@ -37,9 +37,7 @@ function FileChip({ filePath }: { filePath: string }) {
       label={basename}
       detail={
         <div className="flex flex-col gap-1">
-          <SectionLabel>
-            File
-          </SectionLabel>
+          <SectionLabel>File</SectionLabel>
           <span className="font-mono text-xs break-all">{filePath}</span>
         </div>
       }
@@ -51,7 +49,9 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
   const isSkill = command.source === "skill"
   // Skill commands carry a `skill:` prefix in their name — drop it for display
   // so the chip reads `/foo` rather than `/skill:foo`.
-  const displayName = isSkill ? command.name.replace(/^skill:/, "") : command.name
+  const displayName = isSkill
+    ? command.name.replace(/^skill:/, "")
+    : command.name
 
   return (
     <MessageChip
@@ -86,15 +86,16 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
               )}
             >
               {isSkill ? (
-                <ContainerIcon className="size-3.5 text-muted-foreground" aria-hidden />
+                <ContainerIcon
+                  className="size-3.5 text-muted-foreground"
+                  aria-hidden
+                />
               ) : (
                 <FileTextIcon className="size-3.5" aria-hidden />
               )}
             </div>
             <div className="flex min-w-0 flex-col gap-0.5">
-              <SectionLabel>
-                {isSkill ? "Skill" : "Prompt"}
-              </SectionLabel>
+              <SectionLabel>{isSkill ? "Skill" : "Prompt"}</SectionLabel>
               <span className="truncate font-mono text-2xs font-medium text-foreground">
                 /{displayName}
               </span>

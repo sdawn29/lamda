@@ -1,10 +1,6 @@
 import { useCallback, useState, memo } from "react"
 import { History, Loader2 } from "lucide-react"
-import {
-  useLastCommitAt,
-  useRevertToTurn,
-  type TurnSummary,
-} from "../queries"
+import { useLastCommitAt, useRevertToTurn, type TurnSummary } from "../queries"
 import { type DiffMode } from "./diff-view"
 import { TurnItem } from "./turn-item"
 

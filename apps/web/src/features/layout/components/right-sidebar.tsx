@@ -72,8 +72,14 @@ export function RightSidebarContent({
     SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF
   )
   const fileTreeBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE)
-  const { tabs, activeTabId, activeTab, setActiveTab, closeTab, clearActiveTab } =
-    useMainTabs()
+  const {
+    tabs,
+    activeTabId,
+    activeTab,
+    setActiveTab,
+    closeTab,
+    clearActiveTab,
+  } = useMainTabs()
   const fileTabs = tabs.filter((t) => t.type === "file")
   const isChangesActive = !fileTabs.some((t) => t.id === activeTabId)
   const hasActiveFileTab = activeTab?.type === "file"
@@ -88,7 +94,10 @@ export function RightSidebarContent({
       const startX = e.clientX
       const startWidth = fileTreeDrawerRef.current?.offsetWidth ?? 256
       const onMove = (ev: MouseEvent) => {
-        const next = Math.max(180, Math.min(560, startWidth + (startX - ev.clientX)))
+        const next = Math.max(
+          180,
+          Math.min(560, startWidth + (startX - ev.clientX))
+        )
         if (fileTreeDrawerRef.current) {
           fileTreeDrawerRef.current.style.width = `${next}px`
         }
@@ -135,7 +144,7 @@ export function RightSidebarContent({
           type="button"
           onClick={clearActiveTab}
           className={cn(
-            "flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium select-none transition-all duration-150",
+            "flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-all duration-150 select-none",
             isChangesActive
               ? "bg-accent text-accent-foreground shadow-sm ring-1 ring-border/60"
               : "text-muted-foreground/70 hover:bg-accent/60 hover:text-foreground"
@@ -150,7 +159,7 @@ export function RightSidebarContent({
         )}
 
         {/* Open file tabs */}
-        <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+        <div className="flex min-w-0 flex-1 scrollbar-none items-center gap-1 overflow-x-auto">
           {fileTabs.map((tab) => {
             const isActive = tab.id === activeTabId
             return (
@@ -160,7 +169,7 @@ export function RightSidebarContent({
                 aria-selected={isActive}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "group flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md pl-2.5 pr-1.5 text-xs select-none transition-all duration-150",
+                  "group flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md pr-1.5 pl-2.5 text-xs transition-all duration-150 select-none",
                   isActive
                     ? "bg-accent text-accent-foreground shadow-sm ring-1 ring-border/60"
                     : "text-muted-foreground/70 hover:bg-accent/60 hover:text-foreground"
@@ -253,7 +262,7 @@ export function RightSidebarContent({
             as a right-anchored drawer (see below). */}
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <div className="min-w-0 flex-1 overflow-hidden">
-            {(sessionId || hasActiveFileTab) ? (
+            {sessionId || hasActiveFileTab ? (
               <Suspense fallback={<div className="h-full bg-background" />}>
                 <ReviewPanel
                   sessionId={sessionId ?? ""}
@@ -331,7 +340,12 @@ export function RightSidebarContent({
 
   if (isMobile) {
     return (
-      <Sheet open={isOpen} onOpenChange={(open) => { if (!open) close() }}>
+      <Sheet
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) close()
+        }}
+      >
         <SheetContent
           side="right"
           showCloseButton={false}

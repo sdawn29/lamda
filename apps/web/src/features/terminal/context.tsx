@@ -21,7 +21,11 @@ interface TerminalStore {
   initialized: boolean
   states: Map<string, WorkspaceTerminalState>
   setInitialized: (value: boolean) => void
-  setStates: (updater: (prev: Map<string, WorkspaceTerminalState>) => Map<string, WorkspaceTerminalState>) => void
+  setStates: (
+    updater: (
+      prev: Map<string, WorkspaceTerminalState>
+    ) => Map<string, WorkspaceTerminalState>
+  ) => void
 }
 
 const useTerminalStore = create<TerminalStore>((set) => ({
@@ -85,7 +89,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       update(workspaceId, (prev) => ({ ...prev, isOpen: true }))
     } else {
       const tab = makeTab(workspaceId, cwd)
-      update(workspaceId, () => ({ isOpen: true, tabs: [tab], activeTabId: tab.id }))
+      update(workspaceId, () => ({
+        isOpen: true,
+        tabs: [tab],
+        activeTabId: tab.id,
+      }))
     }
   }
 
@@ -97,7 +105,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       update(workspaceId, (prev) => ({ ...prev, isOpen: true }))
     } else {
       const tab = makeTab(workspaceId, cwd)
-      update(workspaceId, () => ({ isOpen: true, tabs: [tab], activeTabId: tab.id }))
+      update(workspaceId, () => ({
+        isOpen: true,
+        tabs: [tab],
+        activeTabId: tab.id,
+      }))
     }
   }
 
@@ -120,9 +132,12 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const idx = prev.tabs.findIndex((tab) => tab.id === tabId)
       if (idx === -1) return prev
       const tabs = prev.tabs.filter((tab) => tab.id !== tabId)
-      if (tabs.length === 0) return { ...prev, tabs: [], isOpen: false, activeTabId: null }
+      if (tabs.length === 0)
+        return { ...prev, tabs: [], isOpen: false, activeTabId: null }
       const activeTabId =
-        prev.activeTabId === tabId ? tabs[idx > 0 ? idx - 1 : 0].id : prev.activeTabId
+        prev.activeTabId === tabId
+          ? tabs[idx > 0 ? idx - 1 : 0].id
+          : prev.activeTabId
       return { ...prev, tabs, activeTabId }
     })
   }
@@ -134,7 +149,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const renameTab = (workspaceId: string, tabId: string, title: string) => {
     update(workspaceId, (prev) => ({
       ...prev,
-      tabs: prev.tabs.map((tab) => (tab.id === tabId ? { ...tab, title } : tab)),
+      tabs: prev.tabs.map((tab) =>
+        tab.id === tabId ? { ...tab, title } : tab
+      ),
     }))
   }
 
@@ -174,7 +191,10 @@ const useTerminalBridgeStore = create<TerminalBridgeStore>((set) => ({
   setValue: (value) => set({ value }),
 }))
 
-function TerminalContextBridge({ value, children }: TerminalContextBridgeProps) {
+function TerminalContextBridge({
+  value,
+  children,
+}: TerminalContextBridgeProps) {
   const setValue = useTerminalBridgeStore((state) => state.setValue)
 
   useEffect(() => {
@@ -196,7 +216,9 @@ export function useTerminal() {
 
 export function useTerminalForWorkspace(workspaceId: string, cwd: string) {
   const ctx = useTerminal()
-  const state = useTerminalStore((store) => store.states.get(workspaceId) ?? makeDefaultState())
+  const state = useTerminalStore(
+    (store) => store.states.get(workspaceId) ?? makeDefaultState()
+  )
 
   return useMemo(
     () => ({
@@ -209,7 +231,8 @@ export function useTerminalForWorkspace(workspaceId: string, cwd: string) {
       addTab: () => ctx.addTab(workspaceId, cwd),
       closeTab: (tabId: string) => ctx.closeTab(workspaceId, tabId),
       setActiveTab: (tabId: string) => ctx.setActiveTab(workspaceId, tabId),
-      renameTab: (tabId: string, title: string) => ctx.renameTab(workspaceId, tabId, title),
+      renameTab: (tabId: string, title: string) =>
+        ctx.renameTab(workspaceId, tabId, title),
       killAll: () => ctx.killAll(workspaceId),
     }),
     [ctx, workspaceId, cwd, state]

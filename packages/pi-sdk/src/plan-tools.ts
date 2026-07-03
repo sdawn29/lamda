@@ -68,10 +68,13 @@ function textResult(text: string) {
 }
 
 function validatePlanContent(content: unknown) {
-  if (typeof content !== "string") return textResult("Plan content must be a string.");
+  if (typeof content !== "string")
+    return textResult("Plan content must be a string.");
   if (!content.trim()) return textResult("Plan content cannot be empty.");
   if (Buffer.byteLength(content, "utf8") > MAX_PLAN_BYTES) {
-    return textResult(`Plan content exceeds the ${Math.round(MAX_PLAN_BYTES / 1024)} KB limit.`);
+    return textResult(
+      `Plan content exceeds the ${Math.round(MAX_PLAN_BYTES / 1024)} KB limit.`,
+    );
   }
   return null;
 }
@@ -109,7 +112,8 @@ export function createPlanModeTools(cwd: string): ToolDefinition[] {
       return textResult(`No plans yet — ${PLAN_DIR}/ is empty.`);
     }
     const mdFiles = entries.filter((f) => f.toLowerCase().endsWith(".md"));
-    if (mdFiles.length === 0) return textResult(`No plans yet — ${PLAN_DIR}/ is empty.`);
+    if (mdFiles.length === 0)
+      return textResult(`No plans yet — ${PLAN_DIR}/ is empty.`);
     const rows = await Promise.all(
       mdFiles.map(async (name) => {
         try {
@@ -122,7 +126,8 @@ export function createPlanModeTools(cwd: string): ToolDefinition[] {
     );
     rows.sort((a, b) => b.mtimeMs - a.mtimeMs);
     const lines = rows.map(
-      (r) => `- ${r.name} (${Math.max(1, Math.round(r.size / 1024))} KB, ${relativeAge(r.mtimeMs)})`,
+      (r) =>
+        `- ${r.name} (${Math.max(1, Math.round(r.size / 1024))} KB, ${relativeAge(r.mtimeMs)})`,
     );
     return textResult(`Plans in ${PLAN_DIR}/:\n${lines.join("\n")}`);
   }
@@ -149,11 +154,16 @@ Operations (the \`operation\` field):
         }),
       ),
       content: Type.Optional(
-        Type.String({ description: "Full markdown plan content. Required for write." }),
+        Type.String({
+          description: "Full markdown plan content. Required for write.",
+        }),
       ),
     }),
     execute: async (toolCallId, params, signal, onUpdate) => {
-      const p = (params && typeof params === "object" ? params : {}) as Record<string, unknown>;
+      const p = (params && typeof params === "object" ? params : {}) as Record<
+        string,
+        unknown
+      >;
       const operation = p.operation;
 
       if (operation === "list") {
@@ -167,7 +177,12 @@ Operations (the \`operation\` field):
             `\`read\` requires \`path\` — the plan's name (e.g. \`my-plan.md\`). Use operation "list" to see existing plans.`,
           );
         }
-        return readTool.execute(toolCallId, { path: normalized.relPath } as never, signal, onUpdate);
+        return readTool.execute(
+          toolCallId,
+          { path: normalized.relPath } as never,
+          signal,
+          onUpdate,
+        );
       }
 
       if (operation === "write") {
@@ -204,11 +219,16 @@ Operations (the \`operation\` field):
           : [];
         return {
           ...result,
-          content: [...content, { type: "text" as const, text: `Plan saved to ${relPath}` }],
+          content: [
+            ...content,
+            { type: "text" as const, text: `Plan saved to ${relPath}` },
+          ],
         };
       }
 
-      return textResult(`Unknown operation. Use one of: "list", "read", "write".`);
+      return textResult(
+        `Unknown operation. Use one of: "list", "read", "write".`,
+      );
     },
   };
 

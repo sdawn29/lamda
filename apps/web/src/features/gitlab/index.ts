@@ -9,10 +9,7 @@ export {
   useMergeRequests,
   useGitlabIssues,
 } from "./queries"
-export {
-  usePublishGitlabRepository,
-  useCreateMergeRequest,
-} from "./mutations"
+export { usePublishGitlabRepository, useCreateMergeRequest } from "./mutations"
 export type {
   GlabStatus,
   GitlabRepoInfo,

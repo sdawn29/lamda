@@ -50,7 +50,10 @@ export class LspClient {
   private workspaceRoot: string;
   private openDocs = new Map<string, number>(); // uri → version
   private diagnosticsByUri = new Map<string, Diagnostic[]>();
-  private diagnosticsWaiters = new Map<string, Set<(diags: Diagnostic[]) => void>>();
+  private diagnosticsWaiters = new Map<
+    string,
+    Set<(diags: Diagnostic[]) => void>
+  >();
   private starting: Promise<void>;
   private disposed = false;
 
@@ -70,7 +73,9 @@ export class LspClient {
 
     this.proc.on("exit", (code) => {
       if (!this.disposed) {
-        console.error(`[lsp:${this.languageId}] server exited unexpectedly code=${code}`);
+        console.error(
+          `[lsp:${this.languageId}] server exited unexpectedly code=${code}`,
+        );
         opts.onExit?.(code);
       }
     });
@@ -94,9 +99,13 @@ export class LspClient {
     );
 
     // Some servers send window/logMessage; route to console for debugging.
-    this.connection.onNotification("window/logMessage", (params: { type: number; message: string }) => {
-      if (params.type <= 2) console.error(`[lsp:${this.languageId}]`, params.message);
-    });
+    this.connection.onNotification(
+      "window/logMessage",
+      (params: { type: number; message: string }) => {
+        if (params.type <= 2)
+          console.error(`[lsp:${this.languageId}]`, params.message);
+      },
+    );
     // Discard window/showMessage and telemetry/event — they are noisy.
     this.connection.onNotification("window/showMessage", () => {});
     this.connection.onNotification("telemetry/event", () => {});
@@ -121,7 +130,11 @@ export class LspClient {
       workspaceFolders: [{ uri: rootUri, name: "workspace" }],
       capabilities: {
         textDocument: {
-          synchronization: { didSave: false, willSave: false, dynamicRegistration: false },
+          synchronization: {
+            didSave: false,
+            willSave: false,
+            dynamicRegistration: false,
+          },
           hover: { contentFormat: ["markdown", "plaintext"] },
           definition: { linkSupport: false },
           signatureHelp: {
@@ -167,7 +180,12 @@ export class LspClient {
     }
     this.openDocs.set(uri, 1);
     this.connection.sendNotification("textDocument/didOpen", {
-      textDocument: { uri, languageId: this.languageId, version: 1, text: content },
+      textDocument: {
+        uri,
+        languageId: this.languageId,
+        version: 1,
+        text: content,
+      },
     });
   }
 
@@ -176,7 +194,9 @@ export class LspClient {
     if (!this.openDocs.has(uri)) return;
     this.openDocs.delete(uri);
     this.diagnosticsByUri.delete(uri);
-    this.connection.sendNotification("textDocument/didClose", { textDocument: { uri } });
+    this.connection.sendNotification("textDocument/didClose", {
+      textDocument: { uri },
+    });
   }
 
   isOpen(filePath: string): boolean {
@@ -192,7 +212,10 @@ export class LspClient {
    * Resolves immediately if diagnostics were already received. Otherwise resolves
    * when the next publishDiagnostics arrives for the URI, or on timeout.
    */
-  waitForDiagnostics(filePath: string, timeoutMs = 3000): Promise<Diagnostic[]> {
+  waitForDiagnostics(
+    filePath: string,
+    timeoutMs = 3000,
+  ): Promise<Diagnostic[]> {
     const uri = filePathToUri(filePath);
     const existing = this.diagnosticsByUri.get(uri);
     if (existing) return Promise.resolve(existing);
@@ -213,7 +236,10 @@ export class LspClient {
         this.diagnosticsWaiters.set(uri, set);
       }
       set.add(finish);
-      const timer = setTimeout(() => finish(this.diagnosticsByUri.get(uri) ?? []), timeoutMs);
+      const timer = setTimeout(
+        () => finish(this.diagnosticsByUri.get(uri) ?? []),
+        timeoutMs,
+      );
     });
   }
 
@@ -241,10 +267,13 @@ export class LspClient {
     position: Position,
   ): Promise<SignatureHelp | null> {
     await this.starting;
-    return this.connection.sendRequest<SignatureHelp | null>("textDocument/signatureHelp", {
-      textDocument: { uri: filePathToUri(filePath) },
-      position,
-    });
+    return this.connection.sendRequest<SignatureHelp | null>(
+      "textDocument/signatureHelp",
+      {
+        textDocument: { uri: filePathToUri(filePath) },
+        position,
+      },
+    );
   }
 
   async references(
@@ -253,11 +282,14 @@ export class LspClient {
     includeDeclaration = true,
   ): Promise<Location[] | null> {
     await this.starting;
-    return this.connection.sendRequest<Location[] | null>("textDocument/references", {
-      textDocument: { uri: filePathToUri(filePath) },
-      position,
-      context: { includeDeclaration },
-    });
+    return this.connection.sendRequest<Location[] | null>(
+      "textDocument/references",
+      {
+        textDocument: { uri: filePathToUri(filePath) },
+        position,
+        context: { includeDeclaration },
+      },
+    );
   }
 
   async documentSymbols(
@@ -291,7 +323,9 @@ export class LspClient {
     this.connection.dispose();
     try {
       this.proc.kill();
-    } catch {}
+    } catch {
+      // Process may already be dead — nothing else to do here.
+    }
   }
 }
 

@@ -5,9 +5,21 @@ import { useKeyboardShortcuts } from "@/shared/components/keyboard-shortcuts-pro
 import { SHORTCUT_LABELS } from "@/shared/lib/keyboard-shortcuts"
 
 const HINTS = [
-  { action: "new_thread", icon: MessageSquarePlus, description: "Start a fresh conversation" } as const,
-  { action: "open_command_palette", icon: Search, description: "Jump to any action or file" } as const,
-  { action: "new_workspace", icon: FolderPlus, description: "Open a local or remote repo" } as const,
+  {
+    action: "new_thread",
+    icon: MessageSquarePlus,
+    description: "Start a fresh conversation",
+  } as const,
+  {
+    action: "open_command_palette",
+    icon: Search,
+    description: "Jump to any action or file",
+  } as const,
+  {
+    action: "new_workspace",
+    icon: FolderPlus,
+    description: "Open a local or remote repo",
+  } as const,
 ]
 
 export function TabsEmptyState() {
@@ -31,12 +43,16 @@ export function TabsEmptyState() {
             key={action}
             className={`group flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-accent/50 ${i !== 0 ? "border-t" : ""}`}
           >
-            <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/8 text-primary/70 group-hover:bg-primary/12 transition-colors">
+            <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/8 text-primary/70 transition-colors group-hover:bg-primary/12">
               <Icon className="size-3.5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-2xs font-medium text-foreground/80">{SHORTCUT_LABELS[action]}</p>
-              <p className="truncate text-3xs text-muted-foreground">{description}</p>
+              <p className="text-2xs font-medium text-foreground/80">
+                {SHORTCUT_LABELS[action]}
+              </p>
+              <p className="truncate text-3xs text-muted-foreground">
+                {description}
+              </p>
             </div>
             <ShortcutKbd binding={shortcuts[action]} />
           </div>

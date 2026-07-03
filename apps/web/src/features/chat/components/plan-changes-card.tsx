@@ -29,7 +29,11 @@ export const PlanChangesCard = memo(function PlanChangesCard({
   const planFiles = useMemo(() => {
     if (turn.files.length === 0) return null
     const all = turn.files.map((f) => f.filePath.replace(/\\/g, "/"))
-    if (!all.every((p) => p.startsWith(PLAN_DIR_PREFIX) && p.toLowerCase().endsWith(".md"))) {
+    if (
+      !all.every(
+        (p) => p.startsWith(PLAN_DIR_PREFIX) && p.toLowerCase().endsWith(".md")
+      )
+    ) {
       return null
     }
     return all
@@ -46,7 +50,9 @@ export const PlanChangesCard = memo(function PlanChangesCard({
           </div>
           <div className="min-w-0 flex-1">
             <SectionLabel className="block text-amber-700 dark:text-amber-400">
-              {planFiles.length === 1 ? "Plan ready" : `${planFiles.length} plans ready`}
+              {planFiles.length === 1
+                ? "Plan ready"
+                : `${planFiles.length} plans ready`}
             </SectionLabel>
             <ul className="mt-1.5 flex flex-col gap-1">
               {planFiles.map((rel) => {
@@ -56,7 +62,10 @@ export const PlanChangesCard = memo(function PlanChangesCard({
                     key={rel}
                     className="flex items-center gap-1.5 text-xs text-foreground/80"
                   >
-                    <FileIcon filename={fileName} className="size-3 shrink-0 opacity-70" />
+                    <FileIcon
+                      filename={fileName}
+                      className="size-3 shrink-0 opacity-70"
+                    />
                     <span className="truncate font-mono">{rel}</span>
                   </li>
                 )

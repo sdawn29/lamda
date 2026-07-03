@@ -10,8 +10,7 @@ import type { SdkConfig } from "./types.js";
  * Default prompt template for thread title generation.
  * `{message}` is replaced with the first user message.
  */
-export const DEFAULT_TITLE_PROMPT =
-  `Generate a short, descriptive thread title (3–6 words) for a conversation that starts with this message:\n\n"{message}"\n\nReply with ONLY the title. No quotes, no punctuation at the end.`;
+export const DEFAULT_TITLE_PROMPT = `Generate a short, descriptive thread title (3–6 words) for a conversation that starts with this message:\n\n"{message}"\n\nReply with ONLY the title. No quotes, no punctuation at the end.`;
 
 /**
  * Uses the Pi SDK to generate a short, descriptive thread title
@@ -24,7 +23,7 @@ export const DEFAULT_TITLE_PROMPT =
 export async function generateThreadTitle(
   message: string,
   config: SdkConfig = {},
-  promptTemplate?: string
+  promptTemplate?: string,
 ): Promise<string> {
   const template = promptTemplate?.trim() || DEFAULT_TITLE_PROMPT;
   const authStorage = buildAuthStorage(config);

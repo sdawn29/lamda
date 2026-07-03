@@ -95,7 +95,10 @@ export function ApprovalModeCombobox({
             title={selectedOption.label}
             className={cn(selectedOption.triggerBg)}
           >
-            <span data-icon="inline-start" className={selectedOption.iconAccent}>
+            <span
+              data-icon="inline-start"
+              className={selectedOption.iconAccent}
+            >
               {selectedOption.icon}
             </span>
             <span

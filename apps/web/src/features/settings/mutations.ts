@@ -31,11 +31,15 @@ export function useUpdateAppSetting() {
     mutationFn: ({ key, value }: { key: string; value: string }) =>
       updateAppSetting(key, value),
     onMutate: async ({ key, value }) => {
-      const prev = queryClient.getQueryData<Record<string, string>>(appSettingsQueryKey)
-      queryClient.setQueryData<Record<string, string>>(appSettingsQueryKey, (current) => ({
-        ...(current ?? {}),
-        [key]: value,
-      }))
+      const prev =
+        queryClient.getQueryData<Record<string, string>>(appSettingsQueryKey)
+      queryClient.setQueryData<Record<string, string>>(
+        appSettingsQueryKey,
+        (current) => ({
+          ...(current ?? {}),
+          [key]: value,
+        })
+      )
       return { prev }
     },
     onError: (_err, _vars, context) => {
@@ -107,7 +111,12 @@ export function useUpdateMemory() {
       fields,
     }: {
       id: string
-      fields: { title?: string; content?: string; category?: string | null; pinned?: boolean }
+      fields: {
+        title?: string
+        content?: string
+        category?: string | null
+        pinned?: boolean
+      }
     }) => updateMemoryApi(id, fields),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: memoriesQueryKey })

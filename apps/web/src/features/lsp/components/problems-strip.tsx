@@ -22,8 +22,12 @@ export function ProblemsStrip({
   const [expanded, setExpanded] = useState(false)
   if (diagnostics.length === 0) return null
 
-  const errors = diagnostics.filter((d) => (d.severity ?? 1) === SEVERITY_ERROR).length
-  const warnings = diagnostics.filter((d) => d.severity === SEVERITY_WARNING).length
+  const errors = diagnostics.filter(
+    (d) => (d.severity ?? 1) === SEVERITY_ERROR
+  ).length
+  const warnings = diagnostics.filter(
+    (d) => d.severity === SEVERITY_WARNING
+  ).length
   const infos = diagnostics.length - errors - warnings
   const atBottom = position === "bottom"
 
@@ -61,7 +65,7 @@ export function ProblemsStrip({
     <ul
       className={cn(
         "max-h-48 overflow-auto bg-background/50",
-        atBottom ? "border-b" : "border-t",
+        atBottom ? "border-b" : "border-t"
       )}
     >
       {diagnostics.map((d, i) => (
@@ -72,7 +76,7 @@ export function ProblemsStrip({
             className={cn(
               "flex w-full items-start gap-2 px-3 py-1 text-left hover:bg-muted/40",
               (d.severity ?? 1) === SEVERITY_ERROR && "text-destructive",
-              d.severity === SEVERITY_WARNING && "text-amber-500",
+              d.severity === SEVERITY_WARNING && "text-amber-500"
             )}
           >
             <span className="shrink-0 font-mono text-muted-foreground">
@@ -80,7 +84,9 @@ export function ProblemsStrip({
             </span>
             <span className="break-all">{d.message}</span>
             {d.source && (
-              <span className="ml-auto shrink-0 text-muted-foreground">{d.source}</span>
+              <span className="ml-auto shrink-0 text-muted-foreground">
+                {d.source}
+              </span>
             )}
           </button>
         </li>
@@ -94,7 +100,7 @@ export function ProblemsStrip({
         "bg-muted/10 text-xs",
         atBottom
           ? "mx-2 mb-2 overflow-hidden rounded-lg border border-border/50 shadow-sm"
-          : "border-b",
+          : "border-b"
       )}
     >
       {atBottom ? (

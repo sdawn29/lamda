@@ -1,3 +1,5 @@
+import { Broadcaster } from "./lib/broadcaster.js";
+
 /**
  * Thread status aligned with PI SDK AgentState.isStreaming.
  *
@@ -31,26 +33,19 @@ export type ThreadStatusEvent = {
   status: ThreadStatus;
 } & ThreadStatusContext;
 
-type Subscriber = (event: ThreadStatusEvent) => void;
-
 class ThreadStatusBroadcaster {
-  private subscribers = new Set<Subscriber>();
+  private inner = new Broadcaster<[ThreadStatusEvent]>();
 
-  subscribe(fn: Subscriber): () => void {
-    this.subscribers.add(fn);
-    return () => this.subscribers.delete(fn);
+  subscribe(fn: (event: ThreadStatusEvent) => void): () => void {
+    return this.inner.subscribe(fn);
   }
 
   broadcast(
     threadId: string,
     status: ThreadStatus,
     context: ThreadStatusContext = {},
-  ) {
-    for (const fn of this.subscribers) {
-      try {
-        fn({ threadId, status, ...context });
-      } catch {}
-    }
+  ): void {
+    this.inner.broadcast({ threadId, status, ...context });
   }
 }
 

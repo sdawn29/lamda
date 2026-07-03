@@ -47,7 +47,6 @@ interface BranchSelectorProps {
   disabledReason?: string
 }
 
-
 export function BranchSelector({
   branch,
   branches,

@@ -80,7 +80,6 @@ interface WorktreeSelectorProps {
   onError?: (message: string) => void
 }
 
-
 /** Surfaces the outcome of a completed worktree merge as a toast. */
 function notifyMergeDone(result: {
   branch?: string | null

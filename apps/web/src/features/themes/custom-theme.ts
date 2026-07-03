@@ -208,9 +208,9 @@ if (import.meta.env.DEV) {
   const missing = THEME_COLOR_KEYS.filter((k) => !grouped.includes(k))
   const extra = grouped.filter((k) => !THEME_COLOR_KEYS.includes(k))
   if (missing.length || extra.length) {
-    console.error(
-      "[themes] TOKEN_GROUPS out of sync with THEME_COLOR_KEYS.",
-      { missing, extra }
-    )
+    console.error("[themes] TOKEN_GROUPS out of sync with THEME_COLOR_KEYS.", {
+      missing,
+      extra,
+    })
   }
 }

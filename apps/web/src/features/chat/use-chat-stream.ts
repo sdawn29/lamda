@@ -26,23 +26,9 @@ import { createErrorMessage, blocksToMessages } from "./types"
 import type { ErrorMessage, Message, UserMessage, MessageBlock } from "./types"
 import { useSetThreadStatus, useThreadStatusStore } from "./thread-status-store"
 import { hasPendingPrompt, clearPendingPrompt } from "./pending-prompts"
-import { gitStatusKey, gitKeys } from "@/features/git/queries"
-
-const FILE_MODIFYING_TOOLS = new Set([
-  "write", "edit", "create", "delete", "replace", "move", "copy",
-  "writefile", "write_file", "editfile", "edit_file", "createfile", "create_file",
-  "bash", "shell",
-])
-
-function isFileModifyingTool(toolName: string): boolean {
-  if (FILE_MODIFYING_TOOLS.has(toolName.toLowerCase())) return true
-  const lower = toolName.toLowerCase()
-  return lower.includes("write") || lower.includes("edit") ||
-    lower.includes("create") || lower.includes("delete") ||
-    lower.includes("mkdir") || lower.includes("move") ||
-    lower.includes("copy") || lower.includes("bash") ||
-    lower.includes("shell")
-}
+import { gitKeys } from "@/features/git/queries"
+import { workspaceKeys, modeKeys } from "@/features/workspace/queries"
+import { reconcileOptimisticUserMessages } from "./lib/stream-reducer"
 
 interface UseChatStreamOptions {
   sessionId: string
@@ -51,8 +37,16 @@ interface UseChatStreamOptions {
   /** Thinking level for a prompt already sent from the new-thread view (never flowed through startUserPrompt). */
   initialPendingThinkingLevel?: string
   onPlanSaved?: (event: { filePath: string; relativePath: string }) => void
-  onToolApprovalRequest?: (event: { toolCallId: string; toolName: string; input: Record<string, unknown>; scopeLabel: string }) => void
-  onToolApprovalResolved?: (event: { toolCallId: string; decision: "once" | "always" | "never" | "reject" }) => void
+  onToolApprovalRequest?: (event: {
+    toolCallId: string
+    toolName: string
+    input: Record<string, unknown>
+    scopeLabel: string
+  }) => void
+  onToolApprovalResolved?: (event: {
+    toolCallId: string
+    decision: "once" | "always" | "never" | "reject"
+  }) => void
 }
 
 interface UseChatStreamResult {
@@ -71,10 +65,11 @@ interface UseChatStreamResult {
   startUserPrompt: (
     text: string,
     thinkingLevel?: string,
-    attachments?: UserMessage["attachments"]
+    attachments?: UserMessage["attachments"],
+    clientId?: string
   ) => void
   /** Optimistically append a steering message to the transcript while the agent is running. */
-  steerPrompt: (text: string) => void
+  steerPrompt: (text: string, clientId?: string) => void
   markStopped: () => void
   markSendFailed: () => void
   dismissError: (id: string) => void
@@ -96,8 +91,12 @@ export function useChatStream({
   const queryClient = useQueryClient()
   const [isStopped, setIsStopped] = useState(initialIsStopped)
   const [isCompacting, setIsCompacting] = useState(false)
-  const [compactionReason, setCompactionReason] = useState<"manual" | "threshold" | "overflow" | null>(null)
-  const [pendingError, setPendingError] = useState<ReturnType<typeof createErrorMessage> | null>(null)
+  const [compactionReason, setCompactionReason] = useState<
+    "manual" | "threshold" | "overflow" | null
+  >(null)
+  const [pendingError, setPendingError] = useState<ReturnType<
+    typeof createErrorMessage
+  > | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [queuedCount, setQueuedCount] = useState(0)
 
@@ -206,8 +205,15 @@ export function useChatStream({
     setIsCompacting(sessionStatus.isCompacting)
     setCompactionReason(sessionStatus.compactionReason)
     if (sessionStatus.pendingError) {
-      const { title, message, retryable, retryCount } = sessionStatus.pendingError
-      setPendingError(createErrorMessage(title, message, { retryable, retryCount, action: { type: "dismiss" } }))
+      const { title, message, retryable, retryCount } =
+        sessionStatus.pendingError
+      setPendingError(
+        createErrorMessage(title, message, {
+          retryable,
+          retryCount,
+          action: { type: "dismiss" },
+        })
+      )
       setThreadStatus(threadId, "error")
     }
 
@@ -240,7 +246,14 @@ export function useChatStream({
         resyncMessages()
       }
     }
-  }, [sessionStatus, setThreadStatus, threadId, queryClient, sessionId, resyncMessages])
+  }, [
+    sessionStatus,
+    setThreadStatus,
+    threadId,
+    queryClient,
+    sessionId,
+    resyncMessages,
+  ])
 
   const {
     messages,
@@ -260,9 +273,12 @@ export function useChatStream({
     if (!loading) setQueuedCount(0)
   }, [])
 
-  const handleQueueUpdate = useCallback((event: { steering: number; followUp: number }) => {
-    setQueuedCount(event.steering + event.followUp)
-  }, [])
+  const handleQueueUpdate = useCallback(
+    (event: { steering: number; followUp: number }) => {
+      setQueuedCount(event.steering + event.followUp)
+    },
+    []
+  )
 
   // All errors reaching this callback are from live events (no replay); mark
   // the thread as error unconditionally.
@@ -270,32 +286,24 @@ export function useChatStream({
     setThreadStatus(threadId, "error")
   }, [setThreadStatus, threadId])
 
-  const handleToolExecutionEnd = useCallback((toolName: string) => {
-    const modifiesFiles = isFileModifyingTool(toolName)
+  // The server's turn_file_changed event (handled in useSessionStream's
+  // onTurnFileChanged) already diffs real git status before/after every tool
+  // call and invalidates git status/turns/diff-stat precisely — it's driven by
+  // what actually changed on disk, not by guessing which tools modify files.
+  // So this only needs the cheap, always-safe invalidations for every tool.
+  const handleToolExecutionEnd = useCallback(() => {
     // Skip per-file diffs (key[3] === "diff") — N active observers all refetching
     // on every tool execution end creates a request burst. Diffs are lazily
     // refreshed when the user expands a file or the statusCode changes.
-    // Also skip git status when it's force-refetched below — invalidating it
-    // here too would cancel that in-flight request and fetch twice.
     void queryClient.invalidateQueries({
       queryKey: gitKeys.session(sessionId),
-      predicate: (query) => {
-        const part = (query.queryKey as unknown[])[3]
-        if (part === "diff") return false
-        if (modifiesFiles && part === "status") return false
-        return true
-      },
+      predicate: (query) => (query.queryKey as unknown[])[3] !== "diff",
     })
-    if (modifiesFiles) {
-      void queryClient.refetchQueries({ queryKey: gitStatusKey(sessionId) })
-      void queryClient.refetchQueries({ queryKey: ["file-tree"] })
-      // A file write may have created/edited a `.lamda/modes/*.md` file (e.g.
-      // via the create-mode skill). The server already reads modes fresh from
-      // disk, so just refetch the picker's list to surface it without a restart.
-      void queryClient.invalidateQueries({ queryKey: ["modes"] })
-    } else {
-      void queryClient.invalidateQueries({ queryKey: ["file-tree"] })
-    }
+    void queryClient.invalidateQueries({ queryKey: workspaceKeys.dirAll })
+    // A file write may have created/edited a `.lamda/modes/*.md` file (e.g. via
+    // the create-mode skill). The server already reads modes fresh from disk,
+    // so just refetch the picker's list to surface it without a restart.
+    void queryClient.invalidateQueries({ queryKey: modeKeys.all })
   }, [queryClient, sessionId])
 
   // Connect to WebSocket stream
@@ -315,10 +323,18 @@ export function useChatStream({
 
   // When a new thread is created from new-thread-view, the prompt is sent
   // directly to the server (not through startUserPrompt), so pendingThinkingLevelRef
-  // is never seeded. Seed it here so onMessageStart picks up the correct level.
-  if (optimisticRunning && initialPendingThinkingLevel != null && pendingThinkingLevelRef.current === null) {
+  // is never seeded. Seed it here — during render, not an effect — so the ref is
+  // populated before the WS stream's onMessageStart handler can read it; an effect
+  // would run too late for the first message of an already-in-flight prompt.
+  /* eslint-disable react-hooks/refs, react-compiler/react-compiler -- intentional render-phase ref read/seed, see comment above */
+  if (
+    optimisticRunning &&
+    initialPendingThinkingLevel != null &&
+    pendingThinkingLevelRef.current === null
+  ) {
     pendingThinkingLevelRef.current = initialPendingThinkingLevel
   }
+  /* eslint-enable react-hooks/refs, react-compiler/react-compiler */
 
   // After the agent finishes, replace optimistic user-message placeholders (no
   // DB id) with server-persisted versions so fork/revert blockIds appear.
@@ -336,36 +352,20 @@ export function useChatStream({
       listMessages(sessionId, { limit: MESSAGES_PAGE_SIZE })
         .then(({ blocks }) => {
           const serverMessages = blocksToMessages(blocks as MessageBlock[])
-          // Build a content-keyed map of server user messages that now have DB ids.
-          const serverUserByContent = new Map<string, UserMessage>()
-          for (const m of serverMessages) {
-            if (m.role === "user" && (m as UserMessage).id) {
-              serverUserByContent.set((m as UserMessage).content, m as UserMessage)
-            }
-          }
-          if (serverUserByContent.size === 0) return
-
           // Patch only the last (most-recent) page — older pages stay intact.
           queryClient.setQueryData<MessagesInfiniteData>(
             messagesQueryKey(sessionId),
             (prev) =>
               updateLastPageMessages(prev, (msgs) =>
-                msgs.map((msg): Message => {
-                  if (msg.role !== "user" || (msg as UserMessage).id) return msg
-                  const persisted = serverUserByContent.get((msg as UserMessage).content)
-                  // Carry the optimistic row's clientId onto the persisted row so
-                  // its React key stays constant — the row reconciles in place
-                  // (gaining its id/createdAt) instead of remounting.
-                  return persisted
-                    ? { ...persisted, clientId: (msg as UserMessage).clientId }
-                    : msg
-                })
+                reconcileOptimisticUserMessages(msgs, serverMessages)
               )
           )
         })
         .catch(() => {
           // Fall back to a full invalidation if the fetch fails.
-          void queryClient.invalidateQueries({ queryKey: messagesQueryKey(sessionId) })
+          void queryClient.invalidateQueries({
+            queryKey: messagesQueryKey(sessionId),
+          })
         })
     }, 750)
     return () => clearTimeout(timer)
@@ -379,39 +379,59 @@ export function useChatStream({
 
   // Append a user message to the transcript immediately, deduping against an
   // identical trailing user row (guards against double-fires from retry paths).
+  // Steering passes allowDuplicate: true — sending the same steering text twice
+  // (e.g. "continue") is a legitimate repeat, not a double-fire, and skipping
+  // the append would desync the transcript from what was actually sent.
+  //
+  // `opts.clientId`, when passed, must be the SAME id the caller sends to the
+  // server (see startUserPrompt/steerPrompt below) — that's what lets the
+  // post-turn reconciliation effect above match this row to its persisted
+  // counterpart by identity instead of by content.
   const appendOptimisticUserMessage = useCallback(
-    (text: string, attachments?: UserMessage["attachments"]) => {
+    (
+      text: string,
+      attachments?: UserMessage["attachments"],
+      opts?: { allowDuplicate?: boolean; clientId?: string }
+    ) => {
       const userMessage: Message = {
         role: "user",
         content: text,
         attachments,
-        clientId: crypto.randomUUID(),
+        clientId: opts?.clientId ?? crypto.randomUUID(),
       }
-      queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
-        updateLastPageMessages(prev, (current) => {
-          const lastMsg = current[current.length - 1]
-          if (
-            current.length > 0 &&
-            lastMsg.role === "user" &&
-            (lastMsg as Message & { content?: string }).content === text &&
-            !attachments
-          ) {
-            return current
-          }
-          return [...current, userMessage]
-        })
+      queryClient.setQueryData<MessagesInfiniteData>(
+        messagesQueryKey(sessionId),
+        (prev) =>
+          updateLastPageMessages(prev, (current) => {
+            const lastMsg = current[current.length - 1]
+            if (
+              !opts?.allowDuplicate &&
+              current.length > 0 &&
+              lastMsg.role === "user" &&
+              (lastMsg as Message & { content?: string }).content === text &&
+              !attachments
+            ) {
+              return current
+            }
+            return [...current, userMessage]
+          })
       )
     },
     [queryClient, sessionId]
   )
 
   const startUserPrompt = useCallback(
-    (text: string, thinkingLevel?: string, attachments?: UserMessage["attachments"]) => {
+    (
+      text: string,
+      thinkingLevel?: string,
+      attachments?: UserMessage["attachments"],
+      clientId?: string
+    ) => {
       setIsStopped(false)
       setIsLoading(true)
       lastPromptRef.current = { text, thinkingLevel }
       pendingThinkingLevelRef.current = thinkingLevel ?? null
-      appendOptimisticUserMessage(text, attachments)
+      appendOptimisticUserMessage(text, attachments, { clientId })
     },
     [appendOptimisticUserMessage, lastPromptRef, pendingThinkingLevelRef]
   )
@@ -421,9 +441,12 @@ export function useChatStream({
   // owns those, and the SDK delivers this message into the current turn. The
   // "queued" count is driven by queue_update events from the server.
   const steerPrompt = useCallback(
-    (text: string) => {
+    (text: string, clientId?: string) => {
       setQueuedCount((n) => n + 1)
-      appendOptimisticUserMessage(text)
+      appendOptimisticUserMessage(text, undefined, {
+        allowDuplicate: true,
+        clientId,
+      })
     },
     [appendOptimisticUserMessage]
   )
@@ -441,28 +464,39 @@ export function useChatStream({
   const markSendFailed = useCallback(() => {
     setIsLoading(false)
     setPendingError(
-      createErrorMessage("Send failed", "Failed to send message. Please try again.", {
-        retryable: true,
-        action: lastPromptRef.current
-          ? {
-              type: "retry",
-              prompt: lastPromptRef.current.text,
-              thinkingLevel: lastPromptRef.current.thinkingLevel,
-            }
-          : { type: "dismiss" },
-      })
+      createErrorMessage(
+        "Send failed",
+        "Failed to send message. Please try again.",
+        {
+          retryable: true,
+          action: lastPromptRef.current
+            ? {
+                type: "retry",
+                prompt: lastPromptRef.current.text,
+                thinkingLevel: lastPromptRef.current.thinkingLevel,
+              }
+            : { type: "dismiss" },
+        }
+      )
     )
   }, [lastPromptRef])
 
   const dismissError = useCallback(
     (id: string) => {
-      queryClient.setQueryData<MessagesInfiniteData>(messagesQueryKey(sessionId), (prev) =>
-        updateLastPageMessages(prev, (msgs) =>
-          msgs.filter((m): boolean => !(m.role === "error" && (m as ErrorMessage).id === id))
-        )
+      queryClient.setQueryData<MessagesInfiniteData>(
+        messagesQueryKey(sessionId),
+        (prev) =>
+          updateLastPageMessages(prev, (msgs) =>
+            msgs.filter(
+              (m): boolean =>
+                !(m.role === "error" && (m as ErrorMessage).id === id)
+            )
+          )
       )
       setPendingError((prev) => (prev?.id === id ? null : prev))
-      dismissSessionError(sessionId).catch(() => { /* best-effort */ })
+      dismissSessionError(sessionId).catch(() => {
+        /* best-effort */
+      })
     },
     [queryClient, sessionId]
   )

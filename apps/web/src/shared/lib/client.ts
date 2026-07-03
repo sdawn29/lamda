@@ -109,11 +109,14 @@ export async function apiFetch<T>(
   init?: RequestInit
 ): Promise<T> {
   const base = await getServerUrl()
-  
+
   // Create abort controller for timeout
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS)
-  
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    DEFAULT_REQUEST_TIMEOUT_MS
+  )
+
   // Merge signals if parent signal provided
   let signal: AbortSignal | undefined = controller.signal
   if (init?.signal) {
@@ -121,7 +124,9 @@ export async function apiFetch<T>(
     // If either aborts, the request should be cancelled
     signal = anySignal([init.signal, controller.signal])
     // When parent aborts, clear the timeout to avoid unnecessary abort
-    init.signal.addEventListener("abort", () => clearTimeout(timeoutId), { once: true })
+    init.signal.addEventListener("abort", () => clearTimeout(timeoutId), {
+      once: true,
+    })
   }
 
   // Attach the bearer token (resolved during getServerUrl above) without
@@ -143,7 +148,10 @@ export async function apiFetch<T>(
       }
       // Check if it's a timeout error
       if (err.message?.includes("abort") || err.message?.includes("timeout")) {
-        throw new Error(`Request timeout (${DEFAULT_REQUEST_TIMEOUT_MS / 1000}s)`, { cause: err })
+        throw new Error(
+          `Request timeout (${DEFAULT_REQUEST_TIMEOUT_MS / 1000}s)`,
+          { cause: err }
+        )
       }
     }
     throw new ServerUnreachableError(
@@ -153,9 +161,9 @@ export async function apiFetch<T>(
       { cause: err }
     )
   }
-  
+
   clearTimeout(timeoutId)
-  
+
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
     // Prefer the server's structured `{ error }` message when present, so
@@ -164,7 +172,9 @@ export async function apiFetch<T>(
     try {
       const parsed = JSON.parse(text) as { error?: unknown }
       if (parsed && typeof parsed.error === "string") message = parsed.error
-    } catch {}
+    } catch {
+      // Not JSON — fall back to the raw response text already assigned above.
+    }
     throw new ApiError(res.status, message)
   }
   if (res.status === 204 || res.headers.get("content-length") === "0") {

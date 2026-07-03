@@ -14,7 +14,7 @@ React web UI layer — the primary user interface for the lamda desktop app, pro
 | Build     | `npm run build -w web`       |
 | Lint      | `npm run lint -w web`        |
 | Typecheck | `npm run check-types -w web` |
-| Preview   | `npm run preview -w web`    |
+| Preview   | `npm run preview -w web`     |
 
 ## Architecture
 
@@ -47,12 +47,12 @@ Each feature module follows a consistent structure with `api.ts`, `queries.ts`, 
 
 ### Routes (src/routes/)
 
-| File                  | Route                  | Purpose                                   |
-| --------------------- | ---------------------- | ----------------------------------------- |
-| `__root.tsx`          | `/`                    | Root layout with sidebar, workspace list  |
-| `index.tsx`           | `/`                    | Redirects to last active thread           |
-| `workspace.$threadId` | `/workspace/:threadId` | Main workspace view with chat/diff/tree   |
-| `settings.tsx`        | `/settings`            | Settings page route                       |
+| File                  | Route                  | Purpose                                  |
+| --------------------- | ---------------------- | ---------------------------------------- |
+| `__root.tsx`          | `/`                    | Root layout with sidebar, workspace list |
+| `index.tsx`           | `/`                    | Redirects to last active thread          |
+| `workspace.$threadId` | `/workspace/:threadId` | Main workspace view with chat/diff/tree  |
+| `settings.tsx`        | `/settings`            | Settings page route                      |
 
 ## Key Files
 

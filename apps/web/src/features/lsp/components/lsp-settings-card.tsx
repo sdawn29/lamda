@@ -196,7 +196,10 @@ function LanguageRow({
             !entry.available && "opacity-60 saturate-50"
           )}
         >
-          <FileIcon filename={`file.${entry.extensions[0]}`} className="size-5" />
+          <FileIcon
+            filename={`file.${entry.extensions[0]}`}
+            className="size-5"
+          />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">

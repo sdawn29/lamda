@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 import type { QueryClient } from "@tanstack/react-query"
 import { chatKeys } from "../queries"
 import type { getChatSyncEngine } from "./use-chat-sync-engine"
@@ -44,7 +50,10 @@ function findScrollAnchor(
   for (const g of groups) {
     const rect = g.getBoundingClientRect()
     if (rect.bottom > viewportTop) {
-      return { groupKey: g.dataset.groupKey ?? "", offset: rect.top - viewportTop }
+      return {
+        groupKey: g.dataset.groupKey ?? "",
+        offset: rect.top - viewportTop,
+      }
     }
   }
   return null

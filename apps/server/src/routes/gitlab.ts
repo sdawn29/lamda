@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { z } from "zod";
 import { GlabError } from "@lamda/gitlab";
 import {
   gl,
@@ -7,8 +8,29 @@ import {
   workspaceCwd,
   anyRepoCwd,
 } from "../services/gitlab-service.js";
+import { parseJsonBody } from "../lib/validate.js";
 
 const gitlab = new Hono();
+
+const repoContextSchema = z.object({
+  id: z.string().optional(),
+  ws: z.string().optional(),
+  path: z.string().optional(),
+});
+
+const publishRepoSchema = repoContextSchema.extend({
+  name: z.string().optional(),
+  visibility: z.string().optional(),
+});
+
+const createMrSchema = repoContextSchema.extend({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  targetBranch: z.string().optional(),
+  sourceBranch: z.string().optional(),
+  draft: z.boolean().optional(),
+  removeSourceBranch: z.boolean().optional(),
+});
 
 function resolveCwd(c: Context): string | null {
   const id = c.req.query("id");
@@ -74,13 +96,9 @@ gitlab.get("/gitlab/repositories", async (c) => {
 });
 
 gitlab.post("/gitlab/repo/publish", async (c) => {
-  const body = await c.req.json<{
-    id?: string;
-    ws?: string;
-    path?: string;
-    name?: string;
-    visibility?: gl.GitlabRepositoryVisibility;
-  }>();
+  const parsed = await parseJsonBody(c, publishRepoSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const cwd = resolveCwdFromBody(body);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   if (
@@ -90,10 +108,13 @@ gitlab.post("/gitlab/repo/publish", async (c) => {
   ) {
     return c.json({ error: "Invalid visibility" }, 400);
   }
+  const visibility = body.visibility as
+    | gl.GitlabRepositoryVisibility
+    | undefined;
   try {
     const repo = await gl.publishRepository(cwd, {
       name: body.name,
-      visibility: body.visibility,
+      visibility,
     });
     return c.json({ repo }, 201);
   } catch (err) {
@@ -117,17 +138,9 @@ gitlab.get("/gitlab/mrs", async (c) => {
 });
 
 gitlab.post("/gitlab/mrs", async (c) => {
-  const body = await c.req.json<{
-    id?: string;
-    ws?: string;
-    path?: string;
-    title?: string;
-    description?: string;
-    targetBranch?: string;
-    sourceBranch?: string;
-    draft?: boolean;
-    removeSourceBranch?: boolean;
-  }>();
+  const parsed = await parseJsonBody(c, createMrSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const cwd = resolveCwdFromBody(body);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   if (!body.title?.trim()) return c.json({ error: "title is required" }, 400);

@@ -42,7 +42,10 @@ export interface MarkupContent {
 export type HoverContents =
   | string
   | MarkupContent
-  | Array<string | { kind: "markdown" | "plaintext"; value: string; language?: string }>
+  | Array<
+      | string
+      | { kind: "markdown" | "plaintext"; value: string; language?: string }
+    >
 
 export interface Hover {
   contents: HoverContents

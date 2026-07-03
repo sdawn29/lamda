@@ -13,7 +13,10 @@ interface CompactingIndicatorProps {
   reason?: CompactionReason | null
 }
 
-export function CompactingIndicator({ className, reason }: CompactingIndicatorProps) {
+export function CompactingIndicator({
+  className,
+  reason,
+}: CompactingIndicatorProps) {
   const label = reason ? REASON_LABEL[reason] : REASON_LABEL.threshold
 
   return (

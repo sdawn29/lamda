@@ -8,12 +8,12 @@ TanStack Router file-based routing configuration for the lamda web application. 
 
 ## Route Files
 
-| File | Route | Description |
-|------|-------|-------------|
-| `__root.tsx` | `/` | Root layout with global providers, theme, panel layout |
-| `index.tsx` | `/` | Landing page — redirects to last active thread or empty state |
-| `workspace.$threadId.tsx` | `/workspace/$threadId` | Thread workspace with chat view, git panel, terminal |
-| `settings.tsx` | `/settings` | Settings page route (redirects to modal in practice) |
+| File                      | Route                  | Description                                                   |
+| ------------------------- | ---------------------- | ------------------------------------------------------------- |
+| `__root.tsx`              | `/`                    | Root layout with global providers, theme, panel layout        |
+| `index.tsx`               | `/`                    | Landing page — redirects to last active thread or empty state |
+| `workspace.$threadId.tsx` | `/workspace/$threadId` | Thread workspace with chat view, git panel, terminal          |
+| `settings.tsx`            | `/settings`            | Settings page route (redirects to modal in practice)          |
 
 ## Root Layout (`__root.tsx`)
 
@@ -37,6 +37,7 @@ AppProviders wraps everything
 ## Workspace Route (`workspace.$threadId.tsx`)
 
 **Responsibilities:**
+
 - Sets active thread ID on mount (clears on unmount)
 - Loads workspace/thread from `useWorkspace()`
 - Registers tab via `useMainTabs()`
@@ -48,11 +49,13 @@ AppProviders wraps everything
 **URL parameter:** `$threadId` — must exist in workspace threads
 
 **Loading states:**
+
 - `isLoading` — initial data fetch
 - `isFetching` — background refetch
 - If thread not found after both settle → redirect to `/`
 
 **Key hooks used:**
+
 - `useWorkspace()` / `useWorkspaces()` — workspace data
 - `useReviewPanel()` — review panel context (set workspace path)
 - `useMainTabs()` — tab management

@@ -2,6 +2,9 @@ import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
 import { openGlobalWebSocket } from "./api"
 import { queryClient } from "@/shared/lib/query-client"
+import { gitKeys } from "@/features/git/queries"
+import { workspaceKeys, modeKeys } from "@/features/workspace/queries"
+import { automationKeys } from "@/features/automations/queries"
 
 export type ThreadStatus =
   | "streaming"
@@ -173,11 +176,11 @@ function handleGlobalMessage(e: MessageEvent): void {
       // The server auto-detached a thread from a worktree that was removed
       // out-of-band; refresh the thread list (holds worktreePath for the
       // selector) and all git/file views so cwd-scoped data re-reads.
-      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
-      void queryClient.invalidateQueries({ queryKey: ["git"] })
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
+      void queryClient.invalidateQueries({ queryKey: gitKeys.all })
       if (data.workspaceId) {
         queryClient.invalidateQueries({
-          queryKey: ["workspace-files", data.workspaceId],
+          queryKey: workspaceKeys.files(data.workspaceId),
         })
         for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
       }
@@ -186,9 +189,9 @@ function handleGlobalMessage(e: MessageEvent): void {
       // An automation was created/edited/deleted, or a run started/finished
       // (which may have created a dedicated thread). Refresh the automations
       // list, their run histories, and the workspace/thread tree.
-      void queryClient.invalidateQueries({ queryKey: ["automations"] })
-      void queryClient.invalidateQueries({ queryKey: ["automation-runs"] })
-      void queryClient.invalidateQueries({ queryKey: ["workspaces"] })
+      void queryClient.invalidateQueries({ queryKey: automationKeys.all })
+      void queryClient.invalidateQueries({ queryKey: automationKeys.runsAll })
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
     }
     if (data.type === "thread_status" && data.threadId && data.status) {
       const { setStatus, isThreadStreamed } = useThreadStatusStore.getState()
@@ -220,14 +223,14 @@ function handleGlobalMessage(e: MessageEvent): void {
       // Scoped delta: re-read just the one directory whose children changed.
       // Keyed by `root` (workspace or worktree path) to match the tree query.
       queryClient.invalidateQueries({
-        queryKey: ["workspace-dir", data.root, data.dir],
+        queryKey: workspaceKeys.dir(data.root, data.dir),
       })
     }
     if (data.type === "modes_changed") {
       // A mode file was added/edited/removed (global or workspace-local).
       // Refetch every mounted mode picker — each is keyed by workspace, and a
       // global mode is visible to all of them.
-      void queryClient.invalidateQueries({ queryKey: ["modes"] })
+      void queryClient.invalidateQueries({ queryKey: modeKeys.all })
     }
     if (data.type === "prompts_changed") {
       // A prompt file was added/edited/removed (global or workspace-local).
@@ -248,7 +251,7 @@ function handleGlobalMessage(e: MessageEvent): void {
     }
     if (data.type === "workspace_files_updated" && data.workspaceId) {
       queryClient.invalidateQueries({
-        queryKey: ["workspace-files", data.workspaceId],
+        queryKey: workspaceKeys.files(data.workspaceId),
       })
       for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
     }
@@ -263,7 +266,7 @@ function handleGlobalMessage(e: MessageEvent): void {
       // immutable once the next turn lands (its post-state is frozen), and the
       // in-progress turn's diff refreshes on re-expand (staleTime 0).
       void queryClient.invalidateQueries({
-        queryKey: ["git"],
+        queryKey: gitKeys.all,
         predicate: (query) => {
           const k = (query.queryKey as unknown[])[3]
           return k !== "diff" && k !== "turn-file-diff"

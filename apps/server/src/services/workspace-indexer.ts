@@ -115,12 +115,16 @@ class WorkspaceIndexer {
     if (state.watcher) {
       try {
         state.watcher.close();
-      } catch {}
+      } catch {
+        // Watcher may already be closed — nothing else to do here.
+      }
     }
     if (state.gitWatcher) {
       try {
         state.gitWatcher.close();
-      } catch {}
+      } catch {
+        // Watcher may already be closed — nothing else to do here.
+      }
     }
     this.workspaces.delete(workspaceId);
     // Shut down any LSP servers spawned for this workspace.

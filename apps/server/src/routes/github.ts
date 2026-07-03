@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { z } from "zod";
 import { GhError } from "@lamda/github";
 import { gitPushSetUpstream } from "@lamda/git";
 import {
@@ -8,8 +9,42 @@ import {
   workspaceCwd,
   anyRepoCwd,
 } from "../services/github-service.js";
+import { parseJsonBody } from "../lib/validate.js";
 
 const github = new Hono();
+
+const repoContextSchema = z.object({
+  id: z.string().optional(),
+  ws: z.string().optional(),
+  path: z.string().optional(),
+});
+
+const publishRepoSchema = repoContextSchema.extend({
+  name: z.string().optional(),
+  visibility: z.string().optional(),
+});
+
+const createPrSchema = repoContextSchema.extend({
+  title: z.string().optional(),
+  body: z.string().optional(),
+  base: z.string().optional(),
+  head: z.string().optional(),
+  draft: z.boolean().optional(),
+  push: z.boolean().optional(),
+});
+
+const mergePrSchema = repoContextSchema.extend({
+  method: z.string().optional(),
+});
+
+const createIssueSchema = repoContextSchema.extend({
+  title: z.string().optional(),
+  body: z.string().optional(),
+});
+
+const commentIssueSchema = repoContextSchema.extend({
+  body: z.string().optional(),
+});
 
 /**
  * Resolves the repo directory for a request. Callers pass one of:
@@ -71,13 +106,9 @@ github.get("/github/repositories", async (c) => {
 });
 
 github.post("/github/repo/publish", async (c) => {
-  const body = await c.req.json<{
-    id?: string;
-    ws?: string;
-    path?: string;
-    name?: string;
-    visibility?: gh.GhRepositoryVisibility;
-  }>();
+  const parsed = await parseJsonBody(c, publishRepoSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const cwd = resolveCwdFromBody(body);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   if (
@@ -87,10 +118,11 @@ github.post("/github/repo/publish", async (c) => {
   ) {
     return c.json({ error: "Invalid visibility" }, 400);
   }
+  const visibility = body.visibility as gh.GhRepositoryVisibility | undefined;
   try {
     const repo = await gh.publishRepository(cwd, {
       name: body.name,
-      visibility: body.visibility,
+      visibility,
     });
     return c.json({ repo }, 201);
   } catch (err) {
@@ -116,7 +148,8 @@ github.get("/github/prs/:number", async (c) => {
   const cwd = resolveCwd(c);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   const number = Number.parseInt(c.req.param("number"), 10);
-  if (!Number.isInteger(number)) return c.json({ error: "Invalid PR number" }, 400);
+  if (!Number.isInteger(number))
+    return c.json({ error: "Invalid PR number" }, 400);
   try {
     const pr = await gh.getPullRequest(cwd, number);
     return c.json({ pr });
@@ -126,17 +159,9 @@ github.get("/github/prs/:number", async (c) => {
 });
 
 github.post("/github/prs", async (c) => {
-  const body = await c.req.json<{
-    id?: string;
-    ws?: string;
-    path?: string;
-    title?: string;
-    body?: string;
-    base?: string;
-    head?: string;
-    draft?: boolean;
-    push?: boolean;
-  }>();
+  const parsed = await parseJsonBody(c, createPrSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const cwd = resolveCwdFromBody(body);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   if (!body.title?.trim()) return c.json({ error: "title is required" }, 400);
@@ -167,16 +192,16 @@ github.post("/github/prs", async (c) => {
 
 github.post("/github/prs/:number/merge", async (c) => {
   const number = Number.parseInt(c.req.param("number"), 10);
-  if (!Number.isInteger(number)) return c.json({ error: "Invalid PR number" }, 400);
-  const body = await c.req
-    .json<{ id?: string; ws?: string; path?: string; method?: gh.MergeMethod }>()
-    .catch(
-      () => ({}) as { id?: string; ws?: string; path?: string; method?: gh.MergeMethod },
-    );
+  if (!Number.isInteger(number))
+    return c.json({ error: "Invalid PR number" }, 400);
+  const parsed = await parseJsonBody(c, mergePrSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const cwd = resolveCwdFromBody(body);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   try {
-    await gh.mergePullRequest(cwd, number, body.method ?? "squash");
+    const method = body.method as gh.MergeMethod | undefined;
+    await gh.mergePullRequest(cwd, number, method ?? "squash");
     return c.json({ ok: true });
   } catch (err) {
     return ghErrorResponse(c, err, "Failed to merge pull request");
@@ -185,11 +210,11 @@ github.post("/github/prs/:number/merge", async (c) => {
 
 github.post("/github/prs/:number/checkout", async (c) => {
   const number = Number.parseInt(c.req.param("number"), 10);
-  if (!Number.isInteger(number)) return c.json({ error: "Invalid PR number" }, 400);
-  const body = await c.req
-    .json<{ id?: string; ws?: string; path?: string }>()
-    .catch(() => ({}) as { id?: string; ws?: string; path?: string });
-  const cwd = resolveCwdFromBody(body);
+  if (!Number.isInteger(number))
+    return c.json({ error: "Invalid PR number" }, 400);
+  const parsed = await parseJsonBody(c, repoContextSchema);
+  if (!parsed.ok) return parsed.response;
+  const cwd = resolveCwdFromBody(parsed.data);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   try {
     await gh.checkoutPullRequest(cwd, number);
@@ -218,7 +243,8 @@ github.get("/github/issues/:number", async (c) => {
   const cwd = resolveCwd(c);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   const number = Number.parseInt(c.req.param("number"), 10);
-  if (!Number.isInteger(number)) return c.json({ error: "Invalid issue number" }, 400);
+  if (!Number.isInteger(number))
+    return c.json({ error: "Invalid issue number" }, 400);
   try {
     const issue = await gh.getIssue(cwd, number);
     return c.json({ issue });
@@ -228,13 +254,9 @@ github.get("/github/issues/:number", async (c) => {
 });
 
 github.post("/github/issues", async (c) => {
-  const body = await c.req.json<{
-    id?: string;
-    ws?: string;
-    path?: string;
-    title?: string;
-    body?: string;
-  }>();
+  const parsed = await parseJsonBody(c, createIssueSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const cwd = resolveCwdFromBody(body);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   if (!body.title?.trim()) return c.json({ error: "title is required" }, 400);
@@ -251,16 +273,15 @@ github.post("/github/issues", async (c) => {
 
 github.post("/github/issues/:number/comment", async (c) => {
   const number = Number.parseInt(c.req.param("number"), 10);
-  if (!Number.isInteger(number)) return c.json({ error: "Invalid issue number" }, 400);
-  const body = await c.req.json<{
-    id?: string;
-    ws?: string;
-    path?: string;
-    body?: string;
-  }>();
+  if (!Number.isInteger(number))
+    return c.json({ error: "Invalid issue number" }, 400);
+  const parsed = await parseJsonBody(c, commentIssueSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const cwd = resolveCwdFromBody(body);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
-  if (!body.body?.trim()) return c.json({ error: "comment body is required" }, 400);
+  if (!body.body?.trim())
+    return c.json({ error: "comment body is required" }, 400);
   try {
     await gh.commentIssue(cwd, number, body.body);
     return c.json({ ok: true });

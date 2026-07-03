@@ -15,7 +15,9 @@ export function parseEnv(content: string): Record<string, string> {
     const line = rawLine.trim()
     if (!line || line.startsWith("#")) continue
 
-    const withoutExport = line.startsWith("export ") ? line.slice(7).trim() : line
+    const withoutExport = line.startsWith("export ")
+      ? line.slice(7).trim()
+      : line
     const eq = withoutExport.indexOf("=")
     if (eq === -1) continue
 
@@ -24,7 +26,11 @@ export function parseEnv(content: string): Record<string, string> {
 
     let value = withoutExport.slice(eq + 1).trim()
     const quote = value[0]
-    if ((quote === '"' || quote === "'") && value.length >= 2 && value.endsWith(quote)) {
+    if (
+      (quote === '"' || quote === "'") &&
+      value.length >= 2 &&
+      value.endsWith(quote)
+    ) {
       value = value.slice(1, -1)
       if (quote === '"') {
         value = value

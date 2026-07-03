@@ -42,22 +42,22 @@ The Git panel shows your repository's status and provides tools for git operatio
 
 The status section shows four categories:
 
-| Category | Description |
-|----------|-------------|
-| **Staged** | Changes ready to commit (green checkmark area) |
-| **Unstaged** | Modified files not yet staged |
-| **Untracked** | New files not tracked by git |
-| **Stashed** | Temporarily stored changes |
+| Category      | Description                                    |
+| ------------- | ---------------------------------------------- |
+| **Staged**    | Changes ready to commit (green checkmark area) |
+| **Unstaged**  | Modified files not yet staged                  |
+| **Untracked** | New files not tracked by git                   |
+| **Stashed**   | Temporarily stored changes                     |
 
 ### Status Badges
 
-| Badge | Meaning |
-|-------|---------|
-| M (blue) | Modified file |
-| A (green) | Added file |
-| D (red) | Deleted file |
-| R (orange) | Renamed file |
-| ?? (gray) | Untracked file |
+| Badge      | Meaning        |
+| ---------- | -------------- |
+| M (blue)   | Modified file  |
+| A (green)  | Added file     |
+| D (red)    | Deleted file   |
+| R (orange) | Renamed file   |
+| ?? (gray)  | Untracked file |
 
 ### Viewing Diffs
 
@@ -152,6 +152,7 @@ Uses conventional commit format:
 ```
 
 Examples:
+
 - `feat(auth): add login redirect timeout`
 - `fix(Button): resolve click handler issue`
 - `docs(readme): update installation instructions`
@@ -212,14 +213,17 @@ stash@{1}: WIP on feature: def456 Add dark mode
 ### Restoring Stashes
 
 **Pop Stash** (apply and delete):
+
 1. Click **Pop** next to the stash
 2. Changes are restored and stash is removed
 
 **Apply Stash** (apply without deleting):
+
 1. Click **Apply** next to the stash
 2. Changes are restored but stash remains
 
 **Drop Stash** (delete without applying):
+
 1. Click **Drop** next to the stash
 2. Confirm in the dialog
 3. Stash is permanently deleted
@@ -264,6 +268,7 @@ git blame src/auth.ts
 ### "Not a git repository"
 
 If you see this error:
+
 1. The folder is not a git repository
 2. Click **Initialize Repository** to run `git init`
 3. Or clone a repository into the workspace

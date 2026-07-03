@@ -119,7 +119,9 @@ class LamdaConfigWatcher {
     if (!watcher) return;
     try {
       watcher.close();
-    } catch {}
+    } catch {
+      // Watcher may already be closed — nothing else to do here.
+    }
     this.watchers.delete(key);
   }
 }

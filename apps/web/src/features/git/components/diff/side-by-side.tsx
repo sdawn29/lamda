@@ -1,6 +1,12 @@
 import { memo } from "react"
 import { cn } from "@/shared/lib/utils"
-import type { CharRange, DiffLine, HighlightMap, ThemeStyle, WordDiffMap } from "./types"
+import type {
+  CharRange,
+  DiffLine,
+  HighlightMap,
+  ThemeStyle,
+  WordDiffMap,
+} from "./types"
 import { getLineTokens, DiffLineContent } from "./highlight"
 
 export interface SideBySideRow {

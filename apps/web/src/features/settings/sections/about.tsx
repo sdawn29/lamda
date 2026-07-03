@@ -123,8 +123,7 @@ export function AboutSection() {
               <RefreshCw
                 className={cn(
                   "mr-1.5 h-3.5 w-3.5",
-                  (checkForUpdates.isPending ||
-                    status?.phase === "checking") &&
+                  (checkForUpdates.isPending || status?.phase === "checking") &&
                     "animate-spin"
                 )}
               />
@@ -234,7 +233,7 @@ function LamdaMark({ className }: { className?: string }) {
       role="img"
       aria-label="Lamda"
       className={cn(
-        "flex select-none items-center justify-center bg-[#09090b] font-semibold leading-none text-[#d4a017]",
+        "flex items-center justify-center bg-[#09090b] leading-none font-semibold text-[#d4a017] select-none",
         className
       )}
     >

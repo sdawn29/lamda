@@ -1,7 +1,4 @@
-import {
-  useEffect,
-  type ReactNode,
-} from "react"
+import { useEffect, type ReactNode } from "react"
 import { create } from "zustand"
 
 interface FileTreeContextValue {

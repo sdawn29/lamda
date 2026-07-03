@@ -29,8 +29,7 @@ export const useLeftSidebarStore = create<LeftSidebarStore>()(
       storage: createJSONStorage(() => localStorage),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<LeftSidebarStore>
-        const isOpen =
-          typeof p.isOpen === "boolean" ? p.isOpen : current.isOpen
+        const isOpen = typeof p.isOpen === "boolean" ? p.isOpen : current.isOpen
         return { ...current, isOpen }
       },
     }

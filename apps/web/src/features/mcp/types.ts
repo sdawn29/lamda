@@ -115,16 +115,25 @@ export function formStateToConfig(form: ServerFormState): McpServerConfig {
     name: form.name,
     transport: form.transport,
     command: !isHttp ? form.command : undefined,
-    args: !isHttp && form.args ? form.args.split(" ").filter(Boolean) : undefined,
+    args:
+      !isHttp && form.args ? form.args.split(" ").filter(Boolean) : undefined,
     env:
       !isHttp && form.envVars.length > 0
-        ? Object.fromEntries(form.envVars.filter((v) => v.key && v.value).map((v) => [v.key, v.value]))
+        ? Object.fromEntries(
+            form.envVars
+              .filter((v) => v.key && v.value)
+              .map((v) => [v.key, v.value])
+          )
         : undefined,
     cwd: !isHttp ? form.cwd || undefined : undefined,
     url: isHttp ? form.url || undefined : undefined,
     headers:
       isHttp && form.headers.length > 0
-        ? Object.fromEntries(form.headers.filter((v) => v.key && v.value).map((v) => [v.key, v.value]))
+        ? Object.fromEntries(
+            form.headers
+              .filter((v) => v.key && v.value)
+              .map((v) => [v.key, v.value])
+          )
         : undefined,
     description: form.description || undefined,
   }
