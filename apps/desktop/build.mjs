@@ -14,6 +14,20 @@ if (!rawElectronVersion) {
   throw new Error("[desktop build] electron not found in devDependencies");
 }
 const electronVersion = String(rawElectronVersion).replace(/^[^\d]*/, "");
+// Native addons are compiled against devDependencies.electron, but
+// electron-builder packages build.electronVersion. If the two drift, the
+// shipped app dies at startup with ERR_DLOPEN_FAILED (NODE_MODULE_VERSION
+// mismatch), so refuse to build.
+const builderElectronVersion = desktopPackageJson.build?.electronVersion;
+if (builderElectronVersion && builderElectronVersion !== electronVersion) {
+  throw new Error(
+    `[desktop build] build.electronVersion (${builderElectronVersion}) does not match ` +
+      `devDependencies.electron (${electronVersion}). Native addons are rebuilt against ` +
+      `devDependencies.electron, so the packaged app would crash with a NODE_MODULE_VERSION ` +
+      `mismatch. Update build.electronVersion in apps/desktop/package.json (or remove it to ` +
+      `let electron-builder use the installed version).`,
+  );
+}
 const bundleOnly = process.argv.includes("--bundle-only");
 
 function run(command, args, cwd = monorepoRoot, env = process.env) {
