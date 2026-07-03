@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, memo } from "react"
 import {
   Archive,
+  ArrowUpDown,
   Clock,
   Container,
   ExternalLink,
@@ -50,6 +51,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
 import { useOpenPath, useOpenWorkspaceWithApp } from "@/features/electron"
@@ -69,6 +72,7 @@ import { CreateWorkspaceDialog } from "./create-workspace-dialog"
 import { WorkspaceEnvDialog } from "./workspace-env-dialog"
 import { useEnvDialog } from "../env-dialog-store"
 import { useWorkspaceCollapseStore } from "../workspace-collapse-store"
+import { useWorkspaceSortStore } from "../workspace-sort-store"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -438,12 +442,29 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
         .map((t) => ({ ...t, workspaceId: ws.id, workspaceName: ws.name }))
     )
     .sort((a, b) => b.updatedAt - a.updatedAt)
+
+  const sortOrder = useWorkspaceSortStore((s) => s.sortOrder)
+  const setSortOrder = useWorkspaceSortStore((s) => s.setSortOrder)
+  const compareWorkspaces = (
+    a: (typeof workspaces)[0],
+    b: (typeof workspaces)[0]
+  ) => {
+    switch (sortOrder) {
+      case "name":
+        return a.name.localeCompare(b.name)
+      case "created-desc":
+        return b.createdAt - a.createdAt
+      case "created-asc":
+      default:
+        return a.createdAt - b.createdAt
+    }
+  }
   const pinnedWorkspaces = workspaces
     .filter((ws) => ws.isPinned)
-    .sort((a, b) => a.createdAt - b.createdAt)
+    .sort(compareWorkspaces)
   const unpinnedWorkspaces = workspaces
     .filter((ws) => !ws.isPinned)
-    .sort((a, b) => a.createdAt - b.createdAt)
+    .sort(compareWorkspaces)
 
   const renderWorkspaceItem = (ws: (typeof workspaces)[0]) => (
     <SidebarMenuItem key={ws.id} className="group/ws">
@@ -720,6 +741,40 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
 
         <SidebarGroup className="group/workspaces flex min-h-0 flex-1 flex-col">
           <SidebarGroupLabel className="text-3xs">WORKSPACES</SidebarGroupLabel>
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <SidebarGroupAction
+                    className="right-9 invisible group-hover/workspaces:visible aria-expanded:visible"
+                    render={<DropdownMenuTrigger />}
+                  >
+                    <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/60 transition-colors hover:text-foreground" />
+                    <span className="sr-only">Sort workspaces</span>
+                  </SidebarGroupAction>
+                }
+              />
+              <TooltipContent side="right">Sort workspaces</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup
+                value={sortOrder}
+                onValueChange={(value) =>
+                  setSortOrder(value as typeof sortOrder)
+                }
+              >
+                <DropdownMenuRadioItem value="name">
+                  Name (A–Z)
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="created-desc">
+                  Date created (newest)
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="created-asc">
+                  Date created (oldest)
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Tooltip>
             <TooltipTrigger
               render={
