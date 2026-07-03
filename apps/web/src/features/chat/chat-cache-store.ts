@@ -330,6 +330,8 @@ function messagesToBlocks(messages: Message[]): MessageBlock[] {
         toolStatus: null,
         toolDuration: null,
         toolStartTime: null,
+        attachments: null,
+        clientId: null,
         createdAt: Date.now(),
       } as MessageBlock
     }
@@ -355,6 +357,7 @@ function messagesToBlocks(messages: Message[]): MessageBlock[] {
       toolDuration: null,
       toolStartTime: null,
       attachments: null,
+      clientId: null,
       createdAt: Date.now(),
     }
 

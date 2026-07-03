@@ -23,6 +23,7 @@ function block(overrides: Partial<MessageBlock> = {}): MessageBlock {
     toolDuration: null,
     toolStartTime: null,
     attachments: null,
+    clientId: null,
     createdAt: 1000,
     ...overrides,
   }
