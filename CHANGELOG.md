@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.43.0](../../releases/tag/v0.43.0) — 2026-07-03
+
+### Features
+
+* **usage:** add reasoningTokens to AI usage metrics and update database schema feat(provider-cards): add new API key providers including NVIDIA and Moonshot AI fix(package): downgrade monaco-editor to version 0.53.0 for compatibility docs(AGENTS): update SDK references from @mariozechner to @earendil-works
+
 ## [0.42.0](../../releases/tag/v0.42.0) — 2026-07-03
 
 ### Features
