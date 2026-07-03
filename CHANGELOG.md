@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.42.0](../../releases/tag/v0.42.0) — 2026-07-03
+
+### Features
+
+* **chat:** add clientId to MessageBlock structure for enhanced message tracking
+
 ## [0.41.0](../../releases/tag/v0.41.0) — 2026-07-03
 
 ### Features
