@@ -183,7 +183,7 @@ export function MobileThreadIslands({
               Archive
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
+              variant="destructive"
               onClick={handleDeleteThisThread}
             >
               <Trash2 className="mr-2 h-4 w-4" />

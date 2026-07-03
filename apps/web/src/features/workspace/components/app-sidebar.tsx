@@ -522,7 +522,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
             {ws.isPinned ? "Unpin Workspace" : "Pin Workspace"}
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
+            variant="destructive"
             onClick={() => {
               setDeleteError(null)
               setDeletingWorkspace(ws)
