@@ -136,6 +136,16 @@ export function KeyboardShortcutsProvider({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
+  React.useEffect(() => {
+    return (
+      window.electronAPI?.onNativeMenuAction?.((action) => {
+        if (Object.values(SHORTCUT_ACTIONS).includes(action as ShortcutAction)) {
+          runAction(action as ShortcutAction)
+        }
+      }) ?? (() => {})
+    )
+  }, [runAction])
+
   const value = React.useMemo<KbContextValue>(
     () => ({
       shortcuts,

@@ -4,10 +4,12 @@ import {
   dialog,
   globalShortcut,
   ipcMain,
+  Menu,
   nativeImage,
   powerMonitor,
   session,
   shell,
+  type MenuItemConstructorOptions,
 } from "electron";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -109,6 +111,183 @@ let pendingReleaseNotes: string | null = null;
 type SelectFolderOptions = {
   canCreateFolder?: boolean;
 };
+
+type RendererMenuAction =
+  | "new_thread"
+  | "new_workspace"
+  | "open_command_palette"
+  | "open_settings"
+  | "open_in_editor"
+  | "toggle_sidebar"
+  | "toggle_review_panel"
+  | "toggle_file_tree"
+  | "toggle_terminal"
+  | "toggle_fullscreen_diff"
+  | "toggle_theme"
+  | "rename_thread"
+  | "navigate_back"
+  | "navigate_forward"
+  | "scroll_to_bottom";
+
+type MenuRole = NonNullable<MenuItemConstructorOptions["role"]>;
+
+function sendRendererMenuAction(action: RendererMenuAction) {
+  const win =
+    BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+  if (!win || win.isDestroyed()) return;
+  win.webContents.send("native-menu-action", action);
+}
+
+function separator(): MenuItemConstructorOptions {
+  return { type: "separator" };
+}
+
+function roleItem(role: MenuRole): MenuItemConstructorOptions {
+  return { role };
+}
+
+function menuAction(
+  label: string,
+  accelerator: string,
+  action: RendererMenuAction,
+): MenuItemConstructorOptions {
+  return {
+    label,
+    accelerator,
+    click: () => sendRendererMenuAction(action),
+  };
+}
+
+function installApplicationMenu() {
+  const template: MenuItemConstructorOptions[] = [
+    ...(process.platform === "darwin"
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              roleItem("about"),
+              separator(),
+              menuAction("Settings...", "Command+,", "open_settings"),
+              separator(),
+              roleItem("services"),
+              separator(),
+              roleItem("hide"),
+              roleItem("hideOthers"),
+              roleItem("unhide"),
+              separator(),
+              roleItem("quit"),
+            ],
+          } satisfies MenuItemConstructorOptions,
+        ]
+      : []),
+    {
+      label: "File",
+      submenu: [
+        menuAction("New Thread", "CommandOrControl+T", "new_thread"),
+        menuAction("New Workspace", "CommandOrControl+Shift+N", "new_workspace"),
+        separator(),
+        menuAction(
+          "Open in Editor",
+          "CommandOrControl+Shift+E",
+          "open_in_editor",
+        ),
+        separator(),
+        roleItem(process.platform === "darwin" ? "close" : "quit"),
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        roleItem("undo"),
+        roleItem("redo"),
+        separator(),
+        roleItem("cut"),
+        roleItem("copy"),
+        roleItem("paste"),
+        roleItem("pasteAndMatchStyle"),
+        roleItem("delete"),
+        separator(),
+        roleItem("selectAll"),
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
+        menuAction(
+          "Command Palette",
+          "CommandOrControl+K",
+          "open_command_palette",
+        ),
+        separator(),
+        menuAction("Toggle Sidebar", "CommandOrControl+B", "toggle_sidebar"),
+        menuAction(
+          "Toggle Review Panel",
+          "CommandOrControl+Shift+D",
+          "toggle_review_panel",
+        ),
+        menuAction(
+          "Toggle File Tree",
+          "CommandOrControl+Shift+F",
+          "toggle_file_tree",
+        ),
+        menuAction("Toggle Terminal", "Control+`", "toggle_terminal"),
+        menuAction(
+          "Toggle Fullscreen Review",
+          "CommandOrControl+Shift+Enter",
+          "toggle_fullscreen_diff",
+        ),
+        separator(),
+        menuAction("Toggle Theme", "CommandOrControl+Shift+L", "toggle_theme"),
+        roleItem("togglefullscreen"),
+        separator(),
+        roleItem("reload"),
+        roleItem("forceReload"),
+        roleItem("toggleDevTools"),
+      ],
+    },
+    {
+      label: "Navigate",
+      submenu: [
+        menuAction("Back", "CommandOrControl+[", "navigate_back"),
+        menuAction("Forward", "CommandOrControl+]", "navigate_forward"),
+        separator(),
+        menuAction(
+          "Scroll to Bottom",
+          "CommandOrControl+Down",
+          "scroll_to_bottom",
+        ),
+      ],
+    },
+    {
+      label: "Thread",
+      submenu: [menuAction("Rename Thread", "F2", "rename_thread")],
+    },
+    {
+      label: "Window",
+      submenu: [
+        roleItem("minimize"),
+        roleItem("zoom"),
+        ...(process.platform === "darwin"
+          ? [separator(), roleItem("front")]
+          : []),
+      ],
+    },
+    {
+      label: "Help",
+      submenu: [
+        {
+          label: "Open Data Directory",
+          click: () => {
+            const dataDir = path.join(homedir(), ".lamda");
+            void shell.openPath(dataDir);
+          },
+        },
+      ],
+    },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 function setUpdateStatus(next: UpdateStatus) {
   updateStatus = next;
@@ -477,6 +656,8 @@ async function createWindow(splash?: BrowserWindow) {
 }
 
 app.whenReady().then(async () => {
+  installApplicationMenu();
+
   if (isDev && process.platform === "darwin") {
     const dockIcon = nativeImage.createFromPath(DEV_ICON_PATH);
     if (!dockIcon.isEmpty()) {

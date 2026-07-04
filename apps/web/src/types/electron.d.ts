@@ -51,6 +51,7 @@ interface ElectronAPI {
   downloadUpdate: () => Promise<void>
   installUpdate: () => Promise<void>
   onUpdateStatusChange: (callback: (status: UpdateStatus) => void) => () => void
+  onNativeMenuAction?: (callback: (action: string) => void) => () => void
   onSystemResume?: (callback: () => void) => () => void
 }
 

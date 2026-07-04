@@ -279,7 +279,11 @@ export const ChatComposer = memo(
     React.useEffect(() => {
       if (initialValue === undefined) return
       const applied = appliedInitialValueRef.current
-      if (applied?.key === initialValueKey && applied.value === initialValue) {
+      if (
+        applied &&
+        applied.key === initialValueKey &&
+        applied.value === initialValue
+      ) {
         return
       }
       appliedInitialValueRef.current = {
