@@ -304,13 +304,26 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
 
       const uploads = attachments ? pendingToUploads(attachments) : undefined
 
+      // Identity for the optimistic user row. Sent with the prompt so the
+      // server persists it onto the user block — every later cache rebuild
+      // from a server snapshot (mount resync, prefetch, post-turn reconcile)
+      // then keeps the row's React key stable instead of flipping it from the
+      // positional fallback to the DB id, which remounts the row and reads as
+      // a flicker when the thread view takes over.
+      const clientId = crypto.randomUUID()
+
       // Pre-populate the messages cache so the optimistic user message is
       // visible the moment the new thread route mounts.
       const seed: MessagesInfiniteData = {
         pages: [
           {
             messages: [
-              { role: "user", content: text, attachments: displayAttachments },
+              {
+                role: "user",
+                clientId,
+                content: text,
+                attachments: displayAttachments,
+              },
             ],
             hasMore: false,
             oldestBlockIndex: null,
@@ -326,6 +339,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
                 ...msgs,
                 {
                   role: "user",
+                  clientId,
                   content: text,
                   attachments: displayAttachments,
                 },
@@ -376,6 +390,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
             model,
             thinkingLevel,
             attachments: uploads,
+            clientId,
           })
         } catch (err) {
           // The prompt never reached the agent — drop the optimistic message

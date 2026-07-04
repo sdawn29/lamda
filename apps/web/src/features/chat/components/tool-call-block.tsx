@@ -15,6 +15,7 @@ import {
   GlobeIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
+  PinIcon,
   SearchIcon,
   SquareTerminalIcon,
   WrenchIcon,
@@ -61,7 +62,7 @@ function isEditArgs(args: unknown): args is EditArgs {
   return typeof a.path === "string" && Array.isArray(a.edits)
 }
 
-function getEditDiff(result: unknown): string | null {
+export function getEditDiff(result: unknown): string | null {
   if (typeof result !== "object" || result === null) return null
   const details = (result as Record<string, unknown>).details
   if (typeof details !== "object" || details === null) return null
@@ -528,6 +529,282 @@ function describeTodo(msg: ToolMessage): { label: string; tone: TodoTone } {
   return { label: running ? "Loading tasks" : "Tasks", tone: "done" }
 }
 
+// ── Memory tool ────────────────────────────────────────────────────────────────
+//
+// The memory tool's result is a JSON payload ({ operation, memories, message }
+// or { error }). Rendering that raw reads as debug output, so the row gets a
+// verbose operation label ("Saved memory", "Found 3 memories"), the memory
+// title / search query as its summary, scope/kind/pin chips, and the expanded
+// body shows each memory as a structured card instead of JSON.
+
+interface MemoryItemLite {
+  id: string
+  scope: "user" | "workspace"
+  title: string
+  content: string
+  category: string | null
+  kind: string
+  pinned: boolean
+}
+
+interface MemoryDisplay {
+  /** Verbose header label, e.g. "Saved memory" / "Found 3 memories". */
+  label: string
+  /** Header summary (memory title / search query / scope filter), if any. */
+  summary: string | null
+  /** Memory whose scope/kind/pin chips show in the header (save/update). */
+  headerItem: MemoryItemLite | null
+  /** Memories rendered as cards in the expanded body. */
+  memories: MemoryItemLite[]
+  /** Outcome note worth surfacing (reinforced / superseded / error text). */
+  message: string | null
+  /** The tool reported a failure (it returns errors as normal results). */
+  failed: boolean
+  /**
+   * The result decoded as the expected payload (or there is none yet). False
+   * means an unexpected shape — the body falls back to the raw result text.
+   */
+  parsed: boolean
+}
+
+function parseMemoryItem(raw: unknown): MemoryItemLite | null {
+  if (typeof raw !== "object" || raw === null) return null
+  const m = raw as Record<string, unknown>
+  if (typeof m.title !== "string" || typeof m.content !== "string") return null
+  return {
+    id: typeof m.id === "string" ? m.id : "",
+    scope: m.scope === "user" ? "user" : "workspace",
+    title: m.title,
+    content: m.content,
+    category:
+      typeof m.category === "string" && m.category.trim()
+        ? m.category.trim()
+        : null,
+    kind: typeof m.kind === "string" && m.kind ? m.kind : "fact",
+    pinned: m.pinned === true,
+  }
+}
+
+const MEMORY_FAILED_LABELS: Record<string, string> = {
+  save: "Couldn't save memory",
+  update: "Couldn't update memory",
+  delete: "Couldn't delete memory",
+  search: "Memory search failed",
+  list: "Couldn't list memories",
+}
+
+function describeMemory(msg: ToolMessage): MemoryDisplay {
+  const a =
+    typeof msg.args === "object" && msg.args !== null
+      ? (msg.args as Record<string, unknown>)
+      : {}
+  const op = typeof a.operation === "string" ? a.operation : "save"
+  const running = msg.status === "running"
+
+  // The memory in flight, reconstructed from args — lets a save/update card
+  // render immediately, before the result lands.
+  const argsItem =
+    typeof a.title === "string" && typeof a.content === "string"
+      ? parseMemoryItem(a)
+      : null
+
+  let resultItems: MemoryItemLite[] | null = null
+  let message: string | null = null
+  let error: string | null = null
+  let parsed = true
+  const text = getResultText(msg)
+  if (!running && text) {
+    try {
+      const payload = JSON.parse(text) as Record<string, unknown>
+      if (typeof payload.error === "string") error = payload.error
+      if (typeof payload.message === "string") message = payload.message
+      if (Array.isArray(payload.memories)) {
+        resultItems = payload.memories
+          .map(parseMemoryItem)
+          .filter((m): m is MemoryItemLite => m !== null)
+      } else if (error === null) {
+        parsed = false
+      }
+    } catch {
+      // Non-JSON result — the caller falls back to the raw text.
+      parsed = false
+    }
+  }
+
+  if (error || msg.status === "error") {
+    return {
+      label: MEMORY_FAILED_LABELS[op] ?? "Memory failed",
+      summary: null,
+      headerItem: null,
+      memories: [],
+      message: error,
+      failed: true,
+      parsed,
+    }
+  }
+
+  // Confirmations that only repeat the label ("Memory saved…", "Memory
+  // updated.", "No matching memories.") are dropped; only outcomes that add
+  // information (reinforced / superseded) surface in the body.
+  if (
+    message &&
+    /^(Memory (saved|updated|deleted)|No matching memories)/.test(message)
+  ) {
+    message = null
+  }
+
+  const memories =
+    resultItems && resultItems.length > 0
+      ? resultItems
+      : argsItem
+        ? [argsItem]
+        : []
+  const count = resultItems?.length ?? 0
+
+  switch (op) {
+    case "save": {
+      let label = running ? "Saving memory" : "Saved memory"
+      if (!running && message) {
+        if (message.includes("reinforced")) label = "Reinforced memory"
+        else if (message.includes("superseded")) label = "Replaced memory"
+      }
+      return {
+        label,
+        summary: memories[0]?.title ?? null,
+        headerItem: memories[0] ?? null,
+        memories,
+        message,
+        failed: false,
+        parsed,
+      }
+    }
+    case "update":
+      return {
+        label: running ? "Updating memory" : "Updated memory",
+        summary: memories[0]?.title ?? null,
+        headerItem: memories[0] ?? null,
+        memories,
+        message,
+        failed: false,
+        parsed,
+      }
+    case "delete":
+      return {
+        label: running ? "Deleting memory" : "Deleted memory",
+        summary: null,
+        headerItem: null,
+        memories: [],
+        message,
+        failed: false,
+        parsed,
+      }
+    case "search": {
+      const query = typeof a.query === "string" ? a.query.trim() : ""
+      return {
+        label: running
+          ? "Searching memories"
+          : count === 0
+            ? "No memories found"
+            : `Found ${count} ${count === 1 ? "memory" : "memories"}`,
+        summary: query ? `"${query}"` : null,
+        headerItem: null,
+        memories: running ? [] : (resultItems ?? []),
+        message,
+        failed: false,
+        parsed,
+      }
+    }
+    case "list": {
+      const scope =
+        a.scope === "user" || a.scope === "workspace"
+          ? (a.scope as string)
+          : null
+      return {
+        label: running
+          ? "Listing memories"
+          : `Listed ${count} ${count === 1 ? "memory" : "memories"}`,
+        summary: scope ? `${scope} scope` : null,
+        headerItem: null,
+        memories: running ? [] : (resultItems ?? []),
+        message,
+        failed: false,
+        parsed,
+      }
+    }
+    default:
+      return {
+        label: "Memory",
+        summary: null,
+        headerItem: null,
+        memories,
+        message,
+        failed: false,
+        parsed,
+      }
+  }
+}
+
+/** Tiny labelled chip for a memory's kind / scope / category. */
+function MemoryChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="shrink-0 rounded-sm border border-border/50 bg-muted/40 px-1 py-px text-3xs font-medium text-muted-foreground/60">
+      {children}
+    </span>
+  )
+}
+
+/**
+ * Structured card list for memory results — one card per memory with its
+ * title, pin, kind/category/scope chips, and the remembered fact as prose.
+ */
+function MemoryView({
+  memories,
+  message,
+  failed,
+}: {
+  memories: MemoryItemLite[]
+  message: string | null
+  failed: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {memories.map((m, i) => (
+        <div
+          key={m.id || i}
+          className="flex flex-col gap-1 rounded-md border border-border/40 bg-background/40 px-2.5 py-2"
+        >
+          <div className="flex items-center gap-1.5">
+            {m.pinned && (
+              <PinIcon className="h-3 w-3 shrink-0 text-amber-500/70" />
+            )}
+            <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground/80">
+              {m.title}
+            </span>
+            {m.kind !== "fact" && <MemoryChip>{m.kind}</MemoryChip>}
+            {m.category && <MemoryChip>{m.category}</MemoryChip>}
+            <MemoryChip>
+              {m.scope === "user" ? "all projects" : "this project"}
+            </MemoryChip>
+          </div>
+          <p className="max-h-40 overflow-auto text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground/75">
+            {m.content}
+          </p>
+        </div>
+      ))}
+      {message && (
+        <p
+          className={cn(
+            "text-2xs",
+            failed ? "text-destructive/80" : "text-muted-foreground/60 italic"
+          )}
+        >
+          {message}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ── ReadView ───────────────────────────────────────────────────────────────────
 
 function ReadView({
@@ -654,6 +931,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const normalizedToolName = msg.toolName.toLowerCase()
   const isEdit = normalizedToolName === "edit" && isEditArgs(msg.args)
   const diff = isEdit ? getEditDiff(msg.result) : null
+  const isMemory = normalizedToolName === "memory"
+  const memory = isMemory ? describeMemory(msg) : null
   const isRead = isReadTool(normalizedToolName, msg.args)
   const readFilePath = isRead ? getReadFilePath(msg.args) : null
   const readLineRange = isRead ? getReadLineRange(msg.args) : null
@@ -864,31 +1143,45 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     (resultText !== null || msg.status === "running" || msg.status === "error")
   // Write: content is in args from tool_start, always available
   const showWriteContent = isWrite && writeArgs !== null
+  const showMemoryContent =
+    isMemory &&
+    (memory!.memories.length > 0 ||
+      memory!.message !== null ||
+      (!memory!.parsed && resultText !== null) ||
+      msg.status === "running" ||
+      msg.status === "error")
   const showOtherContent =
     !isEdit &&
     !isRead &&
     !isWrite &&
+    !isMemory &&
     (resultText !== null ||
       resultImages.length > 0 ||
       msg.status === "running" ||
       msg.status === "error")
 
   const hasBody =
-    showEditContent || showReadContent || showWriteContent || showOtherContent
+    showEditContent ||
+    showReadContent ||
+    showWriteContent ||
+    showMemoryContent ||
+    showOtherContent
 
   // Bash reads as an action, not a tool name: "Running" while the command is in
   // flight, "Ran" once it has finished (or errored — it still ran). Skills read
   // the same way: "Loading" while in flight, "Loaded" once done, with the skill
   // name shown alongside.
-  const toolLabel = skillName
-    ? msg.status === "running"
-      ? "Loading"
-      : "Loaded"
-    : normalizedToolName === "bash"
+  const toolLabel = memory
+    ? memory.label
+    : skillName
       ? msg.status === "running"
-        ? "Running"
-        : "Ran"
-      : toolDisplayName(msg.toolName)
+        ? "Loading"
+        : "Loaded"
+      : normalizedToolName === "bash"
+        ? msg.status === "running"
+          ? "Running"
+          : "Ran"
+        : toolDisplayName(msg.toolName)
 
   return (
     <div
@@ -962,6 +1255,14 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               </>
             )}
           </span>
+        ) : memory ? (
+          memory.summary && (
+            <span
+              className={cn("min-w-0 flex-1 truncate text-xs", DISCLOSURE_DIM)}
+            >
+              {memory.summary}
+            </span>
+          )
         ) : displayFilePath ? (
           <span
             className={cn(
@@ -1013,6 +1314,18 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             <span className="text-green-600 dark:text-green-400">
               +<RollingTimerText text={String(writeLineCount)} />
             </span>
+          </span>
+        )}
+
+        {memory?.headerItem && (
+          <span className="flex shrink-0 items-center gap-1">
+            {memory.headerItem.pinned && (
+              <PinIcon className="h-3 w-3 text-amber-500/70" />
+            )}
+            {memory.headerItem.kind !== "fact" && (
+              <MemoryChip>{memory.headerItem.kind}</MemoryChip>
+            )}
+            <MemoryChip>{memory.headerItem.scope}</MemoryChip>
           </span>
         )}
 
@@ -1077,11 +1390,13 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                 <span className="animate-thinking-shimmer bg-linear-to-r from-muted-foreground/30 via-foreground/80 to-muted-foreground/30 bg-size-[200%_100%] bg-clip-text text-transparent">
                   {isEdit
                     ? "Editing"
-                    : skillName
-                      ? "Loading skill"
-                      : isRead
-                        ? "Reading"
-                        : "Running"}
+                    : memory
+                      ? memory.label
+                      : skillName
+                        ? "Loading skill"
+                        : isRead
+                          ? "Reading"
+                          : "Running"}
                 </span>
               )}
 
@@ -1098,7 +1413,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                       live={true}
                     />
                   )}
-                  {!isRead && resultText && (
+                  {!isRead && !isMemory && resultText && (
                     <LivePre text={resultText} live={true} />
                   )}
                   {!isRead && resultImages.length > 0 && (
@@ -1131,7 +1446,20 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                   />
                 )}
 
-                {!isEdit && !isRead && !isWrite && resultText && (
+                {/* Memory: structured cards; fall back to the raw text only
+                    when the result isn't the expected payload shape. */}
+                {memory &&
+                  (memory.memories.length > 0 || memory.message !== null ? (
+                    <MemoryView
+                      memories={memory.memories}
+                      message={memory.message}
+                      failed={memory.failed}
+                    />
+                  ) : !memory.parsed && resultText ? (
+                    <LivePre text={resultText} live={false} />
+                  ) : null)}
+
+                {!isEdit && !isRead && !isWrite && !isMemory && resultText && (
                   <LivePre text={resultText} live={false} />
                 )}
 

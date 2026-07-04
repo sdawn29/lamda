@@ -298,37 +298,6 @@
   }
 }
 
-/* ── Streaming caret ───────────────────────────────────────────────────────
-   A soft pulsing dot marking the live typing edge of a streaming message.
-   Rendered as an ::after on the last text-bearing block inside a
-   `.chat-streaming-caret` prose container, so it rides the text as the
-   typewriter reveals words. Code blocks/tables are deliberately unmatched —
-   a caret inside them reads as content. ── */
-@keyframes chat-caret-pulse {
-  0%,
-  100% {
-    opacity: 0.85;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.3;
-    transform: scale(0.75);
-  }
-}
-
-.chat-streaming-caret > :is(p, h1, h2, h3, h4, h5, h6):last-child::after,
-.chat-streaming-caret > :is(ul, ol):last-child > li:last-child::after,
-.chat-streaming-caret > blockquote:last-child > p:last-child::after {
-  content: "";
-  display: inline-block;
-  width: 0.5em;
-  height: 0.5em;
-  margin-left: 0.25em;
-  border-radius: 9999px;
-  background-color: currentColor;
-  animation: chat-caret-pulse 1.1s ease-in-out infinite;
-}
-
 /* ── Thinking dots (agent working) ─────────────────────────────────────────
    Three dots that rise and brighten in sequence (staggered via
    animation-delay) — a wave that signals the agent is working while no tool
@@ -374,13 +343,6 @@
     animation: none;
   }
   .animate-thinking-dot {
-    animation: none;
-    opacity: 0.5;
-  }
-  /* Keep the caret as a static presence marker — motion only is removed. */
-  .chat-streaming-caret > :is(p, h1, h2, h3, h4, h5, h6):last-child::after,
-  .chat-streaming-caret > :is(ul, ol):last-child > li:last-child::after,
-  .chat-streaming-caret > blockquote:last-child > p:last-child::after {
     animation: none;
     opacity: 0.5;
   }

@@ -23,16 +23,27 @@ const SHOW_BUTTON_THRESHOLD = 80
 const LOAD_OLDER_THRESHOLD = 600
 // Debounce for persisting scroll position to the query cache / localStorage.
 const SCROLL_SAVE_DEBOUNCE_MS = 150
-// Eased follow (continuous streaming growth / post-turn settle): fraction of
-// the remaining distance closed per frame. Lower = smoother/slower catch-up,
-// higher = snappier. Below FOLLOW_SNAP_PX the eased loop just snaps to the
-// target and stops, so it never spins forever chasing a sub-pixel remainder.
+// Eased follow: fraction of the remaining distance closed per frame. Lower =
+// smoother/slower catch-up, higher = snappier. Below FOLLOW_SNAP_PX the eased
+// loop just snaps to the target and stops, so it never spins forever chasing a
+// sub-pixel remainder.
 const FOLLOW_EASE = 0.3
 const FOLLOW_SNAP_PX = 0.5
 
 interface ScrollAnchor {
   groupKey: string
   offset: number
+}
+
+let reducedMotionQuery: MediaQueryList | null | undefined
+function prefersReducedMotion(): boolean {
+  if (reducedMotionQuery === undefined) {
+    reducedMotionQuery =
+      typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : null
+  }
+  return reducedMotionQuery?.matches ?? false
 }
 
 /**
@@ -62,7 +73,7 @@ function findScrollAnchor(
 interface UseChatScrollOptions {
   sessionId: string
   threadId: string
-  /** Number of rendered message groups — drives auto-scroll. */
+  /** Number of rendered message groups (gates the one-time restore). */
   groupCount: number
   /** Agent is actively streaming a turn. */
   isLoading: boolean
@@ -71,13 +82,6 @@ interface UseChatScrollOptions {
   hasPreviousPage: boolean
   isFetchingPreviousPage: boolean
   fetchPreviousPage: () => void
-  /**
-   * The trailing group is assistant text actively revealing word-by-word.
-   * Only this kind of growth is eased — every other growth source (a tool
-   * call row landing, a thinking block appearing) snaps instantly so the
-   * trailing dots/rows never visibly glide.
-   */
-  isTextStreaming: boolean
   /** Height of the floating bottom bar; growth re-pins to keep the latest row glued. */
   bottomBarHeight: number
   queryClient: QueryClient
@@ -107,15 +111,23 @@ export interface UseChatScrollResult {
  *   • auto-loading older history as the user nears the top
  *   • the "scroll to bottom" affordance
  *
+ * While pinned, a single eased rAF loop (`easeToBottom`) owns every follow:
+ * content growth, the scroll-to-bottom button, and the post-turn settle all
+ * glide toward the live bottom by closing a fraction of the remaining distance
+ * each frame. One mechanism means the sources can never fight each other —
+ * the loop re-reads the target from live scrollHeight every frame, so growth
+ * mid-glide just extends the same glide. The only instant jumps left are the
+ * ones that must land before paint: the per-thread restore, `pinToBottom` on
+ * send, and bottom-bar resizes (viewport height changes under the content).
+ *
  * Position preservation across an older-history prepend (and across the height
  * corrections that `content-visibility: auto` produces while scrolling up) is
  * delegated to the browser's native CSS scroll anchoring — but only while the
  * user is reading history. The container's `overflow-anchor` tracks the pin
- * state (see `setPinned`): OFF while pinned (we actively force the view to the
- * bottom each growth frame, and anchoring would otherwise fight that), ON while
- * scrolled up (so prepends and CV height corrections never shift the view). The
- * streaming/last group is additionally excluded as an anchor candidate. The hook
- * only ever writes `scrollTop` while pinned; scrolled up, it never touches it.
+ * state (see `setPinned`): OFF while pinned (we actively drive the view to the
+ * bottom, and anchoring would otherwise fight that), ON while scrolled up (so
+ * prepends and CV height corrections never shift the view). The hook only ever
+ * writes `scrollTop` while pinned; scrolled up, it never touches it.
  */
 export function useChatScroll({
   sessionId,
@@ -126,7 +138,6 @@ export function useChatScroll({
   hasPreviousPage,
   isFetchingPreviousPage,
   fetchPreviousPage,
-  isTextStreaming,
   bottomBarHeight,
   queryClient,
   syncEngine,
@@ -141,12 +152,12 @@ export function useChatScroll({
   const lastScrollTopRef = useRef(0)
 
   // Pin state also drives native CSS scroll anchoring on the container. The two
-  // are mutually exclusive: while pinned we actively own scrolling (force the
-  // view to the bottom each growth frame), so anchoring is OFF — otherwise it
-  // would try to hold an older element stationary and fight the bottom-follow,
-  // most visibly right after sending a message from a scrolled-up position.
-  // While the user is reading history (not pinned) anchoring is ON, so prepends
-  // and content-visibility height corrections never shift the view.
+  // are mutually exclusive: while pinned we actively own scrolling (drive the
+  // view to the bottom on growth), so anchoring is OFF — otherwise it would try
+  // to hold an older element stationary and fight the bottom-follow, most
+  // visibly right after sending a message from a scrolled-up position. While
+  // the user is reading history (not pinned) anchoring is ON, so prepends and
+  // content-visibility height corrections never shift the view.
   const setPinned = useCallback((value: boolean) => {
     pinnedRef.current = value
     const el = scrollContainerRef.current
@@ -160,6 +171,59 @@ export function useChatScroll({
   const setButtonVisible = useCallback((visible: boolean) => {
     setShowScrollButton((prev) => (prev === visible ? prev : visible))
   }, [])
+
+  // ── Bottom followers ──────────────────────────────────────────────────────
+  // Instant snap. Reserved for moves that must land before paint (restore,
+  // send, viewport resize); everything else goes through easeToBottom.
+  const snapToBottom = useCallback(() => {
+    if (!pinnedRef.current) return
+    const el = scrollContainerRef.current
+    if (!el) return
+    const max = el.scrollHeight - el.clientHeight
+    if (el.scrollTop < max) el.scrollTop = max
+  }, [])
+
+  // The eased follow loop. Recomputes the target from live scrollHeight each
+  // frame, so it naturally tracks content that keeps growing mid-glide rather
+  // than easing toward a stale target. Self-terminates once within
+  // FOLLOW_SNAP_PX, and bails immediately if the user takes over (pinnedRef
+  // cleared) — re-entrant calls just let the running loop keep going toward
+  // the latest target. Respects prefers-reduced-motion by snapping instead.
+  const followRafRef = useRef<number | null>(null)
+  const easeToBottom = useCallback(() => {
+    if (!pinnedRef.current || followRafRef.current !== null) return
+    if (prefersReducedMotion()) {
+      snapToBottom()
+      return
+    }
+    const step = () => {
+      const el = scrollContainerRef.current
+      if (!pinnedRef.current || !el) {
+        followRafRef.current = null
+        return
+      }
+      const max = el.scrollHeight - el.clientHeight
+      const delta = max - el.scrollTop
+      if (delta <= FOLLOW_SNAP_PX) {
+        if (delta > 0) el.scrollTop = max
+        followRafRef.current = null
+        return
+      }
+      el.scrollTop += delta * FOLLOW_EASE
+      followRafRef.current = requestAnimationFrame(step)
+    }
+    followRafRef.current = requestAnimationFrame(step)
+  }, [snapToBottom])
+
+  useEffect(
+    () => () => {
+      if (followRafRef.current !== null) {
+        cancelAnimationFrame(followRafRef.current)
+        followRafRef.current = null
+      }
+    },
+    []
+  )
 
   // ── Position persistence (debounced) ──────────────────────────────────────
   const pendingScrollMetaRef = useRef<ScrollMeta | null>(null)
@@ -252,7 +316,7 @@ export function useChatScroll({
       // user lands back near the bottom. Crucially we do NOT un-pin just because
       // `distanceFromBottom` grew — appending the just-sent message (or streaming
       // text) below the viewport spikes that distance for a frame before the
-      // auto-follow snap catches up, and un-pinning there would kill autoscroll.
+      // auto-follow catches up, and un-pinning there would kill autoscroll.
       if (scrolledUp) setPinned(false)
       else if (distanceFromBottom <= PIN_BOTTOM_THRESHOLD) setPinned(true)
       setButtonVisible(distanceFromBottom >= SHOW_BUTTON_THRESHOLD)
@@ -280,11 +344,15 @@ export function useChatScroll({
   // Any upward gesture immediately stops auto-following so streaming/auto-scroll
   // never fights the user. These listeners only fire for genuine user input —
   // programmatic scrollTop changes don't dispatch wheel/touch/key events.
+  // Gated on the transcript actually overflowing: on a short thread nothing can
+  // scroll, so no scroll event could ever re-pin — an accidental up-tick there
+  // would otherwise kill auto-follow for good.
   useEffect(() => {
     const el = scrollContainerRef.current
     if (!el) return
 
     const interrupt = () => {
+      if (el.scrollHeight - el.clientHeight <= 1) return
       setPinned(false)
     }
 
@@ -319,15 +387,15 @@ export function useChatScroll({
   }, [setPinned])
 
   // ── Imperative scrollers ──────────────────────────────────────────────────
+  // Button / shortcut: glide down via the same eased loop that owns streaming
+  // follow. Using one mechanism (not scrollTo({behavior:"smooth"})) matters:
+  // a native smooth scroll is cancelled by any programmatic scrollTop write,
+  // so growth landing mid-animation used to teleport the view instead.
   const scrollToBottom = useCallback(() => {
-    const el = scrollContainerRef.current
-    if (!el) return
     setPinned(true)
     setButtonVisible(false)
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    if (distanceFromBottom < 10) return
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
-  }, [setButtonVisible, setPinned])
+    easeToBottom()
+  }, [easeToBottom, setButtonVisible, setPinned])
 
   const pinToBottom = useCallback(() => {
     const el = scrollContainerRef.current
@@ -404,107 +472,37 @@ export function useChatScroll({
   ])
 
   // ── Auto-follow new content while pinned ──────────────────────────────────
-  // One mechanism owns bottom-follow: while pinned, jump scrollTop to the bottom.
-  // Instant only — stacking smooth scrolls is what produces visible jitter, and
-  // incremental streaming deltas are too small to perceive. Only acts when the
-  // view is *below* the bottom (content grew); on a shrink the browser already
-  // clamps scrollTop to the new max, keeping us glued, so there's nothing to do —
-  // re-snapping there would be the redundant write the old code guarded against.
-  // Anchoring is OFF while pinned (see setPinned), so this snap always wins.
-  const followBottom = useCallback(() => {
-    if (!pinnedRef.current) return
-    const el = scrollContainerRef.current
-    if (!el) return
-    const max = el.scrollHeight - el.clientHeight
-    if (el.scrollTop < max) el.scrollTop = max
-  }, [])
-
-  // Eased counterpart to followBottom, used for continuous streaming growth
-  // and the post-turn settle window (see below) where an instant snap every
-  // tick reads as jittery. Recomputes the target from live scrollHeight each
-  // frame, so it naturally tracks content that keeps growing mid-ease rather
-  // than easing toward a stale target. Self-terminates once within
-  // FOLLOW_SNAP_PX, and bails immediately if the user takes over (pinnedRef
-  // cleared) or the loop is already running (re-entrant calls just let the
-  // existing loop keep going toward the latest target).
-  const followRafRef = useRef<number | null>(null)
-  const smoothFollowBottom = useCallback(() => {
-    if (!pinnedRef.current || followRafRef.current !== null) return
-    const step = () => {
-      const el = scrollContainerRef.current
-      if (!pinnedRef.current || !el) {
-        followRafRef.current = null
-        return
-      }
-      const max = el.scrollHeight - el.clientHeight
-      const delta = max - el.scrollTop
-      if (delta <= FOLLOW_SNAP_PX) {
-        el.scrollTop = max
-        followRafRef.current = null
-        return
-      }
-      el.scrollTop += delta * FOLLOW_EASE
-      followRafRef.current = requestAnimationFrame(step)
-    }
-    followRafRef.current = requestAnimationFrame(step)
-  }, [])
-
-  useEffect(
-    () => () => {
-      if (followRafRef.current !== null) {
-        cancelAnimationFrame(followRafRef.current)
-        followRafRef.current = null
-      }
-    },
-    []
-  )
-
-  // Coarse triggers: a new group or the loading flag flipping (e.g. the just-sent
-  // message). Layout-phase so the snap lands before paint — instant, not eased,
-  // to avoid a flash of the old position.
-  useLayoutEffect(() => {
-    if (groupCount === 0) return
-    followBottom()
-  }, [isLoading, groupCount, followBottom])
-
-  // Read inside the ResizeObserver callback below without recreating it.
-  const isTextStreamingRef = useRef(isTextStreaming)
-  useEffect(() => {
-    isTextStreamingRef.current = isTextStreaming
-  }, [isTextStreaming])
-
-  // Continuous follow as the content box grows. A single ResizeObserver covers
-  // every growth source; gated on `pinned` so an older-history prepend (growth
-  // above a scrolled-up viewport) is left to native scroll anchoring instead.
-  // Word-reveal growth is eased — it fires on every reveal tick, and an instant
-  // jump each time is what made streaming feel jittery. Every other growth
-  // source (a tool call row landing, a thinking block appearing) snaps
-  // instantly instead — those are one-off size jumps, not a continuous
-  // stream, so easing them just reads as the trailing row visibly gliding.
+  // A single ResizeObserver on the content box covers every growth source —
+  // streamed text, a tool row landing, a thinking block appearing, a new group
+  // mounting — and glides the view down through the eased loop. Gated on
+  // `pinned` (inside easeToBottom) so an older-history prepend (growth above a
+  // scrolled-up viewport) is left to native scroll anchoring instead. Shrinks
+  // need no handling: the browser clamps scrollTop to the new max, which keeps
+  // a pinned view glued to the bottom by itself.
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
     const ro = new ResizeObserver(() => {
-      if (isTextStreamingRef.current) smoothFollowBottom()
-      else followBottom()
+      easeToBottom()
     })
     ro.observe(container)
     return () => ro.disconnect()
-  }, [smoothFollowBottom, followBottom])
+  }, [easeToBottom])
 
   // When the bottom bar grows/shrinks (multi-line input, todo panel, queued pill)
   // the scroll viewport's height changes — keep the latest row glued to its top.
+  // Instant: easing here reads as the transcript lagging behind the input box.
   useLayoutEffect(() => {
-    followBottom()
-  }, [bottomBarHeight, followBottom])
+    snapToBottom()
+  }, [bottomBarHeight, snapToBottom])
 
   // A turn keeps reflowing for a beat *after* it ends — the working block
   // collapses (~300ms grid animation) and the persisted-message refetch swaps the
-  // streamed rows for stored ones (~750ms). Those land after the coarse snap
-  // above and don't all emit a growth resize, so without this the view drifts
-  // ("bounces") down as the content settles below the fold. Hold the bottom glued
-  // across a short window once loading ends; bail the instant the user scrolls up
-  // (pinnedRef cleared by the wheel/touch listeners), so it never fights them.
+  // streamed rows for stored ones (~750ms). Those can land without a growth
+  // resize, so without this the view drifts ("bounces") as the content settles
+  // below the fold. Hold the bottom glued across a short window once loading
+  // ends; bail the instant the user scrolls up (pinnedRef cleared by the
+  // wheel/touch listeners), so it never fights them.
   const prevIsLoadingRef = useRef(isLoading)
   useEffect(() => {
     const wasLoading = prevIsLoadingRef.current
@@ -514,12 +512,12 @@ export function useChatScroll({
     const start = performance.now()
     const tick = () => {
       if (!pinnedRef.current) return
-      smoothFollowBottom()
+      easeToBottom()
       if (performance.now() - start < 900) raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [isLoading, smoothFollowBottom])
+  }, [isLoading, easeToBottom])
 
   return {
     scrollContainerRef,

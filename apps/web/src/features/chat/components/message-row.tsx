@@ -89,8 +89,6 @@ interface AssistantMessageBlockProps {
   isLastInTurn?: boolean
   /** Footer is mounted (height reserved) but hidden — turn still streaming. */
   footerPending?: boolean
-  /** This message is the live tail of an in-flight turn — more text may land. */
-  isStreaming?: boolean
   turnMessages?: AssistantMessage[]
   errorRepeatCount?: number
   rootPath?: string
@@ -210,22 +208,14 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
   entryDelayMs = 0,
   isLastInTurn = true,
   footerPending = false,
-  isStreaming = false,
   turnMessages,
   errorRepeatCount,
   rootPath,
 }: AssistantMessageBlockProps) {
   const hasContent = message.content.length > 0
   const hasError = !!message.errorMessage
-  const { text: displayContent, isRevealing } = useWordReveal(
-    message.content,
-    isNew
-  )
+  const { text: displayContent } = useWordReveal(message.content, isNew)
   const richRendering = useRichChatRenderingSetting()
-  // The caret marks the live typing edge: shown while the typewriter is still
-  // revealing, and also while this message is the streaming tail of the turn
-  // (caught up but more deltas may land) so it doesn't flicker between chunks.
-  const showCaret = hasContent && !hasError && (isRevealing || isStreaming)
 
   if (!hasContent && !hasError) return null
 
@@ -257,12 +247,7 @@ const AssistantMessageBlock = memo(function AssistantMessageBlock({
       }
     >
       {hasContent && (
-        <div
-          className={cn(
-            richRendering ? chatProseClassRich : chatProseClass,
-            showCaret && "chat-streaming-caret"
-          )}
-        >
+        <div className={richRendering ? chatProseClassRich : chatProseClass}>
           <Markdown
             remarkPlugins={remarkPlugins}
             components={getMarkdownComponents(rootPath, richRendering)}
@@ -371,8 +356,6 @@ export interface MessageRowProps {
   isLastInTurn?: boolean
   /** Footer is mounted (height reserved) but hidden — turn still streaming. */
   footerPending?: boolean
-  /** This row is the live tail of an in-flight turn (drives the typing caret). */
-  isStreaming?: boolean
   turnMessages?: AssistantMessage[]
   /** Consecutive identical assistant errors folded into this row (see message-groups.ts). */
   errorRepeatCount?: number
@@ -427,7 +410,6 @@ export const MessageRow = memo(function MessageRow({
   entryDelayMs = 0,
   isLastInTurn = true,
   footerPending = false,
-  isStreaming = false,
   turnMessages,
   errorRepeatCount,
   rootPath,
@@ -611,7 +593,6 @@ export const MessageRow = memo(function MessageRow({
       entryDelayMs={entryDelayMs}
       isLastInTurn={isLastInTurn}
       footerPending={footerPending}
-      isStreaming={isStreaming}
       turnMessages={turnMessages}
       errorRepeatCount={errorRepeatCount}
       rootPath={rootPath}

@@ -8,8 +8,14 @@ import {
 } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
 import { formatDuration } from "@/shared/lib/formatters"
+import { DiffStat, parseDiffCounts } from "@/features/git"
 import { ThinkingBlock } from "./thinking-block"
-import { ToolCallBlock, argsSummary, isSkillRead } from "./tool-call-block"
+import {
+  ToolCallBlock,
+  argsSummary,
+  getEditDiff,
+  isSkillRead,
+} from "./tool-call-block"
 import {
   CollapsibleBody,
   DISCLOSURE_DIM,
@@ -124,6 +130,39 @@ function describeRun(tools: ToolMessage[]): string {
 }
 
 /**
+ * Aggregate +/- line counts across an editing run. Edits carry a display diff
+ * in their result; writes have no diff, so their content lines count as added.
+ */
+function runDiffCounts(tools: ToolMessage[]): {
+  added: number
+  removed: number
+} {
+  let added = 0
+  let removed = 0
+  for (const t of tools) {
+    if (t.status !== "done") continue
+    const name = t.toolName.toLowerCase()
+    if (name === "edit") {
+      const diff = getEditDiff(t.result)
+      if (diff !== null) {
+        const counts = parseDiffCounts(diff)
+        added += counts.added
+        removed += counts.removed
+      }
+    } else if (name === "write") {
+      const content =
+        typeof t.args === "object" && t.args !== null
+          ? (t.args as Record<string, unknown>).content
+          : null
+      if (typeof content === "string" && content.length > 0) {
+        added += content.split("\n").length
+      }
+    }
+  }
+  return { added, removed }
+}
+
+/**
  * Build the collapsed description for a tool run group, appending file/query
  * names for file-based and web groups so the summary is immediately legible.
  */
@@ -192,6 +231,8 @@ function ToolRunGroup({
     ? argsSummary(tools[tools.length - 1].args, rootPath)
     : buildGroupDescription(tools, groupId, rootPath)
 
+  const diffCounts = groupId === "editing" ? runDiffCounts(tools) : null
+
   return (
     <div className="w-full text-xs">
       <button
@@ -232,6 +273,9 @@ function ToolRunGroup({
           >
             {description}
           </span>
+        )}
+        {diffCounts && (
+          <DiffStat added={diffCounts.added} removed={diffCounts.removed} />
         )}
         {!isLive && errorCount > 0 && (
           <span className="shrink-0 text-2xs text-destructive/50 tabular-nums">
@@ -459,7 +503,7 @@ export const WorkingBlock = memo(function WorkingBlock({
   )
   const entries = useMemo(
     () => buildWorkingEntries(messages, showThinking),
-    [messages, showThinking, isActive]
+    [messages, showThinking]
   )
   const hasThinkingContent = messages.some(
     (m) =>

@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import type { AssistantMessage, ErrorAction } from "../types"
-import { WorkingBlock, type WorkingMessage } from "./working-block"
+import { WorkingBlock } from "./working-block"
 import { ArrowDownIcon, PlugZapIcon } from "lucide-react"
 
 import { cn } from "@/shared/lib/utils"
@@ -340,8 +340,12 @@ export function ChatView({
   const chatTextboxRef = useRef<ChatComposerHandle>(null)
   const bottomBarRef = useRef<HTMLDivElement>(null)
   const textboxWrapRef = useRef<HTMLDivElement>(null)
-  // Messages present on the first non-empty render (from cache) skip entry animations.
-  // Only messages that arrive after the initial snapshot get animate-in treatment.
+  // Groups present on the first non-empty render (from cache) skip entry
+  // animations — only groups that arrive after the initial snapshot animate in.
+  // Keyed by the stable per-group keys (groupKeys below), the same identity the
+  // rendered rows use, so working blocks — including synthetic thinking-only
+  // ones, whose first message is not a real transcript message — resolve their
+  // "was I here at first paint?" lookup consistently.
   // State (not a ref) so it can be safely read during render.
   const [initialSnapshot, setInitialSnapshot] = useState<{
     sessionId: string
@@ -362,42 +366,6 @@ export function ChatView({
     setSelectedMode(initialMode)
     setSelectedApprovalMode(initialApprovalMode)
     setPendingApproval(null)
-  }
-
-  // Maintain the entry-animation snapshot during render (the "adjusting state
-  // while rendering" pattern above), not an effect — this keeps isNewMessage
-  // correct on the same frame and avoids the setState-in-effect cascade React
-  // 19 rejects. The per-message key (not per-group) lets us ask "was this
-  // message present at first paint?" for both regular and working-block rows.
-  //
-  //   • First paint / session switch: snapshot the visible keys so cached
-  //     messages skip entry animations.
-  //   • While idle (not streaming): fold every visible key into the snapshot.
-  //     This covers the post-turn refetch (~750 ms later) that re-keys streamed
-  //     rows to stable DB-id / createdAt keys — without it, the next prompt
-  //     would treat those as new and replay entry / word-reveal animations for
-  //     messages already shown. Skipped mid-turn so streaming rows still
-  //     animate in.
-  //
-  // The key-diff guard makes each branch converge, so the render-phase setState
-  // can't loop.
-  if (visibleMessages.length > 0) {
-    const sessionChanged =
-      initialSnapshot === null || initialSnapshot.sessionId !== sessionId
-    if (sessionChanged) {
-      setInitialSnapshot({
-        sessionId,
-        keys: new Set(visibleMessages.map((m, i) => getMessageKey(m, i))),
-      })
-    } else if (!isLoading) {
-      const keys = visibleMessages.map((m, i) => getMessageKey(m, i))
-      const alreadySnapshotted =
-        initialSnapshot.keys.size === keys.length &&
-        keys.every((k) => initialSnapshot.keys.has(k))
-      if (!alreadySnapshotted) {
-        setInitialSnapshot({ sessionId, keys: new Set(keys) })
-      }
-    }
   }
 
   // Focus textbox whenever the active session changes (imperative DOM op — effect is correct here).
@@ -465,6 +433,84 @@ export function ChatView({
     [visibleMessages]
   )
 
+  // Stable per-group keys derived from message identity rather than position,
+  // so prepending older history doesn't re-key existing rows. Used as the
+  // React key for each rendered group, as the entry-animation identity in
+  // initialSnapshot / entryDelayByKey, and as the scroll-anchor id
+  // (data-group-key) that useChatScroll restores against.
+  const groupKeys = useMemo(() => {
+    const keys: string[] = new Array(groupedMessages.length)
+    for (let i = 0; i < groupedMessages.length; i++) {
+      const group = groupedMessages[i]
+      if (group.type === "working") {
+        const firstMsg = group.messages[0]
+        if (firstMsg?.role === "tool") {
+          keys[i] = `working-tool-${firstMsg.toolCallId}`
+        } else if (firstMsg?.role === "assistant") {
+          const a = firstMsg as AssistantMessage
+          keys[i] = a.id
+            ? `working-assistant-id${a.id}`
+            : a.createdAt != null
+              ? `working-assistant-t${a.createdAt}`
+              : `working-assistant-i${group.startIndex}`
+        } else {
+          // Synthetic working block (final-thinking placeholder) is always
+          // followed by a regular assistant group; share its key prefix.
+          const next = groupedMessages[i + 1]
+          if (next?.type === "regular") {
+            keys[i] = `working-syn-${getMessageKey(next.message, next.index)}`
+          } else {
+            keys[i] = `working-i${group.startIndex}`
+          }
+        }
+      } else {
+        keys[i] = getMessageKey(group.message, group.index)
+      }
+    }
+    return keys
+  }, [groupedMessages])
+
+  // Maintain the entry-animation snapshot during render (the "adjusting state
+  // while rendering" pattern above), not an effect — this keeps isNew correct
+  // on the same frame and avoids the setState-in-effect cascade React 19
+  // rejects.
+  //
+  //   • First paint / session switch: snapshot the visible group keys so
+  //     cached groups skip entry animations.
+  //   • While idle (not streaming): fold every visible key into the snapshot.
+  //     This covers the post-turn refetch (~750 ms later) that re-keys streamed
+  //     rows to stable DB-id / createdAt keys — without it, the next prompt
+  //     would treat those as new and replay entry / word-reveal animations for
+  //     messages already shown. Skipped mid-turn so streaming rows still
+  //     animate in.
+  //
+  // Both branches compare set-to-set (deduped) and produce the same result on a
+  // re-render with unchanged input, so the render-phase setState converges.
+  if (groupKeys.length > 0) {
+    const sessionChanged =
+      initialSnapshot === null || initialSnapshot.sessionId !== sessionId
+    if (sessionChanged) {
+      setInitialSnapshot({ sessionId, keys: new Set(groupKeys) })
+    } else if (!isLoading) {
+      const nextKeys = new Set(groupKeys)
+      const alreadySnapshotted =
+        initialSnapshot.keys.size === nextKeys.size &&
+        groupKeys.every((k) => initialSnapshot.keys.has(k))
+      if (!alreadySnapshotted) {
+        setInitialSnapshot({ sessionId, keys: nextKeys })
+      }
+    }
+  }
+
+  // A group animates in only while a turn is streaming and it wasn't part of
+  // the initial snapshot — i.e. it just arrived. Shared by the working and
+  // regular render branches and by the stagger computation below.
+  const isNewGroupKey = (key: string): boolean =>
+    isLoading &&
+    initialSnapshot !== null &&
+    initialSnapshot.sessionId === sessionId &&
+    !initialSnapshot.keys.has(key)
+
   // Per-turn appearance order: maps each not-in-snapshot ("new") key to an
   // `animation-delay`, derived purely from its position among the new rows so
   // rows mounted in the same RAF batch cascade instead of overlapping.
@@ -484,35 +530,26 @@ export function ChatView({
       return delays
     }
     let seq = 0
-    for (const group of groupedMessages) {
-      if (group.type === "working") {
-        const firstMsg = group.messages[0] as WorkingMessage | undefined
-        const firstKey = firstMsg
-          ? getMessageKey(firstMsg, group.startIndex)
-          : `working-${group.startIndex}`
-        if (!initialSnapshot.keys.has(firstKey)) {
-          delays.set(firstKey, entryDelayFor(seq++))
-        }
-        continue
-      }
-      const { message, index } = group
+    for (let i = 0; i < groupedMessages.length; i++) {
+      const group = groupedMessages[i]
       // Empty assistant placeholders render nothing (content === null below),
       // so they don't animate — skip them to keep the stagger aligned with JSX.
       if (
-        message.role === "assistant" &&
-        !message.content.trim() &&
-        !message.thinking.trim() &&
-        !message.errorMessage
+        group.type === "regular" &&
+        group.message.role === "assistant" &&
+        !group.message.content.trim() &&
+        !group.message.thinking.trim() &&
+        !group.message.errorMessage
       ) {
         continue
       }
-      const key = getMessageKey(message, index)
+      const key = groupKeys[i]
       if (!initialSnapshot.keys.has(key)) {
         delays.set(key, entryDelayFor(seq++))
       }
     }
     return delays
-  }, [groupedMessages, isLoading, initialSnapshot, sessionId])
+  }, [groupedMessages, groupKeys, isLoading, initialSnapshot, sessionId])
   const getEntryDelayMs = (key: string): number => entryDelayByKey.get(key) ?? 0
 
   // Once the reply's text has started streaming in, the growing message is
@@ -545,7 +582,6 @@ export function ChatView({
     hasPreviousPage,
     isFetchingPreviousPage,
     fetchPreviousPage,
-    isTextStreaming: lastGroupStreamingContent,
     bottomBarHeight,
     queryClient,
     syncEngine,
@@ -623,41 +659,6 @@ export function ChatView({
       ),
     [groupedMessages, visibleMessages]
   )
-
-  // Stable per-group keys derived from message identity rather than position,
-  // so prepending older history doesn't re-key existing rows. Used as the
-  // React key for each rendered group and by the initialSnapshot isNew lookup.
-  const groupKeys = useMemo(() => {
-    const keys: string[] = new Array(groupedMessages.length)
-    for (let i = 0; i < groupedMessages.length; i++) {
-      const group = groupedMessages[i]
-      if (group.type === "working") {
-        const firstMsg = group.messages[0]
-        if (firstMsg?.role === "tool") {
-          keys[i] = `working-tool-${firstMsg.toolCallId}`
-        } else if (firstMsg?.role === "assistant") {
-          const a = firstMsg as AssistantMessage
-          keys[i] = a.id
-            ? `working-assistant-id${a.id}`
-            : a.createdAt != null
-              ? `working-assistant-t${a.createdAt}`
-              : `working-assistant-i${group.startIndex}`
-        } else {
-          // Synthetic working block (final-thinking placeholder) is always
-          // followed by a regular assistant group; share its key prefix.
-          const next = groupedMessages[i + 1]
-          if (next?.type === "regular") {
-            keys[i] = `working-syn-${getMessageKey(next.message, next.index)}`
-          } else {
-            keys[i] = `working-i${group.startIndex}`
-          }
-        }
-      } else {
-        keys[i] = getMessageKey(group.message, group.index)
-      }
-    }
-    return keys
-  }, [groupedMessages])
 
   // While a question or a tool approval is awaiting the user the agent is idle,
   // not working — hide the shimmering "thinking" phrase so it doesn't claim the
@@ -949,23 +950,14 @@ export function ChatView({
               </div>
             )}
             {groupedMessages.map((group, groupIndex) => {
-              const itemKey = groupKeys[groupIndex] ?? groupIndex
+              const itemKey = groupKeys[groupIndex]
+              const isNewGroup = isNewGroupKey(itemKey)
+              const entryDelayMs = isNewGroup ? getEntryDelayMs(itemKey) : 0
               let content: React.ReactNode
 
               if (group.type === "working") {
                 const isGroupActive =
                   isLoading && groupIndex === groupedMessages.length - 1
-                const firstMsg = group.messages[0] as WorkingMessage | undefined
-                // Use the same key fn as initialSnapshot to keep isNew lookup consistent.
-                const firstKey = firstMsg
-                  ? getMessageKey(firstMsg, group.startIndex)
-                  : `working-${group.startIndex}`
-                const isNewGroup =
-                  isLoading &&
-                  initialSnapshot !== null &&
-                  initialSnapshot.sessionId === sessionId &&
-                  !initialSnapshot.keys.has(firstKey)
-                const entryDelayMs = isNewGroup ? getEntryDelayMs(firstKey) : 0
                 content = (
                   <div className="mx-auto w-full max-w-4xl px-3 pb-3">
                     <WorkingBlock
@@ -982,7 +974,6 @@ export function ChatView({
               } else {
                 const {
                   message,
-                  index,
                   isLastInTurnStatic,
                   turnMessages,
                   repeatCount,
@@ -995,30 +986,15 @@ export function ChatView({
                 ) {
                   content = null
                 } else {
-                  const key = getMessageKey(message, index)
-                  const isNewMessage =
-                    isLoading &&
-                    initialSnapshot !== null &&
-                    initialSnapshot.sessionId === sessionId &&
-                    !initialSnapshot.keys.has(key)
                   // The footer (model · duration · timestamp) isn't final mid-
                   // turn, so it stays hidden while the active turn streams — but
                   // it's still mounted (footerPending) to reserve its height, so
                   // it doesn't add a line and shift the pinned view when the turn
                   // finishes.
-                  const isLastInTurn = isLastInTurnStatic
                   const footerPending =
                     isLastInTurnStatic &&
                     isLoading &&
                     groupIndex === activeTurnFooterGroupIndex
-                  const entryDelayMs = isNewMessage ? getEntryDelayMs(key) : 0
-                  // The trailing assistant group of an in-flight turn is the
-                  // live typing edge — it renders the streaming caret while
-                  // more deltas may still land.
-                  const isStreamingTail =
-                    isLoading &&
-                    message.role === "assistant" &&
-                    groupIndex === groupedMessages.length - 1
                   content = (
                     <div className="mx-auto w-full max-w-4xl px-3 pb-3">
                       <MessageRow
@@ -1027,11 +1003,10 @@ export function ChatView({
                         showThinking={
                           group.suppressThinking ? false : showThinkingSetting
                         }
-                        isNewMessage={isNewMessage}
+                        isNewMessage={isNewGroup}
                         entryDelayMs={entryDelayMs}
-                        isLastInTurn={isLastInTurn}
+                        isLastInTurn={isLastInTurnStatic}
                         footerPending={footerPending}
-                        isStreaming={isStreamingTail}
                         turnMessages={turnMessages}
                         errorRepeatCount={repeatCount}
                         rootPath={rootPath}
@@ -1069,7 +1044,7 @@ export function ChatView({
               return (
                 <div
                   key={itemKey}
-                  data-group-key={String(itemKey)}
+                  data-group-key={itemKey}
                   style={
                     isLastGroup
                       ? { overflowAnchor: "none" }
