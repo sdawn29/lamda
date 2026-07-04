@@ -229,7 +229,7 @@ const ThreadRow = memo(function ThreadRow({
 
   useEffect(() => {
     if (isActive) {
-      rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+      rowRef.current?.scrollIntoView({ block: "nearest", behavior: "auto" })
     }
   }, [isActive])
 

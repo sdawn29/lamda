@@ -23,6 +23,10 @@ const SHOW_BUTTON_THRESHOLD = 80
 const LOAD_OLDER_THRESHOLD = 600
 // Debounce for persisting scroll position to the query cache / localStorage.
 const SCROLL_SAVE_DEBOUNCE_MS = 150
+// After switching threads, the transcript mounts and measures in a short burst
+// (cached rows, content-visibility estimates, images/tool blocks). Keep those
+// first corrections instant so restoring a thread doesn't visibly glide.
+const RESTORE_SNAP_WINDOW_MS = 500
 // Eased follow: fraction of the remaining distance closed per frame. Lower =
 // smoother/slower catch-up, higher = snappier. Below FOLLOW_SNAP_PX the eased
 // loop just snaps to the target and stops, so it never spins forever chasing a
@@ -190,6 +194,7 @@ export function useChatScroll({
   // cleared) — re-entrant calls just let the running loop keep going toward
   // the latest target. Respects prefers-reduced-motion by snapping instead.
   const followRafRef = useRef<number | null>(null)
+  const snapUntilRef = useRef(0)
   const easeToBottom = useCallback(() => {
     if (!pinnedRef.current || followRafRef.current !== null) return
     if (prefersReducedMotion()) {
@@ -460,6 +465,7 @@ export function useChatScroll({
     lastScrollTopRef.current = el.scrollTop
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     setButtonVisible(distanceFromBottom >= SHOW_BUTTON_THRESHOLD)
+    snapUntilRef.current = performance.now() + RESTORE_SNAP_WINDOW_MS
   }, [
     threadId,
     sessionId,
@@ -483,11 +489,15 @@ export function useChatScroll({
     const container = messagesContainerRef.current
     if (!container) return
     const ro = new ResizeObserver(() => {
-      easeToBottom()
+      if (!isLoading || performance.now() < snapUntilRef.current) {
+        snapToBottom()
+      } else {
+        easeToBottom()
+      }
     })
     ro.observe(container)
     return () => ro.disconnect()
-  }, [easeToBottom])
+  }, [easeToBottom, isLoading, snapToBottom])
 
   // When the bottom bar grows/shrinks (multi-line input, todo panel, queued pill)
   // the scroll viewport's height changes — keep the latest row glued to its top.

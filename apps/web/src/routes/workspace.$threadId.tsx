@@ -98,6 +98,7 @@ function WorkspaceThreadRoute() {
 
   return (
     <ChatView
+      key={foundThread.sessionId}
       sessionId={foundThread.sessionId}
       workspaceId={foundWorkspace!.id}
       threadId={foundThread.id}
