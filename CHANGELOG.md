@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.45.0](../../releases/tag/v0.45.0) — 2026-07-04
+
+### Features
+
+* **menu:** implement native menu actions and expose API to renderer
+
+### Other Changes
+
+* Refactor documentation and add new features
+
 ## [0.44.0](../../releases/tag/v0.44.0) — 2026-07-04
 
 ### Features
