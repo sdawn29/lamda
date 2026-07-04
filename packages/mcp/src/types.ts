@@ -36,6 +36,8 @@ export interface McpServerConfig {
   headers?: Record<string, string>;
   /** Optional description */
   description?: string;
+  /** Whether the server is enabled. Defaults to true when omitted. */
+  enabled?: boolean;
 }
 
 /**

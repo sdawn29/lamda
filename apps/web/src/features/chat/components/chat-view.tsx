@@ -74,6 +74,7 @@ import {
   clearPendingThreadPreferences,
   getPendingThreadPreferences,
 } from "./pending-thread-preferences"
+import { readThreadDraft, writeThreadDraft } from "../composer-prefs-store"
 import { getNextMode } from "./mode-combobox"
 import { QuestionView } from "./question-view"
 import { findActiveQuestion } from "../lib/active-question"
@@ -726,6 +727,13 @@ export function ChatView({
     })
   }, [abortSessionMutation, markStopped, threadId, updateThreadStopped])
 
+  const handleComposerValueChange = useCallback(
+    (value: string) => {
+      writeThreadDraft(threadId, value)
+    },
+    [threadId]
+  )
+
   useShortcutHandler(SHORTCUT_ACTIONS.FOCUS_CHAT, () => {
     chatTextboxRef.current?.focus()
   })
@@ -1186,6 +1194,9 @@ export function ChatView({
                 ref={chatTextboxRef}
                 onSend={handleSend}
                 onStop={handleStop}
+                initialValue={readThreadDraft(threadId)}
+                initialValueKey={threadId}
+                onValueChange={handleComposerValueChange}
                 isLoading={isLoading}
                 isAborting={abortSessionMutation.isPending}
                 sessionId={sessionId}

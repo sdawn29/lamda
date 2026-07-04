@@ -1,4 +1,11 @@
-import React, { useState, useCallback, useEffect, useRef, memo } from "react"
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  memo,
+} from "react"
 import {
   Archive,
   ArrowUpDown,
@@ -377,6 +384,13 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
   const envWorkspace = workspaces.find((ws) => ws.id === envWorkspaceId) ?? null
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [draggingWorkspaceId, setDraggingWorkspaceId] = useState<string | null>(
+    null
+  )
+  const [workspaceDropTarget, setWorkspaceDropTarget] = useState<{
+    id: string
+    position: "before" | "after"
+  } | null>(null)
   const navigate = useNavigate()
   const openSettings = useCallback(() => {
     navigate({
@@ -444,12 +458,26 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
   const sortOrder = useWorkspaceSortStore((s) => s.sortOrder)
+  const manualWorkspaceIds = useWorkspaceSortStore((s) => s.manualWorkspaceIds)
   const setSortOrder = useWorkspaceSortStore((s) => s.setSortOrder)
+  const setManualWorkspaceOrder = useWorkspaceSortStore(
+    (s) => s.setManualWorkspaceOrder
+  )
+  const manualOrderIndex = useMemo(
+    () => new Map(manualWorkspaceIds.map((id, index) => [id, index])),
+    [manualWorkspaceIds]
+  )
   const compareWorkspaces = (
     a: (typeof workspaces)[0],
     b: (typeof workspaces)[0]
   ) => {
     switch (sortOrder) {
+      case "manual": {
+        const aIndex = manualOrderIndex.get(a.id) ?? Number.POSITIVE_INFINITY
+        const bIndex = manualOrderIndex.get(b.id) ?? Number.POSITIVE_INFINITY
+        if (aIndex !== bIndex) return aIndex - bIndex
+        return a.createdAt - b.createdAt
+      }
       case "name":
         return a.name.localeCompare(b.name)
       case "created-desc":
@@ -466,9 +494,110 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
     .filter((ws) => !ws.isPinned)
     .sort(compareWorkspaces)
 
+  const finishWorkspaceDrag = useCallback(() => {
+    setDraggingWorkspaceId(null)
+    setWorkspaceDropTarget(null)
+  }, [])
+
+  const canDropWorkspace = useCallback(
+    (draggedId: string, targetId: string) => {
+      if (draggedId === targetId) return false
+      const dragged = workspaces.find((ws) => ws.id === draggedId)
+      const target = workspaces.find((ws) => ws.id === targetId)
+      return !!dragged && !!target && !!dragged.isPinned === !!target.isPinned
+    },
+    [workspaces]
+  )
+
+  const handleWorkspaceDragStart = useCallback(
+    (e: React.DragEvent, workspaceId: string) => {
+      setDraggingWorkspaceId(workspaceId)
+      e.dataTransfer.effectAllowed = "move"
+      e.dataTransfer.setData("text/plain", workspaceId)
+    },
+    []
+  )
+
+  const handleWorkspaceDragOver = useCallback(
+    (e: React.DragEvent, targetId: string) => {
+      const draggedId =
+        draggingWorkspaceId || e.dataTransfer.getData("text/plain")
+      if (!draggedId || !canDropWorkspace(draggedId, targetId)) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = "move"
+      const rect = e.currentTarget.getBoundingClientRect()
+      setWorkspaceDropTarget({
+        id: targetId,
+        position:
+          e.clientY < rect.top + rect.height / 2 ? "before" : "after",
+      })
+    },
+    [canDropWorkspace, draggingWorkspaceId]
+  )
+
+  const handleWorkspaceDrop = useCallback(
+    (e: React.DragEvent, targetId: string) => {
+      const draggedId =
+        draggingWorkspaceId || e.dataTransfer.getData("text/plain")
+      const dropTarget =
+        workspaceDropTarget?.id === targetId
+          ? workspaceDropTarget
+          : { id: targetId, position: "after" as const }
+      if (!draggedId || !canDropWorkspace(draggedId, targetId)) {
+        finishWorkspaceDrag()
+        return
+      }
+      e.preventDefault()
+
+      const currentIds = [
+        ...pinnedWorkspaces.map((ws) => ws.id),
+        ...unpinnedWorkspaces.map((ws) => ws.id),
+      ]
+      const nextIds = currentIds.filter((id) => id !== draggedId)
+      const targetIndex = nextIds.indexOf(targetId)
+      if (targetIndex === -1) {
+        finishWorkspaceDrag()
+        return
+      }
+      nextIds.splice(
+        dropTarget.position === "after" ? targetIndex + 1 : targetIndex,
+        0,
+        draggedId
+      )
+      setManualWorkspaceOrder(nextIds)
+      finishWorkspaceDrag()
+    },
+    [
+      canDropWorkspace,
+      draggingWorkspaceId,
+      finishWorkspaceDrag,
+      pinnedWorkspaces,
+      setManualWorkspaceOrder,
+      unpinnedWorkspaces,
+      workspaceDropTarget,
+    ]
+  )
+
   const renderWorkspaceItem = (ws: (typeof workspaces)[0]) => (
-    <SidebarMenuItem key={ws.id} className="group/ws">
+    <SidebarMenuItem
+      key={ws.id}
+      onDragOver={(e) => handleWorkspaceDragOver(e, ws.id)}
+      onDrop={(e) => handleWorkspaceDrop(e, ws.id)}
+      onDragEnd={finishWorkspaceDrag}
+      className={cn(
+        "group/ws relative cursor-grab active:cursor-grabbing",
+        draggingWorkspaceId === ws.id && "opacity-45",
+        workspaceDropTarget?.id === ws.id &&
+          workspaceDropTarget.position === "before" &&
+          "before:absolute before:inset-x-2 before:top-0 before:z-10 before:h-0.5 before:rounded-full before:bg-primary",
+        workspaceDropTarget?.id === ws.id &&
+          workspaceDropTarget.position === "after" &&
+          "after:absolute after:inset-x-2 after:bottom-0 after:z-10 after:h-0.5 after:rounded-full after:bg-primary"
+      )}
+    >
       <SidebarMenuButton
+        draggable
+        onDragStart={(e) => handleWorkspaceDragStart(e, ws.id)}
         onClick={() => toggleWorkspaceCollapsed(ws.id)}
         tooltip={ws.name}
       >
@@ -763,6 +892,9 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
                   setSortOrder(value as typeof sortOrder)
                 }
               >
+                <DropdownMenuRadioItem value="manual">
+                  Manual
+                </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="name">
                   Name (A–Z)
                 </DropdownMenuRadioItem>

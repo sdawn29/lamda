@@ -124,6 +124,9 @@ interface ChatComposerProps {
   isAborting?: boolean
   onStop?: () => void
   placeholder?: string
+  initialValue?: string
+  initialValueKey?: string
+  onValueChange?: (value: string) => void
   className?: string
   /** Overrides the textbox's default idle height — e.g. a taller hero textbox on the new-thread page. */
   inputMinHeightClassName?: string
@@ -148,6 +151,9 @@ export const ChatComposer = memo(
       isAborting = false,
       onStop,
       placeholder = "Ask anything @ for files, / for commands",
+      initialValue,
+      initialValueKey,
+      onValueChange,
       className,
       inputMinHeightClassName,
       sessionId,
@@ -224,6 +230,9 @@ export const ChatComposer = memo(
       ? controlledThinkingLevel
       : thinkingLevel
     const richInputRef = React.useRef<RichInputHandle>(null)
+    const appliedInitialValueRef = React.useRef<
+      { key: string | undefined; value: string } | undefined
+    >(undefined)
     // Persisted history of sent messages (newest last), cycled with Up/Down.
     const historyRef = React.useRef<string[]>(readMessageHistory())
     // Position within `historyRef`; null means we're showing the live draft.
@@ -260,11 +269,32 @@ export const ChatComposer = memo(
       setValue(text: string) {
         richInputRef.current?.setValue(text)
         setIsEmpty(text.trim().length === 0)
+        onValueChange?.(text)
       },
       focus() {
         richInputRef.current?.focus()
       },
     }))
+
+    React.useEffect(() => {
+      if (initialValue === undefined) return
+      const applied = appliedInitialValueRef.current
+      if (applied?.key === initialValueKey && applied.value === initialValue) {
+        return
+      }
+      appliedInitialValueRef.current = {
+        key: initialValueKey,
+        value: initialValue,
+      }
+
+      if ((richInputRef.current?.getValue() ?? "") === initialValue) return
+      if (initialValue) {
+        richInputRef.current?.setValue(initialValue)
+      } else {
+        richInputRef.current?.clear()
+      }
+      setIsEmpty(initialValue.trim().length === 0)
+    }, [initialValue, initialValueKey])
 
     const { data } = useModels()
     const models = React.useMemo(() => data?.models ?? [], [data])
@@ -454,6 +484,7 @@ export const ChatComposer = memo(
           onSelect: () => {
             richInputRef.current?.clear()
             setIsEmpty(true)
+            onValueChange?.("")
           },
         })
       }
@@ -552,6 +583,7 @@ export const ChatComposer = memo(
       isLoading,
       isEmpty,
       onStop,
+      onValueChange,
       mode,
       modeList,
       onModeChange,
@@ -733,6 +765,7 @@ export const ChatComposer = memo(
       setHistoryNav(null)
       richInputRef.current?.clear()
       setIsEmpty(true)
+      onValueChange?.("")
       setAttachments([])
       setAtMention(null)
       setSlashMention(null)
@@ -751,6 +784,7 @@ export const ChatComposer = memo(
         setIsEmpty(true)
         richInputRef.current?.focus()
       }
+      onValueChange?.(text)
     }
 
     // Leave history navigation, restoring the draft that was in the input when
@@ -821,6 +855,7 @@ export const ChatComposer = memo(
     function handleInput() {
       const text = richInputRef.current?.getValue() ?? ""
       setIsEmpty(text.trim().length === 0)
+      onValueChange?.(text)
       // If the user edits a recalled message, leave history mode so their edit
       // becomes the live draft and the indicator clears immediately.
       if (
@@ -878,6 +913,7 @@ export const ChatComposer = memo(
         setSlashMention(null)
         const text = richInputRef.current?.getValue() ?? ""
         setIsEmpty(text.trim().length === 0)
+        onValueChange?.(text)
         item.onSelect()
         return
       }
@@ -899,6 +935,7 @@ export const ChatComposer = memo(
 
       setSlashMention(null)
       setIsEmpty(false)
+      onValueChange?.(richInputRef.current?.getValue() ?? "")
       richInputRef.current?.focus()
     }
 
@@ -924,6 +961,7 @@ export const ChatComposer = memo(
 
       setAtMention(null)
       setIsEmpty(false)
+      onValueChange?.(richInputRef.current?.getValue() ?? "")
       richInputRef.current?.focus()
     }
 

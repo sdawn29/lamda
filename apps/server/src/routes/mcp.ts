@@ -32,6 +32,7 @@ const mcpServerConfigSchema = z.object({
   cwd: z.string().optional(),
   url: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
+  enabled: z.boolean().optional(),
 });
 
 const mcpSettingsSchema = z.object({

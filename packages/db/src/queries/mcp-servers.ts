@@ -108,7 +108,7 @@ export function saveMcpServers(configs: McpServerConfig[]): void {
         url: config.url ?? null,
         headers: config.headers ? JSON.stringify(config.headers) : null,
         description: config.description ?? null,
-        enabled: enabledMap.get(config.name) ?? true,
+        enabled: config.enabled ?? enabledMap.get(config.name) ?? true,
         createdAt: now,
       })
       .run();
@@ -143,5 +143,6 @@ export function dbToMcpConfig(server: DbMcpServer): McpServerConfig {
     url: server.url ?? undefined,
     headers: server.headers ? JSON.parse(server.headers) : undefined,
     description: server.description ?? undefined,
+    enabled: server.enabled,
   };
 }

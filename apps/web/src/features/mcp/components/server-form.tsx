@@ -865,7 +865,7 @@ export function ServerListItem({
   const [showTools, setShowTools] = useState(false)
 
   const hasTools = tools && tools.length > 0
-  const isEnabled = status?.enabled ?? true
+  const isEnabled = status?.enabled ?? server.enabled ?? true
   const isConnected = status?.connected ?? false
 
   // Reflect the pending toggle immediately for a responsive switch.
