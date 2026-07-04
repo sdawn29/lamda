@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.44.0](../../releases/tag/v0.44.0) — 2026-07-04
+
+### Features
+
+* **mcp:** add enabled property to server config and update related logic feat(chat): enhance chat composer with initial value and value change handling refactor(workspace): implement manual sorting for workspaces with drag-and-drop fix(chat): persist thread drafts in localStorage for chat composer
+* **chat:** improve scroll behavior on thread switch and adjust scrollIntoView behavior
+* **git:** add publish branch functionality and upstream check
+
+### Bug Fixes
+
+* **build:** update electronVersion in package.json to match devDependencies
+* **deps:** update monaco-editor to version 0.55.1
+
+### Code Refactoring
+
+* remove streaming caret logic and related styles; simplify message rendering
+
 ## [0.43.0](../../releases/tag/v0.43.0) — 2026-07-03
 
 ### Features
