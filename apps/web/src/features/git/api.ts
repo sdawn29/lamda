@@ -124,6 +124,12 @@ export function gitPush(sessionId: string): Promise<void> {
   return apiFetch<void>(`${base(sessionId)}/push`, { method: "POST" })
 }
 
+/** Pushes the current branch and sets its upstream (`git push -u origin HEAD`).
+ *  Used for branches that don't exist on origin yet. */
+export function gitPublishBranch(sessionId: string): Promise<void> {
+  return apiFetch<void>(`${base(sessionId)}/publish`, { method: "POST" })
+}
+
 export function gitFetch(sessionId: string): Promise<void> {
   return apiFetch<void>(`${base(sessionId)}/fetch`, { method: "POST" })
 }
@@ -214,12 +220,16 @@ export async function gitShowFileDiff(
   return diff
 }
 
-export async function getAheadBehind(
-  sessionId: string
-): Promise<{ ahead: number | null; behind: number | null }> {
-  return apiFetch<{ ahead: number | null; behind: number | null }>(
-    `${base(sessionId)}/ahead-behind`
-  )
+// ahead/behind are null when the branch has no upstream; combined with
+// hasRemote=true that means the branch was never published to origin.
+export interface AheadBehind {
+  ahead: number | null
+  behind: number | null
+  hasRemote: boolean
+}
+
+export async function getAheadBehind(sessionId: string): Promise<AheadBehind> {
+  return apiFetch<AheadBehind>(`${base(sessionId)}/ahead-behind`)
 }
 
 // ── Turn checkpoints (multi-turn history) ─────────────────────────────────────

@@ -62,11 +62,7 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
       }
       icon={
         isSkill ? (
-          <ContainerIcon
-            data-icon="inline-start"
-            className="text-muted-foreground"
-            aria-hidden
-          />
+          <ContainerIcon data-icon="inline-start" aria-hidden />
         ) : (
           <FileTextIcon data-icon="inline-start" aria-hidden />
         )
@@ -86,10 +82,7 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
               )}
             >
               {isSkill ? (
-                <ContainerIcon
-                  className="size-3.5 text-muted-foreground"
-                  aria-hidden
-                />
+                <ContainerIcon className="size-3.5" aria-hidden />
               ) : (
                 <FileTextIcon className="size-3.5" aria-hidden />
               )}

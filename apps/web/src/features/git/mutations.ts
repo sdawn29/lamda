@@ -15,6 +15,7 @@ import {
   gitStashDrop,
   gitRevertFile,
   gitPush,
+  gitPublishBranch,
   gitFetch,
   gitPull,
   gitGenerateCommitMessage,
@@ -150,6 +151,16 @@ export function useGitRevertFile(sessionId: string) {
 export function useGitPush(sessionId: string) {
   return useMutation({
     mutationFn: () => gitPush(sessionId),
+  })
+}
+
+// Publishes a branch with no upstream to origin (`git push -u origin HEAD`).
+// Invalidates the whole git session so ahead/behind and branch state refresh.
+export function useGitPublishBranch(sessionId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => gitPublishBranch(sessionId),
+    onSuccess: () => invalidateGitSession(queryClient, sessionId),
   })
 }
 

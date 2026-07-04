@@ -16,6 +16,8 @@ import {
   gitFileDiff,
   gitCommit,
   gitPush,
+  gitPushSetUpstream,
+  gitHasOriginRemote,
   gitFetch,
   gitPull,
   gitStage,
@@ -344,6 +346,18 @@ git.post("/session/:id/git/push", async (c) => {
   }
 });
 
+// Publishes a branch that has no upstream yet: `git push -u origin HEAD`.
+git.post("/session/:id/git/publish", async (c) => {
+  const cwd = gitCwd(c.req.param("id"));
+  if (!cwd) return c.json({ error: "Session not found" }, 404);
+  try {
+    await gitPushSetUpstream(cwd);
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    return c.json({ error: parseGitError(err, "Publish failed") }, 500);
+  }
+});
+
 git.post("/session/:id/git/fetch", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
   if (!cwd) return c.json({ error: "Session not found" }, 404);
@@ -368,9 +382,14 @@ git.post("/session/:id/git/pull", async (c) => {
 
 git.get("/session/:id/git/ahead-behind", async (c) => {
   const cwd = gitCwd(c.req.param("id"));
-  if (!cwd) return c.json({ ahead: null, behind: null });
-  const result = await getAheadBehind(cwd);
-  return c.json(result ?? { ahead: null, behind: null });
+  if (!cwd) return c.json({ ahead: null, behind: null, hasRemote: false });
+  const [result, hasRemote] = await Promise.all([
+    getAheadBehind(cwd),
+    gitHasOriginRemote(cwd),
+  ]);
+  // ahead/behind of null with hasRemote true = branch has no upstream yet,
+  // i.e. it was never published to origin.
+  return c.json({ ...(result ?? { ahead: null, behind: null }), hasRemote });
 });
 
 async function readLogEntries(cwd: string, limitParam: string | undefined) {

@@ -27,6 +27,7 @@ import {
   useGenerateCommitMessage,
   useGitCommit,
   useGitPush,
+  useGitPublishBranch,
 } from "../mutations"
 
 interface ChangedFile {
@@ -83,28 +84,61 @@ function AutoTextarea({
 //
 // Step 1 – staged files exist → split [Commit] [▾ Commit & Push]
 // Step 2 – nothing staged but ahead > 0 → [Push N commits]
+// Step 2b – nothing staged, branch has no upstream on origin → [Publish Branch]
 // Otherwise → disabled commit button
 
 function WorkflowButton({
   staged,
   ahead,
+  needsPublish,
   canCommit,
   committing,
   pushing,
   onCommit,
   onCommitAndPush,
   onPush,
+  onPublish,
 }: {
   staged: number
   ahead: number | null
+  needsPublish: boolean
   canCommit: boolean
   committing: boolean
   pushing: boolean
   onCommit: () => void
   onCommitAndPush: () => void
   onPush: () => void
+  onPublish: () => void
 }) {
   const busy = committing || pushing
+
+  // Step 2b: branch was never pushed to origin → offer to publish it
+  if (staged === 0 && needsPublish) {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="sm"
+              onClick={onPublish}
+              disabled={busy}
+              className="h-7 gap-1.5 px-3 text-xs"
+            >
+              {pushing ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <CloudUpload className="size-3" />
+              )}
+              Publish Branch
+            </Button>
+          }
+        />
+        <TooltipContent>
+          Push this branch to origin and set its upstream
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
 
   // Step 2: nothing to commit, but unpushed commits exist → show Push
   if (staged === 0 && (ahead ?? 0) > 0) {
@@ -186,7 +220,7 @@ function WorkflowButton({
             ) : (
               <CloudUpload className="size-3.5" />
             )}
-            Commit & Push
+            {needsPublish ? "Commit & Publish" : "Commit & Push"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -214,10 +248,17 @@ export function CommitInputSection({
   const statusRaw = statusData?.raw ?? ""
   const { data: aheadBehind } = useAheadBehind(sessionId)
   const ahead = aheadBehind?.ahead ?? null
+  // ahead === null with a remote configured means the branch has no upstream,
+  // i.e. it was never published to origin. Undefined data = still loading.
+  const needsPublish =
+    aheadBehind !== undefined &&
+    aheadBehind.ahead === null &&
+    aheadBehind.hasRemote
 
   const commitMutation = useGitCommit(sessionId)
   const generateCommitMessageMutation = useGenerateCommitMessage(sessionId)
   const pushMutation = useGitPush(sessionId)
+  const publishMutation = useGitPublishBranch(sessionId)
 
   const staged = useMemo(() => {
     if (!statusRaw) return []
@@ -233,11 +274,15 @@ export function CommitInputSection({
     commitMutation.error instanceof Error ? commitMutation.error.message : null
   const pushError =
     pushMutation.error instanceof Error ? pushMutation.error.message : null
+  const publishError =
+    publishMutation.error instanceof Error
+      ? publishMutation.error.message
+      : null
   const generateError =
     generateCommitMessageMutation.error instanceof Error
       ? generateCommitMessageMutation.error.message
       : null
-  const error = commitError ?? pushError ?? generateError
+  const error = commitError ?? pushError ?? publishError ?? generateError
 
   async function handleCommit() {
     if (!message.trim() || staged.length === 0) return
@@ -258,6 +303,7 @@ export function CommitInputSection({
     setMessage("")
     commitMutation.reset()
     pushMutation.reset()
+    publishMutation.reset()
     try {
       await commitMutation.mutateAsync(msg)
       onCommitSuccess?.()
@@ -265,9 +311,15 @@ export function CommitInputSection({
       return
     }
     try {
-      await pushMutation.mutateAsync()
+      // A plain `git push` fails when the branch has no upstream — publish
+      // (push -u origin HEAD) instead in that case.
+      if (needsPublish) {
+        await publishMutation.mutateAsync()
+      } else {
+        await pushMutation.mutateAsync()
+      }
     } catch {
-      // Surfaced via pushError above — nothing else to do here.
+      // Surfaced via pushError/publishError above — nothing else to do here.
     }
   }
 
@@ -277,6 +329,15 @@ export function CommitInputSection({
       await pushMutation.mutateAsync()
     } catch {
       // Surfaced via pushError above — nothing else to do here.
+    }
+  }
+
+  async function handlePublish() {
+    publishMutation.reset()
+    try {
+      await publishMutation.mutateAsync()
+    } catch {
+      // Surfaced via publishError above — nothing else to do here.
     }
   }
 
@@ -296,7 +357,7 @@ export function CommitInputSection({
 
   const committing = commitMutation.isPending
   const generating = generateCommitMessageMutation.isPending
-  const pushing = pushMutation.isPending
+  const pushing = pushMutation.isPending || publishMutation.isPending
 
   const canCommit =
     !committing &&
@@ -382,18 +443,22 @@ export function CommitInputSection({
             ? `${staged.length} file${staged.length === 1 ? "" : "s"} staged`
             : (ahead ?? 0) > 0
               ? `${ahead} commit${ahead === 1 ? "" : "s"} ahead`
-              : "Nothing staged"}
+              : needsPublish
+                ? "Branch not on origin"
+                : "Nothing staged"}
         </span>
 
         <WorkflowButton
           staged={staged.length}
           ahead={ahead}
+          needsPublish={needsPublish}
           canCommit={canCommit}
           committing={committing}
           pushing={pushing}
           onCommit={handleCommit}
           onCommitAndPush={handleCommitAndPush}
           onPush={handlePush}
+          onPublish={handlePublish}
         />
       </div>
     </div>

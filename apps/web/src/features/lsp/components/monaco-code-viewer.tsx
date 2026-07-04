@@ -89,6 +89,9 @@ export default function MonacoCodeViewer({
 
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null)
+  // Monaco mounts asynchronously; effects that need the editor (scroll-to-line)
+  // must re-run once it's ready, not just when their inputs change.
+  const [editorReady, setEditorReady] = useState(false)
   const disposablesRef = useRef<IDisposable[]>([])
   const registeredModelUriRef = useRef<string | null>(null)
 
@@ -299,6 +302,8 @@ export default function MonacoCodeViewer({
           }
         })
       )
+
+      setEditorReady(true)
     },
     [openComposer, syncModelRegistration]
   )
@@ -337,7 +342,7 @@ export default function MonacoCodeViewer({
     ])
     const t = window.setTimeout(() => flash.clear(), 700)
     return () => window.clearTimeout(t)
-  }, [scrollToLine])
+  }, [scrollToLine, editorReady])
 
   // Tear down handlers + registry entry on unmount.
   useEffect(() => {

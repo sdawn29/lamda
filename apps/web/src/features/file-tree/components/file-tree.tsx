@@ -159,6 +159,7 @@ const TreeRow = memo(function TreeRow({
         className={cn(
           "min-w-0 truncate",
           entry.isDirectory && "font-medium text-sidebar-foreground/85",
+          dirHasChange && "text-amber-600 dark:text-amber-400",
           status?.className
         )}
       >

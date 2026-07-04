@@ -464,6 +464,22 @@ export async function gitPushSetUpstream(cwd: string): Promise<void> {
   });
 }
 
+/** Returns whether the repository has an `origin` remote configured. */
+export async function gitHasOriginRemote(cwd: string): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync("git", ["remote"], {
+      cwd,
+      timeout: 5000,
+    });
+    return stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .includes("origin");
+  } catch {
+    return false;
+  }
+}
+
 /** Fetches from the remote without merging: `git fetch`. */
 export async function gitFetch(cwd: string): Promise<void> {
   await execFileAsync("git", ["fetch"], { cwd, timeout: 30000 });
