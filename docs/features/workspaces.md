@@ -1,301 +1,97 @@
-# Workspaces Guide
+# Workspaces and Threads
 
-Workspaces are the top-level organizational unit in lamda. Each workspace represents a repository (local folder), and contains multiple conversation threads for different tasks.
+Workspaces are local folders or cloned repositories. Threads are conversations inside a workspace. A workspace can contain many threads, and each thread can have its own model, mode, chat history, terminal context, and git review history.
 
-## Overview
+> Screenshot needed: capture `/workspace/<threadId>` with the left sidebar open, at least two workspaces expanded, pinned threads visible, and archived threads accessible.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Workspaces                                                      │
-│                                                                 │
-│ ▼ my-project                                                   │
-│   ├ 🤖 Fix login bug                          [📌]             │
-│   ├ 💬 Add dark mode                          [📌]             │
-│   └ 💬 Refactor API endpoints                                 │
-│                                                                 │
-│ ▼ another-repo                                                 │
-│   ├ 🤖 Setup CI/CD                                           │
-│   └ 💬 Review pull request                                   │
-│                                                                 │
-│ ▼ archived                                                     │
-│   └── 🔒 Old investigation                                   │
-│                                                                 │
-│ [+ New Workspace]                                              │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Create a Workspace from a Local Folder
 
-## What is a Workspace?
+1. Click `New Workspace` in the sidebar or run it from the command palette.
+2. Choose the local folder option.
+3. Browse for a folder in the desktop app, or paste a path in the browser.
+4. Confirm creation.
+5. lamda creates the workspace and opens its first thread.
 
-A workspace contains:
+## Create a Workspace by Cloning
 
-- **Path**: Local folder on your machine
-- **Name**: Derived from the folder name
-- **Threads**: Multiple conversation threads
-- **MCP Config**: Model Context Protocol server settings
+1. Open `New Workspace`.
+2. Choose the clone option.
+3. Enter an HTTPS or SSH Git URL.
+4. Choose the destination path if prompted.
+5. Start the clone.
+6. Open the generated workspace when cloning completes.
 
-## What is a Thread?
+> Screenshot needed: capture the clone repository tab in the create workspace dialog.
 
-A thread is a conversation about a specific task:
+## Create a Thread
 
-- Has its own chat history
-- Can use a different AI model
-- Tracks its own context and state
-- Can be pinned or archived
+1. Hover over a workspace in the sidebar.
+2. Click the new-thread action, or run `New Thread` from the command palette.
+3. Choose the thread mode and model in the composer.
+4. Send the first prompt.
 
-## Creating a Workspace
+## Rename a Thread
 
-### From Local Folder
+1. Open the thread.
+2. Click the title in the sidebar or title bar when editable.
+3. Enter a new title.
+4. Press `Enter` or leave the field to save.
 
-1. Click **+ New Workspace**
-2. Select **Local Folder** tab
-3. Click **Browse** and select a folder
-4. Click **Create Workspace**
+Thread titles can also be generated from conversation content when chat title generation is enabled.
 
-Or drag a folder onto the sidebar.
+## Pin and Unpin
 
-### By Cloning a Repository
+Use pinning for work you need to return to often.
 
-1. Click **+ New Workspace**
-2. Select **Clone Repository** tab
-3. Enter the git URL (e.g., `https://github.com/user/repo.git`)
-4. Optionally specify a local path
-5. Click **Clone and Create**
+1. Open the thread or workspace context menu.
+2. Choose `Pin`.
+3. Pinned items appear above unpinned items.
+4. Use `Unpin` from the same menu to restore normal sorting.
 
-```bash
-# Example URLs
-https://github.com/user/my-project.git
-git@github.com:user/my-project.git
-https://gitlab.com/user/repo.git
-```
+## Archive and Restore Threads
 
-## Managing Threads
+1. Open a thread context menu.
+2. Choose `Archive`.
+3. Open the archived threads dialog from the sidebar.
+4. Select a thread to restore or continue.
 
-### Creating a Thread
+Archiving keeps history but removes the thread from the active workspace list.
 
-1. Hover over a workspace
-2. Click the **+** button that appears
-3. New thread is created and opened
+## Delete a Thread or Workspace
 
-### Renaming a Thread
+Delete only when you no longer need the local app record.
 
-1. Click on the thread title (in sidebar or title bar)
-2. Type the new name
-3. Press **Enter** to save
+1. Open the context menu.
+2. Choose delete.
+3. Confirm the destructive action.
 
-### Deleting a Thread
+Deleting a workspace removes it from lamda. It does not intentionally delete the repository folder unless a future dialog explicitly says so.
 
-1. Right-click on the thread
-2. Select **Delete Thread**
-3. Confirm in the dialog
+## Workspace Environment
 
-> ⚠️ This permanently deletes the thread and its chat history.
+Some projects need environment variables for commands or agent tools.
 
-### Archiving a Thread
+1. Open the workspace context menu.
+2. Choose the environment action.
+3. Add variables in the supported format.
+4. Save and rerun commands or threads that need them.
 
-Archiving keeps the thread for reference without cluttering your sidebar:
+> Screenshot needed: capture the workspace environment dialog opened from a workspace menu.
 
-1. Right-click on the thread
-2. Select **Archive Thread**
+## Open With External Apps
 
-Archived threads appear under a collapsed **Archived** section.
+In the desktop app, workspaces and files can be opened with installed applications.
 
-### Viewing Archived Threads
+1. Choose `Open With` in the title bar or context menu.
+2. Pick VS Code, Cursor, Xcode, Finder, or another detected app.
+3. Set a default app from Settings if desired.
 
-1. Click **Archived** at the bottom of the sidebar
-2. View all archived threads across workspaces
-3. Click to expand a thread and continue the conversation
-4. Right-click for **Unarchive** option
+## Reindex Files
 
-### Pinning a Thread
+File search and command palette results depend on the workspace index.
 
-Pinned threads appear at the top of their workspace:
+1. Open the workspace context menu.
+2. Choose `Reindex Files`.
+3. Wait for the file tree or command palette to refresh.
 
-1. Right-click on the thread
-2. Select **Pin Thread**
-
-Pinned threads show a 📌 icon.
-
-### Forking a Thread
-
-Fork creates a new thread branched from any earlier point in the conversation:
-
-1. In the chat panel, hover over a user message
-2. Click the **Fork** button
-3. A new thread is created with history up to that message
-4. The git working tree is restored to that checkpoint
-5. The new thread opens in a new tab
-
-See [Chat Interface](chat.md) for full details.
-
-### Switching Threads
-
-Click any thread in the sidebar to switch to it:
-
-- Chat history loads automatically
-- Git status updates to workspace state
-- Terminal starts in workspace directory
-
-## Workspace Pinning
-
-Workspaces can be pinned to keep them at the top of the sidebar:
-
-1. Right-click on a workspace
-2. Select **Pin Workspace**
-
-Pinned workspaces appear before unpinned ones and show a 📌 icon.
-
-## Workspace Tasks
-
-Tasks are custom shell command shortcuts that run inside the workspace directory. They appear as quick-launch buttons in the workspace panel.
-
-### Adding a Task
-
-1. Open the workspace's **Tasks** section
-2. Click **+ Add Task**
-3. Enter an optional icon emoji and the shell command (e.g., `npm test`)
-4. Click **Save**
-
-### Running a Task
-
-Click the task button to execute the command in a new terminal tab. The terminal opens in the workspace root directory.
-
-### Managing Tasks
-
-Right-click a task for **Edit** and **Delete** options.
-
-Tasks are persisted per workspace in the SQLite database.
-
----
-
-## Workspace Settings
-
-### Per-Workspace Preferences
-
-Right-click on a workspace for options:
-
-- **Open with App** — Choose external editor
-- **Reindex Files** — Rebuild file index for search
-- **Delete Workspace** — Remove from lamda
-
-### "Open With" Editor
-
-Launch files in your preferred editor:
-
-1. Right-click workspace → **Open With**
-2. Select an editor from the list:
-   - Visual Studio Code
-   - Cursor
-   - Xcode
-   - etc.
-
-3. The selected editor opens automatically
-
-### Setting Default Editor
-
-1. Open **Settings** → **General**
-2. Find **Default Open With App**
-3. Select your preferred editor
-4. All workspaces will use this editor by default
-
-## Switching Workspaces
-
-### Sidebar Navigation
-
-Click any workspace in the sidebar to switch to it:
-
-- Workspace expands to show threads
-- Thread list loads
-- Last active thread is opened
-
-### Quick Switch
-
-Press the keyboard shortcut for sidebar toggle, then:
-
-- Use arrow keys to navigate
-- Press Enter to select
-
-## Data Storage
-
-### What Gets Stored
-
-| Data               | Location                    |
-| ------------------ | --------------------------- |
-| Workspace metadata | SQLite                      |
-| Thread history     | SQLite                      |
-| Chat messages      | SQLite                      |
-| MCP configurations | SQLite                      |
-| API keys           | `~/.pi/agent/auth.json`     |
-| Settings           | `~/.pi/agent/settings.json` |
-
-### Database Location
-
-SQLite database stored at: `~/.lamda-code/db-v2.sqlite`
-
-### Exporting Data
-
-Thread export functionality:
-
-1. Right-click on thread
-2. Select **Export Thread**
-3. Choose format (JSON, Markdown)
-4. Save to your preferred location
-
-## Multiple Workspaces
-
-### Workflow Example
-
-```
-Workspace: frontend-app
-├── Thread: Fix navigation bug
-├── Thread: Add user settings
-└── Thread: Optimize performance
-
-Workspace: backend-api
-├── Thread: Add authentication
-├── Thread: Database migration
-└── Thread: Write API docs
-
-Workspace: docs-site
-├── Thread: Update getting started
-└── Thread: Fix broken links
-```
-
-### Best Practices
-
-- **One workspace per repository** — Keeps git context clear
-- **One thread per task** — Avoids confusion in conversations
-- **Name threads descriptively** — `Fix login redirect` not `login`
-- **Archive completed threads** — Keep sidebar clean, preserve history
-
-## Troubleshooting
-
-### "Workspace not found"
-
-If lamda can't find a workspace folder:
-
-1. The folder may have been moved or deleted
-2. Right-click → **Remove Missing Workspace**
-3. Optionally re-create by opening the folder again
-
-### "Git repository not initialized"
-
-Workspaces don't require git, but operations fail without it:
-
-1. Open the terminal in that workspace
-2. Run `git init` to initialize
-3. Or clone a git repository when creating
-
-### High Memory Usage
-
-Many workspaces can use memory:
-
-- Each thread maintains its own chat context
-- Close completed threads you don't need
-- Archive threads instead of keeping them active
-
-## Related
-
-- [Chat Interface](chat.md) — Thread conversation
-- [Git Integration](git.md) — Workspace git operations
-- [Settings](settings.md) — Workspace preferences
-- [API Reference](../api.md) — Workspace API endpoints
+Use this after large file moves, dependency changes, or generated-file cleanup.

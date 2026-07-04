@@ -1,334 +1,120 @@
-# Settings Guide
+# Settings
 
-The Settings panel controls how lamda behaves — from AI provider configuration to appearance preferences.
+Settings control provider credentials, chat behavior, appearance, git integrations, memory, keyboard shortcuts, MCP, LSP, retry behavior, updates, usage, and data management.
 
-## Accessing Settings
+> Screenshot needed: capture `/settings/appearance` with the settings sidebar and appearance controls visible.
 
-### Method 1: Settings Button
+## Open Settings
 
-Click the **gear icon** in the sidebar footer.
+1. Click the settings button in the sidebar or title bar.
+2. Or press `Cmd/Ctrl + ,`.
+3. Or open the command palette and run `Open Settings`.
 
-### Method 2: Keyboard Shortcut
+Settings routes use `/settings/<section>`, so pages can be linked directly.
 
-Press `Cmd/Ctrl + ,` to open settings.
+## Sections
 
-## Settings Categories
+| Section       | Route                     | Use it for                                                          |
+| ------------- | ------------------------- | ------------------------------------------------------------------- |
+| Appearance    | `/settings/appearance`    | Mode, color theme, custom theme editor, UI font, code font          |
+| Chat          | `/settings/chat`          | Thinking visibility, response display, title generation             |
+| Subscriptions | `/settings/subscriptions` | OAuth sign-in for Claude Pro, ChatGPT/Codex, GitHub Copilot, Google |
+| API Keys      | `/settings/api-keys`      | Key-based provider credentials                                      |
+| Local Models  | `/settings/local-models`  | OpenAI-compatible local/self-hosted providers                       |
+| AI Usage      | `/settings/usage`         | Token, cost, provider, model, and workspace usage reports           |
+| Git           | `/settings/git`           | Commit-message prompts and GitHub/GitLab connection settings        |
+| Memory        | `/settings/memory`        | Saved lessons, memory controls, self-healing behavior               |
+| Shortcuts     | `/settings/shortcuts`     | Keyboard shortcut bindings                                          |
+| MCP Servers   | `/settings/mcp`           | Model Context Protocol server definitions                           |
+| LSP Config    | `/settings/lsp`           | Language server commands and install status                         |
+| Retry         | `/settings/retry`         | Provider timeout and retry behavior                                 |
+| About         | `/settings/about`         | App version, updates, links, and data reset                         |
 
-### General
+## Configure API Keys
 
-| Setting                 | Description               | Default        |
-| ----------------------- | ------------------------- | -------------- |
-| **Theme**               | Application appearance    | Dark           |
-| **Font Size**           | UI text size              | System default |
-| **Thinking Visibility** | Show/hide thinking blocks | Show           |
+1. Open `/settings/api-keys`.
+2. Find the provider.
+3. Enter the key.
+4. Save.
+5. Return to chat and select a model from that provider.
 
-### Terminal
+Keys are stored in `~/.pi/agent/auth.json`.
 
-| Setting   | Description         | Default        |
-| --------- | ------------------- | -------------- |
-| **Theme** | Terminal appearance | Dark           |
-| **Shell** | Default shell path  | System default |
+## Sign In with Subscriptions
 
-### Advanced
+1. Open `/settings/subscriptions`.
+2. Choose a supported OAuth provider.
+3. Complete the browser or CLI sign-in flow.
+4. Confirm the provider appears connected.
+5. Select its models in the chat composer.
 
-| Setting             | Description                    | Default |
-| ------------------- | ------------------------------ | ------- |
-| **Retry Enabled**   | Auto-retry on transient errors | Enabled |
-| **Max Retries**     | Maximum retry attempts         | 3       |
-| **Base Delay (ms)** | Initial retry delay            | 2000    |
+## Add Local Models
 
-## AI Providers
+1. Start your local model server, such as Ollama, LM Studio, vLLM, or another OpenAI-compatible endpoint.
+2. Open `/settings/local-models`.
+3. Add a provider name, base URL, and model list.
+4. Save.
+5. Pick the local model in chat.
 
-### Supported Providers
+> Screenshot needed: capture `/settings/local-models` with the add provider form open.
 
-| Provider       | API Key Variable       | Status        |
-| -------------- | ---------------------- | ------------- |
-| Anthropic      | `ANTHROPIC_API_KEY`    | ✅ Popular    |
-| OpenAI         | `OPENAI_API_KEY`       | ✅ Popular    |
-| Google Gemini  | `GEMINI_API_KEY`       | ✅ Popular    |
-| DeepSeek       | `DEEPSEEK_API_KEY`     | ✅ Popular    |
-| OpenRouter     | `OPENROUTER_API_KEY`   | ✅ Popular    |
-| Groq           | `GROQ_API_KEY`         | ✅ Popular    |
-| Mistral        | `MISTRAL_API_KEY`      | ✅ Popular    |
-| Ollama         | (local)                | ✅ Local      |
-| Azure OpenAI   | `AZURE_OPENAI_API_KEY` | ✅ Enterprise |
-| Amazon Bedrock | -                      | ✅ Enterprise |
+## Customize Appearance
 
-### Adding a Provider
+1. Open `/settings/appearance`.
+2. Choose light, dark, or system mode.
+3. Pick a built-in color theme.
+4. Select UI and code fonts.
+5. Use the custom theme editor if you need exact colors.
 
-1. Go to **Settings** → **Providers**
-2. Click **Add Provider**
-3. Select the provider from the dropdown
-4. Enter your API key
-5. Click **Save**
+See [Themes](themes.md).
 
-### Provider Card
+## Review Usage
 
-Each configured provider shows:
+1. Open `/settings/usage`.
+2. Pick a date range.
+3. Compare usage by model, provider, workspace, and thread.
+4. Use the data to adjust default models or thinking levels.
 
-- **Status indicator** (green = connected)
-- **Model selector** — Choose which model to use
-- **API key** — Masked for security
-- **Remove button** — Delete this provider
+> Screenshot needed: capture `/settings/usage` with a populated usage chart.
 
-### Provider Status States
+## Configure Git Hosting
 
-| State             | Meaning                       |
-| ----------------- | ----------------------------- |
-| ✅ Configured     | API key present, ready to use |
-| ⚠️ Invalid Key    | API key format is incorrect   |
-| ❌ Quota Exceeded | API limit reached             |
-| ⏳ Checking       | Verifying credentials...      |
+1. Open `/settings/git`.
+2. Connect GitHub or GitLab if available.
+3. Configure AI commit-message generation.
+4. Return to the source-control panel to use hosting-specific review views.
 
-## API Keys
+See [Git Hosting](git-hosting.md).
 
-### Where Keys are Stored
+## Change Shortcuts
 
-API keys are stored in `~/.pi/agent/auth.json`
+1. Open `/settings/shortcuts`.
+2. Click a binding.
+3. Press the new key combination.
+4. Resolve conflicts if the UI reports one.
 
-With file permissions `0600` (user read/write only).
+> Screenshot needed: capture `/settings/shortcuts` while recording a shortcut.
 
-### Key Format
+## Manage Memory
 
-```json
-{
-  "anthropic": {
-    "type": "api_key",
-    "key": "sk-ant-..."
-  },
-  "openai": {
-    "type": "api_key",
-    "key": "sk-..."
-  }
-}
-```
+1. Open `/settings/memory`.
+2. Review saved lessons or memories.
+3. Remove stale entries.
+4. Adjust self-healing behavior if the agent should or should not learn from errors.
 
-### Key Resolution Order
+## Configure Retry
 
-1. CLI `--api-key` flag (not exposed in UI)
-2. `auth.json` entry
-3. Environment variable
+1. Open `/settings/retry`.
+2. Adjust provider timeout, retry count, and delay settings.
+3. Save.
+4. Retry the failed chat turn.
 
-### Environment Variable Keys
+Increase timeouts for slow local models or overloaded providers.
 
-Use environment variables for keys:
+## Reset or Inspect Data
 
-```json
-{
-  "anthropic": {
-    "type": "api_key",
-    "key": "ANTHROPIC_API_KEY"
-  }
-}
-```
+1. Open `/settings/about`.
+2. Review app version and update status.
+3. Use data-management actions carefully.
 
-The system will use the value of the `ANTHROPIC_API_KEY` environment variable.
-
-### Shell Command Keys
-
-Execute a command to retrieve the key:
-
-```json
-{
-  "anthropic": {
-    "type": "api_key",
-    "key": "!security find-generic-password -ws 'anthropic'"
-  }
-}
-```
-
-The `!` prefix executes the command and uses its stdout.
-
-## Model Selection
-
-### Choosing a Model
-
-1. In the chat input area, click the **Model** dropdown
-2. Select from available models
-
-Models are grouped by provider:
-
-```
-Anthropic
-├── Claude 3.5 Sonnet
-├── Claude 3 Opus
-└── Claude 3 Haiku
-
-OpenAI
-├── GPT-4 Turbo
-├── GPT-4
-└── GPT-3.5 Turbo
-
-DeepSeek
-├── DeepSeek V4
-└── DeepSeek Reasoner
-```
-
-### Model Compatibility
-
-Only models compatible with your configured providers appear in the selector.
-
-### Setting Default Model
-
-1. Go to **Settings** → **General**
-2. Find **Default Model**
-3. Select your preferred model
-4. New threads will use this model
-
-## Thinking Settings
-
-### Thinking Levels
-
-Control how deeply the agent thinks:
-
-| Level   | Description          | Token Budget |
-| ------- | -------------------- | ------------ |
-| Off     | No extended thinking | 0            |
-| Minimal | Quick thoughts       | ~100         |
-| Low     | Light reasoning      | ~500         |
-| Medium  | Balanced (default)   | ~2000        |
-| High    | Deep reasoning       | ~8000        |
-| X-High  | Maximum reasoning    | ~32000       |
-
-### Toggling Thinking Visibility
-
-Choose whether thinking blocks appear in chat:
-
-1. **Settings** → **General**
-2. Find **Thinking Visibility**
-3. Choose **Show** or **Hide**
-
-### Custom Thinking Budgets
-
-For advanced users, configure custom token budgets:
-
-```json
-{
-  "thinkingBudgets": {
-    "high": 16000,
-    "xhigh": 64000
-  }
-}
-```
-
-Edit in `~/.pi/agent/settings.json` directly.
-
-## Retry Configuration
-
-### When Retries Happen
-
-Retries occur on transient errors:
-
-- Network timeouts
-- Rate limiting (429 responses)
-- Server errors (5xx responses)
-- Temporary API unavailability
-
-### Retry Settings
-
-| Setting             | Type    | Default | Description                   |
-| ------------------- | ------- | ------- | ----------------------------- |
-| **Retry Enabled**   | boolean | true    | Enable auto-retry             |
-| **Max Retries**     | number  | 3       | Maximum attempts              |
-| **Base Delay (ms)** | number  | 2000    | Initial delay (2s, 4s, 8s...) |
-
-### Provider Timeout
-
-Control how long requests wait:
-
-| Setting              | Type   | Default     | Description                |
-| -------------------- | ------ | ----------- | -------------------------- |
-| **Provider Timeout** | number | SDK default | Per-request timeout        |
-| **Max Retry Delay**  | number | 60000       | Max server-requested delay |
-
-### Example: Long-Running Local Inference
-
-```json
-{
-  "retry": {
-    "enabled": true,
-    "maxRetries": 3,
-    "baseDelayMs": 2000,
-    "provider": {
-      "timeoutMs": 3600000,
-      "maxRetries": 0
-    }
-  }
-}
-```
-
-This sets a 1-hour timeout for slow local models.
-
-## Project Settings
-
-### Override Global Settings
-
-Project settings in `.pi/settings.json` override global settings:
-
-```json
-// ~/.pi/agent/settings.json (global)
-{
-  "theme": "dark",
-  "defaultModel": "claude-3-5-sonnet"
-}
-
-// .pi/settings.json (project)
-{
-  "defaultModel": "deepseek-chat",
-  "retry": {
-    "baseDelayMs": 4000
-  }
-}
-
-// Result: theme=dark, model=deepseek, retry.baseDelayMs=4000
-```
-
-### Creating Project Settings
-
-1. In your project folder, create `.pi/settings.json`
-2. Add your overrides
-3. Settings apply when this folder is the workspace
-
-## Appearance
-
-Appearance has two independent axes: **mode** (Light / Dark / System) and **color theme** (which palette fills the design tokens).
-
-### Themes
-
-Built-in color themes include Jellybeans (default), Graphite, macOS, Nord, Rosé Pine, Solarized, Catppuccin, Cursor Anysphere, and Tokyo Night. You can also create a fully custom theme with the per-token theme editor.
-
-The active theme also drives code-block syntax highlighting and the terminal color scheme.
-
-See the [Themes Guide](themes.md) for details.
-
-### Fonts
-
-Choose the UI (sans) and code (mono) fonts in **Settings** → **Appearance**. Bundled options include Geist, Outfit, and JetBrains Mono, or browse and apply any font from Google Fonts.
-
-## Data Management
-
-### Reset All Data
-
-⚠️ **Destructive Action** — Deletes all workspaces, threads, and settings:
-
-```markdown
-1. Open Settings
-2. Go to **Advanced**
-3. Click **Reset All Data**
-4. Confirm in dialog
-5. Application restarts fresh
-```
-
-### Export Settings
-
-Export your settings for backup or migration.
-
-### Import Settings
-
-Import previously exported settings.
-
-## Related
-
-- [Providers](providers.md) — Detailed provider documentation
-- [Chat Interface](chat.md) — Model and thinking in chat
-- [API Reference](../api.md) — Settings API endpoints
+Reset actions can remove local lamda records. Back up anything important first.

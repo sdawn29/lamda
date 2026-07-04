@@ -2,40 +2,18 @@
 
 ## Overview
 
-`lamda` is a monorepo with three main application layers:
+`lamda` is a monorepo with three main application layers.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Electron Shell                       │
-│              (desktop app, native APIs)                │
-└────────────────────────┬──────────────────────────────┘
-                         │ IPC
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Web UI (React)                      │
-│           (Vite, TanStack Router/Query, Zustand)       │
-│                                                         │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐    │
-│  │  Chat   │ │   Git   │ │Terminal │ │Settings │    │
-│  └─────────┘ └─────────┘ └─────────┘ └─────────┘    │
-└────────────────────────┬──────────────────────────────┘
-                         │ HTTP/WebSocket
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Hono Server                        │
-│               (port 3001, Node.js)                    │
-│                                                         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │ Sessions │ │   Git    │ │ Terminal │            │
-│  └──────────┘ └──────────┘ └──────────┘            │
-└────────────────────────┬──────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│                      SQLite                            │
-│              (Drizzle ORM, local persistence)          │
-│              ~/.lamda-code/db-v2.sqlite                │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+  desktop["Electron shell<br/>desktop app and native APIs"]
+  web["Web UI<br/>React, Vite, TanStack Router, TanStack Query, Zustand"]
+  server["Hono server<br/>Node.js API, sessions, git, terminal, LSP, MCP"]
+  sqlite["SQLite<br/>Drizzle ORM, ~/.lamda-code/db-v2.sqlite"]
+
+  desktop -->|"IPC"| web
+  web -->|"HTTP and WebSocket"| server
+  server --> sqlite
 ```
 
 ## Application Layers
@@ -187,64 +165,57 @@ Utilities for running subordinate agent tasks within a Pi session.
 
 ### Chat Message Flow
 
-```
-User types message
-       │
-       ▼
-POST /session/:id/prompt
-       │
-       ▼
-Server inserts user block to DB
-       │
-       ▼
-entry.handle.prompt(text) — Pi agent starts
-       │
-       ├──► Events stream via WebSocket ◄──┐
-       │                                   │
-       ▼                                   │
-useSessionStream (web hook)                │
-       │                                   │
-       ▼                                   │
-Zustand state updates                      │
-       │                                   │
-       ▼                                   │
-UI renders message delta ──────────────────┘
+```mermaid
+sequenceDiagram
+  participant User
+  participant Web as Web UI
+  participant Server as Hono server
+  participant DB as SQLite
+  participant Agent as Pi agent
+
+  User->>Web: Send prompt
+  Web->>Server: POST /session/:id/prompt
+  Server->>DB: Insert user message block
+  Server->>Agent: handle.prompt(text)
+  Agent-->>Server: Streaming events
+  Server-->>Web: WebSocket session events
+  Web->>Web: Update chat state
+  Web-->>User: Render deltas, tools, thinking, todos
 ```
 
 ### Git Operations
 
-```
-User clicks "Stage" in UI
-       │
-       ▼
-POST /session/:id/git/stage { filePath: "src/index.ts" }
-       │
-       ▼
-Server calls gitStage(cwd, "src/index.ts")
-       │
-       ▼
-Git CLI executes git add src/index.ts
-       │
-       ▼
-GET /session/:id/git/status returns updated status
+```mermaid
+sequenceDiagram
+  participant User
+  participant Web as Git panel
+  participant Server as Hono server
+  participant Git as Git CLI
+
+  User->>Web: Stage file
+  Web->>Server: POST /session/:id/git/stage
+  Server->>Git: git add src/index.ts
+  Web->>Server: GET /session/:id/git/status
+  Server->>Git: git status
+  Server-->>Web: Updated status
 ```
 
 ### Thread Forking
 
-```
-User forks at message N
-       │
-       ▼
-POST /session/:id/fork { messageBlockId }
-       │
-       ▼
-Server creates new thread copying blocks up to N
-       │
-       ▼
-Git state restored to checkpoint SHA of that turn
-       │
-       ▼
-New thread opened in UI
+```mermaid
+sequenceDiagram
+  participant User
+  participant Web as Chat UI
+  participant Server as Hono server
+  participant DB as SQLite
+  participant Git as Git CLI
+
+  User->>Web: Fork at message N
+  Web->>Server: POST /session/:id/fork
+  Server->>DB: Copy message blocks through N
+  Server->>Git: Restore checkpoint SHA when available
+  Server-->>Web: New thread id
+  Web-->>User: Open forked thread
 ```
 
 ## State Management

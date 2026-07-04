@@ -1,8 +1,6 @@
 import { useMemo, memo } from "react"
 import {
   Check,
-  Columns2,
-  AlignLeft,
   GitBranch,
   Loader2,
   PackageMinus,
@@ -23,6 +21,7 @@ import {
 } from "@/shared/ui/dropdown-menu"
 import { useGitStatus } from "../queries"
 import { useGitStageAll, useGitFetch, useGitPull } from "../mutations"
+import { DiffModeToggle } from "./diff-mode-toggle"
 import { type ChangedFile, parseStatusLines } from "./status-badge"
 import { type DiffMode } from "./diff-view"
 import { SORT_OPTIONS, type SortMode } from "./sort-utils"
@@ -162,28 +161,7 @@ export const SourceControlToolbarSection = memo(
         <div className="mx-0.5 h-4 w-px bg-border/50" />
 
         {/* Diff mode */}
-        <div className="inline-flex h-7 items-center rounded-md border border-border/70 bg-muted/30 p-0.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setMode("inline")}
-            data-active={mode === "inline"}
-            className="h-6 rounded-sm px-1.5 text-muted-foreground/75 hover:text-foreground data-[active=true]:bg-background data-[active=true]:text-foreground data-[active=true]:shadow-xs"
-          >
-            <AlignLeft className="h-3.5 w-3.5" />
-            <span className="sr-only">Inline</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setMode("side-by-side")}
-            data-active={mode === "side-by-side"}
-            className="h-6 rounded-sm px-1.5 text-muted-foreground/75 hover:text-foreground data-[active=true]:bg-background data-[active=true]:text-foreground data-[active=true]:shadow-xs"
-          >
-            <Columns2 className="h-3.5 w-3.5" />
-            <span className="sr-only">Side-by-side</span>
-          </Button>
-        </div>
+        <DiffModeToggle mode={mode} onModeChange={setMode} />
       </div>
     )
   }

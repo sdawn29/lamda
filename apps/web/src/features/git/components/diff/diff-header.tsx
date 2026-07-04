@@ -1,10 +1,8 @@
 import { memo } from "react"
-import { AlignLeft, Columns2 } from "lucide-react"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
-import { Button } from "@/shared/ui/button"
-import { cn } from "@/shared/lib/utils"
 import { DiffStat } from "../diff-stat"
+import { DiffModeToggle } from "../diff-mode-toggle"
 import type { DiffMode } from "./types"
 
 interface DiffHeaderProps {
@@ -55,37 +53,11 @@ export const DiffHeader = memo(function DiffHeader({
 
       <DiffStat added={added} removed={removed} />
 
-      <div className="ml-1 inline-flex h-6 items-center rounded-md border border-border/70 bg-background/60 p-0.5">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onModeChange("inline")}
-          data-active={mode === "inline"}
-          className={modeButtonClass}
-          aria-label="Inline view"
-          aria-pressed={mode === "inline"}
-        >
-          <AlignLeft className="size-3" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onModeChange("side-by-side")}
-          data-active={mode === "side-by-side"}
-          className={modeButtonClass}
-          aria-label="Side-by-side view"
-          aria-pressed={mode === "side-by-side"}
-        >
-          <Columns2 className="size-3" />
-        </Button>
-      </div>
+      <DiffModeToggle
+        mode={mode}
+        onModeChange={onModeChange}
+        className="ml-1"
+      />
     </div>
   )
 })
-
-const modeButtonClass = cn(
-  "h-5 rounded-sm px-1.5 text-muted-foreground/70 hover:text-foreground",
-  "data-[active=true]:bg-card data-[active=true]:text-foreground data-[active=true]:shadow-xs"
-)

@@ -1,282 +1,107 @@
-# Chat Interface Guide
-
-The chat interface is the primary way to interact with the Pi coding agent. It provides real-time streaming responses, tool execution visualization, and rich message formatting.
-
-## Overview
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Chat Interface                                                 │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │ 🤖 Assistant                                              │ │
-│  │    I'll analyze the codebase and help fix the bug...     │ │
-│  │                                                           │ │
-│  │ 🔧 Tool: read_file                                        │ │
-│  │    Args: { path: "src/auth.ts" }                          │ │
-│  │    Result: ┌─────────────────────────────────────────────┐│ │
-│  │           │ const login = async (req, res) => {         ││ │
-│  │           │   await authService.login(req.body);         ││ │
-│  │           │   res.redirect('/dashboard');                 ││ │
-│  │           └─────────────────────────────────────────────┘│ │
-│  │                                                           │ │
-│  │ 💭 Thinking                                               │ │
-│  │    The issue appears to be a timing problem where...      │ │
-│  │                                                           │ │
-│  │ 👤 You                                                    │ │
-│  │    Can you fix the login redirect issue?                  │ │
-│  └───────────────────────────────────────────────────────────┘ │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │ Type your message...                        [Model ▾][⏱] │ │
-│  └───────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Sending Messages
-
-### Basic Usage
-
-1. Type your message in the input field at the bottom
-2. Press **Enter** or click **Send** to submit
-3. Watch the agent stream its response in real-time
-
-### Multi-line Input
-
-The chat input supports multi-line messages:
-
-- Press **Shift+Enter** to add a new line
-- Press **Enter** to send the message
-
-### Message Formatting
-
-Messages support Markdown formatting:
-
-- **Bold**, _italic_, `code`
-- Code blocks with syntax highlighting
-- Lists and headings
-- Links and images
+# Chat
 
-## Tool Execution
+The chat view is the main interface for working with the Pi coding agent. It supports streaming responses, thread modes, model selection, file context, image attachments, slash commands, tool approvals, questions, todos, plan cards, file-change cards, and context compaction.
 
-When the agent uses tools, you'll see:
+> Screenshot needed: capture `/workspace/<threadId>` with a chat thread open, a recent assistant message visible, the composer visible, and at least one tool call expanded.
 
-### Tool Call Block
+## Send a Message
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ 🔧 read_file                                                   │
-│                                                                 │
-│ Args:                                                          │
-│ {                                                              │
-│   "path": "src/components/Button.tsx"                          │
-│ }                                                              │
-│                                                                 │
-│ ─────────────────────────────────────────────────────────────── │
-│ Result:                                                        │
-│ ┌─────────────────────────────────────────────────────────────┐│
-│ │ import React from 'react';                                  ││
-│ │ interface ButtonProps {                                     ││
-│ │   variant: 'primary' | 'secondary';                         ││
-│ │ }                                                          ││
-│ └─────────────────────────────────────────────────────────────┘│
-│                                                                 │
-│ Duration: 245ms | Status: ✓ Complete                            │
-└─────────────────────────────────────────────────────────────────┘
-```
+1. Open a workspace thread.
+2. Choose a mode from the composer.
+3. Choose a model and thinking level if you want to override the thread defaults.
+4. Type your prompt.
+5. Press `Cmd/Ctrl + Enter` or use the send button.
 
-### Tool States
+Use `Shift + Enter` for a new line inside the composer.
 
-| State    | Visual  | Meaning                     |
-| -------- | ------- | --------------------------- |
-| Running  | Spinner | Tool is currently executing |
-| Complete | ✓       | Tool finished successfully  |
-| Error    | ✗       | Tool encountered an error   |
+## Choose a Thread Mode
 
-### Collapsible Results
+| Mode    | Use it when                                                                              |
+| ------- | ---------------------------------------------------------------------------------------- |
+| `Agent` | You want the agent to inspect files, edit code, run commands, and carry the task through |
+| `Ask`   | You want explanations, code reading, design feedback, or review without file edits       |
+| `Plan`  | You want a proposed implementation plan before changes begin                             |
 
-- Tool results are collapsible to reduce clutter
-- Click the header to expand/collapse
-- "Edit" tools auto-expand to show before/after
+The selected mode is stored per thread and can be changed between turns.
 
-## Thinking Blocks
+## Add Context
 
-The agent can show its reasoning process:
+Use these context sources when a prompt needs more precision:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ 💭 Thinking                                                    │
-│                                                                 │
-│ The user is asking about a login issue. Let me analyze...       │
-│                                                                 │
-│ First, I need to understand the auth flow:                     │
-│   1. User submits credentials                                   │
-│   2. Server validates                                           │
-│   3. Redirect to dashboard                                     │
-│                                                                 │
-│ The issue might be in the redirect timing...                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+| Context source  | How to use it                                                                  |
+| --------------- | ------------------------------------------------------------------------------ |
+| File mentions   | Type `@` in the composer and choose a workspace file                           |
+| Slash commands  | Type `/` to reveal available command shortcuts                                 |
+| Images          | Attach screenshots or visual references when the composer supports image input |
+| Open file tabs  | Keep relevant source files open while asking questions                         |
+| Terminal output | Paste important output or ask the agent to run a command in `Agent` mode       |
 
-### Toggling Thinking Visibility
+> Screenshot needed: capture the composer with the `@` file mention dropdown open on `/workspace/<threadId>`.
 
-Control when thinking blocks are shown:
+## Read Agent Output
 
-1. Go to **Settings** → **General**
-2. Find **Thinking Visibility**
-3. Choose: **Show** (default) or **Hide**
+| Element           | Meaning                                                               |
+| ----------------- | --------------------------------------------------------------------- |
+| Assistant message | The agent's natural language response                                 |
+| Tool call         | A command, file operation, search, or other capability the agent used |
+| Thinking block    | Optional reasoning text, controlled by chat settings                  |
+| Todo panel        | Progress checklist for multi-step work                                |
+| Question card     | A choice or clarification the agent needs from you                    |
+| Approval block    | A tool action that needs explicit approval before continuing          |
+| File changes card | Summary of files changed during a turn                                |
+| Plan card         | Saved or proposed implementation plan                                 |
+| Error alert       | Recoverable or terminal error with retry or dismiss actions           |
 
-## Thread Modes
+> Screenshot needed: capture a question card in the chat stream on `/workspace/<threadId>`.
 
-Each thread operates in a mode that controls the agent's behaviour. Select the mode in the input bar before sending a message.
+## Approve or Reject Tool Calls
 
-| Mode      | Description                                                                      |
-| --------- | -------------------------------------------------------------------------------- |
-| **Agent** | Default. Full editing permissions — the agent reads, writes, and edits files.    |
-| **Ask**   | Read-only. The agent answers questions and explores code without making changes. |
-| **Plan**  | The agent proposes a step-by-step plan and waits for approval before executing.  |
+Some commands require permission before they run.
 
-The mode is stored per thread and can be changed at any time between turns.
+1. Read the approval block in the chat.
+2. Check the command, affected path, or external action.
+3. Approve it to continue, or reject it and provide a safer instruction.
 
----
+Use approvals for commands that install dependencies, access the network, write outside the workspace, open GUI apps, or could discard data.
 
-## Agent Questions
+## Steer a Running Turn
 
-When the agent needs your input mid-turn (for example, choosing between two approaches), it can ask a multiple-choice question directly in the chat. Pick an option to let the agent continue, or answer with free text. Unanswered questions are highlighted so they don't get lost in the conversation.
+When the agent is mid-task, you can add guidance without starting a new independent task.
 
----
+1. Type a correction or extra constraint while the turn is running.
+2. Send it as a steering message if available.
+3. The agent applies it after the current safe stopping point.
 
-## Todos
+Use follow-up messages for work that should happen after the current turn finishes.
 
-The agent tracks its goals for a task as a todo list. Completed goals are shown inline in the chat as it works, so you can follow progress on multi-step changes at a glance.
+## Fork a Thread
 
----
+Forking lets you branch from an earlier point without losing the original path.
 
-## Forking a Thread
+1. Hover over a user message.
+2. Choose `Fork`.
+3. lamda creates a new thread with history copied up to that message.
+4. The git working tree is restored to the checkpoint for that moment when available.
+5. Continue from the new thread.
 
-Fork lets you branch the conversation at any earlier user message and explore an alternative approach without losing the original history.
+> Screenshot needed: capture a user message hover state with the fork action visible on `/workspace/<threadId>`.
 
-1. Hover over any user message
-2. Click the **Fork** button that appears
-3. A new thread is created with history copied up to that message
-4. The git working tree is restored to the state it was in at that point
-5. The new thread opens automatically
+## Compact Long Context
 
-Forked threads show their source in the sidebar.
+As conversations grow, context usage increases.
 
----
+1. Open the context or usage indicator in the chat.
+2. Review token usage and model cost if shown.
+3. Use compact when the conversation is long but the key state should be preserved.
+4. Continue in the same thread after compaction.
 
-## Model Selection
+> Screenshot needed: capture the context usage indicator or context chart inside a busy thread.
 
-Switch between different AI models:
+## Recover from Errors
 
-1. Click the **Model** dropdown in the input area
-2. Select from available models based on your configured providers
-3. The model choice is saved per thread
+1. Read the error alert in the chat.
+2. Use `Retry` when the issue is transient, such as provider rate limits or network failures.
+3. Use `Dismiss` when you want to keep the current thread but clear the alert.
+4. Adjust provider keys, retry settings, or model choice if the same error repeats.
 
-### Thinking Level
-
-Control how deeply the agent thinks:
-
-| Level   | Description          |
-| ------- | -------------------- |
-| Off     | No extended thinking |
-| Minimal | Quick thoughts only  |
-| Low     | Light reasoning      |
-| Medium  | Balanced thinking    |
-| High    | Deep reasoning       |
-| X-High  | Maximum reasoning    |
-
-## Slash Commands
-
-Quick commands for common actions:
-
-| Command               | Description                      |
-| --------------------- | -------------------------------- |
-| `/search <query>`     | Search code across the workspace |
-| `/file <path>`        | Open a specific file             |
-| `/terminal <command>` | Run a terminal command           |
-
-### Using Slash Commands
-
-1. Type `/` in the chat input
-2. A dropdown appears with available commands
-3. Select or type the command
-4. Follow the command-specific prompts
-
-## Context Usage
-
-Monitor your context window consumption:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Context Usage                                                   │
-│                                                                 │
-│ Used: 45,000 tokens                                             │
-│ Max:   200,000 tokens                                         │
-│ ████████████░░░░░░░░░░░░░░░░░░░░░  22.5%                       │
-│                                                                 │
-│ Input: 30,000 | Output: 15,000 | Est. Cost: $0.12              │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Compact Context
-
-When context gets high, the agent may auto-compact:
-
-1. System reserves tokens for response (default: 16,384)
-2. Older content gets summarized
-3. More recent content remains detailed
-
-Manually trigger compaction:
-
-- Click the **Compact** button in the context chart
-- Or use the `/compact` slash command
-
-## Keyboard Shortcuts
-
-| Shortcut               | Action                   |
-| ---------------------- | ------------------------ |
-| `Cmd/Ctrl + Enter`     | Send message             |
-| `Shift + Enter`        | New line in input        |
-| `↑` (empty input)      | Recall last sent message |
-| `Cmd/Ctrl + K`         | Open command palette     |
-| `Cmd/Ctrl + Shift + S` | Search messages          |
-| `Escape`               | Cancel current operation |
-
-## Error Handling
-
-### Retryable Errors
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ ⚠️ Error                                                       │
-│                                                                 │
-│ Rate limit exceeded. Retry in 30 seconds?                       │
-│                                                                 │
-│ [Retry]  [Dismiss]                                             │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-Click **Retry** to try the operation again.
-
-### Non-Retryable Errors
-
-For permanent errors (e.g., invalid API key):
-
-1. Fix the underlying issue (check Settings)
-2. The message will retry automatically once fixed
-
-## Message Types
-
-| Type      | Icon | Description       |
-| --------- | ---- | ----------------- |
-| User      | 👤   | Your messages     |
-| Assistant | 🤖   | Agent responses   |
-| Tool      | 🔧   | Tool execution    |
-| Thinking  | 💭   | Reasoning process |
-| Error     | ⚠️   | Error messages    |
-
-## Related
-
-- [Git Integration](git.md) — How the agent uses git tools
-- [Settings](settings.md) — Model and thinking configuration
-- [API Reference](../api.md) — Session endpoints
+Related settings: `Settings -> Chat`, `Settings -> Retry`, and `Settings -> API Keys`.

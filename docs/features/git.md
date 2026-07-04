@@ -1,292 +1,89 @@
-# Git Integration Guide
-
-Lamda provides a complete git workflow directly in the application — view diffs, stage files, commit changes, manage branches, and handle stashes without leaving your workspace.
-
-## Overview
-
-The Git panel shows your repository's status and provides tools for git operations:
+# Git
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Git                                                             │
-│                                                                 │
-│ ┌─────────────────────────────────────────────────────────────┐│
-│ │ Branch: main ▾                            [Commit] [+3/-2] ││
-│ └─────────────────────────────────────────────────────────────┘│
-│                                                                 │
-│ Staged (2 files)                                               │
-│ ┌───────────────────────────────────────────────────────────┐ │
-│ │ M  src/auth.ts ─ Login redirect timing fix                  │ │
-│ │ A  src/components/Button.tsx ─ New button component         │ │
-│ └───────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ Unstaged (1 file)                                              │
-│ ┌───────────────────────────────────────────────────────────┐ │
-│ │ M  src/styles.css ─ Update button colors                   │ │
-│ └───────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ Untracked (1 file)                                             │
-│ ┌───────────────────────────────────────────────────────────┐ │
-│ │ ??  test/new-test.ts                                       │ │
-│ └───────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ ┌───────────────────────────────────────────────────────────┐ │
-│ │ [Stage All]  [Unstage All]  [Stash]                       │ │
-│ └───────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Viewing Changes
-
-### Git Status
-
-The status section shows four categories:
-
-| Category      | Description                                    |
-| ------------- | ---------------------------------------------- |
-| **Staged**    | Changes ready to commit (green checkmark area) |
-| **Unstaged**  | Modified files not yet staged                  |
-| **Untracked** | New files not tracked by git                   |
-| **Stashed**   | Temporarily stored changes                     |
-
-### Status Badges
-
-| Badge      | Meaning        |
-| ---------- | -------------- |
-| M (blue)   | Modified file  |
-| A (green)  | Added file     |
-| D (red)    | Deleted file   |
-| R (orange) | Renamed file   |
-| ?? (gray)  | Untracked file |
-
-### Viewing Diffs
-
-1. Click on a file to expand its diff view
-2. The diff shows:
-   - Line numbers (old and new)
-   - Deletions in red
-   - Aditions in green
-   - Context lines in gray
-3. Syntax highlighting for code files
-
-## Staging Operations
-
-### Stage Individual Files
-
-1. Hover over the file in Unstaged section
-2. Click the **Stage** button (plus icon)
-3. File moves to Staged section
-
-### Unstage Files
-
-1. Hover over the file in Staged section
-2. Click the **Unstage** button (minus icon)
-3. File returns to Unstaged section
-
-### Stage Individual Hunks
-
-For fine-grained control, stage or unstage individual diff hunks within a file:
-
-1. Expand the file diff by clicking it
-2. Each hunk shows **Stage Hunk** / **Unstage Hunk** buttons
-3. Click to stage only the lines you want
-
-### Stage All Changes
-
-1. Click **Stage All** at the bottom of Unstaged section
-2. All unstaged changes move to Staged
-
-### Unstage All
-
-1. Click **Unstage All** at the bottom of Staged section
-2. All staged changes return to Unstaged
+The Git panel gives each workspace a built-in source-control workflow: turn-by-turn diffs, full working tree diffs, branch controls, staging, commits, stashes, history, push, and revert operations.
 
-## Committing
+> Screenshot needed: capture `/workspace/<threadId>` with the right source-control panel open on `Turns`, a changed file selected, and the diff visible.
 
-### Creating a Commit
+## Open Source Control
 
-1. Stage the files you want to commit
-2. Click **Commit** in the branch header
-3. Fill in the commit dialog:
+1. Open a workspace thread.
+2. Click the source-control or review-panel button in the title bar, or open it from the command palette.
+3. Use the panel view selector to choose `Turns`, `All Changes`, `History`, `GitHub`, or `GitLab`.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Create Commit                                                   │
-│                                                                 │
-│ Type: ┌─────────────── ▾                                       │
-│        │ feat        │                                          │
-│        │ fix         │                                          │
-│        │ refactor    │                                          │
-│        │ docs        │                                          │
-│        │ test        │                                          │
-│        │ chore       │                                          │
-│        └──────────────┘                                          │
-│                                                                 │
-│ Scope: [optional ────────────]                                 │
-│                                                                 │
-│ Subject: [Brief description * ───────────────────────────] 50  │
-│                                                                 │
-│ Body:                                                           │
-│ ┌───────────────────────────────────────────────────────────┐ │
-│ │ [Detailed explanation (optional)                          │ │
-│ └───────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ Footer: [Closes #123 (optional) ───────────────────────────]   │
-│                                                                 │
-│ [Generate from Diff]                                            │
-│                                                                 │
-│                      [Cancel]  [Create Commit]                │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Choose a Review View
 
-### Commit Message Format
+| View          | Purpose                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------ |
+| `Turns`       | Shows files changed by recent agent turns and helps review exactly what the agent just did |
+| `All Changes` | Shows the full git working tree, including user edits and agent edits                      |
+| `History`     | Shows commit history for the workspace                                                     |
+| `GitHub`      | Shows pull request and GitHub review context when connected                                |
+| `GitLab`      | Shows merge request context when connected                                                 |
 
-Uses conventional commit format:
+## Review Diffs
 
-```
-<type>(<scope>): <subject>
+1. Select a file in the source-control list.
+2. Choose inline or side-by-side diff mode when available.
+3. Use sorting controls to group by name or status.
+4. Inspect insertions, deletions, renamed files, untracked files, and binary-file indicators.
+5. Use fullscreen diff mode for large reviews.
 
-<body>
+> Screenshot needed: capture fullscreen diff mode on `/workspace/<threadId>`.
 
-<footer>
-```
+## Stage Changes
 
-Examples:
+1. Switch to `All Changes`.
+2. Expand a file to inspect its diff.
+3. Stage an individual file, unstage it, or use `Stage All`.
+4. For partial commits, stage only the files that belong together.
 
-- `feat(auth): add login redirect timeout`
-- `fix(Button): resolve click handler issue`
-- `docs(readme): update installation instructions`
+Status labels follow git conventions such as `M` for modified, `A` for added, `D` for deleted, and `??` for untracked.
 
-### Generating Commit Messages
+## Commit Changes
 
-Click **Generate from Diff** to let the AI create a commit message based on your changes.
+1. Stage the changes you want.
+2. Open the commit dialog.
+3. Enter a conventional commit type, optional scope, subject, body, and footer.
+4. Use AI-generated commit messages when the staged diff is clear enough.
+5. Create the commit.
 
-### Revert Changes
+> Screenshot needed: capture the commit dialog opened from the source-control panel with staged files present.
 
-To discard changes to a file:
+## Branches
 
-1. Expand the file in Unstaged section
-2. Click **Revert**
-3. Confirm in the dialog
-4. File reverts to HEAD state
+1. Open the branch selector in the Git panel.
+2. Choose an existing branch to check it out.
+3. Create a new branch when starting isolated work.
+4. Confirm the active branch in the panel header before committing.
 
-## Branch Management
+For agent work, prefer starting a task on the branch where you want the final commit to land.
 
-### Switching Branches
+## Stashes
 
-1. Click the **Branch** dropdown in the Git header
-2. Select a branch from the list
-3. If you have unstaged changes, choose:
-   - **Stash and Switch** — Save changes temporarily
-   - **Discard and Switch** — Lose unsaved changes
-   - **Cancel** — Don't switch
+1. Open the stash section from `All Changes`.
+2. Enter a message and stash current changes.
+3. Use `Apply` to restore a stash while keeping it.
+4. Use `Pop` to restore and remove it.
+5. Use `Drop` only when you are sure the stash is no longer needed.
 
-### Creating a Branch
+## Push
 
-1. Click the **Branch** dropdown
-2. Click **Create Branch** at the bottom
-3. Enter the branch name
-4. Click **Create**
-5. New branch is created and checked out
+1. Commit local changes.
+2. Use the Git panel push action when available.
+3. Resolve authentication or remote errors in your terminal or hosting-provider setup.
 
-## Stash Operations
+## Revert a File
 
-Stashes let you temporarily store changes to switch context.
+1. Select a changed file.
+2. Use the file revert action.
+3. Confirm the destructive action.
 
-### Creating a Stash
+Reverting a file discards local changes for that file. Use it only after checking the diff.
 
-1. Click **Stash** at the bottom of the Git panel
-2. Optionally enter a message describing the stash
-3. Click **Create Stash**
-4. Your changes are safely stored and working tree is clean
+## Initialize Git
 
-### Viewing Stashes
+If a workspace is not a git repository, the panel can offer `Initialize Git Repository`.
 
-Stashes appear in the **Stashed** section:
-
-```
-Stashed (2)
-stash@{0}: WIP on main: abc123 Fix login bug
-stash@{1}: WIP on feature: def456 Add dark mode
-```
-
-### Restoring Stashes
-
-**Pop Stash** (apply and delete):
-
-1. Click **Pop** next to the stash
-2. Changes are restored and stash is removed
-
-**Apply Stash** (apply without deleting):
-
-1. Click **Apply** next to the stash
-2. Changes are restored but stash remains
-
-**Drop Stash** (delete without applying):
-
-1. Click **Drop** next to the stash
-2. Confirm in the dialog
-3. Stash is permanently deleted
-
-## Commit History
-
-The git panel shows the workspace's recent commit history, including when no chat session is active.
-
-## Diff Statistics
-
-The header shows aggregate changes:
-
-```
-[Commit] [+3/-2]
-```
-
-- `+3` — Total lines added
-- `-2` — Total lines deleted
-
-Click to expand file-by-file breakdown.
-
-## Terminal Integration
-
-For advanced git operations, use the embedded terminal:
-
-```bash
-# Interactive rebase
-git rebase -i HEAD~3
-
-# Force push (use with caution!)
-git push --force-with-lease
-
-# Amend last commit
-git commit --amend
-
-# View blame
-git blame src/auth.ts
-```
-
-## Troubleshooting
-
-### "Not a git repository"
-
-If you see this error:
-
-1. The folder is not a git repository
-2. Click **Initialize Repository** to run `git init`
-3. Or clone a repository into the workspace
-
-### "Merge Conflict Detected"
-
-1. Resolve conflicts in the files
-2. Stage the resolved files
-3. Complete the merge/rebase with terminal
-
-### "Permission Denied" (Push)
-
-1. Verify your remote URL is correct
-2. Set up authentication (SSH key or token)
-3. Try pushing again
-
-## Related
-
-- [Chat Interface](chat.md) — How the agent uses git
-- [Terminal](terminal.md) — Command-line access
-- [API Reference](../api.md) — Git API endpoints
+1. Open the Git panel in the workspace.
+2. Choose `Initialize Git Repository`.
+3. Make an initial commit from the panel or terminal.

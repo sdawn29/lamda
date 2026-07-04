@@ -42,22 +42,19 @@ npm run lint          # Lint checks
 
 ## Project Structure
 
-```
-lamda/
-├── apps/
-│   ├── desktop/       # Electron shell
-│   ├── server/        # Hono API server
-│   └── web/           # React UI
-├── packages/
-│   ├── db/            # Drizzle ORM + SQLite
-│   ├── git/           # Git CLI wrappers
-│   ├── lsp/           # Language Server Protocol integration
-│   ├── mcp/           # MCP client management
-│   ├── pi-sdk/        # Pi agent SDK wrapper
-│   └── subagent/      # Subagent utilities
-├── docs/              # Documentation
-└── AGENTS.md          # AI agent context
-```
+| Path                | Purpose                              |
+| ------------------- | ------------------------------------ |
+| `apps/desktop`      | Electron shell                       |
+| `apps/server`       | Hono API server                      |
+| `apps/web`          | React UI                             |
+| `packages/db`       | Drizzle ORM and SQLite               |
+| `packages/git`      | Git CLI wrappers                     |
+| `packages/lsp`      | Language Server Protocol integration |
+| `packages/mcp`      | MCP client management                |
+| `packages/pi-sdk`   | Pi agent SDK wrapper                 |
+| `packages/subagent` | Subagent utilities                   |
+| `docs`              | Documentation                        |
+| `AGENTS.md`         | AI agent context                     |
 
 ## Architecture Notes
 

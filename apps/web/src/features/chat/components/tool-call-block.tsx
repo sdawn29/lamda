@@ -2,10 +2,12 @@ import { lazy, memo, Suspense, useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import {
   AlertCircleIcon,
+  AlertTriangleIcon,
   ArrowRightIcon,
   BrainIcon,
   CheckIcon,
   CircleDotIcon,
+  CircleSlashIcon,
   ContainerIcon,
   CopyIcon,
   DownloadIcon,
@@ -13,6 +15,7 @@ import {
   FilePlus2Icon,
   FileTextIcon,
   GlobeIcon,
+  InfoIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
   PinIcon,
@@ -22,6 +25,7 @@ import {
 } from "lucide-react"
 import { FileIcon } from "@/shared/ui/file-icon"
 import { McpIcon } from "@/shared/ui/mcp-icon"
+import { Badge } from "@/shared/ui/badge"
 
 import { cn } from "@/shared/lib/utils"
 import {
@@ -273,6 +277,7 @@ export function argsSummary(args: unknown, rootPath?: string): string {
   if (typeof a.path === "string") return toRelativePath(a.path, rootPath)
   if (typeof a.file_path === "string")
     return toRelativePath(a.file_path, rootPath)
+  if (typeof a.file === "string") return toRelativePath(a.file, rootPath)
   if (typeof a.pattern === "string") return a.pattern
   const first = Object.values(a)[0]
   return typeof first === "string" ? first : ""
@@ -416,6 +421,336 @@ function getReadLineRange(args: unknown): string | null {
   if (limit === null) return `L${start}+`
   const end = start + limit - 1
   return start === end ? `L${start}` : `L${start}–${end}`
+}
+
+// ── LSP diagnostics ───────────────────────────────────────────────────────────
+
+interface LspRangeLite {
+  start?: { line?: number; character?: number }
+  end?: { line?: number; character?: number }
+}
+
+interface LspDiagnosticLite {
+  message: string
+  severity: number | null
+  range: LspRangeLite | null
+  source: string | null
+  code: string | null
+}
+
+interface LspDisplay {
+  label: string
+  summary: string | null
+  filePath: string | null
+  diagnostics: LspDiagnosticLite[]
+  error: string | null
+  parsed: boolean
+  counts: Record<"error" | "warning" | "info" | "hint", number>
+}
+
+function getLspFilePath(args: unknown): string | null {
+  if (typeof args !== "object" || args === null) return null
+  const file = (args as Record<string, unknown>).file
+  return typeof file === "string" ? file : null
+}
+
+function parseLspRange(raw: unknown): LspRangeLite | null {
+  if (typeof raw !== "object" || raw === null) return null
+  const range = raw as Record<string, unknown>
+  const parsePosition = (value: unknown) => {
+    if (typeof value !== "object" || value === null) return undefined
+    const pos = value as Record<string, unknown>
+    return {
+      line: typeof pos.line === "number" ? pos.line : undefined,
+      character: typeof pos.character === "number" ? pos.character : undefined,
+    }
+  }
+  return {
+    start: parsePosition(range.start),
+    end: parsePosition(range.end),
+  }
+}
+
+function parseLspDiagnostic(raw: unknown): LspDiagnosticLite | null {
+  if (typeof raw !== "object" || raw === null) return null
+  const d = raw as Record<string, unknown>
+  if (typeof d.message !== "string") return null
+  const code = d.code
+  return {
+    message: d.message,
+    severity: typeof d.severity === "number" ? d.severity : null,
+    range: parseLspRange(d.range),
+    source: typeof d.source === "string" ? d.source : null,
+    code:
+      typeof code === "string" || typeof code === "number"
+        ? String(code)
+        : null,
+  }
+}
+
+function lspSeverityKind(
+  severity: number | null
+): "error" | "warning" | "info" | "hint" {
+  if (severity === 1) return "error"
+  if (severity === 2) return "warning"
+  if (severity === 4) return "hint"
+  return "info"
+}
+
+function lspSeverityLabel(severity: number | null): string {
+  const kind = lspSeverityKind(severity)
+  return kind === "info" ? "information" : kind
+}
+
+function formatLspPosition(range: LspRangeLite | null): string | null {
+  const line = range?.start?.line
+  const character = range?.start?.character
+  if (typeof line !== "number") return null
+  const lineLabel = `L${line + 1}`
+  return typeof character === "number"
+    ? `${lineLabel}:${character + 1}`
+    : lineLabel
+}
+
+function summarizeLspCounts(counts: LspDisplay["counts"]): string {
+  const parts = [
+    ["error", counts.error] as const,
+    ["warning", counts.warning] as const,
+    ["information", counts.info] as const,
+    ["hint", counts.hint] as const,
+  ]
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => `${count} ${label}${count === 1 ? "" : "s"}`)
+  return parts.join(", ")
+}
+
+function describeLsp(msg: ToolMessage, resultText: string | null): LspDisplay {
+  const diagnostics: LspDiagnosticLite[] = []
+  let error: string | null = null
+  let parsed = true
+
+  if (resultText) {
+    try {
+      const payload = JSON.parse(resultText) as Record<string, unknown>
+      if (typeof payload.error === "string") {
+        error = payload.error
+      }
+      if (Array.isArray(payload.diagnostics)) {
+        diagnostics.push(
+          ...payload.diagnostics
+            .map(parseLspDiagnostic)
+            .filter((d): d is LspDiagnosticLite => d !== null)
+        )
+      } else if (!error) {
+        parsed = false
+      }
+    } catch {
+      parsed = false
+    }
+  }
+
+  const counts = diagnostics.reduce<LspDisplay["counts"]>(
+    (acc, diagnostic) => {
+      acc[lspSeverityKind(diagnostic.severity)] += 1
+      return acc
+    },
+    { error: 0, warning: 0, info: 0, hint: 0 }
+  )
+
+  const countSummary = summarizeLspCounts(counts)
+  const filePath = getLspFilePath(msg.args)
+  const fileName = filePath ? fileBasename(filePath) : null
+
+  let label = "Checked diagnostics"
+  let summary: string | null = fileName
+  if (msg.status === "running") {
+    label = "Checking diagnostics"
+    summary = fileName ? `Language server is checking ${fileName}` : null
+  } else if (msg.status === "error") {
+    label = "LSP diagnostics failed"
+  } else if (error) {
+    label = "No language server"
+    summary = fileName ? `${fileName} · ${error}` : error
+  } else if (diagnostics.length === 0 && parsed) {
+    label = "No diagnostics found"
+    summary = fileName ? `${fileName} is clean` : "File is clean"
+  } else if (countSummary) {
+    label = `Found ${diagnostics.length} diagnostic${
+      diagnostics.length === 1 ? "" : "s"
+    }`
+    summary = fileName ? `${fileName} · ${countSummary}` : countSummary
+  }
+
+  return {
+    label,
+    summary,
+    filePath,
+    diagnostics,
+    error,
+    parsed,
+    counts,
+  }
+}
+
+function LspSeverityIcon({
+  severity,
+  className,
+}: {
+  severity: number | null
+  className?: string
+}) {
+  const kind = lspSeverityKind(severity)
+  const Icon =
+    kind === "error"
+      ? AlertCircleIcon
+      : kind === "warning"
+        ? AlertTriangleIcon
+        : kind === "hint"
+          ? CircleDotIcon
+          : InfoIcon
+  return <Icon className={className} />
+}
+
+function LspCountBadge({
+  label,
+  count,
+  variant = "outline",
+}: {
+  label: string
+  count: number
+  variant?: "outline" | "destructive" | "secondary"
+}) {
+  if (count === 0) return null
+  return (
+    <Badge variant={variant} className="h-5 rounded-sm px-1.5 font-mono">
+      {count} {label}
+    </Badge>
+  )
+}
+
+function LspView({
+  lsp,
+  rawText,
+  live,
+}: {
+  lsp: LspDisplay
+  rawText: string | null
+  live: boolean
+}) {
+  if (!lsp.parsed && rawText) return <LivePre text={rawText} live={live} />
+
+  if (lsp.error) {
+    return (
+      <div className="flex items-start gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2">
+        <CircleSlashIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/45" />
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="text-xs font-medium text-foreground/75">
+            Language server unavailable
+          </p>
+          <p className="text-xs leading-relaxed text-muted-foreground/70">
+            {lsp.error}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (live && lsp.diagnostics.length === 0) {
+    return (
+      <span className="animate-thinking-shimmer bg-linear-to-r from-muted-foreground/30 via-foreground/80 to-muted-foreground/30 bg-size-[200%_100%] bg-clip-text text-transparent">
+        Waiting for diagnostics from the language server
+      </span>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2 rounded-md border border-border/50 bg-background/40 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <LspCountBadge
+            label="errors"
+            count={lsp.counts.error}
+            variant="destructive"
+          />
+          <LspCountBadge label="warnings" count={lsp.counts.warning} />
+          <LspCountBadge
+            label="info"
+            count={lsp.counts.info}
+            variant="secondary"
+          />
+          <LspCountBadge
+            label="hints"
+            count={lsp.counts.hint}
+            variant="secondary"
+          />
+          {lsp.diagnostics.length === 0 && (
+            <Badge variant="secondary" className="h-5 rounded-sm px-1.5">
+              clean
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground/70">
+          {lsp.diagnostics.length === 0
+            ? "The language server did not report errors, warnings, information messages, or hints for this file."
+            : `The language server reported ${summarizeLspCounts(
+                lsp.counts
+              )} for this file.`}
+        </p>
+      </div>
+
+      {lsp.diagnostics.length > 0 && (
+        <div className="flex max-h-72 flex-col gap-1.5 overflow-auto">
+          {lsp.diagnostics.map((diagnostic, i) => {
+            const kind = lspSeverityKind(diagnostic.severity)
+            const position = formatLspPosition(diagnostic.range)
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-2 rounded-md border border-border/40 bg-background/35 px-2.5 py-2"
+              >
+                <LspSeverityIcon
+                  severity={diagnostic.severity}
+                  className={cn(
+                    "mt-0.5 h-3.5 w-3.5 shrink-0",
+                    kind === "error"
+                      ? "text-destructive/75"
+                      : kind === "warning"
+                        ? "text-amber-500/75"
+                        : "text-muted-foreground/55"
+                  )}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                    <span className="font-medium text-foreground/75">
+                      {lspSeverityLabel(diagnostic.severity)}
+                    </span>
+                    {position && (
+                      <span className="font-mono text-2xs text-muted-foreground/50">
+                        {position}
+                      </span>
+                    )}
+                    {diagnostic.source && (
+                      <span className="text-2xs text-muted-foreground/45">
+                        {diagnostic.source}
+                      </span>
+                    )}
+                    {diagnostic.code && (
+                      <span className="font-mono text-2xs text-muted-foreground/40">
+                        {diagnostic.code}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground/80">
+                    {diagnostic.message}
+                  </p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Todo tool description ──────────────────────────────────────────────────────
@@ -933,6 +1268,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const diff = isEdit ? getEditDiff(msg.result) : null
   const isMemory = normalizedToolName === "memory"
   const memory = isMemory ? describeMemory(msg) : null
+  const isLsp = normalizedToolName === "lsp"
   const isRead = isReadTool(normalizedToolName, msg.args)
   const readFilePath = isRead ? getReadFilePath(msg.args) : null
   const readLineRange = isRead ? getReadLineRange(msg.args) : null
@@ -944,7 +1280,9 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const writeArgs = isWrite ? (msg.args as WriteArgs) : null
   const filePath = isEdit || isWrite ? getReadFilePath(msg.args) : null
   // Reads get the same file-icon + basename row treatment as edits/writes
-  const displayFilePath = filePath ?? (skillName ? null : readFilePath)
+  const lspFilePath = isLsp ? getLspFilePath(msg.args) : null
+  const displayFilePath =
+    filePath ?? lspFilePath ?? (skillName ? null : readFilePath)
 
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -1119,6 +1457,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const resultText = getResultText(msg)
   const resultImages = getResultImages(msg)
   const summary = argsSummary(msg.args, rootPath)
+  const lsp = isLsp ? describeLsp(msg, resultText) : null
 
   // Skill loads parse the SKILL.md frontmatter so the row can show the skill's
   // purpose inline and a structured card on expand, instead of a raw file dump.
@@ -1150,11 +1489,15 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       (!memory!.parsed && resultText !== null) ||
       msg.status === "running" ||
       msg.status === "error")
+  const showLspContent =
+    isLsp &&
+    (resultText !== null || msg.status === "running" || msg.status === "error")
   const showOtherContent =
     !isEdit &&
     !isRead &&
     !isWrite &&
     !isMemory &&
+    !isLsp &&
     (resultText !== null ||
       resultImages.length > 0 ||
       msg.status === "running" ||
@@ -1165,6 +1508,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     showReadContent ||
     showWriteContent ||
     showMemoryContent ||
+    showLspContent ||
     showOtherContent
 
   // Bash reads as an action, not a tool name: "Running" while the command is in
@@ -1173,15 +1517,17 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   // name shown alongside.
   const toolLabel = memory
     ? memory.label
-    : skillName
-      ? msg.status === "running"
-        ? "Loading"
-        : "Loaded"
-      : normalizedToolName === "bash"
+    : lsp
+      ? lsp.label
+      : skillName
         ? msg.status === "running"
-          ? "Running"
-          : "Ran"
-        : toolDisplayName(msg.toolName)
+          ? "Loading"
+          : "Loaded"
+        : normalizedToolName === "bash"
+          ? msg.status === "running"
+            ? "Running"
+            : "Ran"
+          : toolDisplayName(msg.toolName)
 
   return (
     <div
@@ -1261,6 +1607,14 @@ export const ToolCallBlock = memo(function ToolCallBlock({
               className={cn("min-w-0 flex-1 truncate text-xs", DISCLOSURE_DIM)}
             >
               {memory.summary}
+            </span>
+          )
+        ) : lsp ? (
+          lsp.summary && (
+            <span
+              className={cn("min-w-0 flex-1 truncate text-xs", DISCLOSURE_DIM)}
+            >
+              {lsp.summary}
             </span>
           )
         ) : displayFilePath ? (
@@ -1394,9 +1748,11 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                       ? memory.label
                       : skillName
                         ? "Loading skill"
-                        : isRead
-                          ? "Reading"
-                          : "Running"}
+                        : lsp
+                          ? "Checking diagnostics"
+                          : isRead
+                            ? "Reading"
+                            : "Running"}
                 </span>
               )}
 
@@ -1413,8 +1769,11 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                       live={true}
                     />
                   )}
-                  {!isRead && !isMemory && resultText && (
+                  {!isRead && !isMemory && !isLsp && resultText && (
                     <LivePre text={resultText} live={true} />
+                  )}
+                  {lsp && (
+                    <LspView lsp={lsp} rawText={resultText} live={true} />
                   )}
                   {!isRead && resultImages.length > 0 && (
                     <ImageView images={resultImages} />
@@ -1459,9 +1818,14 @@ export const ToolCallBlock = memo(function ToolCallBlock({
                     <LivePre text={resultText} live={false} />
                   ) : null)}
 
-                {!isEdit && !isRead && !isWrite && !isMemory && resultText && (
-                  <LivePre text={resultText} live={false} />
-                )}
+                {lsp && <LspView lsp={lsp} rawText={resultText} live={false} />}
+
+                {!isEdit &&
+                  !isRead &&
+                  !isWrite &&
+                  !isMemory &&
+                  !isLsp &&
+                  resultText && <LivePre text={resultText} live={false} />}
 
                 {/* Screenshots / images returned by the tool (e.g. browser or
                     screenshot tools). Shown after any text, with a small gap. */}

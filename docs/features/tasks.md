@@ -1,74 +1,52 @@
 # Workspace Tasks
 
-Tasks are user-defined shell command shortcuts attached to a workspace. They provide one-click access to frequently run commands without typing them in the terminal each time.
+Tasks are saved shell-command shortcuts for a workspace. They are useful for commands you run often, such as tests, builds, linters, type checks, or dev servers.
 
-## Overview
+> Screenshot needed: capture `/workspace/<threadId>` with the tasks dropdown open and several saved tasks visible.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Tasks                                                           │
-│                                                                 │
-│ ┌───────────────────────────────────────────────────────────┐ │
-│ │ 🧪  npm test                                    [▶] [✎]  │ │
-│ └───────────────────────────────────────────────────────────┘ │
-│ ┌───────────────────────────────────────────────────────────┐ │
-│ │ 🔨  npm run build                               [▶] [✎]  │ │
-│ └───────────────────────────────────────────────────────────┘ │
-│ ┌───────────────────────────────────────────────────────────┐ │
-│ │ 🚀  npm run dev                                 [▶] [✎]  │ │
-│ └───────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ [+ Add Task]                                                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Add a Task
 
-## Adding a Task
+1. Open a workspace.
+2. Open the tasks dropdown from the title bar or workspace controls.
+3. Click `Add Task`.
+4. Enter a command.
+5. Choose an icon if available.
+6. Save.
 
-1. Open the workspace's **Tasks** panel
-2. Click **+ Add Task**
-3. Fill in the dialog:
+## Run a Task
 
-| Field       | Required | Description                             |
-| ----------- | -------- | --------------------------------------- |
-| **Icon**    | No       | Emoji shown on the button (e.g., `🧪`)  |
-| **Command** | Yes      | Shell command to run (e.g., `npm test`) |
+1. Open the tasks dropdown.
+2. Click the run button for a task.
+3. lamda opens a terminal tab and runs the command in the workspace root.
+4. Watch output in the terminal panel.
 
-4. Click **Save**
+## Edit a Task
 
-The task appears immediately in the list.
+1. Open the tasks dropdown.
+2. Open the task menu.
+3. Choose `Edit`.
+4. Update the command or icon.
+5. Save.
 
-## Running a Task
+## Delete a Task
 
-Click the **▶** (run) button on any task. The command executes in a new terminal tab that opens in the workspace root directory.
+1. Open the task menu.
+2. Choose `Delete`.
+3. Confirm deletion.
 
-## Editing a Task
+Deleting a task does not affect terminal history or files in the workspace.
 
-Click the **✎** (edit) button on the task card to modify the icon or command. Click **Save** to apply changes.
+## Good Task Examples
 
-## Deleting a Task
-
-Open the edit dialog and click **Delete**, or use the context menu.
-
-## Common Examples
-
-| Icon | Command               | Purpose              |
-| ---- | --------------------- | -------------------- |
-| 🧪   | `npm test`            | Run test suite       |
-| 🔨   | `npm run build`       | Build project        |
-| 🚀   | `npm run dev`         | Start dev server     |
-| 🧹   | `npm run lint`        | Lint code            |
-| 🔍   | `npm run check-types` | TypeScript check     |
-| 📦   | `npm install`         | Install dependencies |
+| Task       | Command               |
+| ---------- | --------------------- |
+| Dev server | `npm run dev`         |
+| Build      | `npm run build`       |
+| Type check | `npm run check-types` |
+| Lint       | `npm run lint`        |
+| Tests      | `npm test`            |
+| Install    | `npm install`         |
 
 ## Storage
 
-Tasks are stored per workspace in the SQLite database (`workspace_tasks` table). They persist across restarts and are specific to each workspace.
-
-## API
-
-Tasks can also be managed via the [Tasks API](../api.md#tasks).
-
-## Related
-
-- [Terminal](terminal.md) — Where task commands execute
-- [Workspaces](workspaces.md) — Workspace overview
+Tasks are stored per workspace in the local SQLite database. They are not committed to the project repository unless you separately document them in project files.

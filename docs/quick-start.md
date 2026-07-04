@@ -1,15 +1,17 @@
-# Quick Start Guide
+# Quick Start
 
-Get up and running with lamda in 5 minutes.
+This guide gets lamda running and walks through the first useful coding session.
 
-## Prerequisites
+## 1. Install
 
-- **Node.js** 18+
-- **npm** 11+
-- **Git** (for workspace git features)
-- **macOS on Apple Silicon** (for packaged desktop builds)
+Prerequisites:
 
-## Step 1: Install
+| Requirement         | Notes                                     |
+| ------------------- | ----------------------------------------- |
+| Node.js             | 18 or newer                               |
+| npm                 | 11 or newer                               |
+| Git                 | Required for workspace git features       |
+| macOS Apple Silicon | Required only for packaged desktop builds |
 
 ```bash
 git clone https://github.com/sdawn29/lambda.git
@@ -17,191 +19,86 @@ cd lambda
 npm install
 ```
 
-## Step 2: Start the Application
+## 2. Start lamda
 
 ```bash
 npm run dev
 ```
 
-This starts all three components:
+This starts the web UI, server, and Electron desktop shell through Turborepo.
 
-| Component | URL                   | Description        |
-| --------- | --------------------- | ------------------ |
-| Web UI    | http://localhost:5173 | The user interface |
-| Server    | http://localhost:3001 | API backend        |
-| Desktop   | (Electron window)     | Desktop shell      |
+| Component | Default location        |
+| --------- | ----------------------- |
+| Web UI    | `http://localhost:5173` |
+| Server    | `http://localhost:3001` |
+| Desktop   | Electron window         |
 
-## Step 3: Configure Your AI Provider
+> Screenshot needed: capture the first app window after `npm run dev`, either the onboarding screen at `/onboard` or the empty workspace screen at `/`.
 
-Before chatting, configure an AI provider:
+## 3. Configure an AI Provider
 
-1. Click the **Settings** gear icon in the sidebar
-2. Go to **Providers** → **Add Provider**
-3. Select your preferred provider:
-   - **Anthropic** (recommended for best results)
-   - **OpenAI**
-   - **DeepSeek**
-   - **Google Gemini**
-4. Enter your API key
-5. Click **Save**
+1. Open Settings from the sidebar, title bar, or command palette.
+2. Go to `API Keys` for key-based providers or `Subscriptions` for OAuth providers.
+3. Add credentials for Anthropic, OpenAI, DeepSeek, Google Gemini, GitHub Copilot, or another supported provider.
+4. Open `Local Models` if you use Ollama, LM Studio, vLLM, or another OpenAI-compatible local server.
+5. Return to a thread and choose a model from the chat composer.
 
-## Step 4: Create Your First Workspace
+> Screenshot needed: capture `/settings/api-keys` with at least one provider card visible.
 
-1. Click **+ New Workspace** in the sidebar
-2. Choose **Local Folder**
-3. Click **Browse** and select a project folder
-4. Click **Create Workspace**
+## 4. Create a Workspace
 
-Or clone a repository:
+1. Click `New Workspace` in the sidebar or open the command palette and run `New Workspace`.
+2. Choose a local folder or enter a Git URL to clone.
+3. Confirm the path.
+4. lamda creates the workspace and opens a new thread.
 
-1. Click **+ New Workspace**
-2. Choose **Clone Repository**
-3. Enter a git URL (e.g., `https://github.com/user/repo.git`)
-4. Click **Clone and Create**
+> Screenshot needed: capture the create workspace dialog opened from `/`.
 
-## Step 5: Start Chatting
+## 5. Start a Thread
 
-A new thread is automatically created. Type your first message:
+1. Pick a mode in the composer:
+   - `Agent` lets the agent read, edit, run commands, and complete the task.
+   - `Ask` keeps the agent read-only for explanations and review.
+   - `Plan` asks the agent to propose a plan before executing.
+2. Type a prompt, for example:
 
-```
-Hi! Can you help me understand this codebase?
+```text
+Please explore this codebase and explain the main architecture.
 ```
 
-The agent will respond with streaming text and may use tools to explore your code.
+3. Watch the response stream. Tool calls, file changes, todos, questions, approvals, and errors appear inline.
 
----
+> Screenshot needed: capture `/workspace/<threadId>` after a first successful response with at least one tool call visible.
 
-## Your First Conversation
+## 6. Review Code Changes
 
-### Asking Questions
+1. Open the right source-control panel.
+2. Use `Turns` to review changes from the latest agent turn.
+3. Switch to `All Changes` for the full working tree.
+4. Open a file diff, stage selected changes, and commit.
 
-```
-You: "What does this function do?"
+> Screenshot needed: capture `/workspace/<threadId>` with the right panel open on `Turns` and a changed file selected.
 
-Agent: "This function handles user authentication.
-       It validates credentials against the database
-       and creates a session token..."
-```
+## 7. Use the Terminal
 
-### Making Changes
+1. Open the terminal panel from the title bar or command palette.
+2. Run project commands such as `npm test`, `npm run build`, or `git status`.
+3. Create more tabs when you need long-running commands and quick one-off checks side by side.
 
-```
-You: "Can you add input validation to the login form?"
+> Screenshot needed: capture `/workspace/<threadId>` with the bottom terminal panel open and two terminal tabs visible.
 
-Agent: "I'll add validation to ensure:
-       - Email is properly formatted
-       - Password meets minimum requirements
-       - No empty fields are submitted..."
-```
+## Essential Shortcuts
 
-### Debugging Issues
+| Shortcut           | Action                             |
+| ------------------ | ---------------------------------- |
+| `Cmd/Ctrl + K`     | Open command palette               |
+| `Cmd/Ctrl + Enter` | Send chat message                  |
+| `Shift + Enter`    | Add a line break in the composer   |
+| `Cmd/Ctrl + ,`     | Open settings                      |
+| `Escape`           | Close dialogs or cancel focused UI |
 
-```
-You: "The login button isn't working. Can you help?"
-
-Agent: "Let me investigate... I can see the issue.
-       The form submit handler isn't being called
-       because the onClick is on the wrong element..."
-```
-
----
-
-## Essential Keyboard Shortcuts
-
-| Shortcut           | Action                   |
-| ------------------ | ------------------------ |
-| `Cmd/Ctrl + Enter` | Send message             |
-| `Cmd/Ctrl + K`     | Command palette          |
-| `Cmd/Ctrl + ,`     | Open settings            |
-| `Shift + Enter`    | New line in input        |
-| `Escape`           | Cancel current operation |
-
----
-
-## Common Tasks
-
-### View Git Changes
-
-1. Click the **Git** toggle in the title bar
-2. See unstaged, staged, and untracked files
-3. Click a file to see the diff
-
-### Stage and Commit
-
-1. In Git panel, click **Stage All**
-2. Click **Commit**
-3. Write a commit message
-4. Click **Create Commit**
-
-### Open Terminal
-
-1. Click the **Terminal** toggle in the title bar
-2. A terminal opens in the bottom panel
-3. Type commands as usual
-
-### Switch Branches
-
-1. Open the Git panel
-2. Click the **Branch** dropdown
-3. Select a branch
-
----
+Shortcuts can be changed in `Settings -> Shortcuts`.
 
 ## Next Steps
 
-### Learn More
-
-- [Chat Interface](features/chat.md) — Master the chat interface
-- [Git Integration](features/git.md) — Full git workflow
-- [Terminal](features/terminal.md) — Embedded shell
-- [Workspaces](features/workspaces.md) — Organize projects
-
-### Configure
-
-- [Settings](features/settings.md) — Customize preferences
-- [Providers](providers.md) — More provider options
-- [MCP](features/mcp.md) — Extend with MCP servers
-
-### Reference
-
-- [API Reference](api.md) — API endpoints
-- [CLI Reference](cli.md) — Command-line tools
-- [Architecture](architecture.md) — How it works
-
----
-
-## Troubleshooting
-
-### "Connection failed"
-
-```bash
-# Check server is running
-curl http://localhost:3001/health
-
-# Should return: {"status":"ok"}
-```
-
-### "API key not working"
-
-1. Verify key is correct in Settings
-2. Check provider status shows "Connected"
-3. Ensure you have API credits/quota
-
-### "Terminal not responding"
-
-1. Ensure server is running
-2. Close and reopen terminal panel
-3. Check port 3001 is not blocked
-
-### "Git operations failing"
-
-1. Verify Git is installed: `git --version`
-2. Check workspace path exists
-3. Ensure proper file permissions
-
----
-
-## Getting Help
-
-- [GitHub Issues](https://github.com/sdawn29/lambda/issues) — Report bugs
-- [docs/index.md](index.md) — Full documentation
+Read [Chat](features/chat.md), [Git](features/git.md), [Files and Tabs](features/files-and-tabs.md), [Terminal](features/terminal.md), and [Settings](features/settings.md) for the everyday workflow. Then add [MCP servers](features/mcp.md), [skills](features/skills.md), [tasks](features/tasks.md), or [automations](features/automations.md) as your projects need them.

@@ -44,6 +44,7 @@ import {
   BranchSelector,
   WorktreeSelector,
   useThreadBranchControls,
+  useReviewPanel,
 } from "@/features/git"
 import {
   AlertDialog,
@@ -193,10 +194,20 @@ export function TitleBar() {
   const openPalette = useCommandPalette((state) => state.openPalette)
   const {
     isOpen: rightSidebarOpen,
+    close: closeRightSidebar,
     togglePanel,
     toggle: toggleRightSidebar,
   } = useRightSidebar()
+  const { isFullscreen: diffFullscreen, toggleFullscreen } = useReviewPanel()
   const toggleDiff = () => togglePanel("changes")
+  const handleToggleRightSidebar = () => {
+    if (diffFullscreen) {
+      toggleFullscreen()
+      closeRightSidebar()
+    } else {
+      toggleRightSidebar()
+    }
+  }
   const { activeTab } = useMainTabs()
 
   // URL-based thread — drives center display and thread actions
@@ -806,8 +817,8 @@ export function TitleBar() {
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={toggleRightSidebar}
-                      aria-pressed={rightSidebarOpen}
+                      onClick={handleToggleRightSidebar}
+                      aria-pressed={rightSidebarOpen || diffFullscreen}
                       className="size-7 text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
                     >
                       <PanelRight className="size-4" />

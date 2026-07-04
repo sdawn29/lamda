@@ -1,236 +1,82 @@
 # lamda Documentation
 
-Welcome to **lamda**, a local-first desktop coding workspace for running Pi coding agent sessions against real repositories.
+lamda is a local-first desktop coding workspace for running Pi coding agent sessions against real repositories. It combines chat, code browsing, git review, terminals, scheduled agent work, provider management, MCP servers, and desktop integrations in one application.
 
-## 📚 Documentation Guide
+## Start Here
 
-| Category            | Document                                   | Description                       |
-| ------------------- | ------------------------------------------ | --------------------------------- |
-| **Getting Started** |                                            |                                   |
-| Quick Start         | [Quick Start Guide](quick-start.md)        | Get up and running in 5 minutes   |
-| Installation        | [Getting Started](getting-started.md)      | Detailed installation and setup   |
-| **Features**        |                                            |                                   |
-| Workspaces          | [Workspaces Guide](features/workspaces.md) | Managing projects and threads     |
-| Chat                | [Chat Guide](features/chat.md)             | Communicating with the AI agent   |
-| Git                 | [Git Guide](features/git.md)               | Version control workflow          |
-| Terminal            | [Terminal Guide](features/terminal.md)     | Embedded shell access             |
-| Tasks               | [Tasks Guide](features/tasks.md)           | Workspace shell command shortcuts |
-| Settings            | [Settings Guide](features/settings.md)     | Configuration and preferences     |
-| Themes              | [Themes Guide](features/themes.md)         | Color themes and fonts            |
-| MCP                 | [MCP Guide](features/mcp.md)               | Model Context Protocol servers    |
-| **Reference**       |                                            |                                   |
-| API                 | [API Reference](api.md)                    | Server REST API endpoints         |
-| Providers           | [Providers](providers.md)                  | AI provider configuration         |
-| CLI                 | [CLI Reference](cli.md)                    | Command-line commands             |
-| Architecture        | [Architecture](architecture.md)            | Technical architecture overview   |
-| **Contributing**    |                                            |                                   |
-| Contributing        | [Contributing Guide](contributing.md)      | How to contribute to the project  |
+| Goal                     | Page                                  |
+| ------------------------ | ------------------------------------- |
+| Install and launch lamda | [Getting Started](getting-started.md) |
+| Get productive quickly   | [Quick Start](quick-start.md)         |
+| Learn the app layout     | [Workspaces](features/workspaces.md)  |
+| Configure providers      | [Providers](providers.md)             |
+| Understand the internals | [Architecture](architecture.md)       |
 
----
+## User Guides
 
-## 🎯 Key Features
+| Feature                | Guide                                          | What you will learn                                                                                         |
+| ---------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Workspaces and threads | [Workspaces](features/workspaces.md)           | Create workspaces, clone repositories, manage threads, pin, archive, and fork work                          |
+| Chat                   | [Chat](features/chat.md)                       | Send prompts, choose modes, attach context, approve tools, answer questions, and compact long conversations |
+| Files and tabs         | [Files and Tabs](features/files-and-tabs.md)   | Browse files, search the tree, open tabs, inspect code, and use diagnostics                                 |
+| Git                    | [Git](features/git.md)                         | Review changed files, compare turns, stage, commit, branch, stash, push, and revert                         |
+| GitHub and GitLab      | [Git Hosting](features/git-hosting.md)         | Connect hosting accounts, inspect PR/MR context, create PRs/MRs, and review CI status                       |
+| Terminal               | [Terminal](features/terminal.md)               | Open persistent terminal tabs, run commands, and use task-launched shells                                   |
+| Tasks                  | [Tasks](features/tasks.md)                     | Save frequently used shell commands per workspace                                                           |
+| Automations            | [Automations](features/automations.md)         | Schedule recurring prompts that run while the app is open                                                   |
+| Command palette        | [Command Palette](features/command-palette.md) | Navigate, search files, toggle panels, and run actions from the keyboard                                    |
+| Skills                 | [Skills](features/skills.md)                   | Search, install, inspect, and remove global agent skills                                                    |
+| MCP servers            | [MCP](features/mcp.md)                         | Connect external tools through Model Context Protocol                                                       |
+| LSP diagnostics        | [LSP](features/lsp.md)                         | Configure language servers and read code diagnostics in the file viewer                                     |
+| Settings               | [Settings](features/settings.md)               | Configure appearance, chat, API keys, subscriptions, usage, memory, shortcuts, retry, and data              |
+| Themes                 | [Themes](features/themes.md)                   | Pick built-in themes, edit custom themes, and configure fonts                                               |
+| Desktop app            | [Desktop](features/desktop.md)                 | Use native folder picking, open-with apps, server recovery, and updates                                     |
 
-| Feature                | Description                                                                               |
-| ---------------------- | ----------------------------------------------------------------------------------------- |
-| **Chat Interface**     | Real-time streaming conversations with the Pi coding agent                                |
-| **Thread Modes**       | Agent, Ask, and Plan modes control agent behaviour per thread                             |
-| **Thread Forking**     | Branch any conversation at any earlier message                                            |
-| **Git Integration**    | View diffs, hunk-level staging, commit, branches, stashes, and revert                     |
-| **Review Panel**       | Side-by-side diff viewer with last-turn file change tracking                              |
-| **Embedded Terminal**  | Multi-tab terminal with WebSocket PTY backend                                             |
-| **File Tabs**          | Open source files in tabs alongside chat threads                                          |
-| **Command Palette**    | Keyboard-driven command and file search (`Cmd/Ctrl + K`)                                  |
-| **Workspaces**         | Organize multiple repositories with multiple conversation threads                         |
-| **Workspace Tasks**    | One-click shell command shortcuts per workspace                                           |
-| **LSP Integration**    | Live diagnostics in the file viewer, with one-click language server installs              |
-| **MCP Support**        | Connect to Model Context Protocol servers for extended capabilities                       |
-| **Themes & Fonts**     | Built-in color themes (Catppuccin, Nord, Tokyo Night, …), custom themes, and Google Fonts |
-| **Usage Tracking**     | AI token and cost stats with date-range filtering                                         |
-| **Local Models**       | Manage local inference providers alongside cloud APIs                                     |
-| **Local-First**        | All data stored locally in SQLite (`~/.lamda-code/db-v2.sqlite`)                          |
-| **Multiple Providers** | Support for Anthropic, OpenAI, DeepSeek, Google Gemini, and more                          |
+## Reference
 
----
+| Page                                   | Description                                                             |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| [API Reference](api.md)                | Hono server routes used by the app                                      |
+| [Providers](providers.md)              | Supported AI providers, API keys, OAuth subscriptions, and local models |
+| [Settings Reference](settings.md)      | Low-level settings file locations and examples                          |
+| [Screenshot Checklist](screenshots.md) | Capture list for replacing screenshot placeholders                      |
+| [CLI Reference](cli.md)                | Development and package commands                                        |
+| [Contributing](contributing.md)        | Repository workflow for contributors                                    |
 
-## 🚀 Quick Reference
+## Application Overview
+
+> Screenshot needed: capture the main workspace route at `/workspace/<threadId>` with the left workspace sidebar open, a chat thread selected, the right source-control panel open on the `Turns` view, and the terminal panel open at the bottom.
+
+The first screen after setup is usually a workspace thread. The left sidebar holds workspaces and threads. The center area holds chat threads and file tabs. The right panel can show source control, GitHub/GitLab review views, file trees, and opened file content. The bottom panel holds persistent terminal tabs.
+
+## Core Workflow
+
+1. Configure at least one AI provider in [Settings](features/settings.md) or [Providers](providers.md).
+2. Create a workspace from a local folder or clone a repository.
+3. Open a thread and choose `Agent`, `Ask`, or `Plan` mode.
+4. Ask the agent to inspect, explain, modify, or review code.
+5. Watch tool calls, file changes, todos, questions, and approvals in the chat.
+6. Review changes in the Git panel, stage what you want, and commit.
+7. Use terminals, tasks, MCP servers, skills, and automations when the workflow needs more power.
+
+## Quick Commands
 
 ```sh
-# Install dependencies
 npm install
-
-# Start all apps (web, server, desktop)
 npm run dev
-
-# Build for production
 npm run build
-
-# Type check
 npm run check-types
 ```
 
----
+## Data Storage
 
-## 🖥️ Application Overview
+| Location                     | Purpose                                                                |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| `~/.lamda-code/db-v2.sqlite` | Workspaces, threads, messages, tasks, automations, and local app state |
+| `~/.pi/agent/auth.json`      | Provider API keys and OAuth credentials                                |
+| `~/.lamda-code/logs/`        | Application logs                                                       |
+| `~/.lamda/skills`            | Globally installed agent skills                                        |
 
-When you launch lamda, you'll see:
+## Project Status
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ [≡] lamda | Thread: Fix login bug  |  [Open With ▾] [MCP] [Commit] │ <- Title Bar
-├─────────────┬───────────────────────────────────────────┬───────────┤
-│             │                                           │           │
-│ Workspaces  │          Chat Interface                   │   Diff    │
-│             │                                           │   Panel   │
-│ ▼ my-project│  ┌─────────────────────────────────┐    │           │
-│   ├ Thread 1│  │ Agent: I'll help you fix...     │    │  Git status│
-│   └ Thread 2│  │ Tool: read_file("src/auth.ts")   │    │  Files    │
-│             │  │ User: The login button isn't... │    │  Branch   │
-│ ▼ another  │  └─────────────────────────────────┘    │           │
-│             │                                           │           │
-├─────────────┴───────────────────────────────────────────┴───────────┤
-│ [Terminal ▾] [+Tab]                                            [×] │
-│ ┌───────────────────────────────────────────────────────────────┐ │
-│ │ $ git status                                                    │ │
-│ │ $ █                                                             │ │
-│ └───────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 📖 Feature Guides
-
-### [Chat Interface](features/chat.md)
-
-The chat interface is your primary way to interact with the Pi coding agent:
-
-- **Send messages** — Type prompts and get AI responses with real-time streaming
-- **Thread modes** — Choose `agent`, `ask`, or `plan` per thread
-- **Thread forking** — Branch from any earlier message to explore alternatives
-- **Tool execution** — Watch the agent use tools (read files, edit code, run commands)
-- **Thinking visibility** — Toggle whether to show the agent's thinking process
-- **Context usage** — Monitor token usage and context window
-
-### [Git Integration](features/git.md)
-
-Full git workflow support directly in the app:
-
-- **View changes** — See unstaged, staged, and untracked file changes
-- **Stage/unstage** — Selectively stage files or individual diff hunks
-- **Commit** — Write commit messages (with conventional commit support)
-- **Branches** — Switch branches, create new branches
-- **Stashes** — Temporarily store changes, then restore them
-- **Revert** — Discard changes to files or restore to an earlier agent turn
-
-### [Terminal](features/terminal.md)
-
-Embedded terminal with full shell access:
-
-- **Multi-tab support** — Multiple terminal sessions
-- **WebSocket PTY** — Server-side PTY with client-side rendering
-- **Theme support** — Dark and light terminal themes
-- **Auto-resize** — Automatically adjusts to panel size
-
-### [Workspaces](features/workspaces.md)
-
-Organize your work by repository:
-
-- **Create workspace** — Open a local folder as a workspace
-- **Clone repository** — Clone from git URL
-- **Multiple threads** — Multiple conversation threads per workspace
-- **Archive threads** — Keep threads for reference without cluttering
-- **Pin threads and workspaces** — Pin important items to the top
-- **Fork threads** — Branch a conversation at any earlier message
-
-### [Tasks](features/tasks.md)
-
-User-defined shell command shortcuts per workspace:
-
-- **One-click execution** — Run common commands without typing
-- **Custom icons** — Emoji icons for quick visual recognition
-- **Per-workspace** — Each workspace has its own task list
-
-### [Settings](features/settings.md)
-
-Configure your preferences:
-
-- **Provider configuration** — Add API keys for AI providers
-- **Model selection** — Choose which model to use
-- **Thinking level** — Control how much reasoning the agent does
-- **Appearance** — Color themes, fonts, and corner radius (see the [Themes Guide](features/themes.md))
-- **Retry configuration** — Adjust error handling behavior
-
-### [MCP Servers](features/mcp.md)
-
-Extend the agent's capabilities:
-
-- **Filesystem** — Access local files
-- **GitHub** — GitHub API integration
-- **Brave Search** — Web search capabilities
-- **And more** — Any MCP-compliant server
-
----
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-**Application won't start**
-
-```sh
-# Check Node.js version (requires 18+)
-node --version
-
-# Reinstall dependencies
-rm -rf node_modules package-lock.json
-npm install
-```
-
-**API key not working**
-
-- Verify your API key is valid
-- Check that the provider is correctly configured in Settings
-- Ensure no firewall is blocking requests
-
-**Terminal not connecting**
-
-- The server must be running for terminal WebSocket connection
-- Check that port 3001 is not in use by another application
-
-**Git operations failing**
-
-- Ensure Git is installed (`git --version`)
-- Verify the workspace path is correct
-- Check that you have proper file permissions
-
----
-
-## 📊 Project Status
-
-> **Status**: Early open-source release. Functional but evolving. Current version: **v0.18.0**
-
-- ✅ Chat with real-time streaming via WebSocket
-- ✅ Thread modes: agent, ask, plan
-- ✅ Thread forking with git state restoration
-- ✅ Git workflow (status, diff, hunk staging, commit, branches, stashes, revert, workspace-level history)
-- ✅ Embedded terminal with persistent multi-tab sessions and auto-reconnect
-- ✅ Workspace/thread management with pinning and archiving
-- ✅ Workspace tasks (custom shell command shortcuts)
-- ✅ File tabs, file tree browser, and Monaco code/diff viewers
-- ✅ Command palette (`Cmd/Ctrl + K`)
-- ✅ LSP diagnostics with one-click language server installation
-- ✅ MCP server integration
-- ✅ Theming engine with built-in and custom themes, Google Fonts support
-- ✅ AI usage tracking (tokens and cost, with date-range filtering)
-- ✅ Local model provider management
-- ✅ Token-based authentication for the server API and WebSockets
-- ✅ Multiple AI providers (20+)
-- ⚠️ No automated test suite yet
-- ⚠️ macOS `arm64` packaging only (for now)
-
----
-
-## 🆘 Getting Help
-
-- [GitHub Issues](https://github.com/sdawn29/lambda/issues) — Report bugs and request features
-- [AGENTS.md](../AGENTS.md) — Context for AI coding agents working on this codebase
+lamda is functional and evolving. It supports chat streaming, thread modes, git workflows, persistent terminals, file tabs, LSP diagnostics, MCP servers, skills, automations, local model providers, usage tracking, themes, GitHub/GitLab integrations, and Electron desktop features. Automated test coverage is still limited, and packaged desktop builds currently target macOS arm64.

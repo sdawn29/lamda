@@ -1,64 +1,54 @@
-# Themes Guide
+# Themes
 
-lamda has a full theming engine that controls the entire app's appearance — UI colors, code-block syntax highlighting, the embedded terminal, and fonts.
+lamda's theme engine controls UI colors, code syntax highlighting, Monaco editor colors, terminal colors, fonts, and corner styling.
 
-## Mode vs. Color Theme
+> Screenshot needed: capture `/settings/appearance` with the theme swatch grid visible.
 
-Appearance is controlled by two independent settings:
+## Pick a Built-In Theme
 
-| Axis            | Options                      | What it does                                       |
-| --------------- | ---------------------------- | -------------------------------------------------- |
-| **Mode**        | Light, Dark, System          | Toggles the light/dark variant of the active theme |
-| **Color Theme** | Any built-in or custom theme | Picks the palette that fills the design tokens     |
+1. Open `Settings -> Appearance`.
+2. Choose light, dark, or system mode.
+3. Select a color theme from the swatch grid.
+4. Confirm chat, file tabs, diffs, terminal, and settings update together.
 
-Both are persisted to the app settings store, so they survive restarts and apply everywhere.
+Built-in themes include Jellybeans, Graphite, macOS, Nord, Rose Pine, Solarized, Catppuccin, Cursor Anysphere, and Tokyo Night.
 
-## Built-in Themes
+## Edit a Custom Theme
 
-| Theme                | Notes                                        |
-| -------------------- | -------------------------------------------- |
-| **Jellybeans**       | Default                                      |
-| **Graphite**         |                                              |
-| **macOS**            | System-like look with matching corner radius |
-| **Nord**             |                                              |
-| **Rosé Pine**        |                                              |
-| **Solarized**        |                                              |
-| **Catppuccin**       | Macchiato in dark mode, Latte in light mode  |
-| **Cursor Anysphere** |                                              |
-| **Tokyo Night**      |                                              |
+1. Open `Settings -> Appearance`.
+2. Select the custom theme option.
+3. Open the theme editor.
+4. Adjust design tokens by group.
+5. Preview changes live.
+6. Save when the palette works across chat, diffs, and terminal output.
 
-Pick a theme from the swatch grid in **Settings** → **Appearance**.
+> Screenshot needed: capture the custom theme editor open in `/settings/appearance`.
 
-## Custom Themes
+## Configure Fonts
 
-Create your own theme with the theme editor:
+1. Open `Settings -> Appearance`.
+2. Choose a UI font.
+3. Choose a code font.
+4. Browse Google Fonts if you want a font outside the bundled list.
 
-1. Go to **Settings** → **Appearance**
-2. Select the **Custom** theme
-3. Open the theme editor and adjust individual design tokens (backgrounds, foregrounds, accents, borders, …), grouped by purpose
-4. Changes apply live as you edit
+Bundled defaults include Geist for UI and JetBrains Mono for code.
 
-The custom theme is seeded from the currently active theme, so you can start from a palette you like and tweak it.
+## What Themes Affect
 
-## What the Theme Controls
+| Area        | Effect                                              |
+| ----------- | --------------------------------------------------- |
+| Chat        | Message surfaces, code blocks, markdown, tool calls |
+| Git diffs   | Insertions, deletions, headers, file status colors  |
+| File viewer | Monaco editor background, foreground, syntax tokens |
+| Terminal    | xterm.js palette and cursor colors                  |
+| Settings    | Inputs, cards, controls, sidebar, dialogs           |
 
-The active palette is applied as CSS custom properties and derived into:
+## Screenshot Checklist
 
-- **UI colors** — every component reads from the same design tokens
-- **Syntax highlighting** — code blocks in chat and Markdown use a code palette derived from the theme
-- **Monaco editor** — the code/diff viewers follow the theme
-- **Terminal** — the xterm.js color scheme is derived from the UI tokens
+For docs-site images, capture:
 
-## Fonts
-
-Configure the UI (sans) and code (mono) fonts in **Settings** → **Appearance**:
-
-- **Bundled sans fonts**: Geist (default), Outfit, Google Sans, System UI
-- **Bundled mono fonts**: JetBrains Mono (default), System Mono
-- **Google Fonts**: browse the Google Fonts catalog in-app and apply any font; it is loaded on demand
-
-## Related
-
-- [Settings](settings.md) — All settings, including appearance
-- [Terminal](terminal.md) — Terminal theming
-- [Chat Interface](chat.md) — Code blocks and syntax highlighting
+1. `Settings -> Appearance` with built-in themes.
+2. Custom theme editor.
+3. A chat thread with code blocks under the selected theme.
+4. A git diff under the selected theme.
+5. A terminal tab under the selected theme.

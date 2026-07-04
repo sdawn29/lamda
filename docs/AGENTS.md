@@ -15,18 +15,18 @@ Human-facing documentation directory containing user guides, API references, arc
 
 ## File Inventory
 
-| File                 | Purpose                                                                    |
-| -------------------- | -------------------------------------------------------------------------- |
-| `index.md`           | Documentation home page                                                    |
-| `quick-start.md`     | 5-minute setup walkthrough                                                 |
-| `getting-started.md` | Initial setup and first-run guide                                          |
-| `architecture.md`    | System architecture overview                                               |
-| `api.md`             | REST API reference                                                         |
-| `providers.md`       | AI provider configuration guide                                            |
-| `settings.md`        | Settings reference                                                         |
-| `cli.md`             | Command-line interface                                                     |
-| `contributing.md`    | Developer contribution guidelines                                          |
-| `features/*.md`      | User guides: workspaces, chat, git, terminal, tasks, settings, themes, MCP |
+| File                 | Purpose                                                                                                                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `index.md`           | Documentation home page                                                                                                                                                                |
+| `quick-start.md`     | 5-minute setup walkthrough                                                                                                                                                             |
+| `getting-started.md` | Initial setup and first-run guide                                                                                                                                                      |
+| `architecture.md`    | System architecture overview                                                                                                                                                           |
+| `api.md`             | REST API reference                                                                                                                                                                     |
+| `providers.md`       | AI provider configuration guide                                                                                                                                                        |
+| `settings.md`        | Settings reference                                                                                                                                                                     |
+| `cli.md`             | Command-line interface                                                                                                                                                                 |
+| `contributing.md`    | Developer contribution guidelines                                                                                                                                                      |
+| `features/*.md`      | User guides for app features, including workspaces, chat, files, git, hosting, terminal, tasks, automations, command palette, skills, settings, themes, MCP, LSP, and desktop behavior |
 
 ## Relationship to AGENTS.md
 
