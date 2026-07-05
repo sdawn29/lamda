@@ -20,20 +20,10 @@ export { chatKeys, messagesQueryKey, type WorkspaceEntry } from "./queries"
 export {
   useSessionStream,
   useVisibleMessages,
-  useScrollMeta,
   useThreadNotifications,
 } from "./hooks"
-export type { PendingError } from "./hooks/use-scroll-meta"
 export type { UseSessionStreamOptions } from "./hooks/use-session-stream"
 export type { UseVisibleMessagesOptions } from "./hooks/use-visible-messages"
-// Sync engine
-export {
-  getChatSyncEngine,
-  useChatSyncEngine,
-  loadThreadFromStorage,
-  clearThreadFromStorage,
-  getAllStoredThreadIds,
-} from "./hooks/use-chat-sync-engine"
 export type {
   AssistantMessage,
   Message,

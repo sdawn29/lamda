@@ -69,7 +69,6 @@ import {
   AlertDialogAction,
 } from "@/shared/ui/alert-dialog"
 import { PlanChangesCard } from "./plan-changes-card"
-import { getChatSyncEngine } from "../hooks/use-chat-sync-engine"
 import {
   clearPendingThreadPreferences,
   getPendingThreadPreferences,
@@ -138,7 +137,6 @@ export function ChatView({
 }: ChatViewProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const syncEngine = getChatSyncEngine()
   const showThinkingSetting = useShowThinkingSetting()
   const { workspaces } = useWorkspace()
   const activeWorkspace = workspaces.find((w) => w.id === workspaceId)
@@ -575,7 +573,6 @@ export function ChatView({
     scrollToBottom,
     pinToBottom,
   } = useChatScroll({
-    sessionId,
     threadId,
     groupCount: groupedMessages.length,
     isLoading,
@@ -584,8 +581,6 @@ export function ChatView({
     isFetchingPreviousPage,
     fetchPreviousPage,
     bottomBarHeight,
-    queryClient,
-    syncEngine,
   })
 
   // Track the floating bottom bar's height so the scroll area can reserve

@@ -597,7 +597,7 @@ export function useSessionStream({
               undefined,
           }
           pendingThinkingLevelRef.current = null
-          enqueue({ kind: "message_start" })
+          enqueue({ kind: "message_start", replayed: data.replayed === true })
         },
 
         onMessageUpdate: (data) => {

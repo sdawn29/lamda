@@ -13,7 +13,6 @@ import { useQueryClient } from "@tanstack/react-query"
 
 import { useSessionStream } from "./hooks/use-session-stream"
 import { useVisibleMessages } from "./hooks/use-visible-messages"
-import { getChatSyncEngine } from "./hooks/use-chat-sync-engine"
 import {
   messagesQueryKey,
   useSessionStatus,
@@ -174,10 +173,6 @@ export function useChatStream({
             pageParams: [undefined],
           }
         )
-        getChatSyncEngine().saveMessages(sessionId, serverMessages, {
-          hasMore,
-          oldestBlockIndex,
-        })
       } catch {
         // Best-effort fallback — a plain invalidation still nudges a refetch.
         void queryClient.invalidateQueries({

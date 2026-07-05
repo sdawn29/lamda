@@ -1,8 +1,4 @@
-import {
-  useQuery,
-  useInfiniteQuery,
-  useQueryClient,
-} from "@tanstack/react-query"
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query"
 import type { InfiniteData } from "@tanstack/react-query"
 import {
   listMessages,
@@ -20,11 +16,6 @@ import {
   type Message,
   type ToolMessage,
 } from "./types"
-import {
-  getChatSyncEngine,
-  loadThreadFromStorage,
-} from "./hooks/use-chat-sync-engine"
-
 export type { WorkspaceEntry } from "./api"
 
 const chatRootKey = ["chat"] as const
@@ -49,12 +40,6 @@ export const chatKeys = {
     [...chatSessionKey(sessionId), "thinking-levels"] as const,
   status: (sessionId: string) =>
     [...chatSessionKey(sessionId), "status"] as const,
-  scroll: (sessionId: string) =>
-    [...chatSessionKey(sessionId), "meta", "scroll"] as const,
-  errors: (sessionId: string) =>
-    [...chatSessionKey(sessionId), "meta", "errors"] as const,
-  pendingError: (sessionId: string) =>
-    [...chatSessionKey(sessionId), "meta", "pendingError"] as const,
 }
 
 // ── Messages ─────────────────────────────────────────────────────────────────
@@ -131,9 +116,6 @@ export function getMessagesFromInfinite(
 }
 
 export function useInfiniteMessages(sessionId: string) {
-  const syncEngine = getChatSyncEngine()
-  const queryClient = useQueryClient()
-
   return useInfiniteQuery<
     MessagesPage,
     Error,
@@ -151,30 +133,6 @@ export function useInfiniteMessages(sessionId: string) {
       const oldestBlockIndex =
         blocks.length > 0 ? (blocks[0] as MessageBlock).blockIndex : null
 
-      if (pageParam === undefined) {
-        // Initial (most-recent) page — persist it immediately.
-        syncEngine.saveMessages(sessionId, messages, {
-          hasMore,
-          oldestBlockIndex,
-        })
-      } else {
-        // An older page was just loaded (fetchPreviousPage). Persist the full
-        // set — this page + the already-cached newer pages — so that after a
-        // refresh the user sees all previously-loaded blocks, not just the
-        // most-recent 100.
-        const existing = queryClient.getQueryData<MessagesInfiniteData>(
-          messagesQueryKey(sessionId)
-        )
-        const newerMessages = existing
-          ? existing.pages.flatMap((p) => p.messages)
-          : []
-        const allMessages = [...messages, ...newerMessages]
-        syncEngine.saveMessages(sessionId, allMessages, {
-          hasMore,
-          oldestBlockIndex,
-        })
-      }
-
       return { messages, hasMore, oldestBlockIndex }
     },
     initialPageParam: undefined,
@@ -184,32 +142,17 @@ export function useInfiniteMessages(sessionId: string) {
         ? firstPage.oldestBlockIndex
         : undefined,
     getNextPageParam: () => undefined, // WS stream handles new messages
-    // Seed from localStorage immediately (no network wait).
-    //
-    // We restore ALL stored messages in one page so that after a refresh
-    // the user sees their full history without having to scroll/click.
-    // initialDataUpdatedAt: 0 below is what makes the server refetch actually
-    // fire on mount — without it react-query stamps this seed as fresh *now*
-    // and, combined with staleTime, would serve stale/incomplete localStorage
-    // data for up to `staleTime` on every thread switch. The refetch then
-    // replaces the last page with fresh DB content; if there are blocks older
-    // than what's stored, the "Load earlier messages" affordance appears then.
-    initialData: (): MessagesInfiniteData => {
-      const stored = loadThreadFromStorage(sessionId)
-      const storedMsgs = stored?.messages ?? []
-      return {
-        pages: [
-          {
-            messages: storedMsgs,
-            // Use stored hasMore / oldestBlockIndex so that pagination can resume
-            // immediately (the button shows up before the server responds).
-            hasMore: stored?.hasMore ?? false,
-            oldestBlockIndex: stored?.oldestBlockIndex ?? null,
-          },
-        ],
-        pageParams: [undefined],
-      }
-    },
+    // Guarantee the cache always holds a page structure from first mount.
+    // Every transcript writer (optimistic user append, WS stream deltas,
+    // reconnect replay) patches the last page via updateLastPageMessages,
+    // which bails out on `undefined` — without this seed, writes that land
+    // while the initial fetch is still in flight would be silently dropped.
+    // initialDataUpdatedAt: 0 marks the empty seed already-stale so the mount
+    // refetch fires immediately instead of serving it for `staleTime`.
+    initialData: (): MessagesInfiniteData => ({
+      pages: [{ messages: [], hasMore: false, oldestBlockIndex: null }],
+      pageParams: [undefined],
+    }),
     initialDataUpdatedAt: 0,
     gcTime: 30 * 60 * 1000,
     staleTime: 5 * 60 * 1000,

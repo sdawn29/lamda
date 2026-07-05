@@ -13,7 +13,7 @@ The chat module is the largest feature in the web app (34 files, ~5000 lines of 
 1. **Session streaming** via SSE from the Hono server
 2. **Message lifecycle** — user prompts → agent responses → tool execution → database persistence
 3. **Real-time updates** — streaming text deltas, tool outputs, thinking blocks, context usage
-4. **State synchronization** — localStorage-backed message cache with TanStack Query
+4. **State synchronization** — TanStack Query in-memory cache (server SQLite is the source of truth; no client-side message persistence)
 5. **UI rendering** — markdown, syntax highlighting, tool calls, thinking visibility, error recovery
 
 ## Architecture
@@ -41,12 +41,12 @@ The chat module is the largest feature in the web app (34 files, ~5000 lines of 
 │  ├─ api.ts — HTTP client (prompts, title generation, model list)
 │  ├─ queries.ts — TanStack Query hooks (useMessages, useSessionStats, etc.)
 │  ├─ mutations.ts — TanStack Mutation hooks (useSendPrompt, useAbortSession)
-│  └─ hooks/use-chat-sync-engine.ts — localStorage persistence layer
+│  └─ scroll-meta-store.ts — per-thread scroll position persistence (threadId-keyed)
 │
 └─ Context & Utilities
    ├─ error-toast-context.tsx — Error toast dispatcher
    ├─ thread-status-context.tsx — Thread running/stopped status
-   ├─ hooks/ — use-session-stream, use-visible-messages, use-scroll-meta, etc.
+   ├─ hooks/ — use-session-stream, use-visible-messages, use-chat-scroll, etc.
    └─ api.ts — Server communication (SSE, prompts, models)
 ```
 
@@ -69,10 +69,11 @@ The chat module is the largest feature in the web app (34 files, ~5000 lines of 
   - Caches persisted message blocks from database
   - Merges with streaming messages from SSE
   - Pagination support
-- **`hooks/use-scroll-meta.ts`**
-  - Tracks scroll position for auto-scroll behavior
+- **`hooks/use-chat-scroll.ts`**
+  - Owns all transcript scroll behavior: stick-to-bottom while streaming,
+    per-thread position restore, debounced persistence to `scroll-meta-store`,
+    auto-loading older history near the top
   - Detects user scroll-up to prevent "jumping to bottom"
-  - Pending error state propagation
 
 ### Components
 
@@ -154,12 +155,16 @@ The chat module is the largest feature in the web app (34 files, ~5000 lines of 
 
 ### Persistence
 
-- **`hooks/use-chat-sync-engine.ts`** — localStorage-backed message cache
-  - Per-thread message persistence to avoid refetch on navigation
-  - `getChatSyncEngine()` — Singleton engine
-  - `useChatSyncEngine()` — React hook for syncing messages
-  - `loadThreadFromStorage()`, `clearThreadFromStorage()`, `getAllStoredThreadIds()`
-  - Syncs after message received and on window unload
+- **Messages are not persisted client-side.** The server's SQLite is the source
+  of truth; transcripts live only in the TanStack Query in-memory cache.
+  `usePrefetchThreadsMessages` warms that cache for all threads at startup so
+  thread switches render instantly.
+- **`scroll-meta-store.ts`** — per-thread scroll positions (the one piece of
+  chat state that must outlive the process)
+  - Keyed by **threadId** (durable) — sessionIds rotate on every server start
+  - `saveScrollMeta(threadId, meta)` / `loadScrollMeta(threadId)`
+  - Single zustand persist store under `lamda:scroll-meta`; also clears the
+    legacy `lamda:chat:*` cache keys on load
 
 ## Conventions
 

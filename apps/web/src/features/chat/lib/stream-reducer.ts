@@ -163,7 +163,7 @@ export function findLastAssistantIndex(messages: Message[]): number {
 
 export type QueuedEvent =
   | { kind: "agent_start"; runningTools: ToolMessage[] }
-  | { kind: "message_start" }
+  | { kind: "message_start"; replayed?: boolean }
   | { kind: "text_delta"; delta: string }
   | { kind: "thinking_delta"; delta: string }
   | {
@@ -227,8 +227,23 @@ export function applyQueuedEvent(
     case "agent_start":
       return mergeRunningTools(msgs, event.runningTools)
 
-    case "message_start":
-      return [...msgs, createAssistantMessage()]
+    case "message_start": {
+      if (!event.replayed) return [...msgs, createAssistantMessage()]
+      // Replayed start of the in-flight assistant message: a fresh WS connect
+      // during a run gets the whole current message replayed by the server, so
+      // the transcript may already hold that message's rows — streamed on a
+      // previous mount (thread switch away and back mid-turn) or fetched as
+      // partially-persisted blocks. Drop the trailing assistant row (and the
+      // tool rows that followed it, which the replay also rebuilds) so the
+      // replay replaces the block instead of appending a duplicate answer.
+      let end = msgs.length
+      while (end > 0 && msgs[end - 1].role === "tool") end--
+      const base =
+        end > 0 && msgs[end - 1].role === "assistant"
+          ? msgs.slice(0, end - 1)
+          : msgs
+      return [...base, createAssistantMessage()]
+    }
 
     case "text_delta":
       return appendAssistantDelta(msgs, "text_delta", event.delta)

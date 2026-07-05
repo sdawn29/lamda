@@ -43,6 +43,72 @@ describe("applyQueuedEvent", () => {
     expect(result[0].role).toBe("assistant")
   })
 
+  it("live message_start keeps a completed trailing assistant message", () => {
+    const start: Message[] = [assistant({ content: "done thinking" })]
+    const result = applyQueuedEvent(start, { kind: "message_start" })
+    expect(result).toHaveLength(2)
+    expect((result[0] as AssistantMessage).content).toBe("done thinking")
+  })
+
+  it("replayed message_start replaces the stale trailing assistant row", () => {
+    const start: Message[] = [
+      { role: "user", content: "hi" },
+      assistant({ content: "stale partial answer" }),
+    ]
+    const result = applyQueuedEvent(start, {
+      kind: "message_start",
+      replayed: true,
+    })
+    expect(result).toHaveLength(2)
+    expect(result[0].role).toBe("user")
+    expect((result[1] as AssistantMessage).content).toBe("")
+  })
+
+  it("replayed message_start drops the stale assistant row and its tool rows", () => {
+    const start: Message[] = [
+      { role: "user", content: "hi" },
+      assistant({ content: "calling tools" }),
+      tool({ toolCallId: "call-1" }),
+      tool({ toolCallId: "call-2" }),
+    ]
+    const result = applyQueuedEvent(start, {
+      kind: "message_start",
+      replayed: true,
+    })
+    expect(result).toHaveLength(2)
+    expect(result[0].role).toBe("user")
+    expect(result[1].role).toBe("assistant")
+    expect((result[1] as AssistantMessage).content).toBe("")
+  })
+
+  it("replayed message_start leaves earlier turn messages intact", () => {
+    const start: Message[] = [
+      assistant({ content: "first message of the turn" }),
+      tool({ toolCallId: "call-1", status: "done" }),
+      assistant({ content: "stale current message" }),
+    ]
+    const result = applyQueuedEvent(start, {
+      kind: "message_start",
+      replayed: true,
+    })
+    expect(result).toHaveLength(3)
+    expect((result[0] as AssistantMessage).content).toBe(
+      "first message of the turn"
+    )
+    expect(result[1].role).toBe("tool")
+    expect((result[2] as AssistantMessage).content).toBe("")
+  })
+
+  it("replayed message_start appends when the trailing row is a user message", () => {
+    const start: Message[] = [{ role: "user", content: "hi" }]
+    const result = applyQueuedEvent(start, {
+      kind: "message_start",
+      replayed: true,
+    })
+    expect(result).toHaveLength(2)
+    expect(result[1].role).toBe("assistant")
+  })
+
   it("text_delta appends to the trailing assistant message", () => {
     const start: Message[] = [assistant({ content: "Hel" })]
     const result = applyQueuedEvent(start, { kind: "text_delta", delta: "lo" })

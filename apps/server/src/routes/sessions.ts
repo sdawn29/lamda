@@ -956,9 +956,15 @@ export function handleSessionEventsWs(
 
   const subscription = hub.subscribe({ lastEventId, onEvent });
 
+  // Replayed events are tagged so the client can reconcile them against rows
+  // it may already hold for the in-flight message (a stale streamed copy from
+  // before a reconnect, or partially-persisted blocks from a fetch) instead of
+  // appending duplicates. Synthetic replay records (running-tool starts) carry
+  // an empty `data` — serialize their event object instead.
   for (const record of subscription.initialEvents) {
     if (ws.readyState !== 1 /* OPEN */) break;
-    ws.send(`{"id":${record.id},${record.data.slice(1)}`);
+    const body = record.data || JSON.stringify(record.event);
+    ws.send(`{"id":${record.id},"replayed":true,${body.slice(1)}`);
   }
 
   ws.on("close", () => subscription.unsubscribe());

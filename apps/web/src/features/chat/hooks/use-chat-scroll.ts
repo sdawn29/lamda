@@ -5,10 +5,13 @@ import {
   useRef,
   useState,
 } from "react"
-import type { QueryClient } from "@tanstack/react-query"
-import { chatKeys } from "../queries"
-import type { getChatSyncEngine } from "./use-chat-sync-engine"
-import type { ScrollMeta } from "./use-chat-sync-engine"
+import {
+  loadScrollMeta,
+  saveScrollMeta,
+  type ScrollMeta,
+} from "../scroll-meta-store"
+
+type PendingScrollMeta = Omit<ScrollMeta, "savedAt">
 
 // Distance (px) from the bottom at which we consider the user "at the bottom"
 // and resume auto-following. Deliberately tight: once the user scrolls up past
@@ -21,7 +24,7 @@ const SHOW_BUTTON_THRESHOLD = 80
 // generously so the next page is fetched before the user reaches the very top,
 // keeping upward scrolling seamless (there is no manual "load earlier" button).
 const LOAD_OLDER_THRESHOLD = 600
-// Debounce for persisting scroll position to the query cache / localStorage.
+// Debounce for persisting scroll position to the scroll-meta store.
 const SCROLL_SAVE_DEBOUNCE_MS = 150
 // After switching threads, the transcript mounts and measures in a short burst
 // (cached rows, content-visibility estimates, images/tool blocks). Keep those
@@ -75,7 +78,6 @@ function findScrollAnchor(
 }
 
 interface UseChatScrollOptions {
-  sessionId: string
   threadId: string
   /** Number of rendered message groups (gates the one-time restore). */
   groupCount: number
@@ -88,8 +90,6 @@ interface UseChatScrollOptions {
   fetchPreviousPage: () => void
   /** Height of the floating bottom bar; growth re-pins to keep the latest row glued. */
   bottomBarHeight: number
-  queryClient: QueryClient
-  syncEngine: ReturnType<typeof getChatSyncEngine>
 }
 
 export interface UseChatScrollResult {
@@ -111,7 +111,7 @@ export interface UseChatScrollResult {
  * Owns every scroll concern for the chat transcript:
  *   • stick-to-bottom while the agent streams, without fighting the user
  *   • one-time restore of a saved position (or jump to bottom) per thread
- *   • position persistence (debounced) to the query cache + localStorage
+ *   • position persistence (debounced) to the per-thread scroll-meta store
  *   • auto-loading older history as the user nears the top
  *   • the "scroll to bottom" affordance
  *
@@ -134,7 +134,6 @@ export interface UseChatScrollResult {
  * writes `scrollTop` while pinned; scrolled up, it never touches it.
  */
 export function useChatScroll({
-  sessionId,
   threadId,
   groupCount,
   isLoading,
@@ -143,8 +142,6 @@ export function useChatScroll({
   isFetchingPreviousPage,
   fetchPreviousPage,
   bottomBarHeight,
-  queryClient,
-  syncEngine,
 }: UseChatScrollOptions): UseChatScrollResult {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -231,7 +228,7 @@ export function useChatScroll({
   )
 
   // ── Position persistence (debounced) ──────────────────────────────────────
-  const pendingScrollMetaRef = useRef<ScrollMeta | null>(null)
+  const pendingScrollMetaRef = useRef<PendingScrollMeta | null>(null)
   const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   )
@@ -239,16 +236,14 @@ export function useChatScroll({
     const meta = pendingScrollMetaRef.current
     if (!meta) return
     pendingScrollMetaRef.current = null
-    queryClient.setQueryData(chatKeys.scroll(sessionId), meta)
-    syncEngine.saveScrollMeta(sessionId, meta)
-  }, [queryClient, sessionId, syncEngine])
+    saveScrollMeta(threadId, meta)
+  }, [threadId])
 
   const saveScrollPosition = useCallback(
     (scrollTop: number, anchor: ScrollAnchor | null) => {
       pendingScrollMetaRef.current = {
         scrollTop,
         isPinned: pinnedRef.current,
-        visited: true,
         anchorGroupKey: anchor?.groupKey,
         anchorOffset: anchor?.offset,
       }
@@ -414,25 +409,19 @@ export function useChatScroll({
   // useLayoutEffect applies the position before paint — no flash of the wrong
   // spot. Deferred until the initial page has rendered: applying a saved
   // scrollTop against an empty container clamps to 0 and strands the view.
-  const scrollRestoredSessionRef = useRef<string | null>(null)
+  const scrollRestoredThreadRef = useRef<string | null>(null)
   useLayoutEffect(() => {
-    if (scrollRestoredSessionRef.current === sessionId) return
+    if (scrollRestoredThreadRef.current === threadId) return
     const el = scrollContainerRef.current
     if (!el) return
     if (groupCount === 0 && isLoadingMessages) return
-    scrollRestoredSessionRef.current = sessionId
+    scrollRestoredThreadRef.current = threadId
 
     setPinned(true)
 
-    let savedMeta = queryClient.getQueryData<ScrollMeta>(
-      chatKeys.scroll(sessionId)
-    )
-    if (!savedMeta?.visited) {
-      const localMeta = syncEngine.getScrollMeta(sessionId)
-      if (localMeta) savedMeta = localMeta
-    }
+    const savedMeta = loadScrollMeta(threadId)
 
-    if (savedMeta?.visited) {
+    if (savedMeta) {
       setPinned(savedMeta.isPinned)
       // Pinned always means "the live bottom" — recompute it fresh rather than
       // replaying the old scrollTop, which lines up with a snapshot of
@@ -448,34 +437,29 @@ export function useChatScroll({
         const anchorTop = anchorEl.getBoundingClientRect().top
         const viewportTop = el.getBoundingClientRect().top
         el.scrollTop += anchorTop - viewportTop - (savedMeta.anchorOffset ?? 0)
-      } else {
+      } else if (savedMeta.isPinned) {
         el.scrollTop = el.scrollHeight
+      } else {
+        // Anchor row not in the DOM (row identity drifted since the save, or
+        // the group lives in a not-yet-loaded older page). Fall back to the raw
+        // saved scrollTop — approximate under content-visibility estimates, but
+        // it lands near the saved spot instead of dumping the user at the bottom.
+        el.scrollTop = savedMeta.scrollTop
       }
     } else {
+      // First visit — start pinned at the live bottom.
       el.scrollTop = el.scrollHeight
-      const visitedMeta: ScrollMeta = {
+      saveScrollMeta(threadId, {
         scrollTop: el.scrollTop,
         isPinned: pinnedRef.current,
-        visited: true,
-      }
-      queryClient.setQueryData(chatKeys.scroll(sessionId), visitedMeta)
-      syncEngine.saveScrollMeta(sessionId, visitedMeta)
+      })
     }
 
     lastScrollTopRef.current = el.scrollTop
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     setButtonVisible(distanceFromBottom >= SHOW_BUTTON_THRESHOLD)
     snapUntilRef.current = performance.now() + RESTORE_SNAP_WINDOW_MS
-  }, [
-    threadId,
-    sessionId,
-    queryClient,
-    syncEngine,
-    groupCount,
-    isLoadingMessages,
-    setButtonVisible,
-    setPinned,
-  ])
+  }, [threadId, groupCount, isLoadingMessages, setButtonVisible, setPinned])
 
   // ── Auto-follow new content while pinned ──────────────────────────────────
   // A single ResizeObserver on the content box covers every growth source —

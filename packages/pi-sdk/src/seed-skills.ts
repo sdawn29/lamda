@@ -29,21 +29,34 @@ the user can run as \`/<name>\`.
 
 ## Steps
 
-1. **Settle the name and intent.** Pick a short kebab-case \`<name>\` (lowercase
-   letters, digits, hyphens) and confirm what the prompt should make the agent
-   do. Ask the user with the \`question\` tool if either is unclear.
+1. **Survey what exists.** List \`~/.lamda/prompts/\` and
+   \`<workspace>/.lamda/prompts/\` (either may be missing — that's fine) so you
+   know the names already taken and the local house style.
 
-2. **Ask where to create it.** Use the \`question\` tool to ask whether the prompt
-   should be **global** or **local**, then resolve the directory:
+2. **Settle name, intent, and location in one round.** Derive a short
+   kebab-case \`<name>\` (lowercase letters, digits, hyphens) from the request.
+   Then make a single \`question\` call covering everything still open — always
+   include the **location** question (never assume a default), plus the
+   name/behavior only if genuinely unclear:
    - **Global** — \`~/.lamda/prompts/<name>.md\`. Available in every workspace.
-   - **Local** — \`<workspace>/.lamda/prompts/<name>.md\` (relative to the current
-     working directory). Only available in this workspace; can be committed to
-     the repo to share with the team.
+   - **Local** — \`<workspace>/.lamda/prompts/<name>.md\`. Only this workspace;
+     can be committed to the repo to share with the team.
 
-   Do not assume a default — always ask.
+   If the chosen name collides with an existing file, read that file and ask
+   whether to replace it or pick another name — never overwrite silently.
 
-3. **Write the file** at the resolved path with the \`write\` tool. Create the
-   \`.lamda/prompts\` directory first if it does not exist. Format:
+3. **Draft a body that stands alone.** The body is everything the agent gets
+   when the command runs, so write it like a good task brief: imperative voice,
+   concrete steps in order, expected output stated, no context that only made
+   sense in this conversation. Use argument placeholders where the command
+   takes input:
+   - \`$1\`, \`$2\`, … — positional arguments.
+   - \`$@\` or \`$ARGUMENTS\` — all arguments.
+   - \`\${1:-default}\` — positional arg with a fallback when missing/empty.
+   - \`\${@:2}\` / \`\${@:2:3}\` — bash-style slices of the argument list.
+
+4. **Write the file** at the resolved path with the \`write\` tool (create the
+   \`.lamda/prompts\` directory first if needed). Format:
 
    \`\`\`markdown
    ---
@@ -51,20 +64,17 @@ the user can run as \`/<name>\`.
    argument-hint: <optional hint, e.g. "<issue-number>">
    ---
 
-   The prompt body the agent receives when the command runs.
+   Fix GitHub issue $1: read the issue with \`gh issue view $1\`, locate the
+   relevant code, implement the fix, run the affected tests, and summarize the
+   change.
    \`\`\`
 
-   The frontmatter is optional. If \`description\` is omitted, the first line of the
-   body is used. Omit \`argument-hint\` when the prompt takes no arguments.
+   The frontmatter is optional. If \`description\` is omitted, the first line of
+   the body is used. Omit \`argument-hint\` when the prompt takes no arguments.
 
-4. **Use argument placeholders** in the body when the command takes input:
-   - \`$1\`, \`$2\`, … — positional arguments.
-   - \`$@\` or \`$ARGUMENTS\` — all arguments.
-   - \`\${1:-default}\` — positional arg with a fallback when missing/empty.
-   - \`\${@:2}\` / \`\${@:2:3}\` — bash-style slices of the argument list.
-
-5. **Confirm.** Tell the user the file path and that they can now run \`/<name>\`.
-   New prompt files are picked up automatically — no restart needed.
+5. **Confirm.** Tell the user the file path and that they can now run
+   \`/<name>\` (with an example invocation if it takes arguments). New prompt
+   files are picked up automatically — no restart needed.
 `;
 
 const CREATE_MODE_SKILL = `---
@@ -81,48 +91,63 @@ prepended to the user's messages while that mode is selected.
 
 ## Steps
 
-1. **Settle the id and behavior.** Pick a short kebab-case \`<id>\` (lowercase
-   letters, digits, hyphens) and confirm how the mode should behave and which
-   tools it needs. Ask the user with the \`question\` tool if either is unclear.
+1. **Survey what exists.** List \`~/.lamda/modes/\` and
+   \`<workspace>/.lamda/modes/\` (either may be missing — that's fine). The ids
+   \`ask\`, \`plan\`, and \`agent\` are the built-ins: a file with one of those ids
+   **overrides** that built-in mode rather than adding a new one — only reuse a
+   built-in id if the user explicitly wants to customize it.
 
-2. **Ask where to create it.** Use the \`question\` tool to ask whether the mode
-   should be **global** or **local**, then resolve the directory:
+2. **Settle id, behavior, and location in one round.** Derive a short
+   kebab-case \`<id>\` (lowercase letters, digits, hyphens) from the request.
+   Then make a single \`question\` call covering everything still open — always
+   include the **location** question (never assume a default), plus the
+   id/behavior/toolset only if genuinely unclear:
    - **Global** — \`~/.lamda/modes/<id>.md\`. Available in every workspace.
-   - **Local** — \`<workspace>/.lamda/modes/<id>.md\` (relative to the current
-     working directory). Only available in this workspace, and overrides a
-     global mode with the same id; can be committed to share with the team.
+   - **Local** — \`<workspace>/.lamda/modes/<id>.md\`. Only this workspace, and
+     overrides a global mode with the same id; can be committed to share with
+     the team.
 
-   Do not assume a default — always ask.
+   If the chosen id collides with an existing file, read that file and ask
+   whether to replace it or pick another id — never overwrite silently.
 
-3. **Write the file** at the resolved path with the \`write\` tool. Create the
-   \`.lamda/modes\` directory first if it does not exist. Format:
+3. **Choose the smallest sufficient toolset** for \`tools:\` from the built-in
+   set — \`read\`, \`bash\`, \`edit\`, \`write\`, \`plan\`, \`todo\`, \`grep\`, \`find\`,
+   \`ls\`, \`question\`. Tool gating is what actually enforces the mode's
+   boundaries (the preamble only steers), so omit anything the mode shouldn't
+   do — e.g. leave out \`edit\`/\`write\`/\`bash\` for a read-only mode.
+   \`allowCustomTools: true\` keeps MCP/LSP/extension tools active; set it
+   \`false\` to restrict the mode to the listed built-ins.
+
+4. **Draft the preamble** — the body below the frontmatter, prepended to the
+   user's messages while the mode is active. A good preamble states, in order:
+   the mode's role in one opening line; how to work (workflow, priorities,
+   output expectations) as short bullets; and its boundaries — what it must
+   not do, and where to redirect the user for out-of-scope requests. Keep it
+   tight: it occupies context on every thread that uses the mode.
+
+5. **Write the file** at the resolved path with the \`write\` tool (create the
+   \`.lamda/modes\` directory first if needed). Format:
 
    \`\`\`markdown
    ---
    name: Display Name
    description: One-line summary shown in the mode picker.
-   tools: [read, grep, find, ls]
+   tools: [read, grep, find, ls, question]
    allowCustomTools: true
    color: violet
    icon: sparkles
    ---
 
-   The preamble prepended to the user's messages in this mode. Describe the
-   mode's role, what it should and shouldn't do, and how to use its tools.
+   Review mode — inspect code and report findings; never modify files. …
    \`\`\`
 
-4. **Choose the tools** for \`tools:\` from the built-in set — \`read\`, \`bash\`,
-   \`edit\`, \`write\`, \`plan\`, \`todo\`, \`grep\`, \`find\`, \`ls\`, \`question\`. Include only
-   what the mode needs (e.g. omit \`edit\`/\`write\`/\`bash\` for a read-only mode).
-   \`allowCustomTools: true\` keeps MCP/LSP/extension tools active; set it
-   \`false\` to restrict the mode to the listed built-ins.
+   \`color\` is one of: sky, amber, emerald, violet, rose, blue, teal, orange,
+   fuchsia, slate. \`icon\` is a lucide icon name (e.g. sparkles, bot,
+   list-todo, message-circle-question).
 
-5. **Pick a color and icon** for the picker. \`color\` is one of: sky, amber,
-   emerald, violet, rose, blue, teal, orange, fuchsia, slate. \`icon\` is a
-   lucide icon name (e.g. sparkles, bot, list-todo, message-circle-question).
-
-6. **Confirm.** Tell the user the file path and that the new mode now appears in
-   the mode picker.
+6. **Confirm.** Tell the user the file path and that the mode now appears in
+   the mode picker — no restart needed, and later edits to the file take
+   effect on the next message.
 `;
 
 const SEED_SKILLS: readonly SeedSkill[] = [

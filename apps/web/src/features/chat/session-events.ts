@@ -24,6 +24,12 @@ export type AgentEndMessage =
 
 export interface SessionMessageStartEvent {
   message?: { role?: string }
+  /**
+   * Present (true) when this event is a server-side replay of the in-flight
+   * turn delivered on a fresh WS connect, rather than a live event. The
+   * transcript may already contain rows for the replayed message.
+   */
+  replayed?: boolean
 }
 
 export interface SessionMessageUpdateEvent {
