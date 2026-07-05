@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.45.1](../../releases/tag/v0.45.1) — 2026-07-05
+
+### Bug Fixes
+
+* **chat:** enhance session stream handling with replay support
+
 ## [0.45.0](../../releases/tag/v0.45.0) — 2026-07-04
 
 ### Features
