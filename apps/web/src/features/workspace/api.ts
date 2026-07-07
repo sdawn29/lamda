@@ -46,6 +46,8 @@ export interface AgentDto {
   /** `provider::model` override, or null to inherit the conversation model. */
   model: string | null
   tools: string[]
+  /** Null means all currently available custom tools; [] means none. */
+  customTools: string[] | null
   color: string
   icon: string
   source: "builtin" | "local" | "global"
@@ -62,9 +64,16 @@ export interface SaveAgentBody {
   description: string
   model?: string | null
   tools?: string[]
+  customTools?: string[] | null
   color?: string
   icon?: string
   prompt: string
+}
+
+export interface AgentCustomToolDto {
+  name: string
+  label: string
+  description?: string
 }
 
 export function listAgents(
@@ -74,6 +83,15 @@ export function listAgents(
     ? `?workspaceId=${encodeURIComponent(workspaceId)}`
     : ""
   return apiFetch<{ agents: AgentDto[] }>(`/agents${qs}`)
+}
+
+export function listAgentCustomTools(
+  workspaceId?: string
+): Promise<{ tools: AgentCustomToolDto[] }> {
+  const qs = workspaceId
+    ? `?workspaceId=${encodeURIComponent(workspaceId)}`
+    : ""
+  return apiFetch<{ tools: AgentCustomToolDto[] }>(`/agents/custom-tools${qs}`)
 }
 
 export function saveAgent(

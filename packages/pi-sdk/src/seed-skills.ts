@@ -201,8 +201,11 @@ A good agent definition is written for that reality.
    set — \`read\`, \`grep\`, \`find\`, \`ls\`, \`bash\`, \`edit\`, \`write\`. Tool gating
    is what actually enforces the agent's boundaries (the prompt only steers),
    so map the access answer directly: read-only → \`[read, grep, find, ls]\`;
-   read + edit adds \`edit, write\`; full adds \`bash\`. \`question\`, \`todo\`,
-   \`plan\`, and \`task\` are not available to subagents — never list them.
+   read + edit adds \`edit, write\`; full adds \`bash\`. Set \`customTools:\`
+   to the exact workspace custom tool names this agent should see (for example
+   \`[memory]\`, or MCP/LSP/GitHub tool names shown in Settings → Agents), and
+   use \`[]\` for a tightly isolated agent. \`question\`, \`todo\`, \`plan\`,
+   and \`task\` are not available to subagents — never list them.
 
 4. **Write a description that routes well.** The \`description\` is what the
    main assistant reads when deciding which agent to delegate to, so write it
@@ -228,6 +231,7 @@ A good agent definition is written for that reality.
    name: Code Reviewer
    description: Reviews a diff or file for correctness and style issues. Use for review-only passes; prefer over general when no changes should be made.
    tools: [read, grep, find, ls]
+   customTools: [memory]
    color: rose
    icon: search-check
    ---

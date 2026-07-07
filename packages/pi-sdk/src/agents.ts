@@ -69,6 +69,12 @@ export interface AgentConfig {
   model?: AgentModelRef;
   /** Built-in tool names the subagent may use (frontmatter `tools`). */
   tools: readonly string[];
+  /**
+   * Workspace custom tool names this subagent may use (frontmatter
+   * `customTools`). `null` means "all available custom tools" for
+   * compatibility with older `allowCustomTools: true` files.
+   */
+  customTools: readonly string[] | null;
   /** Named accent color for the agent's chip/icon (frontmatter `color`). */
   color: string;
   /** Named lucide icon for the agent (frontmatter `icon`); see web registry. */
@@ -118,6 +124,7 @@ const DEFAULT_AGENT_CONFIG: Record<BuiltinAgent, AgentConfig> = {
       "- If the task is ambiguous, pick the most reasonable interpretation, state the assumption in your report, and proceed.\n\n" +
       SUBAGENT_GROUND_RULES,
     tools: SUBAGENT_TOOL_NAMES,
+    customTools: null,
     color: "emerald",
     icon: "bot",
     source: "builtin",
@@ -126,15 +133,16 @@ const DEFAULT_AGENT_CONFIG: Record<BuiltinAgent, AgentConfig> = {
     id: "explore",
     label: "Explore",
     description:
-      "Read-only codebase scout for searches and \"where/how is X done\" questions. Fast and safe: it can read and search but never modifies anything.",
+      'Read-only codebase scout for searches and "where/how is X done" questions. Fast and safe: it can read and search but never modifies anything.',
     systemPrompt:
       "You are a read-only exploration agent. Investigate the codebase to answer the question you were given.\n\n" +
       "- Ground every claim in code you actually read; cite concrete locations as `path/to/file.ts:line`.\n" +
       "- Fire independent searches in parallel; read excerpts rather than whole files when possible.\n" +
-      "- Separate fact from inference: flag deductions with \"likely\"/\"appears\" — never present a guess as verified.\n" +
+      '- Separate fact from inference: flag deductions with "likely"/"appears" — never present a guess as verified.\n' +
       "- You cannot modify anything; if the task asks for changes, report what you found and what you would change instead.\n\n" +
       SUBAGENT_GROUND_RULES,
     tools: ["read", "grep", "find", "ls"],
+    customTools: null,
     color: "teal",
     icon: "telescope",
     source: "builtin",
@@ -176,15 +184,14 @@ export function serializeAgentFile(
   if (config.model) {
     lines.push(`model: ${config.model.provider}::${config.model.model}`);
   }
-  lines.push(
-    `tools: [${config.tools.join(", ")}]`,
-    `color: ${config.color}`,
-    `icon: ${config.icon}`,
-    "---",
-    "",
-    config.systemPrompt,
-    "",
-  );
+  lines.push(`tools: [${config.tools.join(", ")}]`);
+  if (config.customTools === null) {
+    lines.push("allowCustomTools: true");
+  } else {
+    lines.push(`customTools: [${config.customTools.join(", ")}]`);
+  }
+  lines.push(`color: ${config.color}`, `icon: ${config.icon}`, "---", "");
+  lines.push(config.systemPrompt, "");
   return lines.join("\n");
 }
 
@@ -200,6 +207,7 @@ function genericDefault(id: string, source: AgentSource): AgentConfig {
     description: "",
     systemPrompt: "",
     tools: SUBAGENT_TOOL_NAMES,
+    customTools: null,
     color: DEFAULT_AGENT_COLOR,
     icon: DEFAULT_AGENT_ICON,
     source,
@@ -266,6 +274,16 @@ export function getAgentConfig(
       readFileSync(resolved.path, "utf8"),
     );
     const toolsField = fields.get("tools");
+    const customToolsField = fields.get("customTools");
+    const allowCustomToolsField = fields.get("allowCustomTools");
+    const customTools =
+      customToolsField !== undefined
+        ? parseList(customToolsField)
+        : allowCustomToolsField === undefined
+          ? defaults.customTools
+          : unquote(allowCustomToolsField).toLowerCase() === "true"
+            ? null
+            : [];
     const config: AgentConfig = {
       id,
       label: fields.has("name") ? unquote(fields.get("name")!) : defaults.label,
@@ -276,6 +294,7 @@ export function getAgentConfig(
       model:
         parseAgentModel(unquote(fields.get("model") ?? "")) ?? defaults.model,
       tools: toolsField ? sanitizeTools(parseList(toolsField)) : defaults.tools,
+      customTools,
       color: normalizeColor(fields.get("color")) ?? defaults.color,
       icon: fields.has("icon") ? unquote(fields.get("icon")!) : defaults.icon,
       source: resolved.source,

@@ -21,6 +21,7 @@ import {
 import { getWorkspace } from "@lamda/db";
 import { agentsBroadcaster } from "../agents-broadcaster.js";
 import { parseJsonBody } from "../lib/validate.js";
+import { collectSubagentCustomTools } from "../services/subagent-custom-tools.js";
 
 /**
  * CRUD for subagent definitions (Settings → Agents). The markdown files in
@@ -37,6 +38,8 @@ interface AgentDto {
   /** `provider::model` override, or null to inherit the conversation model. */
   model: string | null;
   tools: string[];
+  /** Null means all currently available custom tools; [] means none. */
+  customTools: string[] | null;
   color: string;
   icon: string;
   source: AgentConfig["source"];
@@ -54,6 +57,7 @@ function toDto(config: AgentConfig): AgentDto {
       ? `${config.model.provider}::${config.model.model}`
       : null,
     tools: [...config.tools],
+    customTools: config.customTools ? [...config.customTools] : null,
     color: config.color,
     icon: config.icon,
     source: config.source,
@@ -62,9 +66,7 @@ function toDto(config: AgentConfig): AgentDto {
   };
 }
 
-function workspacePathFor(
-  workspaceId: string | undefined,
-): string | undefined {
+function workspacePathFor(workspaceId: string | undefined): string | undefined {
   return workspaceId ? getWorkspace(workspaceId)?.path : undefined;
 }
 
@@ -73,6 +75,23 @@ agents.get("/agents", (c) => {
   // one, only global + built-in agents are returned.
   const cwd = workspacePathFor(c.req.query("workspaceId"));
   return c.json({ agents: listAgents(cwd).map(toDto) });
+});
+
+agents.get("/agents/custom-tools", async (c) => {
+  const requestedWorkspaceId = c.req.query("workspaceId");
+  const workspacePath = workspacePathFor(requestedWorkspaceId);
+  const workspaceId = workspacePath ? requestedWorkspaceId : undefined;
+  const tools = await collectSubagentCustomTools(
+    workspaceId,
+    workspacePath ?? process.cwd(),
+  );
+  return c.json({
+    tools: tools.map((tool) => ({
+      name: tool.name,
+      label: tool.label ?? tool.name,
+      description: tool.description,
+    })),
+  });
 });
 
 agents.get("/agents/:id", (c) => {
@@ -90,6 +109,7 @@ const saveAgentSchema = z.object({
   description: z.string().trim().min(1, "description is required"),
   model: z.string().trim().nullish(),
   tools: z.array(z.string()).optional(),
+  customTools: z.array(z.string()).nullable().optional(),
   color: z.string().trim().optional(),
   icon: z.string().trim().optional(),
   prompt: z.string().trim().min(1, "prompt is required"),
@@ -99,7 +119,10 @@ agents.put("/agents/:id", async (c) => {
   const id = c.req.param("id");
   if (!isValidAgentId(id)) {
     return c.json(
-      { error: "Agent id must be kebab-case (lowercase letters, digits, dashes)" },
+      {
+        error:
+          "Agent id must be kebab-case (lowercase letters, digits, dashes)",
+      },
       400,
     );
   }
@@ -163,6 +186,7 @@ agents.put("/agents/:id", async (c) => {
         systemPrompt: body.prompt,
         model,
         tools,
+        customTools: body.customTools ?? null,
         color: body.color?.toLowerCase() ?? "violet",
         icon: body.icon || "bot",
       }),
@@ -170,7 +194,10 @@ agents.put("/agents/:id", async (c) => {
     );
   } catch (err) {
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to write agent file" },
+      {
+        error:
+          err instanceof Error ? err.message : "Failed to write agent file",
+      },
       500,
     );
   }
@@ -203,7 +230,10 @@ agents.delete("/agents/:id", (c) => {
     unlinkSync(path);
   } catch (err) {
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to delete agent file" },
+      {
+        error:
+          err instanceof Error ? err.message : "Failed to delete agent file",
+      },
       500,
     );
   }

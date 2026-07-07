@@ -69,9 +69,11 @@ describe("getAgentConfig", () => {
     const general = getAgentConfig("general");
     expect(general?.source).toBe("builtin");
     expect(general?.tools).toEqual(SUBAGENT_TOOL_NAMES);
+    expect(general?.customTools).toBeNull();
 
     const explore = getAgentConfig("explore");
     expect(explore?.tools).toEqual(["read", "grep", "find", "ls"]);
+    expect(explore?.customTools).toBeNull();
   });
 
   it("returns undefined for unknown or invalid ids", () => {
@@ -89,6 +91,7 @@ describe("getAgentConfig", () => {
         systemPrompt: "You review code.",
         model: { provider: "anthropic", model: "claude-sonnet-5" },
         tools: ["read", "grep"],
+        customTools: ["memory", "mcp__github__search"],
         color: "teal",
         icon: "search",
       }),
@@ -102,6 +105,7 @@ describe("getAgentConfig", () => {
       systemPrompt: "You review code.",
       model: { provider: "anthropic", model: "claude-sonnet-5" },
       tools: ["read", "grep"],
+      customTools: ["memory", "mcp__github__search"],
       color: "teal",
       icon: "search",
       source: "global",
@@ -117,8 +121,18 @@ describe("getAgentConfig", () => {
     const config = getAgentConfig("bare");
     // todo/plan are not in the subagent tool vocabulary.
     expect(config?.tools).toEqual(["read", "bash"]);
+    expect(config?.customTools).toBeNull();
     expect(config?.model).toBeUndefined();
     expect(config?.color).toBe("violet");
+  });
+
+  it("maps legacy allowCustomTools false to an empty custom tool list", () => {
+    writeAgentFile(
+      join(home, ".lamda", "agents"),
+      "isolated",
+      "---\nname: Isolated\nallowCustomTools: false\n---\nDo things.",
+    );
+    expect(getAgentConfig("isolated")?.customTools).toEqual([]);
   });
 
   it("prefers a workspace-local file over the global one", () => {

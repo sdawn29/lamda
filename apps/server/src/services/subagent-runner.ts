@@ -7,6 +7,7 @@ import {
 } from "@lamda/pi-sdk";
 import { getThread, insertAiUsage } from "@lamda/db";
 import { createToolApprovalBridge } from "./tool-approval-bridge.js";
+import { collectSubagentCustomTools } from "./subagent-custom-tools.js";
 import {
   SubagentTranscriptRecorder,
   type SubagentRunDetails,
@@ -82,7 +83,8 @@ function resolveModel(
       const available = getAvailableModels();
       if (
         available.some(
-          (m) => m.provider === agent.model!.provider && m.id === agent.model!.model,
+          (m) =>
+            m.provider === agent.model!.provider && m.id === agent.model!.model,
         )
       ) {
         return agent.model;
@@ -217,12 +219,25 @@ export async function runSubagent(
   };
 
   try {
+    const thread = getThread(opts.parentThreadId);
+    const availableCustomTools = await collectSubagentCustomTools(
+      thread?.workspaceId,
+      opts.cwd,
+      opts.parentThreadId,
+    );
+    const customToolNames = opts.agent.customTools;
+    const selectedCustomTools =
+      customToolNames === null
+        ? availableCustomTools
+        : availableCustomTools.filter((tool) =>
+            customToolNames.includes(tool.name),
+          );
     handle = await createManagedSession({
       cwd: opts.cwd,
       ...(model ?? {}),
       thinkingLevel: asThinkingLevel(opts.thinkingLevel),
       subagent: { systemPrompt: opts.agent.systemPrompt },
-      customTools: [],
+      customTools: selectedCustomTools,
       toolApproval: createToolApprovalBridge(opts.parentThreadId, {
         agentLabel: opts.agent.label,
         parentToolCallId: opts.parentToolCallId,
@@ -231,7 +246,10 @@ export async function runSubagent(
     // Apply the agent definition's tool allowlist. `task` is never granted, so
     // subagents cannot spawn subagents.
     const allowed = new Set<string>(SUBAGENT_TOOL_NAMES);
-    handle.setActiveTools(opts.agent.tools.filter((name) => allowed.has(name)));
+    handle.setActiveTools([
+      ...opts.agent.tools.filter((name) => allowed.has(name)),
+      ...selectedCustomTools.map((tool) => tool.name),
+    ]);
 
     if (opts.signal?.aborted) {
       return settle("aborted", "Aborted before the subagent started.");

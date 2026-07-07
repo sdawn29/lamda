@@ -40,6 +40,7 @@ import {
 } from "@/features/workspace/api"
 import {
   agentKeys,
+  useAgentCustomTools,
   useAgents,
   useWorkspaces,
 } from "@/features/workspace/queries"
@@ -81,6 +82,7 @@ interface AgentFormState {
   description: string
   model: string | null
   tools: string[]
+  customTools: string[] | null
   color: string
   icon: string
   prompt: string
@@ -97,6 +99,7 @@ function formFromAgent(agent: AgentDto): AgentFormState {
     description: agent.description,
     model: agent.model,
     tools: [...agent.tools],
+    customTools: agent.customTools ? [...agent.customTools] : null,
     color: agent.color,
     icon: agent.icon,
     prompt: agent.prompt,
@@ -112,6 +115,7 @@ function emptyForm(): AgentFormState {
     description: "",
     model: null,
     tools: ["read", "grep", "find", "ls"],
+    customTools: null,
     color: "violet",
     icon: "bot",
     prompt: "",
@@ -168,6 +172,12 @@ function AgentRow({
         <span className="text-3xs text-muted-foreground/70">
           {agent.model ?? "Inherits conversation model"} ·{" "}
           {agent.tools.join(", ")}
+          {" · "}
+          {agent.customTools === null
+            ? "all custom tools"
+            : agent.customTools.length > 0
+              ? `${agent.customTools.length} custom tools`
+              : "no custom tools"}
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-1">
@@ -209,6 +219,8 @@ export function AgentsSection() {
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined)
   const effectiveWorkspaceId = workspaceId ?? workspaces[0]?.id
   const { data: agents = [], isLoading } = useAgents(effectiveWorkspaceId)
+  const { data: customTools = [], isLoading: customToolsLoading } =
+    useAgentCustomTools(effectiveWorkspaceId)
   const [form, setForm] = useState<AgentFormState | null>(null)
 
   const { data: modelsData } = useModels()
@@ -278,7 +290,18 @@ export function AgentsSection() {
     !!form.description.trim() &&
     !!form.prompt.trim() &&
     form.tools.length > 0 &&
+    !customToolsLoading &&
     !save.isPending
+
+  const selectedCustomTools = useMemo(() => {
+    if (!form) return []
+    return form.customTools ?? customTools.map((tool) => tool.name)
+  }, [customTools, form])
+
+  const selectedCustomToolSet = useMemo(
+    () => new Set(selectedCustomTools),
+    [selectedCustomTools]
+  )
 
   const submit = () => {
     if (!form || !canSubmit) return
@@ -291,6 +314,7 @@ export function AgentsSection() {
         description: form.description.trim(),
         model: form.model,
         tools: form.tools,
+        customTools: selectedCustomTools,
         color: form.color,
         icon: form.icon.trim() || "bot",
         prompt: form.prompt.trim(),
@@ -506,6 +530,81 @@ export function AgentsSection() {
                       )
                     })}
                   </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 text-xs font-medium">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Custom tools</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-2xs"
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            customTools: customTools.map((tool) => tool.name),
+                          })
+                        }
+                      >
+                        All
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-2xs"
+                        onClick={() => setForm({ ...form, customTools: [] })}
+                      >
+                        None
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {customToolsLoading ? (
+                      <span className="text-2xs font-normal text-muted-foreground">
+                        Loading custom tools…
+                      </span>
+                    ) : customTools.length === 0 ? (
+                      <span className="text-2xs font-normal text-muted-foreground">
+                        No custom tools are available for this workspace.
+                      </span>
+                    ) : (
+                      customTools.map((tool) => {
+                        const active = selectedCustomToolSet.has(tool.name)
+                        return (
+                          <button
+                            key={tool.name}
+                            type="button"
+                            title={tool.description}
+                            className={cn(
+                              "rounded-md border px-2 py-1 text-left font-mono text-2xs transition-colors",
+                              active
+                                ? "border-primary/40 bg-primary/10 text-foreground"
+                                : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                            )}
+                            onClick={() =>
+                              setForm({
+                                ...form,
+                                customTools: active
+                                  ? selectedCustomTools.filter(
+                                      (name) => name !== tool.name
+                                    )
+                                  : [...selectedCustomTools, tool.name],
+                              })
+                            }
+                          >
+                            {tool.name}
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+                  <span className="text-3xs font-normal text-muted-foreground">
+                    Select memory, MCP, LSP, GitHub, or other workspace tools
+                    this subagent may use.
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

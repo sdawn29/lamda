@@ -5,10 +5,12 @@ import {
   listWorkspaceDir,
   listModes,
   listAgents,
+  listAgentCustomTools,
   type WorkspaceDto,
   type WorkspaceFileEntry,
   type ModeDto,
   type AgentDto,
+  type AgentCustomToolDto,
 } from "./api"
 
 /**
@@ -71,6 +73,8 @@ export const agentKeys = {
   all: ["agents"] as const,
   list: (workspaceId: string | undefined) =>
     ["agents", workspaceId ?? null] as const,
+  customTools: (workspaceId: string | undefined) =>
+    ["agents", "custom-tools", workspaceId ?? null] as const,
 }
 
 /**
@@ -86,6 +90,17 @@ export function useAgents(workspaceId: string | undefined) {
       return agents
     },
     staleTime: 60_000,
+  })
+}
+
+export function useAgentCustomTools(workspaceId: string | undefined) {
+  return useQuery({
+    queryKey: agentKeys.customTools(workspaceId),
+    queryFn: async (): Promise<AgentCustomToolDto[]> => {
+      const { tools } = await listAgentCustomTools(workspaceId)
+      return tools
+    },
+    staleTime: 30_000,
   })
 }
 
