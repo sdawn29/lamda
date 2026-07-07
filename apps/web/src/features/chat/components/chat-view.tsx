@@ -374,7 +374,7 @@ export function ChatView({
     setSelectedThinkingLevel(nextPendingPreferences?.thinkingLevel)
     setSelectedMode(initialMode)
     setSelectedApprovalMode(initialApprovalMode)
-    setPendingApproval(null)
+    setPendingApprovals([])
   }
 
   // Focus textbox whenever the active session changes (imperative DOM op — effect is correct here).

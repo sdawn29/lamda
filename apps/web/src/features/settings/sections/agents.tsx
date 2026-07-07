@@ -332,7 +332,7 @@ export function AgentsSection() {
             {workspaces.length > 1 && (
               <Select
                 value={effectiveWorkspaceId ?? ""}
-                onValueChange={(v) => setWorkspaceId(v)}
+                onValueChange={(v) => setWorkspaceId(v ?? undefined)}
               >
                 <SelectTrigger size="sm" className="h-7 w-44 text-xs">
                   {/* Base UI's Value renders the raw value (the workspace id)
