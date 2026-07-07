@@ -223,6 +223,13 @@ export interface AiUsageByModel extends AiUsageTotals {
   model: string
 }
 
+export interface AiUsageByAgent extends AiUsageTotals {
+  /** Null for main-agent usage; a subagent's agent id (e.g. "explore") otherwise. */
+  agentId: string | null
+  /** Representative display label for agentId. */
+  agentLabel: string | null
+}
+
 export interface AiUsageByWorkspace extends AiUsageTotals {
   workspaceId: string
   workspaceName: string | null
@@ -246,6 +253,7 @@ export interface AiUsageStats {
   totals: AiUsageTotals
   byModel: AiUsageByModel[]
   byWorkspace: AiUsageByWorkspace[]
+  byAgent: AiUsageByAgent[]
   daily: AiUsageDaily[]
 }
 

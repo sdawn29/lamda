@@ -23,14 +23,14 @@ import {
   DISCLOSURE_ROW_CLASS,
   DisclosureChevron,
   NESTED_BODY_CLASS,
+  SHIMMER_TEXT_CLASS,
 } from "./disclosure"
+import { SubagentGroup } from "./subagent-group"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
+import { TASK_TOOL_NAME } from "../lib/subagent"
 import type { AssistantMessage, ToolMessage } from "../types"
 
 export type WorkingMessage = AssistantMessage | ToolMessage
-
-const SHIMMER_TEXT_CLASS =
-  "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
 
 /**
  * Tool-group categories. Consecutive calls to tools in the same category
@@ -85,7 +85,14 @@ const TOOL_GROUP_META: Record<
   },
 }
 
-function toolGroupId(t: ToolMessage): ToolGroupId | null {
+/**
+ * The grouping category for a tool call, or null when it should never
+ * collapse into a run (e.g. skill reads, or tools outside {@link TOOL_GROUP_IDS}
+ * like `todo`/`question`/`plan`). Exported so other collapsible transcripts —
+ * currently the subagent card — can apply the same "Exploring · read 4
+ * files" collapsing to their own tool call lists.
+ */
+export function toolGroupId(t: ToolMessage): ToolGroupId | null {
   if (isSkillRead(t)) return null
   return TOOL_GROUP_IDS[t.toolName.toLowerCase()] ?? null
 }
@@ -202,8 +209,12 @@ function buildGroupDescription(
   return `${runDesc} · ${shown}${extra}`
 }
 
-/** A collapsed run of consecutive same-category tool calls inside a working block. */
-function ToolRunGroup({
+/**
+ * A collapsed run of consecutive same-category tool calls inside a working
+ * block (or, via {@link toolGroupId}, any other collapsible transcript that
+ * groups its own tool calls the same way — see the subagent card).
+ */
+export function ToolRunGroup({
   tools,
   rootPath,
   live = false,
@@ -307,12 +318,18 @@ type WorkingEntry =
   | { kind: "thinking"; key: string; thinking: string }
   | { kind: "tool"; key: string; msg: ToolMessage }
   | { kind: "run"; key: string; tools: ToolMessage[] }
+  | { kind: "subagents"; key: string; tools: ToolMessage[] }
+
+function isTaskTool(t: ToolMessage): boolean {
+  return t.toolName.toLowerCase() === TASK_TOOL_NAME
+}
 
 /**
  * Flatten messages into visible rows, collapsing consecutive calls of
- * same-category tools (exploring, web, editing) into verbose runs. Hidden
- * thinking (showThinking off) doesn't split a run, since it renders nothing
- * between the calls anyway.
+ * same-category tools (exploring, web, editing) into verbose runs, and
+ * consecutive `task` calls (parallel subagents) into a carousel instead of
+ * stacking a full card per call. Hidden thinking (showThinking off) doesn't
+ * split a run, since it renders nothing between the calls anyway.
  */
 function buildWorkingEntries(
   messages: WorkingMessage[],
@@ -332,6 +349,15 @@ function buildWorkingEntries(
       continue
     }
     const t = m as ToolMessage
+    if (isTaskTool(t)) {
+      const last = out[out.length - 1]
+      if (last?.kind === "subagents") {
+        last.tools.push(t)
+      } else {
+        out.push({ kind: "subagents", key: t.toolCallId, tools: [t] })
+      }
+      continue
+    }
     const groupId = toolGroupId(t)
     const last = out[out.length - 1]
     if (
@@ -497,10 +523,19 @@ export const WorkingBlock = memo(function WorkingBlock({
     )
 
   const hasTools = messages.some((m) => m.role === "tool")
-  const toolCount = useMemo(
-    () => messages.filter((m) => m.role === "tool").length,
-    [messages]
-  )
+  // Agent (`task`) calls are counted separately from plain tools so the
+  // collapsed summary says "5 tools · 2 agents" instead of folding delegated
+  // work into an undifferentiated tool count.
+  const { toolCount, agentCount } = useMemo(() => {
+    let tools = 0
+    let agents = 0
+    for (const m of messages) {
+      if (m.role !== "tool") continue
+      if (isTaskTool(m as ToolMessage)) agents++
+      else tools++
+    }
+    return { toolCount: tools, agentCount: agents }
+  }, [messages])
   const entries = useMemo(
     () => buildWorkingEntries(messages, showThinking),
     [messages, showThinking]
@@ -561,11 +596,19 @@ export const WorkingBlock = memo(function WorkingBlock({
           )}
         </span>
 
-        {!isActive && toolCount > 0 && (
+        {!isActive && (toolCount > 0 || agentCount > 0) && (
           <span
             className={cn("shrink-0 text-2xs tabular-nums", DISCLOSURE_DIM)}
           >
-            · {toolCount} {toolCount === 1 ? "tool" : "tools"}
+            ·{" "}
+            {[
+              toolCount > 0 &&
+                `${toolCount} ${toolCount === 1 ? "tool" : "tools"}`,
+              agentCount > 0 &&
+                `${agentCount} ${agentCount === 1 ? "agent" : "agents"}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         )}
 
@@ -597,6 +640,30 @@ export const WorkingBlock = memo(function WorkingBlock({
                     !hasFinalThinking &&
                     idx === entries.length - 1
                   }
+                />
+              )
+            }
+            if (entry.kind === "subagents") {
+              // A lone task call needs no group chrome — it renders as a
+              // normal ToolCallBlock (which dispatches to SubagentCard) just
+              // like any other tool. Two or more become a live tile grid.
+              if (entry.tools.length === 1) {
+                return (
+                  <ToolCallBlock
+                    key={entry.key}
+                    msg={entry.tools[0]}
+                    isNew={false}
+                    rootPath={rootPath}
+                    suppressPlanSavedCard
+                  />
+                )
+              }
+              return (
+                <SubagentGroup
+                  key={entry.key}
+                  tools={entry.tools}
+                  isNew={false}
+                  rootPath={rootPath}
                 />
               )
             }

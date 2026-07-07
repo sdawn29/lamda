@@ -16,6 +16,7 @@ import { LspSection } from "@/features/settings/sections/lsp"
 import { McpSection } from "@/features/settings/sections/mcp"
 import { RetrySection } from "@/features/settings/sections/retry"
 import { MemorySection } from "@/features/settings/sections/memory"
+import { AgentsSection } from "@/features/settings/sections/agents"
 import { UsageSection } from "@/features/settings/sections/usage"
 import { AboutSection } from "@/features/settings/sections/about"
 
@@ -30,6 +31,7 @@ const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
   shortcuts: ShortcutsSection,
   lsp: LspSection,
   mcp: McpSection,
+  agents: AgentsSection,
   memory: MemorySection,
   retry: RetrySection,
   about: AboutSection,

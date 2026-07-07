@@ -220,6 +220,12 @@ export const aiUsage = sqliteTable("ai_usage", {
   workspaceId: text("workspace_id").notNull().default(""),
   provider: text("provider").notNull().default(""),
   model: text("model").notNull().default(""),
+  // Null for the thread's own (main-agent) usage. Set to a subagent's agent id
+  // (e.g. "explore") for usage recorded by a `task`-tool run — agentLabel is a
+  // display-name snapshot taken at insert time, so historical rows still show
+  // a sensible name even if the agent file is later renamed or deleted.
+  agentId: text("agent_id"),
+  agentLabel: text("agent_label"),
   inputTokens: integer("input_tokens").notNull().default(0),
   outputTokens: integer("output_tokens").notNull().default(0),
   cacheReadTokens: integer("cache_read_tokens").notNull().default(0),

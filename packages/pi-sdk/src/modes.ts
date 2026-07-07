@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { parseFrontmatter, parseList, unquote } from "./frontmatter.js";
 import {
   lamdaLocalModesDir,
   lamdaModeFilePath,
@@ -223,50 +224,19 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
 //
 //   Ask mode — read-only Q&A about this codebase. ...
 //
-// The frontmatter carries the mode's metadata; the body is the preamble. We
-// parse only the small subset above (scalar strings, a boolean, and an inline
-// `[a, b, c]` list) rather than pull in a YAML dependency.
+// The frontmatter carries the mode's metadata; the body is the preamble. The
+// shared parser in `frontmatter.ts` handles the block; this maps its raw
+// fields onto the mode config shape.
 
 interface ParsedModeFile {
   frontmatter: Partial<Omit<ModeConfig, "preamble">>;
   body: string;
 }
 
-/** Strip a single layer of matching single/double quotes, if present. */
-function unquote(value: string): string {
-  if (
-    value.length >= 2 &&
-    ((value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'")))
-  ) {
-    return value.slice(1, -1);
-  }
-  return value;
-}
-
-/** Parse an inline `[a, b, c]` (or bare `a, b, c`) list into trimmed strings. */
-function parseList(value: string): string[] {
-  return value
-    .replace(/^\[/, "")
-    .replace(/\]$/, "")
-    .split(",")
-    .map((item) => unquote(item.trim()))
-    .filter((item) => item.length > 0);
-}
-
 function parseModeFile(raw: string): ParsedModeFile {
-  const text = raw.replace(/^\uFEFF/, "");
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
-  if (!match) return { frontmatter: {}, body: text.trim() };
-
+  const { fields, body } = parseFrontmatter(raw);
   const frontmatter: ParsedModeFile["frontmatter"] = {};
-  for (const line of match[1].split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const idx = trimmed.indexOf(":");
-    if (idx === -1) continue;
-    const key = trimmed.slice(0, idx).trim();
-    const value = trimmed.slice(idx + 1).trim();
+  for (const [key, value] of fields) {
     if (key === "name") frontmatter.label = unquote(value);
     else if (key === "description") frontmatter.description = unquote(value);
     else if (key === "tools") frontmatter.allowedBuiltins = parseList(value);
@@ -275,7 +245,7 @@ function parseModeFile(raw: string): ParsedModeFile {
     else if (key === "color") frontmatter.color = unquote(value);
     else if (key === "icon") frontmatter.icon = unquote(value);
   }
-  return { frontmatter, body: text.slice(match[0].length).trim() };
+  return { frontmatter, body };
 }
 
 /** Normalize a frontmatter color to a known palette entry, or undefined. */

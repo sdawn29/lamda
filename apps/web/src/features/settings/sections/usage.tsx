@@ -9,6 +9,7 @@ import {
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  BotIcon,
   CalendarRange,
   ChartColumn,
   ChartPie,
@@ -47,6 +48,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import { cn } from "@/shared/lib/utils"
 
 import type {
+  AiUsageByAgent,
   AiUsageByModel,
   AiUsageByWorkspace,
   AiUsageDaily,
@@ -300,6 +302,14 @@ export function UsageSection() {
             <ModelCostChart models={data.byModel} totals={data.totals} />
             <ModelTable models={data.byModel} />
           </SettingsGroup>
+          {data.byAgent.some((a) => a.agentId !== null) && (
+            <SettingsGroup
+              title="Agents"
+              description="Spend split between the main agent's own turns and subagents it spawned with the task tool."
+            >
+              <AgentUsageBreakdown byAgent={data.byAgent} />
+            </SettingsGroup>
+          )}
           <SettingsGroup
             title="Workspaces"
             description="Usage per workspace, with the models used in each."
@@ -857,6 +867,109 @@ function ModelTable({ models }: { models: AiUsageByModel[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+// ── Agent breakdown ───────────────────────────────────────────────────────────
+
+const AGENT_ROW_LABEL = (a: AiUsageByAgent) =>
+  a.agentId === null ? "Main agent" : a.agentLabel || a.agentId
+
+function AgentUsageBreakdown({ byAgent }: { byAgent: AiUsageByAgent[] }) {
+  const main = byAgent.find((a) => a.agentId === null)
+  const subagents = byAgent.filter((a) => a.agentId !== null)
+  const mainCost = main?.cost ?? 0
+  const subagentCost = subagents.reduce((sum, a) => sum + a.cost, 0)
+  const totalCost = mainCost + subagentCost
+  const mainShare = totalCost > 0 ? (mainCost / totalCost) * 100 : 100
+
+  return (
+    <div className="flex flex-col gap-3 py-3.5">
+      {totalCost > 0 && (
+        <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <div
+                  className="h-full bg-chart-1"
+                  style={{ width: `${mainShare}%` }}
+                />
+              }
+            />
+            <TooltipContent>Main agent: {formatCost(mainCost)}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <div
+                  className="h-full bg-chart-3"
+                  style={{ width: `${100 - mainShare}%` }}
+                />
+              }
+            />
+            <TooltipContent>Subagents: {formatCost(subagentCost)}</TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-chart-1" />
+            <span className="text-xs text-muted-foreground">Main agent</span>
+          </div>
+          <span className="text-sm font-medium tabular-nums">
+            {formatCost(mainCost)}
+          </span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-chart-3" />
+            <span className="text-xs text-muted-foreground">Subagents</span>
+          </div>
+          <span className="text-sm font-medium tabular-nums">
+            {formatCost(subagentCost)}
+          </span>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto pt-1.5">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-border/50 text-left text-muted-foreground">
+              <th className="pr-3 pb-2 font-medium">Agent</th>
+              <th className="pr-3 pb-2 text-right font-medium">Requests</th>
+              <th className="pr-3 pb-2 text-right font-medium">Total tokens</th>
+              <th className="pb-2 text-right font-medium">Cost</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/30">
+            {byAgent.map((a) => (
+              <tr key={a.agentId ?? "main"}>
+                <td className="max-w-48 py-2 pr-3">
+                  <div className="flex items-center gap-1.5">
+                    {a.agentId !== null && (
+                      <BotIcon className="size-3 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="truncate font-medium">
+                      {AGENT_ROW_LABEL(a)}
+                    </span>
+                  </div>
+                </td>
+                <td className="py-2 pr-3 text-right tabular-nums">
+                  {fullFormat.format(a.requests)}
+                </td>
+                <td className="py-2 pr-3 text-right tabular-nums">
+                  {formatTokens(a.totalTokens)}
+                </td>
+                <td className="py-2 text-right tabular-nums">
+                  {formatCost(a.cost)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

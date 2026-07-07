@@ -46,7 +46,9 @@ import { useSyntaxTheme } from "@/features/themes"
 import { RollingTimerText } from "./working-block"
 import { WriteView } from "./write-view"
 import { PlanSavedCard } from "./plan-saved-card"
+import { SubagentCard } from "./subagent-card"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
+import { TASK_TOOL_NAME } from "../lib/subagent"
 import type { ToolMessage } from "../types"
 
 const PrismCode = lazy(() => import("./prism-code"))
@@ -1293,6 +1295,20 @@ export const ToolCallBlock = memo(function ToolCallBlock({
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
     }
   }, [])
+
+  // Task tool: a running subagent. Rendered by its own card — a collapsible
+  // nested transcript with the agent's identity and live progress. (Placed
+  // after this component's hooks so hook order stays unconditional.)
+  if (normalizedToolName === TASK_TOOL_NAME) {
+    return (
+      <SubagentCard
+        msg={msg}
+        isNew={isNew}
+        entryDelayMs={entryDelayMs}
+        rootPath={rootPath}
+      />
+    )
+  }
 
   // Question tool: the agent paused to ask the user. Render a friendly summary
   // instead of the raw tool name + JSON args. While pending it's a single

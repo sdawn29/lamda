@@ -38,6 +38,71 @@ export function listModes(workspaceId?: string): Promise<{ modes: ModeDto[] }> {
   return apiFetch<{ modes: ModeDto[] }>(`/modes${qs}`)
 }
 
+/** A subagent definition as surfaced by the server `/agents` endpoints. */
+export interface AgentDto {
+  id: string
+  label: string
+  description: string
+  /** `provider::model` override, or null to inherit the conversation model. */
+  model: string | null
+  tools: string[]
+  color: string
+  icon: string
+  source: "builtin" | "local" | "global"
+  /** True for the shipped agents (general, explore). */
+  builtin: boolean
+  /** The agent's system prompt (the markdown body of its file). */
+  prompt: string
+}
+
+export interface SaveAgentBody {
+  scope: "global" | "local"
+  workspaceId?: string
+  name: string
+  description: string
+  model?: string | null
+  tools?: string[]
+  color?: string
+  icon?: string
+  prompt: string
+}
+
+export function listAgents(
+  workspaceId?: string
+): Promise<{ agents: AgentDto[] }> {
+  const qs = workspaceId
+    ? `?workspaceId=${encodeURIComponent(workspaceId)}`
+    : ""
+  return apiFetch<{ agents: AgentDto[] }>(`/agents${qs}`)
+}
+
+export function saveAgent(
+  id: string,
+  body: SaveAgentBody
+): Promise<{ agent: AgentDto | null }> {
+  return apiFetch<{ agent: AgentDto | null }>(
+    `/agents/${encodeURIComponent(id)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  )
+}
+
+export function deleteAgent(
+  id: string,
+  scope: "global" | "local",
+  workspaceId?: string
+): Promise<{ deleted: boolean }> {
+  const params = new URLSearchParams({ scope })
+  if (workspaceId) params.set("workspaceId", workspaceId)
+  return apiFetch<{ deleted: boolean }>(
+    `/agents/${encodeURIComponent(id)}?${params}`,
+    { method: "DELETE" }
+  )
+}
+
 /** Tool-approval gating for a thread: prompt before risky tools, auto-approve
  *  file edits/writes only, or run every tool freely. */
 export type ApprovalMode = "ask" | "edits_allowed" | "all_allowed"

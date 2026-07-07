@@ -187,9 +187,13 @@ export function ChatView({
   const modeList = useMemo(() => modeData ?? [], [modeData])
   const [selectedApprovalMode, setSelectedApprovalMode] =
     useState<ApprovalMode>(initialApprovalMode)
-  // The tool call currently paused awaiting the user's approval, if any.
-  const [pendingApproval, setPendingApproval] =
-    useState<PendingApproval | null>(null)
+  // Tool calls paused awaiting the user's approval, oldest first. Parallel
+  // subagents can request approvals concurrently, so this is a FIFO queue —
+  // the head renders; resolving it reveals the next.
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(
+    []
+  )
+  const pendingApproval = pendingApprovals[0] ?? null
   const updateThreadModel = useUpdateThreadModel()
   const updateThreadMode = useUpdateThreadMode()
   const updateThreadApprovalMode = useUpdateThreadApprovalMode()
@@ -205,6 +209,9 @@ export function ChatView({
   useEffect(() => {
     announcedPlansRef.current = new Set()
     resolvedApprovalsRef.current = new Set()
+    // Approvals belong to the previous thread's session; the status-snapshot
+    // effect below restores any still pending for the new one.
+    setPendingApprovals([])
   }, [threadId])
 
   const handlePlanSaved = useCallback(
@@ -229,13 +236,12 @@ export function ChatView({
   )
 
   const handleToolApprovalRequest = useCallback(
-    (event: {
-      toolCallId: string
-      toolName: string
-      input: Record<string, unknown>
-      scopeLabel: string
-    }) => {
-      setPendingApproval(event)
+    (event: PendingApproval) => {
+      setPendingApprovals((prev) =>
+        prev.some((a) => a.toolCallId === event.toolCallId)
+          ? prev
+          : [...prev, event]
+      )
     },
     []
   )
@@ -243,27 +249,31 @@ export function ChatView({
   const handleToolApprovalResolved = useCallback(
     (event: { toolCallId: string }) => {
       resolvedApprovalsRef.current.add(event.toolCallId)
-      // Clear only if it matches the request we're showing (a stale resolve for
-      // an already-replaced request shouldn't dismiss a newer prompt).
-      setPendingApproval((prev) =>
-        prev && prev.toolCallId === event.toolCallId ? null : prev
+      setPendingApprovals((prev) =>
+        prev.filter((a) => a.toolCallId !== event.toolCallId)
       )
     },
     []
   )
 
-  // Restore the approval prompt from the status snapshot fetched on every thread
+  // Restore approval prompts from the status snapshot fetched on every thread
   // mount. The live `tool_approval_request` event fires once and isn't replayed
   // on reconnect, so without this, switching away from a paused tool and back
   // would leave the prompt gone — and the tool stuck — until the turn aborted.
   const { data: sessionStatus } = useSessionStatus(sessionId)
   useEffect(() => {
-    const approval = sessionStatus?.pendingApproval
-    if (!approval) return
-    if (resolvedApprovalsRef.current.has(approval.toolCallId)) return
-    setPendingApproval((prev) =>
-      prev?.toolCallId === approval.toolCallId ? prev : approval
+    const snapshot =
+      sessionStatus?.pendingApprovals ??
+      (sessionStatus?.pendingApproval ? [sessionStatus.pendingApproval] : [])
+    const restorable = snapshot.filter(
+      (a) => !resolvedApprovalsRef.current.has(a.toolCallId)
     )
+    if (restorable.length === 0) return
+    setPendingApprovals((prev) => {
+      const known = new Set(prev.map((a) => a.toolCallId))
+      const missing = restorable.filter((a) => !known.has(a.toolCallId))
+      return missing.length > 0 ? [...prev, ...missing] : prev
+    })
   }, [sessionStatus])
 
   const { data: turns = [] } = useTurns(sessionId)

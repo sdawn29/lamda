@@ -133,6 +133,12 @@ function buildRuntimeHandle(
       );
       session.setActiveToolsByName(next);
     },
+    setActiveTools: (toolNames) => {
+      const session = runtime.session as unknown as {
+        setActiveToolsByName(toolNames: string[]): void;
+      };
+      session.setActiveToolsByName(toolNames);
+    },
     get sessionFile() {
       return runtime.session.sessionFile;
     },
@@ -249,9 +255,19 @@ function buildRuntimeFactory(
       authStorage,
       modelRegistry,
       resourceLoaderOptions: {
-        appendSystemPromptOverride: (base) => [...base, LAMDA_SYSTEM_CONTEXT],
-        additionalPromptTemplatePaths: lamdaPromptTemplatePaths(effectiveCwd),
-        additionalSkillPaths: lamdaSkillPaths(effectiveCwd),
+        // Subagent sessions are headless workers: they get their agent
+        // definition's prompt instead of lamda's chat-app context, and none of
+        // the slash-command/skill surface (those are chat affordances).
+        appendSystemPromptOverride: (base) => [
+          ...base,
+          config.subagent ? config.subagent.systemPrompt : LAMDA_SYSTEM_CONTEXT,
+        ],
+        additionalPromptTemplatePaths: config.subagent
+          ? []
+          : lamdaPromptTemplatePaths(effectiveCwd),
+        additionalSkillPaths: config.subagent
+          ? []
+          : lamdaSkillPaths(effectiveCwd),
         extensionFactories: config.toolApproval
           ? [createToolApprovalExtension(config.toolApproval)]
           : [],
@@ -281,7 +297,9 @@ function applyInitialMode(
 }
 
 /**
- * Create a new managed agent session, persisted to disk under ~/.pi/agent/sessions/.
+ * Create a new managed agent session, persisted to disk under
+ * ~/.pi/agent/sessions/ — except subagent sessions (`config.subagent`), which
+ * are kept in memory: their durable record is the parent tool call's result.
  */
 export async function createManagedSession(
   config: SdkConfig,
@@ -295,7 +313,9 @@ export async function createManagedSession(
   const runtime = await createAgentSessionRuntime(createRuntime, {
     cwd,
     agentDir: getAgentDir(),
-    sessionManager: SessionManager.create(cwd),
+    sessionManager: config.subagent
+      ? SessionManager.inMemory(cwd)
+      : SessionManager.create(cwd),
   });
   return applyInitialMode(buildRuntimeHandle(runtime), config.mode);
 }

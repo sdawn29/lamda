@@ -222,8 +222,10 @@ function dynamicModeIcon(name: IconName): LucideIcon {
 /**
  * Resolve a frontmatter `icon` name to a component: a curated icon for the fast
  * common path, any other valid Lucide name via dynamic import, else the default.
+ * Also used by the subagent card and Settings → Agents, which share the mode
+ * files' icon convention.
  */
-function resolveModeIcon(name: string): LucideIcon {
+export function resolveModeIcon(name: string): LucideIcon {
   return (
     MODE_ICONS[name] ??
     (isLucideIconName(name) ? dynamicModeIcon(name) : DEFAULT_ICON)
@@ -244,7 +246,8 @@ export interface ModeOption {
   sendButton: string
 }
 
-function colorStyle(color: string): ModeColorStyle {
+/** Class set for a named accent color — shared with the subagent card and Settings → Agents. */
+export function colorStyle(color: string): ModeColorStyle {
   return MODE_COLOR_STYLES[color] ?? MODE_COLOR_STYLES[DEFAULT_COLOR]
 }
 

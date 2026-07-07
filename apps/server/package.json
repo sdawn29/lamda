@@ -10,7 +10,8 @@
     "start": "node dist/server.cjs",
     "check-types": "tsc --noEmit",
     "postinstall": "node -e \"const{existsSync,chmodSync}=require('fs'),p=require.resolve('node-pty/prebuilds/darwin-arm64/spawn-helper');if(existsSync(p))chmodSync(p,'755');\"",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.5",
@@ -37,6 +38,7 @@
     "globals": "^17.6.0",
     "tsx": "4.21.0",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.61.1"
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^3.2.6"
   }
 }

@@ -20,6 +20,9 @@ export {
   lamdaWorktreePath,
   lamdaModesDir,
   lamdaLocalModesDir,
+  lamdaAgentsDir,
+  lamdaLocalAgentsDir,
+  lamdaAgentFilePath,
   lamdaGlobalPromptsDir,
   lamdaLocalPromptsDir,
   lamdaGlobalSkillsDir,
@@ -84,6 +87,25 @@ export {
   listModes,
 } from "./modes.js";
 export type { Mode, BuiltinMode, ModeConfig, ModeSource } from "./modes.js";
+export {
+  TASK_TOOL_NAME,
+  SUBAGENT_TOOL_NAMES,
+  BUILTIN_AGENTS,
+  isValidAgentId,
+  parseAgentModel,
+  getAgentConfig,
+  listAgents,
+  ensureAgentFiles,
+  serializeAgentFile,
+} from "./agents.js";
+export type {
+  AgentConfig,
+  AgentSource,
+  AgentModelRef,
+  BuiltinAgent,
+} from "./agents.js";
+export { parseFrontmatter, parseList, unquote } from "./frontmatter.js";
+export type { ParsedFrontmatter } from "./frontmatter.js";
 export type {
   ManagedSessionHandle,
   ManagedSessionStats,

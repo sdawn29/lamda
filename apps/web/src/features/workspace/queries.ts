@@ -4,9 +4,11 @@ import {
   listWorkspaceIndexFiles,
   listWorkspaceDir,
   listModes,
+  listAgents,
   type WorkspaceDto,
   type WorkspaceFileEntry,
   type ModeDto,
+  type AgentDto,
 } from "./api"
 
 /**
@@ -61,6 +63,28 @@ export function useModes(workspaceId: string | undefined) {
       return modes
     },
     placeholderData: BUILTIN_MODE_DTOS,
+    staleTime: 60_000,
+  })
+}
+
+export const agentKeys = {
+  all: ["agents"] as const,
+  list: (workspaceId: string | undefined) =>
+    ["agents", workspaceId ?? null] as const,
+}
+
+/**
+ * Subagents available to a workspace: the built-ins (general, explore) plus
+ * any custom agents defined in `~/.lamda/agents` (global) or the workspace's
+ * `.lamda/agents` (local).
+ */
+export function useAgents(workspaceId: string | undefined) {
+  return useQuery({
+    queryKey: agentKeys.list(workspaceId),
+    queryFn: async (): Promise<AgentDto[]> => {
+      const { agents } = await listAgents(workspaceId)
+      return agents
+    },
     staleTime: 60_000,
   })
 }

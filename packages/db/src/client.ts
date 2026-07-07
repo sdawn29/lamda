@@ -73,7 +73,7 @@ export function closeDb(): void {
 // `user_version = 0` (SQLite's default), so on first run after an upgrade the
 // whole gated block below runs once and then never again — instead of on
 // every app startup, which is what it did before this version gate existed.
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 function getTableColumns(sqlite: Database.Database, table: string): string[] {
   const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as {
@@ -267,6 +267,8 @@ function createDb() {
       workspace_id       TEXT NOT NULL DEFAULT '',
       provider           TEXT NOT NULL DEFAULT '',
       model              TEXT NOT NULL DEFAULT '',
+      agent_id           TEXT,
+      agent_label        TEXT,
       input_tokens       INTEGER NOT NULL DEFAULT 0,
       output_tokens      INTEGER NOT NULL DEFAULT 0,
       cache_read_tokens  INTEGER NOT NULL DEFAULT 0,
@@ -681,6 +683,21 @@ function createDb() {
       }
     } catch {
       // Safe to ignore — column may already exist.
+    }
+  }
+
+  if (currentVersion < 4) {
+    // Migration: Add agent_id/agent_label columns to ai_usage, so a subagent
+    // (`task` tool) run's spend can be told apart from the thread's own usage.
+    try {
+      if (!hasColumn(sqlite, "ai_usage", "agent_id")) {
+        sqlite.exec(`ALTER TABLE ai_usage ADD COLUMN agent_id TEXT`);
+      }
+      if (!hasColumn(sqlite, "ai_usage", "agent_label")) {
+        sqlite.exec(`ALTER TABLE ai_usage ADD COLUMN agent_label TEXT`);
+      }
+    } catch {
+      // Safe to ignore — columns may already exist.
     }
   }
 

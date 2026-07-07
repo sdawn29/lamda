@@ -510,7 +510,19 @@ export interface SessionStatus {
     toolName: string
     input: Record<string, unknown>
     scopeLabel: string
+    subagent?: { agentLabel: string; parentToolCallId: string }
   } | null
+  /**
+   * Every unresolved approval, oldest first — parallel subagents can pause on
+   * approvals concurrently, so a remount restores the whole queue.
+   */
+  pendingApprovals?: {
+    toolCallId: string
+    toolName: string
+    input: Record<string, unknown>
+    scopeLabel: string
+    subagent?: { agentLabel: string; parentToolCallId: string }
+  }[]
 }
 
 export function fetchSessionStatus(sessionId: string): Promise<SessionStatus> {
@@ -527,6 +539,18 @@ export interface SessionTokenStats {
   total: number
 }
 
+/** Aggregated token/cost usage recorded by subagents this thread has spawned. */
+export interface SubagentUsageTotals {
+  requests: number
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  reasoningTokens: number
+  totalTokens: number
+  cost: number
+}
+
 export interface SessionStats {
   sessionFile: string | null
   sessionId: string
@@ -538,6 +562,13 @@ export interface SessionStats {
   tokens: SessionTokenStats
   cost: number
   contextUsage?: ContextUsage
+  /**
+   * Usage from subagents spawned via the `task` tool, across this thread's
+   * whole history. Not included in `tokens`/`cost` above — those come from
+   * the SDK's own session stats, which can't see a subagent's separate
+   * session object — so add this in wherever a "total spend" figure is shown.
+   */
+  subagentUsage?: SubagentUsageTotals
 }
 
 export interface SessionStatsResponse {

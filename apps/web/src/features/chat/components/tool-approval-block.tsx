@@ -22,6 +22,8 @@ export interface PendingApproval {
   input: Record<string, unknown>
   /** What an Always/Don't-allow decision will remember (e.g. `git status`). */
   scopeLabel: string
+  /** Present when the gated call came from inside a subagent run. */
+  subagent?: { agentLabel: string; parentToolCallId: string }
 }
 
 interface ToolMeta {
@@ -162,10 +164,14 @@ export function ToolApprovalBlock({
         </span>
         <div className="flex min-w-0 flex-col">
           <span className="text-sm leading-tight font-semibold text-foreground">
-            {meta.label}
+            {approval.subagent
+              ? `${approval.subagent.agentLabel} agent · ${meta.label}`
+              : meta.label}
           </span>
           <span className="text-3xs leading-tight text-muted-foreground">
-            Needs your approval to continue
+            {approval.subagent
+              ? "A subagent needs your approval to continue"
+              : "Needs your approval to continue"}
           </span>
         </div>
         <span className="ml-auto shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">

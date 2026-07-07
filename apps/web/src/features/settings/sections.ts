@@ -1,5 +1,6 @@
 import type { ComponentType } from "react"
 import {
+  Bot,
   Brain,
   ChartColumn,
   Code2,
@@ -200,6 +201,26 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
       "remote",
       "connect",
       "integration",
+    ],
+  },
+  {
+    slug: "agents",
+    label: "Agents",
+    title: "Agents",
+    description:
+      "Define subagents the assistant can launch with the task tool — globally or per workspace.",
+    icon: Bot,
+    group: "customization",
+    keywords: [
+      "agent",
+      "subagent",
+      "task",
+      "spawn",
+      "delegate",
+      "parallel",
+      "explore",
+      "general",
+      "system prompt",
     ],
   },
   {

@@ -21,6 +21,9 @@ const SKILLS_SUBDIR = "skills";
 /** Global `.lamda` subdirectory that holds per-mode prompt override files. */
 const MODES_SUBDIR = "modes";
 
+/** `.lamda` subdirectory that holds subagent definition files. */
+const AGENTS_SUBDIR = "agents";
+
 /** Global `.lamda` subdirectory that contains managed git worktrees. */
 const WORKTREES_SUBDIR = "worktrees";
 
@@ -103,6 +106,25 @@ export function lamdaLocalModesDir(cwd: string): string {
 /** Absolute path to a single global mode's prompt file: `~/.lamda/modes/<mode>.md`. */
 export function lamdaModeFilePath(mode: string): string {
   return join(lamdaModesDir(), `${mode}.md`);
+}
+
+/** Absolute directory holding global subagent definition files: `~/.lamda/agents`. */
+export function lamdaAgentsDir(): string {
+  return join(homedir(), LAMDA_DIR_NAME, AGENTS_SUBDIR);
+}
+
+/**
+ * Workspace-local directory holding subagent definition files:
+ * `<cwd>/.lamda/agents`. Agents defined here are scoped to the workspace and
+ * take precedence over a global agent of the same id (see {@link lamdaAgentsDir}).
+ */
+export function lamdaLocalAgentsDir(cwd: string): string {
+  return join(cwd, LAMDA_DIR_NAME, AGENTS_SUBDIR);
+}
+
+/** Absolute path to a single global agent's definition file: `~/.lamda/agents/<id>.md`. */
+export function lamdaAgentFilePath(id: string): string {
+  return join(lamdaAgentsDir(), `${id}.md`);
 }
 
 /**

@@ -13,6 +13,7 @@ import type {
   UserMessage,
 } from "../types"
 import type { AgentEndMessage } from "../session-events"
+import type { SubagentRunDetails } from "./subagent"
 
 export interface TurnMeta {
   startTime: number
@@ -132,6 +133,30 @@ export function finalizeRunningTools(
         status: result.isError ? "error" : "done",
         result: { content: result.content, details: result.details },
         duration,
+      }
+    }
+    // A subagent (task tool) whose parent turn ended without a result was
+    // interrupted mid-run: settle its streamed transcript as aborted so the
+    // card renders the partial run instead of a bare error line.
+    const partialDetails = (
+      msg.partialResult as { details?: SubagentRunDetails } | undefined
+    )?.details
+    if (partialDetails?.kind === "subagent_run") {
+      return {
+        ...msg,
+        status: "error",
+        result: {
+          content: [{ type: "text", text: fallbackError }],
+          details: {
+            ...partialDetails,
+            status:
+              partialDetails.status === "done" ? "done" : ("aborted" as const),
+            endedAt: partialDetails.endedAt ?? Date.now(),
+          },
+        },
+        duration:
+          msg.duration ??
+          (msg.startTime ? Date.now() - msg.startTime : undefined),
       }
     }
     return {

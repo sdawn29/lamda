@@ -357,6 +357,79 @@ describe("finalizeRunningTools", () => {
     expect((result[0] as ToolMessage).result).toBe("cached")
     expect(result[1].role).toBe("user")
   })
+
+  it("settles an interrupted subagent's streamed transcript as aborted", () => {
+    const partialDetails = {
+      kind: "subagent_run",
+      agent: "explore",
+      agentLabel: "Explore",
+      color: "teal",
+      icon: "telescope",
+      status: "running",
+      startedAt: 1000,
+      blocks: [
+        {
+          role: "tool",
+          toolCallId: "sub-1",
+          toolName: "read",
+          args: {},
+          status: "done",
+        },
+      ],
+    }
+    const messages: Message[] = [
+      tool({
+        toolCallId: "call-1",
+        toolName: "task",
+        status: "running",
+        partialResult: { content: [], details: partialDetails },
+      }),
+    ]
+    const agentMessages: AgentEndMessage[] = [
+      { role: "assistant", stopReason: "aborted" },
+    ]
+    const result = finalizeRunningTools(messages, agentMessages)
+    const t = result[0] as ToolMessage
+    expect(t.status).toBe("error")
+    const details = (
+      t.result as { details: { status: string; endedAt?: number; blocks: unknown[] } }
+    ).details
+    expect(details.status).toBe("aborted")
+    expect(details.endedAt).toBeTypeOf("number")
+    // The streamed transcript survives into the settled result.
+    expect(details.blocks).toHaveLength(1)
+  })
+
+  it("keeps a completed subagent's details as done in the fallback path", () => {
+    const messages: Message[] = [
+      tool({
+        toolCallId: "call-1",
+        toolName: "task",
+        status: "running",
+        partialResult: {
+          content: [],
+          details: {
+            kind: "subagent_run",
+            agent: "general",
+            agentLabel: "General",
+            color: "emerald",
+            icon: "bot",
+            status: "done",
+            startedAt: 1000,
+            endedAt: 2000,
+            blocks: [],
+          },
+        },
+      }),
+    ]
+    const result = finalizeRunningTools(messages, [
+      { role: "assistant", stopReason: "aborted" },
+    ])
+    const details = (
+      (result[0] as ToolMessage).result as { details: { status: string } }
+    ).details
+    expect(details.status).toBe("done")
+  })
 })
 
 function optimisticUser(overrides: Partial<UserMessage> = {}): UserMessage {

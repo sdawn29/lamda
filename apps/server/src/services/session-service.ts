@@ -25,6 +25,7 @@ import { sessionEvents } from "../session-events.js";
 import { waitForAnswer } from "./question-registry.js";
 import { createToolApprovalBridge } from "./tool-approval-bridge.js";
 import { createAutomationTool } from "./automation-tool.js";
+import { createTaskTool } from "./subagent-tool.js";
 import { worktreeWatcher } from "./worktree-watcher.js";
 import { worktreeBroadcaster } from "../worktree-broadcaster.js";
 
@@ -48,7 +49,12 @@ async function buildSessionCustomTools(
       ? [...createPlanModeTools(cwd), questionTool]
       : mode === "ask"
         ? [questionTool]
-        : [createTodoTool(threadId), createMemoryTool(undefined), questionTool];
+        : [
+            createTodoTool(threadId),
+            createMemoryTool(undefined),
+            questionTool,
+            createTaskTool(threadId, cwd),
+          ];
 
   return { customTools, mode };
 }
@@ -385,6 +391,9 @@ export async function collectCustomTools(
     memoryTool,
     questionTool,
     createAutomationTool(workspaceId),
+    // The task (subagent) tool is thread-bound like todo: its approval bridge
+    // and transcript streaming key off the thread's live session.
+    ...(threadId ? [createTaskTool(threadId, workspacePath)] : []),
     ...planTools,
     ...mcpTools,
     ...lspTools,

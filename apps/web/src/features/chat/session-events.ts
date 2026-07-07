@@ -97,6 +97,12 @@ export interface SessionToolApprovalRequestEvent {
   input: Record<string, unknown>
   /** What an Always/Don't-allow decision will remember (e.g. `git status`). */
   scopeLabel: string
+  /** Present when the gated call came from inside a subagent run. */
+  subagent?: {
+    agentLabel: string
+    /** The parent `task` tool call the subagent runs under. */
+    parentToolCallId: string
+  }
 }
 
 export interface SessionToolApprovalResolvedEvent {

@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware"
 import { openGlobalWebSocket } from "./api"
 import { queryClient } from "@/shared/lib/query-client"
 import { gitKeys } from "@/features/git/queries"
-import { workspaceKeys, modeKeys } from "@/features/workspace/queries"
+import { workspaceKeys, modeKeys, agentKeys } from "@/features/workspace/queries"
 import { automationKeys } from "@/features/automations/queries"
 
 export type ThreadStatus =
@@ -231,6 +231,11 @@ function handleGlobalMessage(e: MessageEvent): void {
       // Refetch every mounted mode picker — each is keyed by workspace, and a
       // global mode is visible to all of them.
       void queryClient.invalidateQueries({ queryKey: modeKeys.all })
+    }
+    if (data.type === "agents_changed") {
+      // An agent file was added/edited/removed (global or workspace-local).
+      // Refetch every mounted agent list (Settings → Agents).
+      void queryClient.invalidateQueries({ queryKey: agentKeys.all })
     }
     if (data.type === "prompts_changed") {
       // A prompt file was added/edited/removed (global or workspace-local).

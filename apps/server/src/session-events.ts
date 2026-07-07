@@ -38,12 +38,20 @@ export type SessionPendingError = {
   retryCount?: number;
 };
 
+/** Set when the gated tool call came from inside a subagent run. */
+export type ApprovalSubagentContext = {
+  agentLabel: string;
+  /** The parent `task` tool call the subagent runs under. */
+  parentToolCallId: string;
+};
+
 /** A tool call paused awaiting the user's approval, surfaced in the status snapshot. */
 export type SessionPendingApproval = {
   toolCallId: string;
   toolName: string;
   input: Record<string, unknown>;
   scopeLabel: string;
+  subagent?: ApprovalSubagentContext;
 };
 
 export type SessionStatus = {
@@ -57,6 +65,12 @@ export type SessionStatus = {
    * live `tool_approval_request` event fires only once and isn't replayed).
    */
   pendingApproval: SessionPendingApproval | null;
+  /**
+   * Every unresolved approval, oldest first. Parallel subagents can pause on
+   * approvals concurrently, so a remount must restore the whole queue —
+   * `pendingApproval` (the newest) is kept for back-compat.
+   */
+  pendingApprovals: SessionPendingApproval[];
 };
 
 // ── Self-healing observers ──────────────────────────────────────────────────────
@@ -125,6 +139,8 @@ type ToolApprovalRequestEvent = {
   input: Record<string, unknown>;
   /** What an Always/Don't-allow decision will remember (e.g. `git status`). */
   scopeLabel: string;
+  /** Present when the call came from inside a subagent run. */
+  subagent?: ApprovalSubagentContext;
 };
 /** A previously-requested approval has been settled (or cancelled). */
 type ToolApprovalResolvedEvent = {
@@ -292,6 +308,18 @@ class SessionEventHub {
 
   setNextThinkingLevel(level: string) {
     this.pendingThinkingLevel = level;
+  }
+
+  /**
+   * The thinking level of the turn in flight (or queued for the next one).
+   * Lets a subagent spawned mid-turn inherit the parent's effort level —
+   * without this, subagent sessions fall back to the pi settings default,
+   * which can silently disable thinking for them entirely.
+   */
+  getThinkingLevel(): string | undefined {
+    return (
+      this.turnContext?.thinkingLevel ?? this.pendingThinkingLevel ?? undefined
+    );
   }
 
   getLastTurnChanges(): string {
@@ -635,18 +663,16 @@ class SessionEventHub {
   }
 
   getStatus(): SessionStatus {
-    // Surface the most-recent unresolved approval — the one the user was last
-    // prompted with (matches the single-prompt-at-a-time client UI).
-    let pendingApproval: SessionPendingApproval | null = null;
-    for (const approval of this.pendingApprovals.values()) {
-      pendingApproval = approval;
-    }
+    // Insertion order == request order; the newest doubles as the legacy
+    // single-approval field.
+    const pendingApprovals = [...this.pendingApprovals.values()];
     return {
       isRunning: this.runInProgress,
       isCompacting: this.isCompacting,
       compactionReason: this.compactionReason,
       pendingError: this.pendingErrorState,
-      pendingApproval,
+      pendingApproval: pendingApprovals.at(-1) ?? null,
+      pendingApprovals,
     };
   }
 
@@ -712,6 +738,7 @@ class SessionEventHub {
     toolName: string;
     input: Record<string, unknown>;
     scopeLabel: string;
+    subagent?: ApprovalSubagentContext;
   }): void {
     if (this.disposed) return;
     // Remember it so a thread re-mount can restore the prompt via /status.
@@ -803,16 +830,44 @@ class SessionEventHub {
         const toolBlocks = listRunningToolBlocks(this.threadId);
         const toolEvents: SessionEventRecord[] = toolBlocks
           .filter((b) => b.role === "tool" && b.toolStatus === "running")
-          .map((block) => ({
-            id: 0,
-            event: {
-              type: "tool_execution_start",
-              toolCallId: block.toolCallId ?? "",
-              toolName: block.toolName ?? "",
-              args: block.toolArgs ? JSON.parse(block.toolArgs) : {},
-            } as any,
-            data: "",
-          }));
+          .flatMap((block) => {
+            const toolCallId = block.toolCallId ?? "";
+            const toolName = block.toolName ?? "";
+            const args = block.toolArgs ? JSON.parse(block.toolArgs) : {};
+            const records: SessionEventRecord[] = [
+              {
+                id: 0,
+                event: {
+                  type: "tool_execution_start",
+                  toolCallId,
+                  toolName,
+                  args,
+                } as any,
+                data: "",
+              },
+            ];
+            // A running block's persisted toolResult is its latest partial
+            // result (e.g. a subagent's nested transcript) — replay it so a
+            // fresh connect restores the live card, not just its header.
+            if (block.toolResult) {
+              try {
+                records.push({
+                  id: 0,
+                  event: {
+                    type: "tool_execution_update",
+                    toolCallId,
+                    toolName,
+                    args,
+                    partialResult: JSON.parse(block.toolResult),
+                  } as any,
+                  data: "",
+                });
+              } catch {
+                // Unparseable partials just skip the restore.
+              }
+            }
+            return records;
+          });
         return [...this.currentRunEvents, ...toolEvents];
       }
       return [];
@@ -1063,6 +1118,8 @@ class SessionEventHub {
           workspaceId: this.cachedWorkspaceId,
           provider: m.provider ?? "",
           model: m.model ?? "",
+          agentId: null,
+          agentLabel: null,
           inputTokens: input,
           outputTokens: output,
           cacheReadTokens: cacheRead,
@@ -1231,6 +1288,21 @@ class SessionEventHub {
       }
     }
 
+    // Partial results are snapshots (each update supersedes the last for its
+    // tool call), so keep only the newest per toolCallId in the replay buffers.
+    // Long subagent runs stream updates for minutes — without this, a mid-turn
+    // reconnect would replay every one of them.
+    if (event.type === "tool_execution_update") {
+      const toolCallId = (event as { toolCallId: string }).toolCallId;
+      const isStaleUpdate = (r: SessionEventRecord) =>
+        r.event.type === "tool_execution_update" &&
+        (r.event as { toolCallId?: string }).toolCallId === toolCallId;
+      this.currentRunEvents = this.currentRunEvents.filter(
+        (r) => !isStaleUpdate(r),
+      );
+      this.recentEvents = this.recentEvents.filter((r) => !isStaleUpdate(r));
+    }
+
     if (this.runInProgress) {
       this.currentRunEvents.push(record);
     }
@@ -1369,6 +1441,11 @@ class SessionEventRegistry {
     this.hubs.get(sessionId)?.setNextThinkingLevel(level);
   }
 
+  /** Thinking level of the session's in-flight (or queued) turn, if any. */
+  getThinkingLevel(sessionId: string): string | undefined {
+    return this.hubs.get(sessionId)?.getThinkingLevel();
+  }
+
   emitError(sessionId: string, message: string) {
     this.hubs.get(sessionId)?.emitError(message);
   }
@@ -1384,6 +1461,7 @@ class SessionEventRegistry {
       toolName: string;
       input: Record<string, unknown>;
       scopeLabel: string;
+      subagent?: ApprovalSubagentContext;
     },
   ) {
     this.hubs.get(sessionId)?.emitToolApprovalRequest(payload);
@@ -1419,6 +1497,7 @@ class SessionEventRegistry {
         compactionReason: null,
         pendingError: null,
         pendingApproval: null,
+        pendingApprovals: [],
       }
     );
   }

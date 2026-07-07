@@ -9,6 +9,7 @@ import { startAutomationScheduler } from "./services/automation-scheduler.js";
 import { store } from "./store.js";
 import { registerHealingHooks } from "./services/healing-service.js";
 import {
+  ensureAgentFiles,
   ensureModeFiles,
   ensurePromptsDir,
   ensureSkillsDir,
@@ -34,6 +35,10 @@ registerHealingHooks();
 // editable on disk; existing files are left untouched.
 ensureModeFiles();
 
+// Same for ~/.lamda/agents/<id>.md — the built-in subagent definitions
+// (general, explore) become editable files; user edits are never overwritten.
+ensureAgentFiles();
+
 // Ensure ~/.lamda/prompts exists so the resource loader always registers it:
 // prompt files dropped in later are then picked up by an on-demand reload
 // (slash-command list + `/`-expansion) without restarting the server.
@@ -43,8 +48,9 @@ ensurePromptsDir();
 // are discovered by an on-demand resource reload without a server restart.
 ensureSkillsDir();
 
-// Seed the bundled create-prompt / create-mode skills into ~/.lamda/skills;
-// existing files are left untouched so user edits are preserved.
+// Seed the bundled create-prompt / create-mode / create-agent skills into
+// ~/.lamda/skills; existing files are left untouched so user edits are
+// preserved.
 ensureSkillFiles();
 
 // Watch ~/.lamda/{modes,prompts} so a mode/prompt file added/edited/removed

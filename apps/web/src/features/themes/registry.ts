@@ -3,7 +3,7 @@
  *
  * Each theme provides a full {@link ThemePalette} for light and dark. The first
  * entry is the default and matches the palette baked into `index.css`
- * ("Jellybeans"), so users who never pick a theme see no change. `TypeScript`
+ * ("Lamda"), so users who never pick a theme see no change. `TypeScript`
  * enforces that every {@link ThemeColorKey} is present in each palette, so a
  * missing token is a compile error rather than a silent visual gap.
  */
@@ -15,6 +15,97 @@ import {
   jellybeanshljslight,
 } from "@/shared/lib/syntax-theme"
 import type { ColorTheme, ThemePalette } from "./types"
+
+// ── Lamda (brand default — mirrors index.css) ───────────────────────────────────
+//
+// The house identity: near-neutral surfaces with a molten-copper accent. The
+// neutrals are grey at heart with a slight warm cast (just enough to never
+// read blue-grey, never so much they read cream). Copper was chosen over the
+// usual blue/violet both to
+// stand apart from every other built-in and as a nod to amber terminal
+// phosphor — fitting for a coding harness. Borders sit one soft step off the
+// surface they bound: visible, never bright.
+
+const lamdaLight: ThemePalette = {
+  background: "#f7f6f4",
+  foreground: "#1f1d1a",
+  card: "#fdfcfa",
+  "card-foreground": "#1f1d1a",
+  popover: "#fdfcfa",
+  "popover-foreground": "#1f1d1a",
+  /* Copper ember — ~4.8:1 against white, so filled buttons stay legible. */
+  primary: "#b4551d",
+  "primary-foreground": "#ffffff",
+  secondary: "#eeedea",
+  "secondary-foreground": "#1f1d1a",
+  muted: "#e7e5e1",
+  "muted-foreground": "#6d6a64",
+  accent: "#e3e1dc",
+  "accent-foreground": "#1f1d1a",
+  destructive: "#c03a2b",
+  border: "#e5e3de",
+  input: "#d5d2cc",
+  ring: "#b4551d",
+  "chart-1": "#b4551d",
+  "chart-2": "#567a3d",
+  "chart-3": "#3d6b8f",
+  "chart-4": "#a84a5f",
+  "chart-5": "#7a5aa0",
+  sidebar: "#efeeea",
+  "sidebar-foreground": "#1f1d1a",
+  "sidebar-primary": "#b4551d",
+  "sidebar-primary-foreground": "#ffffff",
+  "sidebar-accent": "#e5e3de",
+  "sidebar-accent-foreground": "#1f1d1a",
+  "sidebar-border": "#e1dfd9",
+  "sidebar-ring": "#b4551d",
+}
+
+const lamdaDark: ThemePalette = {
+  background: "#131211",
+  foreground: "#eae8e3",
+  card: "#1b1a18",
+  "card-foreground": "#eae8e3",
+  popover: "#201f1d",
+  "popover-foreground": "#eae8e3",
+  /* Molten copper, lifted for dark surfaces; ink text on it reads ~8:1. */
+  primary: "#e3a563",
+  "primary-foreground": "#231708",
+  secondary: "#252321",
+  "secondary-foreground": "#eae8e3",
+  muted: "#2c2a27",
+  "muted-foreground": "#a09c94",
+  accent: "#35322d",
+  "accent-foreground": "#eae8e3",
+  destructive: "#e05d47",
+  border: "#262421",
+  input: "#363330",
+  ring: "#e3a563",
+  "chart-1": "#e3a563",
+  "chart-2": "#9db56d",
+  "chart-3": "#6fa3c7",
+  "chart-4": "#d47983",
+  "chart-5": "#ab8fd1",
+  sidebar: "#0e0d0c",
+  "sidebar-foreground": "#eae8e3",
+  "sidebar-primary": "#e3a563",
+  "sidebar-primary-foreground": "#231708",
+  "sidebar-accent": "#232120",
+  "sidebar-accent-foreground": "#eae8e3",
+  "sidebar-border": "#1e1d1b",
+  "sidebar-ring": "#e3a563",
+}
+
+const lamda: ColorTheme = {
+  id: "lamda",
+  name: "Lamda",
+  description:
+    "The Lamda house palette. Warm ink surfaces, molten copper accent.",
+  group: "Built-in",
+  radius: "0.625rem",
+  light: lamdaLight,
+  dark: lamdaDark,
+}
 
 // ── Jellybeans (default — mirrors index.css) ───────────────────────────────────
 
@@ -792,6 +883,7 @@ const linear: ColorTheme = {
 
 /** All built-in themes, in display order. The first entry is the default. */
 export const BUILT_IN_THEMES: ColorTheme[] = [
+  lamda,
   macos,
   jellybeans,
   graphite,
@@ -805,7 +897,7 @@ export const BUILT_IN_THEMES: ColorTheme[] = [
 ]
 
 /** The default theme id — matches the palette baked into `index.css`. */
-export const DEFAULT_THEME_ID = macos.id
+export const DEFAULT_THEME_ID = lamda.id
 
 /** Look up a theme by id, falling back to the default when unknown. */
 export function getThemeById(id: string | null | undefined): ColorTheme {

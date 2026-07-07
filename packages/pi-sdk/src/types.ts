@@ -109,6 +109,13 @@ export interface SdkConfig {
    * without approval.
    */
   toolApproval?: ToolApprovalBridge;
+  /**
+   * Configure this session as a headless subagent: `systemPrompt` (an agent
+   * definition's markdown body) is appended to the SDK base prompt in place of
+   * lamda's chat-app context, no prompt-template/skill dirs are attached, and
+   * the conversation is kept in memory (no session file on disk).
+   */
+  subagent?: { systemPrompt: string };
 }
 
 /**
@@ -250,6 +257,11 @@ export interface ManagedSessionHandle {
    * workspace-supplied custom tools). Takes effect on the next agent turn.
    */
   setMode(mode: Mode): void;
+  /**
+   * Directly set the active built-in tool names, bypassing mode logic. Used by
+   * subagent sessions to apply an agent definition's tool allowlist.
+   */
+  setActiveTools(toolNames: string[]): void;
   /**
    * Branch the conversation at the Nth user message (0-indexed among user messages).
    * Returns the path of the new session JSONL file.

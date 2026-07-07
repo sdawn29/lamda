@@ -1,4 +1,4 @@
-import { and, gte, lte, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte, sql, type SQL } from "drizzle-orm";
 import { db } from "../client.js";
 import { aiUsage, workspaces } from "../schema.js";
 
@@ -7,6 +7,13 @@ export interface AiUsageRecord {
   workspaceId: string;
   provider: string;
   model: string;
+  /**
+   * Null for the thread's own (main-agent) usage; a subagent's agent id
+   * (e.g. "explore") for usage recorded by a `task`-tool run.
+   */
+  agentId: string | null;
+  /** Display-name snapshot of the agent at insert time; null alongside agentId. */
+  agentLabel: string | null;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -34,6 +41,13 @@ export interface AiUsageByModel extends AiUsageTotals {
   model: string;
 }
 
+export interface AiUsageByAgent extends AiUsageTotals {
+  /** Null for the thread-owner's own usage; a subagent's agent id otherwise. */
+  agentId: string | null;
+  /** Representative display label for agentId (most recently recorded). */
+  agentLabel: string | null;
+}
+
 export interface AiUsageByWorkspace extends AiUsageTotals {
   workspaceId: string;
   workspaceName: string | null;
@@ -57,6 +71,7 @@ export interface AiUsageStats {
   totals: AiUsageTotals;
   byModel: AiUsageByModel[];
   byWorkspace: AiUsageByWorkspace[];
+  byAgent: AiUsageByAgent[];
   daily: AiUsageDaily[];
 }
 
@@ -84,14 +99,8 @@ function rangeFilter(sinceMs?: number, untilMs?: number): SQL | undefined {
   return filters.length > 0 ? and(...filters) : undefined;
 }
 
-/** Aggregated usage stats, optionally limited to rows recorded within [sinceMs, untilMs]. */
-export function getAiUsageStats(
-  sinceMs?: number,
-  untilMs?: number,
-): AiUsageStats {
-  const where = rangeFilter(sinceMs, untilMs);
-
-  const totals = db.select(totalsColumns).from(aiUsage).where(where).get() ?? {
+function zeroTotals(): AiUsageTotals {
+  return {
     requests: 0,
     inputTokens: 0,
     outputTokens: 0,
@@ -101,6 +110,31 @@ export function getAiUsageStats(
     totalTokens: 0,
     cost: 0,
   };
+}
+
+/** Aggregated usage stats, optionally limited to rows recorded within [sinceMs, untilMs]. */
+export function getAiUsageStats(
+  sinceMs?: number,
+  untilMs?: number,
+): AiUsageStats {
+  const where = rangeFilter(sinceMs, untilMs);
+
+  const totals =
+    db.select(totalsColumns).from(aiUsage).where(where).get() ?? zeroTotals();
+
+  const byAgent = db
+    .select({
+      agentId: aiUsage.agentId,
+      // Representative label for this agentId — a custom agent renamed since
+      // its last run would otherwise mix labels across grouped rows.
+      agentLabel: sql<string | null>`max(${aiUsage.agentLabel})`,
+      ...totalsColumns,
+    })
+    .from(aiUsage)
+    .where(where)
+    .groupBy(aiUsage.agentId)
+    .orderBy(sql`sum(${aiUsage.totalTokens}) desc`)
+    .all();
 
   const byModel = db
     .select({
@@ -167,5 +201,35 @@ export function getAiUsageStats(
     .orderBy(dayExpr)
     .all();
 
-  return { totals, byModel, byWorkspace, daily };
+  return { totals, byModel, byWorkspace, byAgent, daily };
+}
+
+/**
+ * One thread's usage split into its own (main-agent) turns vs everything
+ * recorded by subagents it spawned — used by the chat UI's context popup,
+ * which otherwise only sees the live session's own token accounting (the
+ * SDK's `getSessionStats()` has no visibility into a nested subagent's
+ * separate session object).
+ */
+export interface ThreadAiUsageBreakdown {
+  main: AiUsageTotals;
+  subagents: AiUsageTotals;
+}
+
+export function getThreadAiUsageBreakdown(
+  threadId: string,
+): ThreadAiUsageBreakdown {
+  const main =
+    db
+      .select(totalsColumns)
+      .from(aiUsage)
+      .where(and(eq(aiUsage.threadId, threadId), isNull(aiUsage.agentId)))
+      .get() ?? zeroTotals();
+  const subagents =
+    db
+      .select(totalsColumns)
+      .from(aiUsage)
+      .where(and(eq(aiUsage.threadId, threadId), isNotNull(aiUsage.agentId)))
+      .get() ?? zeroTotals();
+  return { main, subagents };
 }

@@ -1,7 +1,7 @@
 import { useState, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Loader2Icon, SparklesIcon } from "lucide-react"
+import { BotIcon, Loader2Icon, SparklesIcon } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 import { Button } from "@/shared/ui/button"
 import { SectionLabel } from "@/shared/ui/section-label"
@@ -121,6 +121,9 @@ export function ContextChart({
   const tokens = sessionStats?.tokens
   const cost = sessionStats?.cost ?? null
   const hasCost = cost != null && cost > 0
+
+  const subagentUsage = sessionStats?.subagentUsage
+  const hasSubagentUsage = !!subagentUsage && subagentUsage.requests > 0
 
   // Stacked segments of the current context window (real per-request usage).
   const breakdown = display.breakdown
@@ -305,6 +308,25 @@ export function ContextChart({
                   {hasCost && (
                     <span className="text-3xs text-muted-foreground/60 tabular-nums">
                       {formatCost(cost)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            {hasSubagentUsage && (
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1 text-3xs text-muted-foreground">
+                  <BotIcon className="size-3" />
+                  {subagentUsage.requests}{" "}
+                  {subagentUsage.requests === 1 ? "subagent call" : "subagent calls"}
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xs font-medium text-foreground/80 tabular-nums">
+                    +{formatTokens(subagentUsage.totalTokens)}
+                  </span>
+                  {subagentUsage.cost > 0 && (
+                    <span className="text-3xs text-muted-foreground/60 tabular-nums">
+                      {formatCost(subagentUsage.cost)}
                     </span>
                   )}
                 </div>

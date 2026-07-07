@@ -29,6 +29,10 @@ export const DISCLOSURE_LABEL_DONE =
 export const DISCLOSURE_DIM =
   "text-muted-foreground/40 transition-colors group-hover/row:text-muted-foreground/70"
 
+/** Shimmering gradient-clip text used for an in-progress row's label. */
+export const SHIMMER_TEXT_CLASS =
+  "animate-thinking-shimmer bg-linear-to-r from-muted-foreground/40 via-foreground to-muted-foreground/40 bg-size-[200%_100%] bg-clip-text text-transparent"
+
 export function DisclosureChevron({
   expanded,
   /** Hide until the row is hovered while collapsed — used by the leaf rows that

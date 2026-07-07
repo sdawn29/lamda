@@ -4,6 +4,7 @@ import {
   TODO_TOOL_NAME,
   MEMORY_TOOL_NAME,
   PLAN_TOOL_NAME,
+  TASK_TOOL_NAME,
 } from "@lamda/pi-sdk";
 import { getThread } from "@lamda/db";
 import { store } from "../store.js";
@@ -29,6 +30,9 @@ const AUTO_ALLOW = new Set<string>([
   QUESTION_TOOL_NAME,
   TODO_TOOL_NAME,
   MEMORY_TOOL_NAME,
+  // Spawning a subagent is safe in itself: every gated tool the subagent then
+  // calls still flows through this bridge (labeled with the agent's name).
+  TASK_TOOL_NAME,
   // Read-only GitHub tools (list/view PRs, issues, checks). The write tools
   // (`github_create_pr`, `github_comment_issue`) are intentionally absent so
   // they go through the approval gate like bash/MCP tools.
@@ -60,14 +64,28 @@ function approvalScope(
   return { storeKey: toolName, label: toolName };
 }
 
+/** Identifies the subagent a gated tool call came from, for the approval UI. */
+export interface SubagentApprovalContext {
+  agentLabel: string;
+  /** The parent `task` tool call the subagent runs under. */
+  parentToolCallId: string;
+}
+
 /**
  * Build the approval gate for one thread's session. Consulted by the SDK before
  * every tool call. State (the thread's approval mode, saved per-workspace
  * decisions) is read fresh on each call so changes take effect immediately. The
  * live sessionId is resolved lazily because it doesn't exist yet when the
  * session — and thus this bridge — is created.
+ *
+ * A subagent session reuses its parent thread's bridge with `subagent` set:
+ * the same policy applies, and approval prompts surface through the parent's
+ * event hub labeled with the subagent's name.
  */
-export function createToolApprovalBridge(threadId: string): ToolApprovalBridge {
+export function createToolApprovalBridge(
+  threadId: string,
+  subagent?: SubagentApprovalContext,
+): ToolApprovalBridge {
   return {
     async decide(req, signal) {
       // Thread's per-conversation toggle: skip all gating when "all_allowed".
@@ -104,6 +122,7 @@ export function createToolApprovalBridge(threadId: string): ToolApprovalBridge {
         toolName: req.toolName,
         input: req.input,
         scopeLabel: label,
+        subagent,
       });
 
       const decision = await waitForApproval(req.toolCallId, signal);

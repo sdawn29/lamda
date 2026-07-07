@@ -27,6 +27,7 @@ import {
   getAgentTurnFiles,
   getAgentTurnsFromId,
   deleteAgentTurnsFrom,
+  getThreadAiUsageBreakdown,
 } from "@lamda/db";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
@@ -493,7 +494,11 @@ sessions.get("/session/:id/stats", (c) => {
   if (!entry) return c.json({ stats: null });
   try {
     const stats = entry.handle.getSessionStats();
-    return c.json({ stats });
+    // The SDK's own stats only see this session's turns — a subagent spawned
+    // via the `task` tool runs on an entirely separate session object, so its
+    // spend is folded in here from the ai_usage table (keyed by threadId).
+    const { subagents } = getThreadAiUsageBreakdown(entry.threadId);
+    return c.json({ stats: { ...stats, subagentUsage: subagents } });
   } catch (err) {
     console.error(`[stats:${id}]`, err);
     return c.json({

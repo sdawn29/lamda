@@ -2,18 +2,21 @@ import { watch, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import {
   LAMDA_DIR_NAME,
+  lamdaAgentsDir,
   lamdaGlobalPromptsDir,
+  lamdaLocalAgentsDir,
   lamdaLocalModesDir,
   lamdaLocalPromptsDir,
   lamdaModesDir,
 } from "@lamda/pi-sdk";
+import { agentsBroadcaster } from "../agents-broadcaster.js";
 import { modesBroadcaster } from "../modes-broadcaster.js";
 import { promptsBroadcaster } from "../prompts-broadcaster.js";
 
 const DEBOUNCE_MS = 150;
 
 /** The on-disk config kinds whose `.lamda` subdirectory we watch. */
-type Kind = "modes" | "prompts";
+type Kind = "modes" | "prompts" | "agents";
 
 /**
  * Watches the `.lamda/modes` and `.lamda/prompts` directories — globally
@@ -39,13 +42,16 @@ class LamdaConfigWatcher {
   // One pending broadcast timer per kind, so bursts coalesce into one signal.
   private timers = new Map<Kind, ReturnType<typeof setTimeout>>();
 
-  /** Watch the global `~/.lamda/{modes,prompts}` dirs. Call once at startup. */
+  /** Watch the global `~/.lamda/{modes,prompts,agents}` dirs. Call once at startup. */
   start(): void {
     this.watchDir("global:modes", lamdaModesDir(), () =>
       this.scheduleBroadcast("modes"),
     );
     this.watchDir("global:prompts", lamdaGlobalPromptsDir(), () =>
       this.scheduleBroadcast("prompts"),
+    );
+    this.watchDir("global:agents", lamdaAgentsDir(), () =>
+      this.scheduleBroadcast("agents"),
     );
   }
 
@@ -61,6 +67,7 @@ class LamdaConfigWatcher {
         this.attachWorkspaceSubdirs(workspaceId, workspacePath);
         this.scheduleBroadcast("modes");
         this.scheduleBroadcast("prompts");
+        this.scheduleBroadcast("agents");
       },
     );
     this.attachWorkspaceSubdirs(workspaceId, workspacePath);
@@ -71,6 +78,7 @@ class LamdaConfigWatcher {
     this.closeWatch(`ws:${workspaceId}:lamda`);
     this.closeWatch(`ws:${workspaceId}:modes`);
     this.closeWatch(`ws:${workspaceId}:prompts`);
+    this.closeWatch(`ws:${workspaceId}:agents`);
   }
 
   private attachWorkspaceSubdirs(
@@ -86,6 +94,11 @@ class LamdaConfigWatcher {
       `ws:${workspaceId}:prompts`,
       lamdaLocalPromptsDir(workspacePath),
       () => this.scheduleBroadcast("prompts"),
+    );
+    this.watchDir(
+      `ws:${workspaceId}:agents`,
+      lamdaLocalAgentsDir(workspacePath),
+      () => this.scheduleBroadcast("agents"),
     );
   }
 
@@ -109,7 +122,16 @@ class LamdaConfigWatcher {
       setTimeout(() => {
         this.timers.delete(kind);
         if (kind === "modes") modesBroadcaster.broadcast();
-        else promptsBroadcaster.broadcast();
+        else if (kind === "prompts") promptsBroadcaster.broadcast();
+        else {
+          agentsBroadcaster.broadcast();
+          // Live sessions bake the agent list into the task tool's
+          // description — rebuild their custom tools so new/edited agents are
+          // spawnable without a restart.
+          void import("./session-service.js")
+            .then((m) => m.refreshAllSessionTools())
+            .catch(() => undefined);
+        }
       }, DEBOUNCE_MS),
     );
   }
