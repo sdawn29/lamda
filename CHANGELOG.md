@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.0](../../releases/tag/v0.46.0) — 2026-07-07
+
+### Features
+
+* add custom tools support for agents and subagents
+* add agent management functionality with tests
+
 ## [0.45.1](../../releases/tag/v0.45.1) — 2026-07-05
 
 ### Bug Fixes
