@@ -1177,12 +1177,6 @@ export const ChatComposer = memo(
               </div>
 
               <div className="flex min-w-0 items-center justify-end gap-2">
-                {showApproval && (
-                  <ApprovalModeCombobox
-                    selected={approvalMode}
-                    onSelect={onApprovalModeChange!}
-                  />
-                )}
                 <ContextChart
                   contextUsage={contextUsage}
                   sessionId={sessionId}
@@ -1280,6 +1274,15 @@ export const ChatComposer = memo(
             </div>
           </div>
         </div>
+
+        {showApproval && (
+          <div className="mt-1.5 flex w-full justify-end">
+            <ApprovalModeCombobox
+              selected={approvalMode}
+              onSelect={onApprovalModeChange!}
+            />
+          </div>
+        )}
       </div>
     )
   })

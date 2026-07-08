@@ -319,7 +319,7 @@ export function ModeCombobox({
             >
               <selectedOption.Icon className="size-3.5 shrink-0" />
             </span>
-            <span className="font-medium @max-2xl/composer-controls:hidden">
+            <span className="font-medium">
               {selectedOption.label}
             </span>
             <ChevronDownIcon

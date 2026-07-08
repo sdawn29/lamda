@@ -103,7 +103,7 @@ export function ApprovalModeCombobox({
             </span>
             <span
               className={cn(
-                "max-w-32 truncate @max-2xl/composer-controls:hidden",
+                "max-w-32 truncate",
                 selectedOption.iconAccent
               )}
             >
@@ -119,7 +119,7 @@ export function ApprovalModeCombobox({
       <PopoverContent
         className="w-56 p-0"
         side="top"
-        align="start"
+        align="end"
         sideOffset={6}
       >
         <Command>
