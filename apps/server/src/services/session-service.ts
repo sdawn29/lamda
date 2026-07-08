@@ -360,7 +360,7 @@ export async function collectCustomTools(
     : false;
   const planTools = allowsPlanTool ? createPlanModeTools(workspacePath) : [];
 
-  const [mcpTools, lspTools, githubTools] = await Promise.all([
+  const [mcpTools, lspTools, githubTools, gitlabTools] = await Promise.all([
     import("./mcp-service.js")
       .then((m) => m.getMcpToolsForSession())
       .catch((err) => {
@@ -385,6 +385,18 @@ export async function collectCustomTools(
         console.warn("[session-service] failed to load GitHub tools:", err);
         return [];
       }),
+    // GitLab tools follow the same gate: only exposed when `glab` is installed
+    // and authenticated.
+    Promise.all([import("./gitlab-service.js"), import("./gitlab-tool.js")])
+      .then(async ([svc, tool]) => {
+        const cwd = svc.threadRepoCwd(threadId, workspacePath);
+        if (!(await svc.isGitlabAvailable(cwd))) return [];
+        return tool.createGitlabTools(threadId, workspacePath);
+      })
+      .catch((err) => {
+        console.warn("[session-service] failed to load GitLab tools:", err);
+        return [];
+      }),
   ]);
   return [
     ...(todoTool ? [todoTool] : []),
@@ -398,6 +410,7 @@ export async function collectCustomTools(
     ...mcpTools,
     ...lspTools,
     ...githubTools,
+    ...gitlabTools,
   ];
 }
 

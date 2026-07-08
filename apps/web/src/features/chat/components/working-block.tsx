@@ -567,12 +567,6 @@ export const WorkingBlock = memo(function WorkingBlock({
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
-        {isActive && !pendingQuestion && (
-          <span className="relative flex h-1.5 w-1.5 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/50" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary/80" />
-          </span>
-        )}
         <span
           className={cn(
             "shrink-0 text-xs font-medium transition-colors",

@@ -13,6 +13,7 @@ import { waitForApproval } from "./approval-registry.js";
 import { getToolDecision, setToolDecision } from "./tool-approval-store.js";
 import { bashCommandScope } from "./bash-command-scope.js";
 import { GITHUB_READ_TOOLS } from "./github-tool.js";
+import { GITLAB_READ_TOOLS } from "./gitlab-tool.js";
 
 /**
  * Tools that never require approval: read-only built-ins and host tools that
@@ -33,10 +34,11 @@ const AUTO_ALLOW = new Set<string>([
   // Spawning a subagent is safe in itself: every gated tool the subagent then
   // calls still flows through this bridge (labeled with the agent's name).
   TASK_TOOL_NAME,
-  // Read-only GitHub tools (list/view PRs, issues, checks). The write tools
-  // (`github_create_pr`, `github_comment_issue`) are intentionally absent so
-  // they go through the approval gate like bash/MCP tools.
+  // Read-only GitHub/GitLab tools (list/view PRs/MRs, issues, CI). The write
+  // tools (create PR/MR, comment) are intentionally absent so they go through
+  // the approval gate like bash/MCP tools.
   ...GITHUB_READ_TOOLS,
+  ...GITLAB_READ_TOOLS,
 ]);
 
 /**

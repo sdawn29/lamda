@@ -187,8 +187,15 @@ A good agent definition is written for that reality.
      overrides a global agent with the same id; can be committed to share
      with the team).
    - **Tool access** — Read-only (search/inspect), Read + edit (can modify
-     files), or Full (edits + shell). Ask when the request doesn't imply it;
-     this is the agent's real permission boundary.
+     files), or Full (edits + shell). When the request doesn't make the
+     needed access clear, never guess — ask via the \`question\` tool with
+     those three as the options; this is the agent's real permission
+     boundary.
+   - **Custom tools** — if the workspace has custom tools (memory, MCP,
+     LSP, GitHub — the names shown in Settings → Agents) and the request
+     doesn't make clear which of them the agent needs, add a
+     \`multiSelect\` question listing them by name so the user picks the
+     allowed set (selecting none means \`customTools: []\`).
    - **Purpose/behavior** — only if the request leaves the agent's job or
      output genuinely ambiguous.
    - **Model** — usually skip; agents inherit the conversation's model.
@@ -203,8 +210,9 @@ A good agent definition is written for that reality.
    so map the access answer directly: read-only → \`[read, grep, find, ls]\`;
    read + edit adds \`edit, write\`; full adds \`bash\`. Set \`customTools:\`
    to the exact workspace custom tool names this agent should see (for example
-   \`[memory]\`, or MCP/LSP/GitHub tool names shown in Settings → Agents), and
-   use \`[]\` for a tightly isolated agent. \`question\`, \`todo\`, \`plan\`,
+   \`[memory]\`, or MCP/LSP/GitHub tool names shown in Settings → Agents) —
+   taken from the custom-tools answer if you asked — and use \`[]\` for a
+   tightly isolated agent. \`question\`, \`todo\`, \`plan\`,
    and \`task\` are not available to subagents — never list them.
 
 4. **Write a description that routes well.** The \`description\` is what the

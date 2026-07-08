@@ -14,7 +14,7 @@ export async function collectSubagentCustomTools(
   const tools: ToolDefinition[] = [createMemoryTool(workspaceId)];
   if (!workspaceId) return tools;
 
-  const [mcpTools, lspTools, githubTools] = await Promise.all([
+  const [mcpTools, lspTools, githubTools, gitlabTools] = await Promise.all([
     import("./mcp-service.js")
       .then((m) => m.getMcpToolsForSession())
       .catch((err) => {
@@ -40,7 +40,20 @@ export async function collectSubagentCustomTools(
         );
         return [];
       }),
+    Promise.all([import("./gitlab-service.js"), import("./gitlab-tool.js")])
+      .then(async ([svc, tool]) => {
+        const cwd = svc.threadRepoCwd(parentThreadId, workspacePath);
+        if (!(await svc.isGitlabAvailable(cwd))) return [];
+        return tool.createGitlabTools(parentThreadId, workspacePath);
+      })
+      .catch((err) => {
+        console.warn(
+          "[subagent-custom-tools] failed to load GitLab tools:",
+          err,
+        );
+        return [];
+      }),
   ]);
 
-  return [...tools, ...mcpTools, ...lspTools, ...githubTools];
+  return [...tools, ...mcpTools, ...lspTools, ...githubTools, ...gitlabTools];
 }

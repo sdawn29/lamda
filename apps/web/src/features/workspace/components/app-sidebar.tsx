@@ -585,7 +585,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
       onDrop={(e) => handleWorkspaceDrop(e, ws.id)}
       onDragEnd={finishWorkspaceDrag}
       className={cn(
-        "group/ws relative cursor-grab active:cursor-grabbing",
+        "group/ws relative",
         draggingWorkspaceId === ws.id && "opacity-45",
         workspaceDropTarget?.id === ws.id &&
           workspaceDropTarget.position === "before" &&

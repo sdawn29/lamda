@@ -329,6 +329,70 @@ export async function listMergeRequests(
   return raws.map(mapMergeRequest);
 }
 
+export interface NoteSummary {
+  author: string | null;
+  body: string;
+  createdAt: string;
+}
+
+/**
+ * Non-system notes (comments) on an issue or merge request, via the REST API.
+ * `:id` is glab's placeholder for the current project.
+ */
+async function listNotes(
+  cwd: string,
+  kind: "issues" | "merge_requests",
+  iid: number,
+): Promise<NoteSummary[]> {
+  const raws = await runGlabJson<Record<string, unknown>[]>(
+    ["api", `projects/:id/${kind}/${iid}/notes?per_page=100`],
+    cwd,
+  );
+  return raws
+    .filter((raw) => raw.system !== true)
+    .map((raw) => {
+      const author = raw.author as { username?: string; name?: string } | null;
+      return {
+        author: author?.username ?? author?.name ?? null,
+        body: String(raw.body ?? ""),
+        createdAt: String(raw.created_at ?? raw.createdAt ?? ""),
+      };
+    });
+}
+
+export interface MergeRequestDetail extends MergeRequestSummary {
+  description: string;
+  mergeStatus: string | null;
+  /** GitLab reports this as a string, e.g. "5" or "1000+". */
+  changesCount: string | null;
+  comments: NoteSummary[];
+  pipeline: PipelineDetail | null;
+}
+
+export async function getMergeRequest(
+  cwd: string,
+  number: number,
+): Promise<MergeRequestDetail> {
+  assertPositiveInt(number, "merge request number");
+  const raw = await runGlabJson<Record<string, unknown>>(
+    ["mr", "view", String(number), "--output", "json"],
+    cwd,
+  );
+  const [comments, pipeline] = await Promise.all([
+    listNotes(cwd, "merge_requests", number).catch(() => []),
+    getPipeline(cwd, { mr: number }).catch(() => null),
+  ]);
+  return {
+    ...mapMergeRequest(raw),
+    description: String(raw.description ?? ""),
+    mergeStatus:
+      stringField(raw.detailed_merge_status ?? raw.merge_status) || null,
+    changesCount: stringField(raw.changes_count) || null,
+    comments,
+    pipeline,
+  };
+}
+
 export interface CreateMergeRequestInput {
   title: string;
   description?: string;
@@ -409,7 +473,7 @@ function mapIssue(raw: Record<string, unknown>): IssueSummary {
 
 export async function listIssues(
   cwd: string,
-  opts: { state?: IssueState; limit?: number } = {},
+  opts: { state?: IssueState; search?: string; limit?: number } = {},
 ): Promise<IssueSummary[]> {
   const state = opts.state ?? "opened";
   const limit = opts.limit ?? 30;
@@ -424,8 +488,144 @@ export async function listIssues(
   ];
   const flag = stateListFlag(state);
   if (flag) args.push(flag);
+  if (opts.search?.trim()) {
+    args.push("--search", opts.search.trim());
+  }
   const raws = await runGlabJson<Record<string, unknown>[]>(args, cwd);
   return raws.map(mapIssue);
+}
+
+export interface IssueDetail extends IssueSummary {
+  description: string;
+  comments: NoteSummary[];
+}
+
+export async function getIssue(
+  cwd: string,
+  number: number,
+): Promise<IssueDetail> {
+  assertPositiveInt(number, "issue number");
+  const raw = await runGlabJson<Record<string, unknown>>(
+    ["issue", "view", String(number), "--output", "json"],
+    cwd,
+  );
+  const comments = await listNotes(cwd, "issues", number).catch(() => []);
+  return {
+    ...mapIssue(raw),
+    description: String(raw.description ?? ""),
+    comments,
+  };
+}
+
+export async function commentIssue(
+  cwd: string,
+  number: number,
+  body: string,
+): Promise<void> {
+  assertPositiveInt(number, "issue number");
+  if (!body.trim()) throw new GlabError("Comment body is required", "");
+  await runGlab(["issue", "note", String(number), "--message", body], cwd);
+}
+
+export async function commentMergeRequest(
+  cwd: string,
+  number: number,
+  body: string,
+): Promise<void> {
+  assertPositiveInt(number, "merge request number");
+  if (!body.trim()) throw new GlabError("Comment body is required", "");
+  await runGlab(["mr", "note", String(number), "--message", body], cwd);
+}
+
+// ── Pipelines / CI ───────────────────────────────────────────────────────────
+
+export interface PipelineJob {
+  name: string;
+  stage: string | null;
+  /** Normalized bucket: "pass" | "fail" | "pending" | "skipping" | "cancel". */
+  bucket: string;
+  state: string;
+  link: string | null;
+  allowFailure: boolean;
+}
+
+export interface PipelineDetail {
+  id: number;
+  status: string;
+  ref: string | null;
+  url: string | null;
+  jobs: PipelineJob[];
+}
+
+function normalizeJobBucket(status: string): string {
+  const s = status.toLowerCase();
+  if (s === "success") return "pass";
+  if (s === "failed") return "fail";
+  if (s === "canceled" || s === "canceling") return "cancel";
+  if (s === "skipped" || s === "manual") return "skipping";
+  return "pending";
+}
+
+async function pipelineJobs(
+  cwd: string,
+  pipelineId: number,
+): Promise<PipelineJob[]> {
+  const raws = await runGlabJson<Record<string, unknown>[]>(
+    ["api", `projects/:id/pipelines/${pipelineId}/jobs?per_page=100`],
+    cwd,
+  );
+  return raws.map((raw) => {
+    const state = String(raw.status ?? "");
+    return {
+      name: String(raw.name ?? "job"),
+      stage: stringField(raw.stage) || null,
+      bucket: normalizeJobBucket(state),
+      state,
+      link: stringField(raw.web_url ?? raw.webUrl) || null,
+      allowFailure: raw.allow_failure === true,
+    };
+  });
+}
+
+/**
+ * Latest pipeline (with its jobs) for a merge request (by iid) or a ref;
+ * defaults to the current branch. Returns null when there is no pipeline.
+ */
+export async function getPipeline(
+  cwd: string,
+  opts: { mr?: number; ref?: string } = {},
+): Promise<PipelineDetail | null> {
+  let raws: Record<string, unknown>[];
+  if (opts.mr != null) {
+    assertPositiveInt(opts.mr, "merge request number");
+    raws = await runGlabJson<Record<string, unknown>[]>(
+      ["api", `projects/:id/merge_requests/${opts.mr}/pipelines?per_page=1`],
+      cwd,
+    );
+  } else {
+    const ref = opts.ref ?? (await currentBranch(cwd));
+    if (!ref) return null;
+    assertNotOption(ref, "ref");
+    raws = await runGlabJson<Record<string, unknown>[]>(
+      [
+        "api",
+        `projects/:id/pipelines?ref=${encodeURIComponent(ref)}&per_page=1`,
+      ],
+      cwd,
+    );
+  }
+
+  const raw = raws[0];
+  if (!raw) return null;
+  const id = Number(raw.id ?? 0);
+  const jobs = id > 0 ? await pipelineJobs(cwd, id).catch(() => []) : [];
+  return {
+    id,
+    status: String(raw.status ?? ""),
+    ref: stringField(raw.ref) || null,
+    url: stringField(raw.web_url ?? raw.webUrl) || null,
+    jobs,
+  };
 }
 
 async function hasRemote(cwd: string, remote: string): Promise<boolean> {
