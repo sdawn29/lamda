@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.47.0](../../releases/tag/v0.47.0) — 2026-07-08
+
+### Features
+
+* **gitlab:** add GitLab tools and integration for issue and merge request management
+
+### Bug Fixes
+
+* **chat:** update pending approval state to use an array fix(agents): handle undefined value in workspace selection change
+
 ## [0.46.0](../../releases/tag/v0.46.0) — 2026-07-07
 
 ### Features
