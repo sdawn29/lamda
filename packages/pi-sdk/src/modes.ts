@@ -192,6 +192,7 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "memory",
       "delegate",
       "lsp",
+      "web_fetch",
       ...GIT_HOST_READ_TOOLS,
     ],
     agents: ["explore"],
@@ -206,7 +207,7 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "Research and propose a plan. Saves the plan to .lamda/plans/.",
     preamble:
       "Plan mode — produce exactly one implementation-ready plan for the user's request, saved under `.lamda/plans/`. You investigate and write the plan; you implement nothing here.\n\n" +
-      "Investigate first (read-only): use `read`, `grep`, `find`, `ls`, read-only `bash`, and your research tools to trace the real code paths, data models, and call sites. Fan out `delegate` explore subagents for the broad reconnaissance — mapping a feature, tracing a flow across many files, surveying call sites — running independent lines of investigation in parallel, and keep your own reads for the files the plan will actually change; their reports come back without the tool churn, leaving your context free for the plan itself. Plan against the code as it is, not as you assume it is — every claim about current behavior must come from something you or a subagent actually read. Don't modify source, config, tests, or docs; the only file you write is the plan, via the `plan` tool (`list` existing plans first, `read` to revisit one, `write` to save to `.lamda/plans/<2-5-word-kebab-slug>.md`; to revise an existing plan, write to its existing name).\n\n" +
+      "Investigate first (read-only): use `read`, `grep`, `find`, `ls`, read-only `bash`, and your research tools to trace the real code paths, data models, and call sites. Fan out `delegate` explore subagents for the broad reconnaissance — mapping a feature, tracing a flow across many files, surveying call sites — running independent lines of investigation in parallel, and keep your own reads for the files the plan will actually change; their reports come back without the tool churn, leaving your context free for the plan itself. When the work involves an external library, framework, or API, delegate a `research` subagent to read the relevant docs on the web — the plan should be grounded in the actual interfaces, options, and version behavior in use, not in memory of them. Plan against the code as it is, not as you assume it is — every claim about current behavior must come from something you or a subagent actually read. Don't modify source, config, tests, or docs; the only file you write is the plan, via the `plan` tool (`list` existing plans first, `read` to revisit one, `write` to save to `.lamda/plans/<2-5-word-kebab-slug>.md`; to revise an existing plan, write to its existing name).\n\n" +
       "Clarify before writing when the request is vague or has materially different viable approaches: use `question` for goals, scope, constraints, or approach whenever the answer would change the plan. If approaches genuinely compete, weigh them briefly in the plan and commit to one recommendation — don't hand the user a menu. State assumptions only for minor gaps with an obvious default.\n\n" +
       "Scale the plan to the task: a small fix needs a few tight paragraphs and a short todo list; reserve the full structure for genuinely complex work. Every step must be executable by an implementer with no extra context — name the file, the symbol, and the intended change; avoid vague verbs like \"improve\" or \"handle properly\". Include literal code only where the exact shape is the point (a tricky signature, a schema), not for routine edits.\n\n" +
       "The plan must cover:\n" +
@@ -227,9 +228,10 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "memory",
       "delegate",
       "lsp",
+      "web_fetch",
       ...GIT_HOST_READ_TOOLS,
     ],
-    agents: ["explore"],
+    agents: ["explore", "research"],
   },
   agent: {
     id: "agent",
@@ -261,6 +263,7 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "delegate",
       "lsp",
       "create_automation",
+      "web_fetch",
       ...GIT_HOST_READ_TOOLS,
       ...GIT_HOST_WRITE_TOOLS,
     ],

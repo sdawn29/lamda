@@ -26,7 +26,7 @@ function buildDelegateDescription(agents: AgentConfig[]): string {
 
 The subagent runs in this conversation's working directory with its own context window and its agent-specific toolset. It cannot ask the user questions and cannot spawn further subagents. Nothing but its final message comes back to you, so \`prompt\` must be fully self-contained: include all the context it needs and state exactly what it should return.
 
-To run subagents in parallel, emit multiple delegate calls in a single message (at most 4 execute concurrently; extras wait in a queue). Prefer the cheapest agent that can do the job — use \`explore\` for read-only research and reserve \`general\` for work that needs edits or shell access. The active mode may restrict which agents can be launched (read-only modes only allow read-only agents); a disallowed launch fails with the permitted list.
+To run subagents in parallel, emit multiple delegate calls in a single message (at most 4 execute concurrently; extras wait in a queue). Prefer the cheapest agent that can do the job — use \`explore\` for read-only codebase questions, \`research\` for reading external docs and web pages, and reserve \`general\` for work that needs edits or shell access. The active mode may restrict which agents can be launched (read-only modes only allow read-only agents); a disallowed launch fails with the permitted list.
 
 Available agents:
 ${list}`;

@@ -14,6 +14,7 @@ import { getToolDecision, setToolDecision } from "./tool-approval-store.js";
 import { bashCommandScope } from "./bash-command-scope.js";
 import { GITHUB_READ_TOOLS } from "./github-tool.js";
 import { GITLAB_READ_TOOLS } from "./gitlab-tool.js";
+import { WEB_FETCH_TOOL_NAME, webFetchHost } from "./web-fetch-tool.js";
 
 /**
  * Tools that never require approval: read-only built-ins and host tools that
@@ -62,6 +63,14 @@ function approvalScope(
     const command = typeof input.command === "string" ? input.command : "";
     const { key, label } = bashCommandScope(command);
     return { storeKey: `bash:${key}`, label };
+  }
+  // `web_fetch` is scoped per host, so approving one site doesn't unlock the
+  // whole web.
+  if (toolName === WEB_FETCH_TOOL_NAME) {
+    const host = webFetchHost(input);
+    if (host) {
+      return { storeKey: `web_fetch:${host}`, label: `fetch ${host}` };
+    }
   }
   return { storeKey: toolName, label: toolName };
 }

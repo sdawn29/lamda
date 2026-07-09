@@ -123,6 +123,12 @@ const HOST_GROUP: CatalogGroupDto = {
       description: "Language-server diagnostics for a file.",
       subagent: true,
     },
+    {
+      name: "web_fetch",
+      label: "web_fetch",
+      description: "Fetch a URL and read it as text.",
+      subagent: true,
+    },
   ],
 };
 

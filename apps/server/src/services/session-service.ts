@@ -25,6 +25,7 @@ import { sessionEvents } from "../session-events.js";
 import { waitForAnswer } from "./question-registry.js";
 import { createToolApprovalBridge } from "./tool-approval-bridge.js";
 import { createAutomationTool } from "./automation-tool.js";
+import { createWebFetchTool } from "./web-fetch-tool.js";
 import { createDelegateTool } from "./subagent-tool.js";
 import { worktreeWatcher } from "./worktree-watcher.js";
 import { worktreeBroadcaster } from "../worktree-broadcaster.js";
@@ -415,6 +416,7 @@ export async function collectCustomTools(
     memoryTool,
     questionTool,
     createAutomationTool(workspaceId),
+    createWebFetchTool(),
     // The delegate (subagent) tool is thread-bound like todo: its approval bridge
     // and transcript streaming key off the thread's live session.
     ...(threadId ? [createDelegateTool(threadId, workspacePath)] : []),

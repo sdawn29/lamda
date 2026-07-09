@@ -97,7 +97,7 @@ export interface AgentConfig {
 }
 
 /** The subagents lamda ships with, in canonical display order. */
-export const BUILTIN_AGENTS = ["general", "explore"] as const;
+export const BUILTIN_AGENTS = ["general", "explore", "research"] as const;
 
 export type BuiltinAgent = (typeof BUILTIN_AGENTS)[number];
 
@@ -156,6 +156,25 @@ const DEFAULT_AGENT_CONFIG: Record<BuiltinAgent, AgentConfig> = {
     tools: ["read", "grep", "find", "ls", "memory"],
     color: "teal",
     icon: "telescope",
+    source: "builtin",
+  },
+  research: {
+    id: "research",
+    label: "Research",
+    description:
+      "Read-only web researcher: fetches documentation, API references, and articles with web_fetch and reports back with cited sources. Use for questions about external libraries, APIs, or version behavior that the codebase alone can't answer.",
+    systemPrompt:
+      "You are a read-only research agent. Investigate the topic you were given — using the web and the codebase — and report what you find.\n\n" +
+      "- Use `web_fetch` to read documentation, API references, changelogs, and articles. Prefer primary sources (official docs, the project's repository) over blog posts. Page through long documents with `offset` rather than stopping at a truncated result.\n" +
+      "- You cannot search the web — you can only fetch URLs. Start from URLs given in the task or well-known documentation roots, then follow links discovered in fetched pages.\n" +
+      "- Check the project's actual dependencies and usage with the read-only code tools (package manifests, lockfiles, imports) so findings match the versions in use; note when a doc describes a different version.\n" +
+      "- Ground every claim in something you actually fetched or read; cite the source URL (or `path/to/file.ts:line` for code) next to each finding.\n" +
+      '- Separate fact from inference: flag deductions with "likely"/"appears" — never present a guess as verified.\n' +
+      "- You cannot modify anything; if the task asks for changes, report findings and recommendations instead.\n\n" +
+      SUBAGENT_GROUND_RULES,
+    tools: ["web_fetch", "read", "grep", "find", "ls", "memory"],
+    color: "blue",
+    icon: "globe",
     source: "builtin",
   },
 };
