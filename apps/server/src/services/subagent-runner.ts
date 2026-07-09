@@ -1,6 +1,7 @@
 import {
   createManagedSession,
   getAvailableModels,
+  isToolAllowed,
   SUBAGENT_TOOL_NAMES,
   type AgentConfig,
   type ManagedSessionHandle,
@@ -127,7 +128,7 @@ export interface RunSubagentOptions {
    * subagent's model capabilities.
    */
   thinkingLevel?: string;
-  /** The parent `task` tool call's abort signal. */
+  /** The parent `delegate` tool call's abort signal. */
   signal: AbortSignal | undefined;
   /** Streams transcript snapshots up as the parent tool call's partial result. */
   onUpdate:
@@ -225,13 +226,14 @@ export async function runSubagent(
       opts.cwd,
       opts.parentThreadId,
     );
-    const customToolNames = opts.agent.customTools;
-    const selectedCustomTools =
-      customToolNames === null
-        ? availableCustomTools
-        : availableCustomTools.filter((tool) =>
-            customToolNames.includes(tool.name),
-          );
+    // The agent's `tools` is one flat allowlist of builtin and custom names
+    // (plus `*` prefix globs like `mcp__github__*`); intersect it with what's
+    // actually available here. Denied names (`delegate`, `question`, …) were
+    // already stripped when the config loaded, and globs can't reach them —
+    // the available set here never contains host chat controls.
+    const selectedCustomTools = availableCustomTools.filter((tool) =>
+      isToolAllowed(tool.name, opts.agent.tools),
+    );
     handle = await createManagedSession({
       cwd: opts.cwd,
       ...(model ?? {}),
@@ -243,11 +245,11 @@ export async function runSubagent(
         parentToolCallId: opts.parentToolCallId,
       }),
     });
-    // Apply the agent definition's tool allowlist. `task` is never granted, so
+    // Apply the agent definition's tool allowlist. `delegate` is never granted, so
     // subagents cannot spawn subagents.
-    const allowed = new Set<string>(SUBAGENT_TOOL_NAMES);
+    const grantableBuiltins = new Set<string>(SUBAGENT_TOOL_NAMES);
     handle.setActiveTools([
-      ...opts.agent.tools.filter((name) => allowed.has(name)),
+      ...opts.agent.tools.filter((name) => grantableBuiltins.has(name)),
       ...selectedCustomTools.map((tool) => tool.name),
     ]);
 

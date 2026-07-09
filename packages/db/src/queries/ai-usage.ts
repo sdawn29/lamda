@@ -9,7 +9,7 @@ export interface AiUsageRecord {
   model: string;
   /**
    * Null for the thread's own (main-agent) usage; a subagent's agent id
-   * (e.g. "explore") for usage recorded by a `task`-tool run.
+   * (e.g. "explore") for usage recorded by a `delegate`-tool run.
    */
   agentId: string | null;
   /** Display-name snapshot of the agent at insert time; null alongside agentId. */

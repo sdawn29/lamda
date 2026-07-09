@@ -48,7 +48,7 @@ import { WriteView } from "./write-view"
 import { PlanSavedCard } from "./plan-saved-card"
 import { SubagentCard } from "./subagent-card"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
-import { TASK_TOOL_NAME } from "../lib/subagent"
+import { isSubagentToolName } from "../lib/subagent"
 import type { ToolMessage } from "../types"
 
 const PrismCode = lazy(() => import("./prism-code"))
@@ -233,9 +233,53 @@ export function isMcpTool(toolName: string): boolean {
   return toolName.startsWith(MCP_TOOL_PREFIX)
 }
 
-/** Display label for a tool — strips the internal `mcp__` namespace prefix. */
+/**
+ * Split a registered MCP tool name (`mcp__<server>__<tool>`) into its server
+ * and tool parts. Pre-rename persisted calls (`mcp__<name>` without the
+ * double-underscore server segment) come back with an empty server so the
+ * whole remainder still renders as the tool.
+ */
+export function parseMcpToolName(
+  toolName: string
+): { server: string; tool: string } | null {
+  if (!isMcpTool(toolName)) return null
+  const rest = toolName.slice(MCP_TOOL_PREFIX.length)
+  const sep = rest.indexOf("__")
+  if (sep <= 0) return { server: "", tool: rest }
+  return { server: rest.slice(0, sep), tool: rest.slice(sep + 2) }
+}
+
+/** `create_pull_request` → `create pull request` for human-facing labels. */
+function humanizeMcpName(name: string): string {
+  return name.replace(/[_-]+/g, " ").trim()
+}
+
+/** Display label for a tool — MCP names render as their humanized tool part. */
 export function toolDisplayName(toolName: string): string {
-  return isMcpTool(toolName) ? toolName.slice(MCP_TOOL_PREFIX.length) : toolName
+  const mcp = parseMcpToolName(toolName)
+  return mcp ? humanizeMcpName(mcp.tool) : toolName
+}
+
+/**
+ * Collapsed-row summary for an MCP call: the first few primitive args as
+ * `key: value` pairs. MCP schemas are arbitrary, so unlike builtins there is
+ * no single well-known "main" argument to promote.
+ */
+function mcpArgsSummary(args: unknown): string {
+  if (typeof args !== "object" || args === null) return ""
+  const parts: string[] = []
+  for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
+    const text =
+      typeof value === "string"
+        ? value
+        : typeof value === "number" || typeof value === "boolean"
+          ? String(value)
+          : null
+    if (text === null || text.length === 0) continue
+    parts.push(`${key}: ${text}`)
+    if (parts.length >= 3) break
+  }
+  return parts.join("  ·  ")
 }
 
 /** Small leading glyph that identifies the tool kind at a glance. */
@@ -1296,10 +1340,10 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     }
   }, [])
 
-  // Task tool: a running subagent. Rendered by its own card — a collapsible
+  // Delegate tool: a running subagent. Rendered by its own card — a collapsible
   // nested transcript with the agent's identity and live progress. (Placed
   // after this component's hooks so hook order stays unconditional.)
-  if (normalizedToolName === TASK_TOOL_NAME) {
+  if (isSubagentToolName(normalizedToolName)) {
     return (
       <SubagentCard
         msg={msg}
@@ -1472,7 +1516,10 @@ export const ToolCallBlock = memo(function ToolCallBlock({
 
   const resultText = getResultText(msg)
   const resultImages = getResultImages(msg)
-  const summary = argsSummary(msg.args, rootPath)
+  const mcp = parseMcpToolName(msg.toolName)
+  const summary = mcp
+    ? mcpArgsSummary(msg.args) || argsSummary(msg.args, rootPath)
+    : argsSummary(msg.args, rootPath)
   const lsp = isLsp ? describeLsp(msg, resultText) : null
 
   // Skill loads parse the SKILL.md frontmatter so the row can show the skill's
@@ -1599,6 +1646,20 @@ export const ToolCallBlock = memo(function ToolCallBlock({
           {toolLabel}
         </span>
 
+        {mcp && (
+          <span
+            className="flex shrink-0 items-center gap-1 rounded-md border border-border/50 bg-muted/40 px-1.5 py-px font-mono text-3xs text-muted-foreground"
+            title={
+              mcp.server
+                ? `MCP server: ${mcp.server}`
+                : "Model Context Protocol tool"
+            }
+          >
+            <McpIcon className="h-2.5 w-2.5 opacity-70" />
+            {mcp.server || "mcp"}
+          </span>
+        )}
+
         {skillName ? (
           <span
             className={cn(
@@ -1651,7 +1712,9 @@ export const ToolCallBlock = memo(function ToolCallBlock({
             className={cn(
               "min-w-0 flex-1 truncate",
               DISCLOSURE_DIM,
-              normalizedToolName === "bash" ? "font-mono text-2xs" : "text-xs"
+              normalizedToolName === "bash" || mcp
+                ? "font-mono text-2xs"
+                : "text-xs"
             )}
           >
             {summary}

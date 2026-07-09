@@ -28,6 +28,7 @@ import terminal from "./routes/terminal.js";
 import usage from "./routes/usage.js";
 import memories from "./routes/memories.js";
 import agentsRoute from "./routes/agents.js";
+import toolsRoute from "./routes/tools.js";
 
 const app = new Hono();
 
@@ -66,6 +67,7 @@ app.route("/", auth);
 app.route("/", localModels);
 app.route("/", modes);
 app.route("/", agentsRoute);
+app.route("/", toolsRoute);
 app.route("/", file);
 app.route("/", terminal);
 app.route("/", usage);

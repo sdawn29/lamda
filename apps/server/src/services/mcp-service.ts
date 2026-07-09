@@ -338,9 +338,24 @@ export async function testMcpConnection(server: McpServerConfig) {
 
 // ── Tool Conversion for pi ───────────────────────────────────────────────────
 
-export async function getMcpToolsForSession(): Promise<ToolDefinition[]> {
+export interface McpServerTools {
+  /** The configured server name (as shown in Settings → MCP). */
+  server: string;
+  /** Whether the server is currently serving tools (vs connecting/stopped). */
+  connected: boolean;
+  tools: ToolDefinition[];
+}
+
+/**
+ * The registrable pi tools of every enabled MCP server, grouped per server —
+ * the grouping feeds the tool-picker UI and per-server allowlist globs. A
+ * server that isn't connected yet is returned with an empty tool list (its
+ * background connect is kicked off, and a session-tools refresh injects the
+ * tools once it's up).
+ */
+export async function getMcpToolsByServer(): Promise<McpServerTools[]> {
   const dbServers = getEnabledMcpServers();
-  const tools: ToolDefinition[] = [];
+  const servers: McpServerTools[] = [];
 
   for (const s of dbServers) {
     try {
@@ -357,12 +372,15 @@ export async function getMcpToolsForSession(): Promise<ToolDefinition[]> {
         // server coming up — connect in the background and inject its tools via
         // a session-tools refresh once it's ready.
         ensureBackgroundConnect(entry, config);
+        servers.push({ server: s.name, connected: false, tools: [] });
         continue;
       }
       const mcpTools = await entry.client.listTools();
 
-      for (const tool of mcpTools) {
-        tools.push(
+      servers.push({
+        server: s.name,
+        connected: true,
+        tools: mcpTools.map((tool) =>
           mcpToolToPiTool(tool, async (name, params) => {
             const result = await entry.client.callTool(name, params);
             return {
@@ -371,12 +389,16 @@ export async function getMcpToolsForSession(): Promise<ToolDefinition[]> {
               error: result.error,
             };
           }),
-        );
-      }
+        ),
+      });
     } catch (e) {
       console.error(`[MCP] Failed to load tools from ${s.name}:`, e);
     }
   }
 
-  return tools;
+  return servers;
+}
+
+export async function getMcpToolsForSession(): Promise<ToolDefinition[]> {
+  return (await getMcpToolsByServer()).flatMap((server) => server.tools);
 }

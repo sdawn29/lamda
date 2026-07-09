@@ -2,7 +2,7 @@ import type { AssistantMessage, Message, UserMessage } from "../types"
 import type { WorkingMessage } from "../components/working-block"
 import type { TurnSummary } from "@/features/git/api"
 import type { CompletedGoalList, TodoGoal } from "../components/todo-panel"
-import { TASK_TOOL_NAME } from "./subagent"
+import { isSubagentToolName } from "./subagent"
 
 const PLAN_DIR_PREFIX = ".lamda/plans/"
 
@@ -16,10 +16,7 @@ export function estimateMessageSize(message: Message): number {
   if (message.role === "tool") {
     // A running subagent card renders its whole nested transcript expanded, so
     // reserve substantially more height than a plain tool row.
-    if (
-      message.toolName.toLowerCase() === TASK_TOOL_NAME &&
-      message.status === "running"
-    ) {
+    if (isSubagentToolName(message.toolName) && message.status === "running") {
       return 360
     }
     return message.status === "running" ? 84 : 120

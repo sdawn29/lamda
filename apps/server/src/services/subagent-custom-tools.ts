@@ -3,7 +3,7 @@ import { createMemoryTool } from "@lamda/pi-sdk";
 
 /**
  * Workspace custom tools subagents may opt into. Deliberately excludes host
- * chat controls (`task`, `question`, `todo`, `plan`) because subagents run
+ * chat controls (`delegate`, `question`, `todo`, `plan`) because subagents run
  * headlessly inside a parent turn.
  */
 export async function collectSubagentCustomTools(

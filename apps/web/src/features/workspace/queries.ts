@@ -5,12 +5,12 @@ import {
   listWorkspaceDir,
   listModes,
   listAgents,
-  listAgentCustomTools,
+  listToolCatalog,
   type WorkspaceDto,
   type WorkspaceFileEntry,
   type ModeDto,
   type AgentDto,
-  type AgentCustomToolDto,
+  type ToolCatalogGroup,
 } from "./api"
 
 /**
@@ -26,6 +26,10 @@ export const BUILTIN_MODE_DTOS: ModeDto[] = [
     color: "sky",
     icon: "message-circle-question",
     source: "builtin",
+    builtin: true,
+    tools: [],
+    agents: null,
+    preamble: "",
   },
   {
     id: "plan",
@@ -35,6 +39,10 @@ export const BUILTIN_MODE_DTOS: ModeDto[] = [
     color: "amber",
     icon: "list-todo",
     source: "builtin",
+    builtin: true,
+    tools: [],
+    agents: null,
+    preamble: "",
   },
   {
     id: "agent",
@@ -43,6 +51,10 @@ export const BUILTIN_MODE_DTOS: ModeDto[] = [
     color: "emerald",
     icon: "bot",
     source: "builtin",
+    builtin: true,
+    tools: [],
+    agents: null,
+    preamble: "",
   },
 ]
 
@@ -73,8 +85,12 @@ export const agentKeys = {
   all: ["agents"] as const,
   list: (workspaceId: string | undefined) =>
     ["agents", workspaceId ?? null] as const,
-  customTools: (workspaceId: string | undefined) =>
-    ["agents", "custom-tools", workspaceId ?? null] as const,
+}
+
+export const toolCatalogKeys = {
+  all: ["tool-catalog"] as const,
+  list: (workspaceId: string | undefined) =>
+    ["tool-catalog", workspaceId ?? null] as const,
 }
 
 /**
@@ -93,12 +109,18 @@ export function useAgents(workspaceId: string | undefined) {
   })
 }
 
-export function useAgentCustomTools(workspaceId: string | undefined) {
+/**
+ * The tool catalog: every registrable tool grouped by origin (built-ins, app
+ * tools, git-host, one group per MCP server). Feeds the mode/agent tool
+ * pickers. Short staleTime so a just-connected MCP server's tools appear on
+ * the next editor open.
+ */
+export function useToolCatalog(workspaceId: string | undefined) {
   return useQuery({
-    queryKey: agentKeys.customTools(workspaceId),
-    queryFn: async (): Promise<AgentCustomToolDto[]> => {
-      const { tools } = await listAgentCustomTools(workspaceId)
-      return tools
+    queryKey: toolCatalogKeys.list(workspaceId),
+    queryFn: async (): Promise<ToolCatalogGroup[]> => {
+      const { groups } = await listToolCatalog(workspaceId)
+      return groups
     },
     staleTime: 30_000,
   })

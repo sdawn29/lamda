@@ -688,7 +688,7 @@ function createDb() {
 
   if (currentVersion < 4) {
     // Migration: Add agent_id/agent_label columns to ai_usage, so a subagent
-    // (`task` tool) run's spend can be told apart from the thread's own usage.
+    // (`delegate` tool) run's spend can be told apart from the thread's own usage.
     try {
       if (!hasColumn(sqlite, "ai_usage", "agent_id")) {
         sqlite.exec(`ALTER TABLE ai_usage ADD COLUMN agent_id TEXT`);

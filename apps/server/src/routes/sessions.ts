@@ -495,7 +495,7 @@ sessions.get("/session/:id/stats", (c) => {
   try {
     const stats = entry.handle.getSessionStats();
     // The SDK's own stats only see this session's turns — a subagent spawned
-    // via the `task` tool runs on an entirely separate session object, so its
+    // via the `delegate` tool runs on an entirely separate session object, so its
     // spend is folded in here from the ai_usage table (keyed by threadId).
     const { subagents } = getThreadAiUsageBreakdown(entry.threadId);
     return c.json({ stats: { ...stats, subagentUsage: subagents } });

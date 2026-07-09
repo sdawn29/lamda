@@ -110,13 +110,23 @@ prepended to the user's messages while that mode is selected.
    If the chosen id collides with an existing file, read that file and ask
    whether to replace it or pick another id — never overwrite silently.
 
-3. **Choose the smallest sufficient toolset** for \`tools:\` from the built-in
-   set — \`read\`, \`bash\`, \`edit\`, \`write\`, \`plan\`, \`todo\`, \`grep\`, \`find\`,
-   \`ls\`, \`question\`. Tool gating is what actually enforces the mode's
-   boundaries (the preamble only steers), so omit anything the mode shouldn't
-   do — e.g. leave out \`edit\`/\`write\`/\`bash\` for a read-only mode.
-   \`allowCustomTools: true\` keeps MCP/LSP/extension tools active; set it
-   \`false\` to restrict the mode to the listed built-ins.
+3. **Choose the smallest sufficient toolset** for \`tools:\` — a single flat
+   allowlist naming everything the mode may use: builtins (\`read\`, \`bash\`,
+   \`edit\`, \`write\`, \`plan\`, \`todo\`, \`grep\`, \`find\`, \`ls\`), host tools
+   (\`question\`, \`memory\`, \`delegate\`, \`lsp\`, \`create_automation\`), and any
+   workspace custom tools (MCP, \`github_*\`, \`gitlab_*\`) by name. Only listed
+   names are active. An entry ending in \`*\` is a prefix glob: e.g.
+   \`mcp__github__*\` allows every tool from the "github" MCP server, including
+   tools it adds later, and \`github_*\` covers all git-host GitHub tools. Tool
+   gating is what actually enforces the mode's boundaries (the preamble only
+   steers), so omit anything the mode shouldn't do — e.g. leave out
+   \`edit\`/\`write\`/\`bash\` for a read-only mode.
+
+   If the mode includes \`delegate\`, also set \`agents:\` — the subagent ids the
+   mode may launch (omit the field to allow all). A mode without
+   \`edit\`/\`write\`/\`bash\` must restrict \`agents:\` to read-only agents (e.g.
+   \`[explore]\`): delegating to an agent with shell access would bypass the
+   mode's own tool boundary.
 
 4. **Draft the preamble** — the body below the frontmatter, prepended to the
    user's messages while the mode is active. A good preamble states, in order:
@@ -132,8 +142,8 @@ prepended to the user's messages while that mode is selected.
    ---
    name: Display Name
    description: One-line summary shown in the mode picker.
-   tools: [read, grep, find, ls, question]
-   allowCustomTools: true
+   tools: [read, grep, find, ls, question, memory, delegate]
+   agents: [explore]
    color: violet
    icon: sparkles
    ---
@@ -152,14 +162,14 @@ prepended to the user's messages while that mode is selected.
 
 const CREATE_AGENT_SKILL = `---
 name: create-agent
-description: Create a new lamda subagent (a delegate the assistant can launch with the task tool) under .lamda/agents. Use when the user wants to add, scaffold, or author a custom agent or subagent.
+description: Create a new lamda subagent (an agent the assistant can launch with the delegate tool) under .lamda/agents. Use when the user wants to add, scaffold, or author a custom agent or subagent.
 ---
 
 # Create a subagent
 
 Author a new lamda subagent. A subagent is a markdown file under a
 \`.lamda/agents\` directory; its filename (without \`.md\`) is the agent \`id\` the
-main assistant passes to the \`task\` tool. The frontmatter sets identity and
+main assistant passes to the \`delegate\` tool. The frontmatter sets identity and
 toolset; the body is the agent's system prompt.
 
 Subagents run headlessly: they cannot ask the user questions, only their final
@@ -194,8 +204,8 @@ A good agent definition is written for that reality.
    - **Custom tools** — if the workspace has custom tools (memory, MCP,
      LSP, GitHub — the names shown in Settings → Agents) and the request
      doesn't make clear which of them the agent needs, add a
-     \`multiSelect\` question listing them by name so the user picks the
-     allowed set (selecting none means \`customTools: []\`).
+     \`multiSelect\` question listing them by name so the user picks which
+     to include in \`tools:\` alongside the builtins.
    - **Purpose/behavior** — only if the request leaves the agent's job or
      output genuinely ambiguous.
    - **Model** — usually skip; agents inherit the conversation's model.
@@ -204,16 +214,18 @@ A good agent definition is written for that reality.
    If the chosen id collides with an existing file, read that file and ask
    whether to replace it or pick another id — never overwrite silently.
 
-3. **Choose the smallest sufficient toolset** for \`tools:\` from the subagent
-   set — \`read\`, \`grep\`, \`find\`, \`ls\`, \`bash\`, \`edit\`, \`write\`. Tool gating
-   is what actually enforces the agent's boundaries (the prompt only steers),
-   so map the access answer directly: read-only → \`[read, grep, find, ls]\`;
-   read + edit adds \`edit, write\`; full adds \`bash\`. Set \`customTools:\`
-   to the exact workspace custom tool names this agent should see (for example
-   \`[memory]\`, or MCP/LSP/GitHub tool names shown in Settings → Agents) —
-   taken from the custom-tools answer if you asked — and use \`[]\` for a
-   tightly isolated agent. \`question\`, \`todo\`, \`plan\`,
-   and \`task\` are not available to subagents — never list them.
+3. **Choose the smallest sufficient toolset** for \`tools:\` — one flat
+   allowlist mixing builtins (\`read\`, \`grep\`, \`find\`, \`ls\`, \`bash\`, \`edit\`,
+   \`write\`) and workspace custom tool names (\`memory\`, or MCP/LSP/GitHub
+   names shown in Settings → Agents). Tool gating is what actually enforces
+   the agent's boundaries (the prompt only steers), so map the access answer
+   directly: read-only → \`[read, grep, find, ls]\`; read + edit adds
+   \`edit, write\`; full adds \`bash\`. Append the custom tool names from the
+   custom-tools answer if you asked; leave them out for a tightly isolated
+   agent. An entry ending in \`*\` is a prefix glob (e.g. \`mcp__github__*\`
+   allows every tool from that MCP server, including future ones).
+   \`question\`, \`todo\`, \`plan\`, and \`delegate\` are never available to
+   subagents — never list them.
 
 4. **Write a description that routes well.** The \`description\` is what the
    main assistant reads when deciding which agent to delegate to, so write it
@@ -238,8 +250,7 @@ A good agent definition is written for that reality.
    ---
    name: Code Reviewer
    description: Reviews a diff or file for correctness and style issues. Use for review-only passes; prefer over general when no changes should be made.
-   tools: [read, grep, find, ls]
-   customTools: [memory]
+   tools: [read, grep, find, ls, memory]
    color: rose
    icon: search-check
    ---
@@ -263,7 +274,7 @@ A good agent definition is written for that reality.
    shield-check).
 
 7. **Confirm.** Tell the user the file path, and that the agent is now
-   available to the \`task\` tool and editable under Settings → Agents — no
+   available to the \`delegate\` tool and editable under Settings → Agents — no
    restart needed, and later edits to the file take effect on the next spawn.
 `;
 

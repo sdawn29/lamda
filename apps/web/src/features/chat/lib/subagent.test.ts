@@ -24,11 +24,11 @@ function details(
   }
 }
 
-function taskMsg(overrides: Partial<ToolMessage> = {}): ToolMessage {
+function delegateMsg(overrides: Partial<ToolMessage> = {}): ToolMessage {
   return {
     role: "tool",
     toolCallId: "call-1",
-    toolName: "task",
+    toolName: "delegate",
     args: { agent: "explore", description: "Find things", prompt: "…" },
     status: "running",
     ...overrides,
@@ -37,7 +37,7 @@ function taskMsg(overrides: Partial<ToolMessage> = {}): ToolMessage {
 
 describe("getSubagentDetails", () => {
   it("prefers the live partialResult while running", () => {
-    const msg = taskMsg({
+    const msg = delegateMsg({
       partialResult: { content: [], details: details({ status: "running" }) },
       result: { content: [], details: details({ status: "queued" }) },
     })
@@ -45,14 +45,14 @@ describe("getSubagentDetails", () => {
   })
 
   it("falls back to a DB-restored result while running", () => {
-    const msg = taskMsg({
+    const msg = delegateMsg({
       result: { content: [], details: details({ status: "running" }) },
     })
     expect(getSubagentDetails(msg)?.status).toBe("running")
   })
 
   it("prefers the final result over a stale partial once settled", () => {
-    const msg = taskMsg({
+    const msg = delegateMsg({
       status: "done",
       partialResult: { content: [], details: details({ status: "running" }) },
       result: { content: [], details: details({ status: "done" }) },
@@ -61,7 +61,7 @@ describe("getSubagentDetails", () => {
   })
 
   it("rejects results without the subagent_run discriminator", () => {
-    const msg = taskMsg({
+    const msg = delegateMsg({
       status: "done",
       result: { content: [{ type: "text", text: "plain" }], details: {} },
     })

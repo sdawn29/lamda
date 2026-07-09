@@ -1,12 +1,21 @@
 // Client mirror of the server's subagent transcript shapes — see
-// apps/server/src/services/subagent-transcript.ts (keep in sync). A `task`
+// apps/server/src/services/subagent-transcript.ts (keep in sync). A `delegate`
 // tool call's partial result / final result carries the nested subagent run:
 //   partialResult = { content: [], details: SubagentRunDetails }
 //   result        = { content: [{type:"text",text}], details: SubagentRunDetails }
 
 import type { Message, ToolMessage } from "../types"
 
-export const TASK_TOOL_NAME = "task"
+export const DELEGATE_TOOL_NAME = "delegate"
+
+/** The tool's pre-rename name; persisted threads still contain such calls. */
+const LEGACY_TASK_TOOL_NAME = "task"
+
+/** True for the subagent tool under its current or legacy persisted name. */
+export function isSubagentToolName(toolName: string): boolean {
+  const lower = toolName.toLowerCase()
+  return lower === DELEGATE_TOOL_NAME || lower === LEGACY_TASK_TOOL_NAME
+}
 
 export type SubagentRunStatus =
   | "queued"
@@ -51,26 +60,26 @@ export interface SubagentRunDetails {
   stats?: SubagentRunStats
 }
 
-export function isTaskToolMessage(msg: ToolMessage): boolean {
-  return msg.toolName.toLowerCase() === TASK_TOOL_NAME
+export function isDelegateToolMessage(msg: ToolMessage): boolean {
+  return isSubagentToolName(msg.toolName)
 }
 
-/** The model-provided 3-7 word task summary from the task tool's args. */
-export function taskDescription(args: unknown): string {
+/** The model-provided 3-7 word task summary from the delegate tool's args. */
+export function delegateDescription(args: unknown): string {
   if (typeof args !== "object" || args === null) return ""
   const description = (args as { description?: unknown }).description
   return typeof description === "string" ? description : ""
 }
 
-/** The agent id from the task tool's args — the pre-transcript fallback label. */
-export function taskAgentId(args: unknown): string {
+/** The agent id from the delegate tool's args — the pre-transcript fallback label. */
+export function delegateAgentId(args: unknown): string {
   if (typeof args !== "object" || args === null) return ""
   const agent = (args as { agent?: unknown }).agent
   return typeof agent === "string" ? agent : ""
 }
 
 /**
- * Effective run status for a `task` tool call. The nested run's own status is
+ * Effective run status for a `delegate` tool call. The nested run's own status is
  * authoritative (it distinguishes queued/aborted); before the first snapshot
  * arrives, fall back to the tool call's coarse status.
  */
@@ -94,7 +103,7 @@ function detailsFrom(value: unknown): SubagentRunDetails | null {
 }
 
 /**
- * Pull the nested run out of a `task` tool message. While running, the live
+ * Pull the nested run out of a `delegate` tool message. While running, the live
  * `partialResult` snapshot is freshest; a settled tool's final `result` wins
  * over any stale partial. A running block fetched from the DB (mid-run
  * refresh) carries its last snapshot in `result`, so that's the running

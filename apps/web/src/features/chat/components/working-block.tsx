@@ -27,7 +27,7 @@ import {
 } from "./disclosure"
 import { SubagentGroup } from "./subagent-group"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
-import { TASK_TOOL_NAME } from "../lib/subagent"
+import { isSubagentToolName } from "../lib/subagent"
 import type { AssistantMessage, ToolMessage } from "../types"
 
 export type WorkingMessage = AssistantMessage | ToolMessage
@@ -320,14 +320,14 @@ type WorkingEntry =
   | { kind: "run"; key: string; tools: ToolMessage[] }
   | { kind: "subagents"; key: string; tools: ToolMessage[] }
 
-function isTaskTool(t: ToolMessage): boolean {
-  return t.toolName.toLowerCase() === TASK_TOOL_NAME
+function isDelegateTool(t: ToolMessage): boolean {
+  return isSubagentToolName(t.toolName)
 }
 
 /**
  * Flatten messages into visible rows, collapsing consecutive calls of
  * same-category tools (exploring, web, editing) into verbose runs, and
- * consecutive `task` calls (parallel subagents) into a carousel instead of
+ * consecutive `delegate` calls (parallel subagents) into a carousel instead of
  * stacking a full card per call. Hidden thinking (showThinking off) doesn't
  * split a run, since it renders nothing between the calls anyway.
  */
@@ -349,7 +349,7 @@ function buildWorkingEntries(
       continue
     }
     const t = m as ToolMessage
-    if (isTaskTool(t)) {
+    if (isDelegateTool(t)) {
       const last = out[out.length - 1]
       if (last?.kind === "subagents") {
         last.tools.push(t)
@@ -523,7 +523,7 @@ export const WorkingBlock = memo(function WorkingBlock({
     )
 
   const hasTools = messages.some((m) => m.role === "tool")
-  // Agent (`task`) calls are counted separately from plain tools so the
+  // Agent (`delegate`) calls are counted separately from plain tools so the
   // collapsed summary says "5 tools · 2 agents" instead of folding delegated
   // work into an undifferentiated tool count.
   const { toolCount, agentCount } = useMemo(() => {
@@ -531,7 +531,7 @@ export const WorkingBlock = memo(function WorkingBlock({
     let agents = 0
     for (const m of messages) {
       if (m.role !== "tool") continue
-      if (isTaskTool(m as ToolMessage)) agents++
+      if (isDelegateTool(m as ToolMessage)) agents++
       else tools++
     }
     return { toolCount: tools, agentCount: agents }

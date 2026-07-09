@@ -18,7 +18,7 @@ export interface CreateWorkspaceBody {
  */
 export type Mode = string
 
-/** A mode as surfaced to the picker; see the server `/modes` endpoint. */
+/** A mode as surfaced by the server `/modes` endpoints. */
 export interface ModeDto {
   id: string
   label: string
@@ -29,6 +29,14 @@ export interface ModeDto {
   icon: string
   /** Where the mode came from: built-in, workspace-local, or global file. */
   source: "builtin" | "local" | "global"
+  /** True for the shipped modes (ask, plan, agent). */
+  builtin: boolean
+  /** Complete tool allowlist — names and `*` prefix globs mixed. */
+  tools: string[]
+  /** Subagent ids the delegate tool may launch here; null means all agents. */
+  agents: string[] | null
+  /** The mode's preamble (the markdown body of its file). */
+  preamble: string
 }
 
 export function listModes(workspaceId?: string): Promise<{ modes: ModeDto[] }> {
@@ -38,6 +46,75 @@ export function listModes(workspaceId?: string): Promise<{ modes: ModeDto[] }> {
   return apiFetch<{ modes: ModeDto[] }>(`/modes${qs}`)
 }
 
+export interface SaveModeBody {
+  scope: "global" | "local"
+  workspaceId?: string
+  name: string
+  description: string
+  tools: string[]
+  /** Null allows every agent; a list restricts the delegate tool. */
+  agents?: string[] | null
+  color?: string
+  icon?: string
+  preamble: string
+}
+
+export function saveMode(
+  id: string,
+  body: SaveModeBody
+): Promise<{ mode: ModeDto | null }> {
+  return apiFetch<{ mode: ModeDto | null }>(
+    `/modes/${encodeURIComponent(id)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  )
+}
+
+export function deleteMode(
+  id: string,
+  scope: "global" | "local",
+  workspaceId?: string
+): Promise<{ ok: boolean }> {
+  const params = new URLSearchParams({ scope })
+  if (workspaceId) params.set("workspaceId", workspaceId)
+  return apiFetch<{ ok: boolean }>(
+    `/modes/${encodeURIComponent(id)}?${params}`,
+    { method: "DELETE" }
+  )
+}
+
+/** One tool in the catalog served by `GET /tools`. */
+export interface ToolCatalogTool {
+  name: string
+  label: string
+  description?: string
+  /** Whether this tool may appear in a subagent's allowlist. */
+  subagent: boolean
+}
+
+/** A catalog group: built-ins, app tools, GitHub/GitLab, or one MCP server. */
+export interface ToolCatalogGroup {
+  id: string
+  label: string
+  /** Allowlist glob covering the whole group (e.g. `mcp__github__*`), if any. */
+  glob: string | null
+  /** Connection state, for groups backed by a live server (MCP). */
+  connected?: boolean
+  tools: ToolCatalogTool[]
+}
+
+export function listToolCatalog(
+  workspaceId?: string
+): Promise<{ groups: ToolCatalogGroup[] }> {
+  const qs = workspaceId
+    ? `?workspaceId=${encodeURIComponent(workspaceId)}`
+    : ""
+  return apiFetch<{ groups: ToolCatalogGroup[] }>(`/tools${qs}`)
+}
+
 /** A subagent definition as surfaced by the server `/agents` endpoints. */
 export interface AgentDto {
   id: string
@@ -45,9 +122,8 @@ export interface AgentDto {
   description: string
   /** `provider::model` override, or null to inherit the conversation model. */
   model: string | null
+  /** The complete tool allowlist — builtins and custom tool names mixed. */
   tools: string[]
-  /** Null means all currently available custom tools; [] means none. */
-  customTools: string[] | null
   color: string
   icon: string
   source: "builtin" | "local" | "global"
@@ -64,16 +140,9 @@ export interface SaveAgentBody {
   description: string
   model?: string | null
   tools?: string[]
-  customTools?: string[] | null
   color?: string
   icon?: string
   prompt: string
-}
-
-export interface AgentCustomToolDto {
-  name: string
-  label: string
-  description?: string
 }
 
 export function listAgents(
@@ -83,15 +152,6 @@ export function listAgents(
     ? `?workspaceId=${encodeURIComponent(workspaceId)}`
     : ""
   return apiFetch<{ agents: AgentDto[] }>(`/agents${qs}`)
-}
-
-export function listAgentCustomTools(
-  workspaceId?: string
-): Promise<{ tools: AgentCustomToolDto[] }> {
-  const qs = workspaceId
-    ? `?workspaceId=${encodeURIComponent(workspaceId)}`
-    : ""
-  return apiFetch<{ tools: AgentCustomToolDto[] }>(`/agents/custom-tools${qs}`)
 }
 
 export function saveAgent(

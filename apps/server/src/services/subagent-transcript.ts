@@ -1,6 +1,6 @@
 import type { SessionEvent } from "@lamda/pi-sdk";
 
-// Shapes that ride inside the parent `task` tool call's streaming updates and
+// Shapes that ride inside the parent `delegate` tool call's streaming updates and
 // final result:
 //   tool_execution_update.partialResult = { content: [], details: SubagentRunDetails }
 //   tool_execution_end.result           = { content: [{type:"text",text}], details: SubagentRunDetails }

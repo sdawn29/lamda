@@ -68,12 +68,10 @@ describe("getAgentConfig", () => {
   it("returns built-in defaults when no file exists", () => {
     const general = getAgentConfig("general");
     expect(general?.source).toBe("builtin");
-    expect(general?.tools).toEqual(SUBAGENT_TOOL_NAMES);
-    expect(general?.customTools).toBeNull();
+    expect(general?.tools).toEqual([...SUBAGENT_TOOL_NAMES, "memory"]);
 
     const explore = getAgentConfig("explore");
-    expect(explore?.tools).toEqual(["read", "grep", "find", "ls"]);
-    expect(explore?.customTools).toBeNull();
+    expect(explore?.tools).toEqual(["read", "grep", "find", "ls", "memory"]);
   });
 
   it("returns undefined for unknown or invalid ids", () => {
@@ -90,8 +88,7 @@ describe("getAgentConfig", () => {
         description: "Reviews diffs",
         systemPrompt: "You review code.",
         model: { provider: "anthropic", model: "claude-sonnet-5" },
-        tools: ["read", "grep"],
-        customTools: ["memory", "mcp__github__search"],
+        tools: ["read", "grep", "memory", "mcp__github__search"],
         color: "teal",
         icon: "search",
       }),
@@ -104,35 +101,39 @@ describe("getAgentConfig", () => {
       description: "Reviews diffs",
       systemPrompt: "You review code.",
       model: { provider: "anthropic", model: "claude-sonnet-5" },
-      tools: ["read", "grep"],
-      customTools: ["memory", "mcp__github__search"],
+      tools: ["read", "grep", "memory", "mcp__github__search"],
       color: "teal",
       icon: "search",
       source: "global",
     });
   });
 
-  it("defaults omitted fields and filters disallowed tools", () => {
+  it("defaults omitted fields and strips denied tools", () => {
     writeAgentFile(
       join(home, ".lamda", "agents"),
       "bare",
-      "---\nname: Bare\ntools: [read, todo, plan, bash]\n---\nDo things.",
+      "---\nname: Bare\ntools: [read, todo, plan, delegate, question, bash]\n---\nDo things.",
     );
     const config = getAgentConfig("bare");
-    // todo/plan are not in the subagent tool vocabulary.
+    // Host chat controls are never available to subagents; unknown names
+    // (potential workspace custom tools) would be kept.
     expect(config?.tools).toEqual(["read", "bash"]);
-    expect(config?.customTools).toBeNull();
     expect(config?.model).toBeUndefined();
     expect(config?.color).toBe("violet");
   });
 
-  it("maps legacy allowCustomTools false to an empty custom tool list", () => {
+  it("merges a legacy customTools list into the unified tools array", () => {
     writeAgentFile(
       join(home, ".lamda", "agents"),
-      "isolated",
-      "---\nname: Isolated\nallowCustomTools: false\n---\nDo things.",
+      "legacy",
+      "---\nname: Legacy\ntools: [read, grep]\ncustomTools: [memory, mcp__github__search]\n---\nDo things.",
     );
-    expect(getAgentConfig("isolated")?.customTools).toEqual([]);
+    expect(getAgentConfig("legacy")?.tools).toEqual([
+      "read",
+      "grep",
+      "memory",
+      "mcp__github__search",
+    ]);
   });
 
   it("prefers a workspace-local file over the global one", () => {
@@ -166,7 +167,7 @@ describe("getAgentConfig", () => {
     expect(config?.label).toBe("Custom Explore");
     expect(config?.systemPrompt).toBe("Custom prompt");
     // Omitted fields fall back to the built-in default.
-    expect(config?.tools).toEqual(["read", "grep", "find", "ls"]);
+    expect(config?.tools).toEqual(["read", "grep", "find", "ls", "memory"]);
   });
 });
 

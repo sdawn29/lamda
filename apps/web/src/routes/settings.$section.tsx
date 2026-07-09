@@ -17,6 +17,7 @@ import { McpSection } from "@/features/settings/sections/mcp"
 import { RetrySection } from "@/features/settings/sections/retry"
 import { MemorySection } from "@/features/settings/sections/memory"
 import { AgentsSection } from "@/features/settings/sections/agents"
+import { ModesSection } from "@/features/settings/sections/modes"
 import { UsageSection } from "@/features/settings/sections/usage"
 import { AboutSection } from "@/features/settings/sections/about"
 
@@ -31,6 +32,7 @@ const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
   shortcuts: ShortcutsSection,
   lsp: LspSection,
   mcp: McpSection,
+  modes: ModesSection,
   agents: AgentsSection,
   memory: MemorySection,
   retry: RetrySection,
@@ -40,11 +42,20 @@ const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
 interface SettingsSectionSearch {
   /** Active MCP server form: "new" to add, or a server name to edit. */
   server?: string
+  /** Active mode editor: "new" to create, or a mode id to edit. */
+  mode?: string
+  /** Active agent editor: "new" to create, or an agent id to edit. */
+  agent?: string
+  /** Workspace the modes/agents lists and editors operate on. */
+  ws?: string
 }
 
 export const Route = createFileRoute("/settings/$section")({
   validateSearch: (search: Record<string, unknown>): SettingsSectionSearch => ({
     server: typeof search.server === "string" ? search.server : undefined,
+    mode: typeof search.mode === "string" ? search.mode : undefined,
+    agent: typeof search.agent === "string" ? search.agent : undefined,
+    ws: typeof search.ws === "string" ? search.ws : undefined,
   }),
   beforeLoad: ({ params }) => {
     const section = findSettingsSection(params.section)
@@ -62,12 +73,16 @@ export const Route = createFileRoute("/settings/$section")({
 
 function SettingsSectionRoute() {
   const { section: slug } = Route.useParams()
-  const { server } = Route.useSearch()
+  const { server, mode, agent } = Route.useSearch()
   const section = findSettingsSection(slug)!
   const Component = SECTION_COMPONENTS[slug]!
 
-  // The MCP form takes over the full page, providing its own header/chrome.
-  if (slug === "mcp" && server) {
+  // Editor forms take over the full page, providing their own header/chrome.
+  if (
+    (slug === "mcp" && server) ||
+    (slug === "modes" && mode) ||
+    (slug === "agents" && agent)
+  ) {
     return <Component />
   }
 

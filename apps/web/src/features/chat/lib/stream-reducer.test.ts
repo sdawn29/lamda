@@ -380,7 +380,7 @@ describe("finalizeRunningTools", () => {
     const messages: Message[] = [
       tool({
         toolCallId: "call-1",
-        toolName: "task",
+        toolName: "delegate",
         status: "running",
         partialResult: { content: [], details: partialDetails },
       }),
@@ -404,7 +404,7 @@ describe("finalizeRunningTools", () => {
     const messages: Message[] = [
       tool({
         toolCallId: "call-1",
-        toolName: "task",
+        toolName: "delegate",
         status: "running",
         partialResult: {
           content: [],

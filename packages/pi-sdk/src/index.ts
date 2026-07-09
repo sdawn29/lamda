@@ -20,6 +20,7 @@ export {
   lamdaWorktreePath,
   lamdaModesDir,
   lamdaLocalModesDir,
+  lamdaModeFilePath,
   lamdaAgentsDir,
   lamdaLocalAgentsDir,
   lamdaAgentFilePath,
@@ -76,6 +77,7 @@ export {
   BUILTIN_TOOL_NAMES,
   PLAN_DIR,
   isMode,
+  isValidModeId,
   normalizeMode,
   ensureModeFiles,
   getModeConfig,
@@ -85,11 +87,18 @@ export {
   createModePreambleStripper,
   computeActiveToolsForMode,
   listModes,
+  serializeModeFile,
 } from "./modes.js";
 export type { Mode, BuiltinMode, ModeConfig, ModeSource } from "./modes.js";
 export {
-  TASK_TOOL_NAME,
+  toolAllowlistEntryMatches,
+  isToolAllowed,
+  expandToolAllowlist,
+} from "./tool-allowlist.js";
+export {
+  DELEGATE_TOOL_NAME,
   SUBAGENT_TOOL_NAMES,
+  SUBAGENT_DENIED_TOOL_NAMES,
   BUILTIN_AGENTS,
   isValidAgentId,
   parseAgentModel,

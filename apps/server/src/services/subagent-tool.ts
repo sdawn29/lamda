@@ -1,10 +1,13 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
   getAgentConfig,
+  getModeConfig,
   listAgents,
-  TASK_TOOL_NAME,
+  normalizeMode,
+  DELEGATE_TOOL_NAME,
   type AgentConfig,
 } from "@lamda/pi-sdk";
+import { getThread } from "@lamda/db";
 import { sessionEvents } from "../session-events.js";
 import { store } from "../store.js";
 import { runSubagent } from "./subagent-runner.js";
@@ -15,23 +18,23 @@ function clampDescription(text: string, max = 220): string {
   return oneLine.length > max ? `${oneLine.slice(0, max - 1)}…` : oneLine;
 }
 
-function buildTaskDescription(agents: AgentConfig[]): string {
+function buildDelegateDescription(agents: AgentConfig[]): string {
   const list = agents
     .map((a) => `- ${a.id}: ${clampDescription(a.description) || a.label}`)
     .join("\n");
-  return `Launch a subagent to handle a task autonomously and report back.
+  return `Delegate a task to a subagent that handles it autonomously and reports back.
 
 The subagent runs in this conversation's working directory with its own context window and its agent-specific toolset. It cannot ask the user questions and cannot spawn further subagents. Nothing but its final message comes back to you, so \`prompt\` must be fully self-contained: include all the context it needs and state exactly what it should return.
 
-To run subagents in parallel, emit multiple task calls in a single message (at most 4 execute concurrently; extras wait in a queue). Prefer the cheapest agent that can do the job — use \`explore\` for read-only research and reserve \`general\` for work that needs edits or shell access.
+To run subagents in parallel, emit multiple delegate calls in a single message (at most 4 execute concurrently; extras wait in a queue). Prefer the cheapest agent that can do the job — use \`explore\` for read-only research and reserve \`general\` for work that needs edits or shell access. The active mode may restrict which agents can be launched (read-only modes only allow read-only agents); a disallowed launch fails with the permitted list.
 
 Available agents:
 ${list}`;
 }
 
 /**
- * The `task` tool: lets the main agent delegate work to a subagent defined in
- * `.lamda/agents/` (or a built-in). The nested run streams its transcript up
+ * The `delegate` tool: lets the main agent delegate work to a subagent defined
+ * in `.lamda/agents/` (or a built-in). The nested run streams its transcript up
  * through this tool call's partial results — see subagent-runner.ts.
  *
  * The available-agents list is baked into the description at build time;
@@ -39,15 +42,15 @@ ${list}`;
  * `execute` re-resolves the agent from disk so a stale description still runs
  * the current definition.
  */
-export function createTaskTool(
+export function createDelegateTool(
   threadId: string,
   workspacePath: string,
 ): ToolDefinition {
   return {
-    name: TASK_TOOL_NAME,
-    label: "task",
-    description: buildTaskDescription(listAgents(workspacePath)),
-    // Multiple task calls in one assistant message run concurrently; the
+    name: DELEGATE_TOOL_NAME,
+    label: "delegate",
+    description: buildDelegateDescription(listAgents(workspacePath)),
+    // Multiple delegate calls in one assistant message run concurrently; the
     // global MAX_CONCURRENT_SUBAGENTS semaphore bounds the fan-out.
     executionMode: "parallel",
     parameters: {
@@ -89,6 +92,19 @@ export function createTaskTool(
           .join(", ");
         throw new Error(
           `Unknown agent "${agentId}". Available agents: ${available}.`,
+        );
+      }
+      // Enforce the current mode's `agents` allowlist at launch time (the
+      // thread's mode can change after this tool's description was built).
+      // This is a real boundary, not advice: a read-only mode delegating to
+      // an agent with edit/bash would bypass the mode's own tool gating.
+      const mode = normalizeMode(getThread(threadId)?.mode);
+      const allowedAgents = mode ? getModeConfig(mode, cwd).agents : null;
+      if (allowedAgents !== null && !allowedAgents.includes(agent.id)) {
+        throw new Error(
+          allowedAgents.length > 0
+            ? `Agent "${agent.id}" is not allowed in ${mode} mode. Allowed agents: ${allowedAgents.join(", ")}.`
+            : `The ${mode} mode does not allow launching subagents.`,
         );
       }
       if (!prompt) throw new Error("`prompt` is required.");

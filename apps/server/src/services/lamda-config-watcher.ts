@@ -121,11 +121,18 @@ class LamdaConfigWatcher {
       kind,
       setTimeout(() => {
         this.timers.delete(kind);
-        if (kind === "modes") modesBroadcaster.broadcast();
-        else if (kind === "prompts") promptsBroadcaster.broadcast();
+        if (kind === "modes") {
+          modesBroadcaster.broadcast();
+          // A mode file's tool allowlist may have changed — re-apply each
+          // live session's mode so its active tools update without a new
+          // message or mode switch.
+          void import("./session-service.js")
+            .then((m) => m.reapplyAllSessionModes())
+            .catch(() => undefined);
+        } else if (kind === "prompts") promptsBroadcaster.broadcast();
         else {
           agentsBroadcaster.broadcast();
-          // Live sessions bake the agent list into the task tool's
+          // Live sessions bake the agent list into the delegate tool's
           // description — rebuild their custom tools so new/edited agents are
           // spawnable without a restart.
           void import("./session-service.js")

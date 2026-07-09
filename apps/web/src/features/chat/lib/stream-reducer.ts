@@ -135,7 +135,7 @@ export function finalizeRunningTools(
         duration,
       }
     }
-    // A subagent (task tool) whose parent turn ended without a result was
+    // A subagent (delegate tool) whose parent turn ended without a result was
     // interrupted mid-run: settle its streamed transcript as aborted so the
     // card renders the partial run instead of a bare error line.
     const partialDetails = (

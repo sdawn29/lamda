@@ -25,7 +25,7 @@ import { sessionEvents } from "../session-events.js";
 import { waitForAnswer } from "./question-registry.js";
 import { createToolApprovalBridge } from "./tool-approval-bridge.js";
 import { createAutomationTool } from "./automation-tool.js";
-import { createTaskTool } from "./subagent-tool.js";
+import { createDelegateTool } from "./subagent-tool.js";
 import { worktreeWatcher } from "./worktree-watcher.js";
 import { worktreeBroadcaster } from "../worktree-broadcaster.js";
 
@@ -43,17 +43,29 @@ async function buildSessionCustomTools(
   const mode = normalizeMode(thread?.mode);
   // The question tool is available in every mode so the agent can always pause
   // to ask the user a blocking multiple-choice question.
+  // The delegate tool is registered in every mode; each mode's `tools`
+  // allowlist decides whether it's active, and its `agents` allowlist gates
+  // which subagents a read-only mode may launch.
   const customTools = workspaceId
     ? await collectCustomTools(workspaceId, cwd, mode, threadId)
     : mode === "plan"
-      ? [...createPlanModeTools(cwd), questionTool]
+      ? [
+          ...createPlanModeTools(cwd),
+          createMemoryTool(undefined),
+          questionTool,
+          createDelegateTool(threadId, cwd),
+        ]
       : mode === "ask"
-        ? [questionTool]
+        ? [
+            createMemoryTool(undefined),
+            questionTool,
+            createDelegateTool(threadId, cwd),
+          ]
         : [
             createTodoTool(threadId),
             createMemoryTool(undefined),
             questionTool,
-            createTaskTool(threadId, cwd),
+            createDelegateTool(threadId, cwd),
           ];
 
   return { customTools, mode };
@@ -345,18 +357,18 @@ export async function collectCustomTools(
   mode?: SdkConfig["mode"],
   threadId?: string,
 ) {
-  // All custom (non-builtin) tools are registered in every mode — MCP, LSP, and
-  // memory stay available in Ask and Plan, matching `MODE_CONFIG.allowCustomTools`.
-  // Mode gating of the *builtins* (edit/write/bash vs read/grep) happens via
-  // `setMode` → `computeActiveToolsForMode`, which preserves these custom tools
-  // and filters builtin-named ones (e.g. `todo`, `plan_*`) by the mode's allowlist.
+  // All custom (non-builtin) tools are registered in every mode; which of them
+  // are *active* is decided per mode by `setMode` → `computeActiveToolsForMode`,
+  // which applies the mode's single `tools` allowlist (builtins and custom
+  // names alike). Registering everything keeps mode switches a pure
+  // activate/deactivate operation with no tool rebuilding.
   const todoTool = threadId ? createTodoTool(threadId) : null;
   const memoryTool = createMemoryTool(workspaceId);
-  // The `plan` tool is only meaningful in modes whose allowlist includes the
-  // `plan` builtin (Plan, plus any custom mode that opts in); it's gated out of
-  // other modes by the builtin allowlist anyway, so create it only when needed.
+  // The `plan` tool is only meaningful in modes whose allowlist includes
+  // `plan` (Plan, plus any custom mode that opts in); it's gated out of
+  // other modes by the allowlist anyway, so create it only when needed.
   const allowsPlanTool = mode
-    ? getModeConfig(mode, workspacePath).allowedBuiltins.includes("plan")
+    ? getModeConfig(mode, workspacePath).tools.includes("plan")
     : false;
   const planTools = allowsPlanTool ? createPlanModeTools(workspacePath) : [];
 
@@ -403,9 +415,9 @@ export async function collectCustomTools(
     memoryTool,
     questionTool,
     createAutomationTool(workspaceId),
-    // The task (subagent) tool is thread-bound like todo: its approval bridge
+    // The delegate (subagent) tool is thread-bound like todo: its approval bridge
     // and transcript streaming key off the thread's live session.
-    ...(threadId ? [createTaskTool(threadId, workspacePath)] : []),
+    ...(threadId ? [createDelegateTool(threadId, workspacePath)] : []),
     ...planTools,
     ...mcpTools,
     ...lspTools,
@@ -459,5 +471,19 @@ export async function refreshAllSessionTools() {
     const ws = getWorkspace(workspaceId);
     if (!ws) continue;
     await refreshSessionTools(sessionId, handle, workspaceId, cwd);
+  }
+}
+
+/**
+ * Re-apply each live session's current mode, so an edited mode file's tool
+ * allowlist takes effect immediately (`getModeConfig` re-reads changed files
+ * by mtime; `setMode` recomputes the active-tool set from it).
+ */
+export function reapplyAllSessionModes(): void {
+  for (const { sessionId, handle } of store.getAll()) {
+    const threadId = store.getThreadId(sessionId);
+    if (!threadId) continue;
+    const mode = normalizeMode(getThread(threadId)?.mode);
+    if (mode) handle.setMode(mode);
   }
 }

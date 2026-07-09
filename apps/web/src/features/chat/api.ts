@@ -563,7 +563,7 @@ export interface SessionStats {
   cost: number
   contextUsage?: ContextUsage
   /**
-   * Usage from subagents spawned via the `task` tool, across this thread's
+   * Usage from subagents spawned via the `delegate` tool, across this thread's
    * whole history. Not included in `tokens`/`cost` above — those come from
    * the SDK's own session stats, which can't see a subagent's separate
    * session object — so add this in wherever a "total spend" figure is shown.

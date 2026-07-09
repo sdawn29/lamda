@@ -16,13 +16,14 @@ import {
 import { MODE_COLORS } from "./modes.js";
 
 /** Name of the tool the main agent uses to launch subagents. */
-export const TASK_TOOL_NAME = "task";
+export const DELEGATE_TOOL_NAME = "delegate";
 
 /**
  * Built-in tool names a subagent may be granted. Deliberately narrower than
  * `BUILTIN_TOOL_NAMES`: `todo` and `plan` are thread-bound UI features, and
  * `question` would block a headless run on user input that can never arrive.
- * The `task` tool itself is never granted, so subagents cannot spawn subagents.
+ * The `delegate` tool itself is never granted, so subagents cannot spawn
+ * subagents.
  */
 export const SUBAGENT_TOOL_NAMES = [
   "read",
@@ -32,6 +33,19 @@ export const SUBAGENT_TOOL_NAMES = [
   "grep",
   "find",
   "ls",
+] as const;
+
+/**
+ * Tool names a subagent may never hold, regardless of its file's `tools`
+ * list: host chat controls that only make sense on the interactive thread
+ * (`question` would block a headless run forever; `todo`/`plan` are
+ * thread-bound UI), plus `delegate` so subagents cannot spawn subagents.
+ */
+export const SUBAGENT_DENIED_TOOL_NAMES = [
+  DELEGATE_TOOL_NAME,
+  "question",
+  "todo",
+  "plan",
 ] as const;
 
 /**
@@ -52,7 +66,7 @@ export interface AgentConfig {
   label: string;
   /**
    * One-line summary of what the agent is for (frontmatter `description`).
-   * Surfaced to the model in the task tool's description, so it should say
+   * Surfaced to the model in the delegate tool's description, so it should say
    * when to pick this agent.
    */
   description: string;
@@ -67,14 +81,13 @@ export interface AgentConfig {
    * the subagent inherits the parent thread's model.
    */
   model?: AgentModelRef;
-  /** Built-in tool names the subagent may use (frontmatter `tools`). */
-  tools: readonly string[];
   /**
-   * Workspace custom tool names this subagent may use (frontmatter
-   * `customTools`). `null` means "all available custom tools" for
-   * compatibility with older `allowCustomTools: true` files.
+   * The subagent's complete tool allowlist (frontmatter `tools`) — one flat
+   * array of names, mixing builtins (`read`, `bash`, …) and workspace custom
+   * tools (`memory`, MCP, LSP, git-host) alike. Names in
+   * {@link SUBAGENT_DENIED_TOOL_NAMES} are stripped on read.
    */
-  customTools: readonly string[] | null;
+  tools: readonly string[];
   /** Named accent color for the agent's chip/icon (frontmatter `color`). */
   color: string;
   /** Named lucide icon for the agent (frontmatter `icon`); see web registry. */
@@ -123,8 +136,7 @@ const DEFAULT_AGENT_CONFIG: Record<BuiltinAgent, AgentConfig> = {
       "- Verify your work with the narrowest relevant check (the failing test, the changed file's type-check) before finishing.\n" +
       "- If the task is ambiguous, pick the most reasonable interpretation, state the assumption in your report, and proceed.\n\n" +
       SUBAGENT_GROUND_RULES,
-    tools: SUBAGENT_TOOL_NAMES,
-    customTools: null,
+    tools: [...SUBAGENT_TOOL_NAMES, "memory"],
     color: "emerald",
     icon: "bot",
     source: "builtin",
@@ -141,8 +153,7 @@ const DEFAULT_AGENT_CONFIG: Record<BuiltinAgent, AgentConfig> = {
       '- Separate fact from inference: flag deductions with "likely"/"appears" — never present a guess as verified.\n' +
       "- You cannot modify anything; if the task asks for changes, report what you found and what you would change instead.\n\n" +
       SUBAGENT_GROUND_RULES,
-    tools: ["read", "grep", "find", "ls"],
-    customTools: null,
+    tools: ["read", "grep", "find", "ls", "memory"],
     color: "teal",
     icon: "telescope",
     source: "builtin",
@@ -166,10 +177,14 @@ function normalizeColor(value: string | undefined): string | undefined {
   return (MODE_COLORS as readonly string[]).includes(lower) ? lower : undefined;
 }
 
-/** Keep only tool names a subagent is allowed to hold. */
+/**
+ * Drop tool names a subagent may never hold. Unknown names are kept — they
+ * may be workspace custom tools (MCP/LSP/git-host) that only resolve at spawn
+ * time, when the runner intersects this list with what's actually available.
+ */
 function sanitizeTools(tools: readonly string[]): string[] {
-  const allowed = new Set<string>(SUBAGENT_TOOL_NAMES);
-  return tools.filter((name) => allowed.has(name));
+  const denied = new Set<string>(SUBAGENT_DENIED_TOOL_NAMES);
+  return [...new Set(tools.filter((name) => !denied.has(name)))];
 }
 
 /** Render an agent config as the on-disk file: frontmatter block + prompt body. */
@@ -185,11 +200,6 @@ export function serializeAgentFile(
     lines.push(`model: ${config.model.provider}::${config.model.model}`);
   }
   lines.push(`tools: [${config.tools.join(", ")}]`);
-  if (config.customTools === null) {
-    lines.push("allowCustomTools: true");
-  } else {
-    lines.push(`customTools: [${config.customTools.join(", ")}]`);
-  }
   lines.push(`color: ${config.color}`, `icon: ${config.icon}`, "---", "");
   lines.push(config.systemPrompt, "");
   return lines.join("\n");
@@ -206,8 +216,7 @@ function genericDefault(id: string, source: AgentSource): AgentConfig {
     label: id.charAt(0).toUpperCase() + id.slice(1),
     description: "",
     systemPrompt: "",
-    tools: SUBAGENT_TOOL_NAMES,
-    customTools: null,
+    tools: [...SUBAGENT_TOOL_NAMES, "memory"],
     color: DEFAULT_AGENT_COLOR,
     icon: DEFAULT_AGENT_ICON,
     source,
@@ -274,16 +283,15 @@ export function getAgentConfig(
       readFileSync(resolved.path, "utf8"),
     );
     const toolsField = fields.get("tools");
+    // Pre-unification files split the allowlist across `tools` (builtins) and
+    // `customTools` (workspace tools); merge the latter into the single array
+    // so those files keep working. The old `allowCustomTools: true` ("all
+    // custom tools") has no explicit spelling anymore and is ignored.
     const customToolsField = fields.get("customTools");
-    const allowCustomToolsField = fields.get("allowCustomTools");
-    const customTools =
-      customToolsField !== undefined
-        ? parseList(customToolsField)
-        : allowCustomToolsField === undefined
-          ? defaults.customTools
-          : unquote(allowCustomToolsField).toLowerCase() === "true"
-            ? null
-            : [];
+    const tools = sanitizeTools([
+      ...(toolsField ? parseList(toolsField) : defaults.tools),
+      ...(customToolsField ? parseList(customToolsField) : []),
+    ]);
     const config: AgentConfig = {
       id,
       label: fields.has("name") ? unquote(fields.get("name")!) : defaults.label,
@@ -293,8 +301,7 @@ export function getAgentConfig(
       systemPrompt: body.length > 0 ? body : defaults.systemPrompt,
       model:
         parseAgentModel(unquote(fields.get("model") ?? "")) ?? defaults.model,
-      tools: toolsField ? sanitizeTools(parseList(toolsField)) : defaults.tools,
-      customTools,
+      tools,
       color: normalizeColor(fields.get("color")) ?? defaults.color,
       icon: fields.has("icon") ? unquote(fields.get("icon")!) : defaults.icon,
       source: resolved.source,

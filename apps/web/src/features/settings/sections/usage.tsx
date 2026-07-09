@@ -305,7 +305,7 @@ export function UsageSection() {
           {data.byAgent.some((a) => a.agentId !== null) && (
             <SettingsGroup
               title="Agents"
-              description="Spend split between the main agent's own turns and subagents it spawned with the task tool."
+              description="Spend split between the main agent's own turns and subagents it spawned with the delegate tool."
             >
               <AgentUsageBreakdown byAgent={data.byAgent} />
             </SettingsGroup>

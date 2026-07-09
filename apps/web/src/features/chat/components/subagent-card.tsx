@@ -5,7 +5,7 @@ import { formatDuration } from "@/shared/lib/formatters"
 import { colorStyle, resolveModeIcon } from "./mode-combobox"
 import { getMarkdownComponents } from "./markdown-components"
 import { ThinkingBlock } from "./thinking-block"
-import { ToolCallBlock } from "./tool-call-block"
+import { ToolCallBlock, toolDisplayName } from "./tool-call-block"
 import { RollingTimerText, ToolRunGroup, toolGroupId } from "./working-block"
 import {
   CollapsibleBody,
@@ -21,7 +21,7 @@ import {
   getSubagentDetails,
   subagentBlocksToMessages,
   subagentStatus,
-  taskDescription,
+  delegateDescription,
 } from "../lib/subagent"
 import type { Message, ToolMessage } from "../types"
 
@@ -195,10 +195,10 @@ export const SubagentTranscript = memo(function SubagentTranscript({
 })
 
 /**
- * The chat card for a `task` tool call — a running subagent. Header shows the
+ * The chat card for a `delegate` tool call — a running subagent. Header shows the
  * agent's identity, live activity, and a ticking timer; the collapsible body
  * renders the subagent's own transcript with the same tool-call blocks as the
- * main conversation (children are never `task`, so recursion is one level
+ * main conversation (children are never `delegate`, so recursion is one level
  * deep). Open while running, collapsed to a one-liner when settled.
  */
 export const SubagentCard = memo(function SubagentCard({
@@ -222,7 +222,7 @@ export const SubagentCard = memo(function SubagentCard({
   const expanded = userExpanded ?? isLive
 
   const label = details?.agentLabel ?? "Subagent"
-  const description = taskDescription(msg.args)
+  const description = delegateDescription(msg.args)
   const iconName = details?.icon ?? "bot"
   // resolveModeIcon returns module-cached components, so identity is stable
   // across renders; rendering via the wrapper's property (`visual.Icon`) keeps
@@ -237,7 +237,11 @@ export const SubagentCard = memo(function SubagentCard({
       ? details.endedAt - details.startedAt
       : msg.duration
 
-  const activity = details && isLive ? describeSubagentActivity(details) : null
+  const rawActivity =
+    details && isLive ? describeSubagentActivity(details) : null
+  // MCP tool names are registered as `mcp__<server>__<tool>` — show the
+  // humanized tool part, not the internal name.
+  const activity = rawActivity ? toolDisplayName(rawActivity) : null
   const toolCount = details?.stats?.toolCalls ?? 0
 
   const failed = status === "error"

@@ -41,7 +41,7 @@ export type SessionPendingError = {
 /** Set when the gated tool call came from inside a subagent run. */
 export type ApprovalSubagentContext = {
   agentLabel: string;
-  /** The parent `task` tool call the subagent runs under. */
+  /** The parent `delegate` tool call the subagent runs under. */
   parentToolCallId: string;
 };
 

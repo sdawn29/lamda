@@ -278,6 +278,10 @@ export function getModeOption(mode: Mode, modes: ModeDto[]): ModeOption {
       color: DEFAULT_COLOR,
       icon: "",
       source: "builtin",
+      builtin: false,
+      tools: [],
+      agents: null,
+      preamble: "",
     }
   )
 }

@@ -19,6 +19,7 @@ export type {
 } from "./types.js";
 export {
   MCP_TOOL_PREFIX,
+  mcpServerToolPrefix,
   mcpToolNameToPiToolName,
   mcpToolToPiTool,
 } from "./converter.js";

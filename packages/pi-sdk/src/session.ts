@@ -11,7 +11,11 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { buildAuthStorage } from "./auth.js";
 import { sessionEventGenerator } from "./stream.js";
-import { computeActiveToolsForMode, type Mode } from "./modes.js";
+import {
+  BUILTIN_TOOL_NAMES,
+  computeActiveToolsForMode,
+  type Mode,
+} from "./modes.js";
 import { createToolApprovalExtension } from "./tool-approval-extension.js";
 import { mapResourceCommands } from "./commands.js";
 import { lamdaPromptTemplatePaths, lamdaSkillPaths } from "./lamda-paths.js";
@@ -123,13 +127,20 @@ function buildRuntimeHandle(
     setThinkingLevel: (level) => runtime.session.setThinkingLevel(level as any),
     setMode: (mode: Mode) => {
       const session = runtime.session as unknown as {
-        getActiveToolNames(): string[];
         setActiveToolsByName(toolNames: string[]): void;
+        _customTools?: Array<{ name: string }>;
       };
+      // Expand `*` allowlist globs (e.g. `mcp__github__*`) against everything
+      // registered in this session: the builtins plus the custom tools poked
+      // in via setCustomTools (same private field that method writes).
+      const available = [
+        ...BUILTIN_TOOL_NAMES,
+        ...(session._customTools ?? []).map((tool) => tool.name),
+      ];
       const next = computeActiveToolsForMode(
         mode,
-        session.getActiveToolNames(),
         runtime.session.sessionManager.getCwd(),
+        available,
       );
       session.setActiveToolsByName(next);
     },

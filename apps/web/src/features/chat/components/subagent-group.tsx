@@ -13,13 +13,14 @@ import {
   SHIMMER_TEXT_CLASS,
 } from "./disclosure"
 import { SubagentTranscript, useElapsed } from "./subagent-card"
+import { toolDisplayName } from "./tool-call-block"
 import { RollingTimerText } from "./working-block"
 import {
   describeSubagentActivity,
   getSubagentDetails,
   subagentStatus,
-  taskAgentId,
-  taskDescription,
+  delegateAgentId,
+  delegateDescription,
 } from "../lib/subagent"
 import type { ToolMessage } from "../types"
 
@@ -45,8 +46,8 @@ const SubagentTile = memo(function SubagentTile({
   const failed = status === "error"
   const aborted = status === "aborted"
 
-  const label = details?.agentLabel ?? (taskAgentId(msg.args) || "Subagent")
-  const description = taskDescription(msg.args)
+  const label = details?.agentLabel ?? (delegateAgentId(msg.args) || "Subagent")
+  const description = delegateDescription(msg.args)
   // resolveModeIcon returns module-cached components, so identity is stable
   // across renders; rendering via the wrapper's property (`visual.Icon`) keeps
   // the react-compiler static-components rule satisfied.
@@ -60,7 +61,11 @@ const SubagentTile = memo(function SubagentTile({
       ? details.endedAt - details.startedAt
       : msg.duration
 
-  const activity = details && running ? describeSubagentActivity(details) : null
+  const rawActivity =
+    details && running ? describeSubagentActivity(details) : null
+  // MCP tool names are registered as `mcp__<server>__<tool>` — show the
+  // humanized tool part, not the internal name.
+  const activity = rawActivity ? toolDisplayName(rawActivity) : null
 
   return (
     <button
@@ -171,7 +176,7 @@ function SubagentFocusPanel({
 }
 
 /**
- * Group block for two or more `task` tool calls launched together (parallel
+ * Group block for two or more `delegate` tool calls launched together (parallel
  * subagents). Every agent is visible at once as a compact live tile — status,
  * current activity, ticking timer — so a fleet of parallel runs can be
  * watched at a glance; clicking a tile opens that agent's full transcript in

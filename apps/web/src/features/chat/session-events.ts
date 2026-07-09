@@ -100,7 +100,7 @@ export interface SessionToolApprovalRequestEvent {
   /** Present when the gated call came from inside a subagent run. */
   subagent?: {
     agentLabel: string
-    /** The parent `task` tool call the subagent runs under. */
+    /** The parent `delegate` tool call the subagent runs under. */
     parentToolCallId: string
   }
 }

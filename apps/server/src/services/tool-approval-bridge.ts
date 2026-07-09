@@ -4,7 +4,7 @@ import {
   TODO_TOOL_NAME,
   MEMORY_TOOL_NAME,
   PLAN_TOOL_NAME,
-  TASK_TOOL_NAME,
+  DELEGATE_TOOL_NAME,
 } from "@lamda/pi-sdk";
 import { getThread } from "@lamda/db";
 import { store } from "../store.js";
@@ -33,7 +33,7 @@ const AUTO_ALLOW = new Set<string>([
   MEMORY_TOOL_NAME,
   // Spawning a subagent is safe in itself: every gated tool the subagent then
   // calls still flows through this bridge (labeled with the agent's name).
-  TASK_TOOL_NAME,
+  DELEGATE_TOOL_NAME,
   // Read-only GitHub/GitLab tools (list/view PRs/MRs, issues, CI). The write
   // tools (create PR/MR, comment) are intentionally absent so they go through
   // the approval gate like bash/MCP tools.
@@ -69,7 +69,7 @@ function approvalScope(
 /** Identifies the subagent a gated tool call came from, for the approval UI. */
 export interface SubagentApprovalContext {
   agentLabel: string;
-  /** The parent `task` tool call the subagent runs under. */
+  /** The parent `delegate` tool call the subagent runs under. */
   parentToolCallId: string;
 }
 

@@ -13,7 +13,7 @@ import {
   lamdaModeFilePath,
   lamdaModesDir,
 } from "./lamda-paths.js";
-import { QUESTION_TOOL_NAME } from "./question-tool.js";
+import { expandToolAllowlist } from "./tool-allowlist.js";
 
 /**
  * A mode id. The three built-ins (`ask`, `plan`, `agent`) always exist; any
@@ -40,7 +40,7 @@ export function isMode(value: unknown): value is BuiltinMode {
 }
 
 /** Valid mode-id shape: kebab/alphanumeric, matching how files on disk are named. */
-function isValidModeId(value: string): boolean {
+export function isValidModeId(value: string): boolean {
   return /^[a-z0-9][a-z0-9-]*$/.test(value);
 }
 
@@ -57,9 +57,9 @@ export function normalizeMode(value: unknown): Mode | undefined {
   return undefined;
 }
 
-// Built-in tool names the agent ships with. Used to compute which to keep active
-// per mode — anything not in this list is treated as a custom (MCP/LSP/extension)
-// tool and left alone.
+// Built-in tool names the agent ships with. Anything outside this list is a
+// custom (host/MCP/LSP/extension) tool; both kinds are allowlisted together in
+// a mode's single `tools` array.
 export const BUILTIN_TOOL_NAMES = [
   "read",
   "bash",
@@ -90,13 +90,22 @@ export interface ModeConfig {
    * mode's markdown file (everything after the frontmatter).
    */
   preamble: string;
-  /** Built-in tool names active in this mode (frontmatter `tools`). */
-  allowedBuiltins: readonly string[];
   /**
-   * Whether non-builtin tools (MCP/LSP/extensions) remain active in this mode
-   * (frontmatter `allowCustomTools`).
+   * The complete tool allowlist for this mode (frontmatter `tools`) — one flat
+   * array of tool names, mixing builtins (`read`, `bash`, …), host tools
+   * (`question`, `memory`, `delegate`, …), and workspace custom tools (MCP,
+   * LSP, GitHub) alike. Only listed names are active; everything else is
+   * disabled while the mode is selected.
    */
-  allowCustomTools: boolean;
+  tools: readonly string[];
+  /**
+   * Subagent ids the `delegate` tool may launch in this mode (frontmatter
+   * `agents`). `null` (field omitted) means every available agent. Modes
+   * without `edit`/`write`/`bash` should restrict this to read-only agents —
+   * delegating to an agent with shell access would bypass the mode's own
+   * tool boundary.
+   */
+  agents: readonly string[] | null;
   /**
    * Named accent color for the mode's chip/icon in the picker (frontmatter
    * `color`). One of {@link MODE_COLORS}; the web maps it to concrete classes.
@@ -127,6 +136,30 @@ const DEFAULT_MODE_COLOR = "violet";
 /** Fallback icon for custom modes that omit `icon`. */
 const DEFAULT_MODE_ICON = "sparkles";
 
+// Fixed names of server-registered git-host tools, so the built-in modes can
+// allowlist them explicitly (MCP tool names are workspace-specific and can't
+// be listed here — add them to a mode file by name to enable them).
+const GIT_HOST_READ_TOOLS = [
+  "github_list_prs",
+  "github_get_pr",
+  "github_list_issues",
+  "github_get_issue",
+  "github_checks",
+  "gitlab_list_mrs",
+  "gitlab_get_mr",
+  "gitlab_list_issues",
+  "gitlab_get_issue",
+  "gitlab_pipelines",
+] as const;
+
+const GIT_HOST_WRITE_TOOLS = [
+  "github_create_pr",
+  "github_comment_issue",
+  "gitlab_create_mr",
+  "gitlab_comment_issue",
+  "gitlab_comment_mr",
+] as const;
+
 /**
  * Built-in defaults for each mode. These seed `~/.lamda/modes/<mode>.md` on
  * first run and act as the fallback for any field a file omits (or when the file
@@ -142,15 +175,26 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
     label: "Ask",
     description: "Read-only Q&A. Cannot edit, write, or run shell commands.",
     preamble:
-      "Ask mode — read-only Q&A about this codebase. You have `read`, `grep`, `find`, `ls`, and any available custom tools (memory, LSP, MCP); editing, writing, and shell are disabled here.\n\n" +
+      "Ask mode — read-only Q&A about this codebase. You have `read`, `grep`, `find`, `ls`, read-only research tools, and `delegate` (read-only agents only); editing, writing, and shell are disabled here.\n\n" +
       "- Ground every non-trivial answer in the actual code: search and read the relevant files before answering rather than relying on memory of similar codebases. Fire independent searches in parallel.\n" +
+      "- For broad questions that span many files — \"how does X work end to end\", \"where is Y handled\" — fan out `delegate` explore subagents (in parallel when the question has independent parts) and synthesize their reports, instead of filling your own context reading everything; keep quick targeted lookups local.\n" +
       "- Answer at the depth the question was asked: a factual question gets a direct answer plus its evidence, not a tour of everything you read.\n" +
       "- Cite concrete locations as `path/to/file.ts:line`, and quote only the minimal snippet that proves the point.\n" +
       "- Separate fact from inference: state what you actually read as fact with its citation; flag deductions with \"likely\"/\"appears\" — never present a guess as verified.\n" +
       "- If the question is ambiguous or unanswerable from the code, clarify via `question` or state your assumption explicitly and answer under it.\n" +
       "- You cannot change files here. If the user asks for a change, outline what you would change (files and approach) and point them to Plan or Agent mode — never describe an edit as if it were applied.",
-    allowedBuiltins: ["read", "grep", "find", "ls", QUESTION_TOOL_NAME],
-    allowCustomTools: true,
+    tools: [
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "question",
+      "memory",
+      "delegate",
+      "lsp",
+      ...GIT_HOST_READ_TOOLS,
+    ],
+    agents: ["explore"],
   },
   plan: {
     id: "plan",
@@ -162,7 +206,7 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "Research and propose a plan. Saves the plan to .lamda/plans/.",
     preamble:
       "Plan mode — produce exactly one implementation-ready plan for the user's request, saved under `.lamda/plans/`. You investigate and write the plan; you implement nothing here.\n\n" +
-      "Investigate first (read-only): use `read`, `grep`, `find`, `ls`, read-only `bash`, and any available custom tools (memory, LSP, MCP) to trace the real code paths, data models, and call sites. Plan against the code as it is, not as you assume it is — every claim about current behavior must come from something you actually read. Don't modify source, config, tests, or docs; the only file you write is the plan, via the `plan` tool (`list` existing plans first, `read` to revisit one, `write` to save to `.lamda/plans/<2-5-word-kebab-slug>.md`; to revise an existing plan, write to its existing name).\n\n" +
+      "Investigate first (read-only): use `read`, `grep`, `find`, `ls`, read-only `bash`, and your research tools to trace the real code paths, data models, and call sites. Fan out `delegate` explore subagents for the broad reconnaissance — mapping a feature, tracing a flow across many files, surveying call sites — running independent lines of investigation in parallel, and keep your own reads for the files the plan will actually change; their reports come back without the tool churn, leaving your context free for the plan itself. Plan against the code as it is, not as you assume it is — every claim about current behavior must come from something you or a subagent actually read. Don't modify source, config, tests, or docs; the only file you write is the plan, via the `plan` tool (`list` existing plans first, `read` to revisit one, `write` to save to `.lamda/plans/<2-5-word-kebab-slug>.md`; to revise an existing plan, write to its existing name).\n\n" +
       "Clarify before writing when the request is vague or has materially different viable approaches: use `question` for goals, scope, constraints, or approach whenever the answer would change the plan. If approaches genuinely compete, weigh them briefly in the plan and commit to one recommendation — don't hand the user a menu. State assumptions only for minor gaps with an obvious default.\n\n" +
       "Scale the plan to the task: a small fix needs a few tight paragraphs and a short todo list; reserve the full structure for genuinely complex work. Every step must be executable by an implementer with no extra context — name the file, the symbol, and the intended change; avoid vague verbs like \"improve\" or \"handle properly\". Include literal code only where the exact shape is the point (a tricky signature, a schema), not for routine edits.\n\n" +
       "The plan must cover:\n" +
@@ -172,16 +216,20 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "- A clear definition of done.\n\n" +
       "End the plan with a `## Todos` section as the very last section: a GitHub-style checklist (`- [ ] …`) of the concrete, ordered, actionable steps from the plan, each one short enough to be a single unit of work. This is what the agent will work through when implementing.\n\n" +
       "After the `plan` write succeeds, reply with a 2-3 sentence summary of the recommended approach and any open questions, then stop and wait for review — implement nothing in this mode.",
-    allowedBuiltins: [
+    tools: [
       "read",
       "grep",
       "find",
       "ls",
       "bash",
       "plan",
-      QUESTION_TOOL_NAME,
+      "question",
+      "memory",
+      "delegate",
+      "lsp",
+      ...GIT_HOST_READ_TOOLS,
     ],
-    allowCustomTools: true,
+    agents: ["explore"],
   },
   agent: {
     id: "agent",
@@ -193,12 +241,13 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
     preamble:
       "Agent mode — you are a skilled software engineer with full `read`, `edit`, `write`, and `bash` access. Own the request end to end: implement it, verify it, and leave the workspace in a working state.\n\n" +
       "- Understand before changing: read the relevant code and trace the actual cause; fix root causes, not symptoms. If a plan for this task exists in `.lamda/plans/`, follow it and work through its todos.\n" +
+      "- Delegate liberally to keep your context on the core change: hand self-contained pieces — broad exploration, research across many files, an independent side task, a verification pass — to `delegate` subagents, and launch independent ones in parallel in a single message. Do quick targeted lookups and the changes that need your full picture yourself.\n" +
       "- Track multi-step work (beyond 2–3 steps) with the `todo` tool: lay out the steps up front and update statuses as you go so the user sees live progress; skip it for trivial tasks.\n" +
       "- Implement incrementally: make the smallest change that fully solves the problem; don't refactor or reformat unrelated code. If you notice unrelated problems along the way, mention them — don't fix them unasked.\n" +
       "- Verify before finishing: run the narrowest relevant check first (the failing test, the changed file's type-check), then the broader suite or build when warranted, and fix what you broke. The task isn't done until verified — if you can't verify (missing deps, no test runner), say exactly what you couldn't check.\n" +
       "- Recover honestly: if the same approach fails twice, step back and rethink instead of iterating blindly. If genuinely blocked, stop and report what's done and what remains — never leave the workspace half-migrated or silently narrow the task.\n" +
       "- Clarify with `question` before coding only when blocked on a decision that is genuinely the user's and would change what you build (scope, approach, trade-offs, conflicting requirements). Pick obvious defaults yourself, mention them, and proceed.",
-    allowedBuiltins: [
+    tools: [
       "read",
       "bash",
       "edit",
@@ -207,9 +256,15 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "grep",
       "find",
       "ls",
-      QUESTION_TOOL_NAME,
+      "question",
+      "memory",
+      "delegate",
+      "lsp",
+      "create_automation",
+      ...GIT_HOST_READ_TOOLS,
+      ...GIT_HOST_WRITE_TOOLS,
     ],
-    allowCustomTools: true,
+    agents: null,
   },
 };
 
@@ -218,12 +273,15 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
 //   ---
 //   name: Ask
 //   description: Read-only Q&A. Cannot edit, write, or run shell commands.
-//   tools: [read, grep, find, ls, question]
-//   allowCustomTools: true
+//   tools: [read, grep, find, ls, question, memory, delegate]
+//   agents: [explore]
 //   ---
 //
 //   Ask mode — read-only Q&A about this codebase. ...
 //
+// `tools` is the mode's complete allowlist — builtins, host tools, and
+// workspace custom tools (MCP/LSP/git-host) all by name in one array.
+// `agents` limits which subagents `delegate` may launch; omit it to allow all.
 // The frontmatter carries the mode's metadata; the body is the preamble. The
 // shared parser in `frontmatter.ts` handles the block; this maps its raw
 // fields onto the mode config shape.
@@ -239,11 +297,13 @@ function parseModeFile(raw: string): ParsedModeFile {
   for (const [key, value] of fields) {
     if (key === "name") frontmatter.label = unquote(value);
     else if (key === "description") frontmatter.description = unquote(value);
-    else if (key === "tools") frontmatter.allowedBuiltins = parseList(value);
-    else if (key === "allowCustomTools")
-      frontmatter.allowCustomTools = value === "true";
+    else if (key === "tools") frontmatter.tools = parseList(value);
+    else if (key === "agents") frontmatter.agents = parseList(value);
     else if (key === "color") frontmatter.color = unquote(value);
     else if (key === "icon") frontmatter.icon = unquote(value);
+    // Pre-unification files carried `allowCustomTools`; there is no "all
+    // custom tools" spelling anymore, so the field is intentionally ignored —
+    // delete the mode file to re-seed it in the current format.
   }
   return { frontmatter, body };
 }
@@ -256,20 +316,21 @@ function normalizeColor(value: string | undefined): string | undefined {
 }
 
 /** Render a mode config as the on-disk file: frontmatter block + preamble body. */
-function serializeModeFile(config: ModeConfig): string {
-  return [
+export function serializeModeFile(
+  config: Omit<ModeConfig, "id" | "source">,
+): string {
+  const lines = [
     "---",
     `name: ${config.label}`,
     `description: ${config.description}`,
-    `tools: [${config.allowedBuiltins.join(", ")}]`,
-    `allowCustomTools: ${config.allowCustomTools}`,
-    `color: ${config.color}`,
-    `icon: ${config.icon}`,
-    "---",
-    "",
-    config.preamble,
-    "",
-  ].join("\n");
+    `tools: [${config.tools.join(", ")}]`,
+  ];
+  if (config.agents !== null) {
+    lines.push(`agents: [${config.agents.join(", ")}]`);
+  }
+  lines.push(`color: ${config.color}`, `icon: ${config.icon}`, "---", "");
+  lines.push(config.preamble, "");
+  return lines.join("\n");
 }
 
 /**
@@ -284,8 +345,8 @@ function genericDefault(mode: Mode, source: ModeSource): ModeConfig {
     label: mode.charAt(0).toUpperCase() + mode.slice(1),
     description: "",
     preamble: "",
-    allowedBuiltins: agent.allowedBuiltins,
-    allowCustomTools: true,
+    tools: agent.tools,
+    agents: null,
     color: DEFAULT_MODE_COLOR,
     icon: DEFAULT_MODE_ICON,
     source,
@@ -356,9 +417,8 @@ export function getModeConfig(mode: Mode, cwd?: string): ModeConfig {
       label: frontmatter.label ?? defaults.label,
       description: frontmatter.description ?? defaults.description,
       preamble: body.length > 0 ? body : defaults.preamble,
-      allowedBuiltins: frontmatter.allowedBuiltins ?? defaults.allowedBuiltins,
-      allowCustomTools:
-        frontmatter.allowCustomTools ?? defaults.allowCustomTools,
+      tools: frontmatter.tools ?? defaults.tools,
+      agents: frontmatter.agents ?? defaults.agents,
       color: normalizeColor(frontmatter.color) ?? defaults.color,
       icon: frontmatter.icon ?? defaults.icon,
       source: resolved.source,
@@ -490,20 +550,20 @@ export function createModePreambleStripper(
 }
 
 /**
- * Given the currently-active tool names and a target mode, return the active
- * tool list that should be applied. Preserves non-builtin tools (MCP/LSP/extensions)
- * and swaps in the builtin set that mode allows.
+ * The active tool list a mode prescribes: the names in its `tools` allowlist,
+ * with `*`-suffixed prefix globs (e.g. `mcp__github__*`) expanded against
+ * `availableTools` when provided. Exact names that aren't registered in the
+ * session are ignored by the SDK when applied, so the list can safely include
+ * tools a given workspace doesn't have (e.g. git-host tools in a non-GitHub
+ * repo).
  */
 export function computeActiveToolsForMode(
   mode: Mode,
-  currentActive: readonly string[],
   cwd?: string,
+  availableTools?: readonly string[],
 ): string[] {
-  const modeConfig = getModeConfig(mode, cwd);
-  const allowed = new Set(modeConfig.allowedBuiltins);
-  const builtins = new Set<string>(BUILTIN_TOOL_NAMES);
-  const preserved = modeConfig.allowCustomTools
-    ? currentActive.filter((name) => !builtins.has(name))
-    : [];
-  return [...new Set([...preserved, ...allowed])];
+  const tools = getModeConfig(mode, cwd).tools;
+  return availableTools
+    ? expandToolAllowlist(tools, availableTools)
+    : [...new Set(tools)];
 }

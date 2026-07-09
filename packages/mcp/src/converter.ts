@@ -9,15 +9,35 @@ import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 /** Prefix that marks a registered tool as originating from an MCP server. */
 export const MCP_TOOL_PREFIX = "mcp__";
 
+function sanitizeMcpNamePart(part: string): string {
+  return part.replace(/[^a-zA-Z0-9_]/g, "_");
+}
+
 /**
- * Convert an MCP tool name to a pi-compatible tool name.
- * E.g., "filesystem/readFile" -> "mcp__filesystem_readFile".
+ * The registered-name prefix shared by every tool from `serverName`, e.g.
+ * `mcp__github__`. Appending `*` makes the allowlist glob that covers the
+ * whole server, including tools it adds later (see tool allowlists in
+ * @lamda/pi-sdk).
+ */
+export function mcpServerToolPrefix(serverName: string): string {
+  return `${MCP_TOOL_PREFIX}${sanitizeMcpNamePart(serverName)}__`;
+}
+
+/**
+ * Convert an MCP tool to its pi-registered name:
+ * `mcp__<server>__<tool>`, e.g. ("filesystem", "readFile") ->
+ * "mcp__filesystem__readFile".
  *
  * The `mcp__` prefix namespaces MCP tools away from built-ins (so an MCP tool
- * named e.g. "read" can't collide) and lets the UI recognise them at a glance.
+ * named e.g. "read" can't collide); the double-underscore server segment keeps
+ * same-named tools from different servers apart and gives each server a stable
+ * prefix that allowlists can match on.
  */
-export function mcpToolNameToPiToolName(mcpName: string): string {
-  return MCP_TOOL_PREFIX + mcpName.replace(/[^a-zA-Z0-9_]/g, "_");
+export function mcpToolNameToPiToolName(
+  serverName: string,
+  toolName: string,
+): string {
+  return mcpServerToolPrefix(serverName) + sanitizeMcpNamePart(toolName);
 }
 
 /**
@@ -103,7 +123,10 @@ export function mcpToolToPiTool(
     error?: string;
   }>,
 ): ToolDefinition {
-  const piToolName = mcpToolNameToPiToolName(mcpTool.name);
+  const piToolName = mcpToolNameToPiToolName(
+    mcpTool.serverName,
+    mcpTool.originalName,
+  );
   const schema = buildSchemaFromMcpTool(mcpTool);
 
   return {

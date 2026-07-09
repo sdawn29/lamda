@@ -14,6 +14,7 @@ import {
   Palette,
   Plug,
   Server,
+  SlidersHorizontal,
 } from "lucide-react"
 
 export interface SettingsSectionMeta {
@@ -204,11 +205,34 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     ],
   },
   {
+    slug: "modes",
+    label: "Modes",
+    title: "Modes",
+    description:
+      "Configure each chat mode's allowed tools, subagents, and preamble — globally or per workspace.",
+    icon: SlidersHorizontal,
+    group: "customization",
+    keywords: [
+      "mode",
+      "modes",
+      "ask",
+      "plan",
+      "agent",
+      "tools",
+      "allowlist",
+      "mcp",
+      "preamble",
+      "delegate",
+      "subagent",
+      "permissions",
+    ],
+  },
+  {
     slug: "agents",
     label: "Agents",
     title: "Agents",
     description:
-      "Define subagents the assistant can launch with the task tool — globally or per workspace.",
+      "Define subagents the assistant can launch with the delegate tool — globally or per workspace.",
     icon: Bot,
     group: "customization",
     keywords: [
