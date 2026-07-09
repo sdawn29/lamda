@@ -309,6 +309,29 @@ function createDb() {
       use_count     INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS code_files (
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      file_path    TEXT NOT NULL,
+      file_hash    TEXT NOT NULL,
+      mtime_ms     INTEGER NOT NULL,
+      size         INTEGER NOT NULL,
+      chunk_count  INTEGER NOT NULL DEFAULT 0,
+      indexed_at   INTEGER NOT NULL,
+      PRIMARY KEY (workspace_id, file_path)
+    );
+
+    CREATE TABLE IF NOT EXISTS code_chunks (
+      id           TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      file_path    TEXT NOT NULL,
+      chunk_index  INTEGER NOT NULL,
+      start_line   INTEGER NOT NULL,
+      end_line     INTEGER NOT NULL,
+      content      TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      created_at   INTEGER NOT NULL
+    );
+
     CREATE UNIQUE INDEX IF NOT EXISTS workspaces_path_unique ON workspaces(path);
     CREATE INDEX IF NOT EXISTS threads_workspace_idx ON threads(workspace_id);
     CREATE INDEX IF NOT EXISTS message_blocks_thread_idx ON message_blocks(thread_id, block_index);
@@ -324,6 +347,7 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS thread_todos_thread_idx ON thread_todos(thread_id, sort_order, created_at);
     CREATE INDEX IF NOT EXISTS thread_todos_goal_idx ON thread_todos(goal_id);
     CREATE INDEX IF NOT EXISTS agent_memories_scope_idx ON agent_memories(scope, workspace_id);
+    CREATE INDEX IF NOT EXISTS code_chunks_ws_file_idx ON code_chunks(workspace_id, file_path);
   `);
 
   // Every ALTER TABLE below is idempotent (guarded by a column check), so each
@@ -740,6 +764,39 @@ function createDb() {
     // FTS5 unavailable — memory retrieval falls back to LIKE search.
   }
 
+  // Code search: FTS5 index over code_chunks for BM25-ranked keyword search,
+  // kept in sync by triggers — mirrors the agent_memories_fts setup above.
+  try {
+    sqlite.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS code_chunks_fts USING fts5(
+        id UNINDEXED, file_path, content, tokenize = 'unicode61'
+      );
+
+      CREATE TRIGGER IF NOT EXISTS code_chunks_fts_ai AFTER INSERT ON code_chunks BEGIN
+        INSERT INTO code_chunks_fts(id, file_path, content)
+        VALUES (new.id, new.file_path, new.content);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS code_chunks_fts_ad AFTER DELETE ON code_chunks BEGIN
+        DELETE FROM code_chunks_fts WHERE id = old.id;
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS code_chunks_fts_au AFTER UPDATE ON code_chunks BEGIN
+        UPDATE code_chunks_fts
+        SET file_path = new.file_path, content = new.content
+        WHERE id = old.id;
+      END;
+    `);
+    sqlite.exec(`
+      INSERT INTO code_chunks_fts(id, file_path, content)
+      SELECT id, file_path, content
+      FROM code_chunks
+      WHERE id NOT IN (SELECT id FROM code_chunks_fts);
+    `);
+  } catch {
+    // FTS5 unavailable — code search falls back to LIKE search.
+  }
+
   // Memory retrieval: vec0 virtual table holding one embedding per memory,
   // keyed by the memory id, for semantic KNN search. Rows are populated
   // asynchronously by the embedding backfill (Voyage), so an empty table just
@@ -750,6 +807,24 @@ function createDb() {
     try {
       sqlite.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS agent_memories_vec USING vec0(
+          id TEXT PRIMARY KEY,
+          embedding float[${MEMORY_EMBEDDING_DIM}]
+        );
+      `);
+    } catch {
+      // vec0 unavailable despite the extension loading — disable semantic search.
+      vecAvailable = false;
+    }
+  }
+
+  // Code search: vec0 virtual table holding one embedding per code chunk, keyed
+  // by the chunk's content-addressed id, for semantic KNN search. Same caveats
+  // as agent_memories_vec: populated asynchronously by the embedding backfill,
+  // and not trigger-syncable — the indexer deletes/upserts vectors explicitly.
+  if (vecAvailable) {
+    try {
+      sqlite.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS code_chunks_vec USING vec0(
           id TEXT PRIMARY KEY,
           embedding float[${MEMORY_EMBEDDING_DIM}]
         );

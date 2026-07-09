@@ -9,6 +9,7 @@ import {
 import { isGitRepo, listWorkspaceFiles } from "@lamda/git";
 import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
 import { gitStatusBroadcaster } from "../git-status-broadcaster.js";
+import { workspaceActivityBroadcaster } from "../workspace-activity-broadcaster.js";
 
 // Directories never worth indexing for fuzzy search. `git ls-files` already
 // honors .gitignore, so these only matter for the non-git fallback scan and for
@@ -160,14 +161,19 @@ class WorkspaceIndexer {
         state.path,
         { recursive: true, persistent: false },
         (_eventType, filename) => {
+          let rel: string | null = null;
           if (filename) {
-            const rel = filename.split(sep).join("/");
+            rel = filename.split(sep).join("/");
             // Cheap discard: ignored paths (node_modules churn, etc.) never
             // trigger a refresh or a git-status broadcast.
             if (this.isIgnored(rel)) return;
           }
           this.scheduleRefresh(workspaceId, state, REFRESH_DEBOUNCE_MS);
           this.scheduleGitStatusBroadcast(workspaceId, state);
+          // Raw activity signal for the semantic indexer, which cares about
+          // content edits too — this fires on every change, not just ones that
+          // alter the file-path set (see workspaceIndexBroadcaster above).
+          workspaceActivityBroadcaster.broadcast(workspaceId, rel);
         },
       );
       watcher.on("error", (err) => {

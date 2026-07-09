@@ -16,6 +16,7 @@ import { LspSection } from "@/features/settings/sections/lsp"
 import { McpSection } from "@/features/settings/sections/mcp"
 import { RetrySection } from "@/features/settings/sections/retry"
 import { MemorySection } from "@/features/settings/sections/memory"
+import { CodeSearchSection } from "@/features/settings/sections/code-search"
 import { AgentsSection } from "@/features/settings/sections/agents"
 import { ModesSection } from "@/features/settings/sections/modes"
 import { UsageSection } from "@/features/settings/sections/usage"
@@ -35,6 +36,7 @@ const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
   modes: ModesSection,
   agents: AgentsSection,
   memory: MemorySection,
+  "code-search": CodeSearchSection,
   retry: RetrySection,
   about: AboutSection,
 }

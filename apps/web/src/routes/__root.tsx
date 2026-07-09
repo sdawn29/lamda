@@ -6,6 +6,7 @@ import { useThreadNotifications } from "@/features/chat"
 import { ErrorBoundary } from "@/shared/components/error-boundary"
 import { SplashScreen } from "@/shared/components/splash-screen"
 import { Toaster } from "@/shared/ui/sonner"
+import { ToastNotificationBridge } from "@/features/notifications"
 
 function RootLayoutInner() {
   // Toast when any thread (foreground or not) needs approval, asks a question,
@@ -35,6 +36,7 @@ function Root() {
     <ErrorBoundary>
       <RootLayoutGate />
       <Toaster position="top-center" closeButton />
+      <ToastNotificationBridge />
     </ErrorBoundary>
   )
 }

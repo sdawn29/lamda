@@ -153,7 +153,7 @@ const DEFAULT_AGENT_CONFIG: Record<BuiltinAgent, AgentConfig> = {
       '- Separate fact from inference: flag deductions with "likely"/"appears" — never present a guess as verified.\n' +
       "- You cannot modify anything; if the task asks for changes, report what you found and what you would change instead.\n\n" +
       SUBAGENT_GROUND_RULES,
-    tools: ["read", "grep", "find", "ls", "memory"],
+    tools: ["read", "grep", "find", "ls", "memory", "semantic_search"],
     color: "teal",
     icon: "telescope",
     source: "builtin",
@@ -172,7 +172,7 @@ const DEFAULT_AGENT_CONFIG: Record<BuiltinAgent, AgentConfig> = {
       '- Separate fact from inference: flag deductions with "likely"/"appears" — never present a guess as verified.\n' +
       "- You cannot modify anything; if the task asks for changes, report findings and recommendations instead.\n\n" +
       SUBAGENT_GROUND_RULES,
-    tools: ["web_fetch", "read", "grep", "find", "ls", "memory"],
+    tools: ["web_fetch", "read", "grep", "find", "ls", "memory", "semantic_search"],
     color: "blue",
     icon: "globe",
     source: "builtin",

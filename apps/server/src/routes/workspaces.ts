@@ -17,13 +17,19 @@ import {
   pinWorkspace,
   unpinWorkspace,
   createWorkspaceTask,
+  searchCodeChunks,
+  getCodeIndexStats,
+  isVecAvailable,
+  getSetting,
+  upsertSetting,
 } from "@lamda/db";
-import { getWorkspaceCommands } from "@lamda/pi-sdk";
+import { getWorkspaceCommands, embeddingsEnabled, embedQuery } from "@lamda/pi-sdk";
 import { abortMerge, isMergeInProgress } from "@lamda/git";
 import { existsSync } from "node:fs";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
 import { workspaceIndexer } from "../services/workspace-indexer.js";
+import { semanticIndexer } from "../services/semantic-indexer.js";
 import { fileTreeService } from "../services/file-tree-service.js";
 import { lamdaConfigWatcher } from "../services/lamda-config-watcher.js";
 import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
@@ -249,6 +255,7 @@ async function finalizeWorkspaceCreation(
 ): Promise<string | null> {
   await createTasksFromPackageScripts(workspaceId, path);
   workspaceIndexer.startIndexing(workspaceId, path);
+  semanticIndexer.start(workspaceId, path);
   lamdaConfigWatcher.watchWorkspace(workspaceId, path);
   const detectedIcon = await detectWorkspaceIcon(path).catch(() => null);
   if (detectedIcon) updateWorkspaceIcon(workspaceId, detectedIcon);
@@ -392,6 +399,91 @@ workspaces.post("/workspace/:id/reindex", async (c) => {
   return c.json({ ok: true });
 });
 
+// Semantic (embedding + keyword) search over the workspace's chunked file
+// content. Best-effort: falls back to FTS/LIKE when embeddings aren't
+// configured — `mode` in the response tells the caller which path served it.
+workspaces.get("/workspace/:id/semantic-search", async (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  const q = c.req.query("q")?.trim() ?? "";
+  if (!q) return c.json({ results: [], mode: "none" });
+  const limit = Math.min(20, Math.max(1, Number(c.req.query("limit")) || 8));
+  const path = c.req.query("path") || undefined;
+
+  let queryVector: number[] | undefined;
+  if (isVecAvailable() && embeddingsEnabled()) {
+    queryVector = (await embedQuery(q).catch(() => null)) ?? undefined;
+  }
+
+  const { hits, mode } = searchCodeChunks(workspaceId, q, queryVector, limit, path);
+  return c.json({
+    results: hits.map((h) => ({
+      filePath: h.filePath,
+      startLine: h.startLine,
+      endLine: h.endLine,
+      content: h.content,
+      score: h.score,
+    })),
+    mode,
+  });
+});
+
+workspaces.get("/workspace/:id/semantic-index/status", (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  const stats = getCodeIndexStats(workspaceId);
+  const override = getSetting(`semantic_index.workspace.${workspaceId}`) ?? "auto";
+  const enabled = getSetting("semantic_index.enabled") !== "false" && override !== "off";
+  const injectionEnabled = getSetting("semantic_index.injection_enabled") !== "false";
+  return c.json({
+    ...stats,
+    vecAvailable: isVecAvailable(),
+    embeddingsEnabled: embeddingsEnabled(),
+    enabled,
+    injectionEnabled,
+    override,
+  });
+});
+
+workspaces.post("/workspace/:id/semantic-index/reindex", (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  semanticIndexer.reindex(workspaceId);
+  return c.json({ ok: true }, 202);
+});
+
+const semanticIndexConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  injectionEnabled: z.boolean().optional(),
+  override: z.enum(["auto", "on", "off"]).optional(),
+});
+
+workspaces.put("/workspace/:id/semantic-index/config", async (c) => {
+  const workspaceId = c.req.param("id");
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return c.json({ error: "Workspace not found" }, 404);
+  const parsed = await parseJsonBody(c, semanticIndexConfigSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  if (body.enabled !== undefined) {
+    upsertSetting("semantic_index.enabled", body.enabled ? "true" : "false");
+  }
+  if (body.injectionEnabled !== undefined) {
+    upsertSetting(
+      "semantic_index.injection_enabled",
+      body.injectionEnabled ? "true" : "false",
+    );
+  }
+  if (body.override !== undefined) {
+    upsertSetting(`semantic_index.workspace.${workspaceId}`, body.override);
+  }
+  semanticIndexer.start(workspaceId, ws.path);
+  return c.json({ ok: true });
+});
+
 workspaces.delete("/workspace/:id", async (c) => {
   const workspaceId = c.req.param("id");
   const ws = listWorkspacesWithThreads().find((w) => w.id === workspaceId);
@@ -411,6 +503,7 @@ workspaces.delete("/workspace/:id", async (c) => {
     }
   }
   workspaceIndexer.stopIndexing(workspaceId);
+  semanticIndexer.stop(workspaceId);
   fileTreeService.stopWorkspace(workspaceId);
   lamdaConfigWatcher.stopWorkspace(workspaceId);
   deleteWorkspace(workspaceId);

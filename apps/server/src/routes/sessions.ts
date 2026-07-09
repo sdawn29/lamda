@@ -44,6 +44,7 @@ import {
   readSessionHistory,
   createModePreambleStripper,
   stripMemoryPreamble,
+  stripCodeContextPreamble,
 } from "@lamda/pi-sdk";
 import { withInjections } from "../services/prompt-injection.js";
 import { sendPrompt } from "../services/prompt-runner.js";
@@ -826,7 +827,7 @@ sessions.post("/session/:id/fork", async (c) => {
         // then the memory block.
         insertUserBlock(
           newThreadId,
-          stripMemoryPreamble(stripModePre(block.content)),
+          stripCodeContextPreamble(stripMemoryPreamble(stripModePre(block.content))),
           undefined,
           block.createdAt,
         );

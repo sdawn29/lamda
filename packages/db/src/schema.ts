@@ -354,6 +354,49 @@ export const automationRuns = sqliteTable("automation_runs", {
     .default("scheduled"),
 });
 
+// ── Code Search (semantic indexing) ──────────────────────────────────────────
+
+/**
+ * Per-file manifest for the semantic code index. Lets an incremental sweep
+ * skip re-reading/re-chunking a file whose mtime+size are unchanged, and lets
+ * a full sweep detect vanished files to prune.
+ */
+export const codeFiles = sqliteTable(
+  "code_files",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    filePath: text("file_path").notNull(),
+    fileHash: text("file_hash").notNull(),
+    mtimeMs: integer("mtime_ms").notNull(),
+    size: integer("size").notNull(),
+    chunkCount: integer("chunk_count").notNull().default(0),
+    indexedAt: integer("indexed_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.filePath] })],
+);
+
+/**
+ * Chunked file content for semantic + keyword code search. `id` is
+ * content-addressed (see code-chunker.ts `chunkId`) so unchanged content keeps
+ * its embedding across re-indexes — re-indexing a file only re-embeds chunks
+ * whose content actually changed.
+ */
+export const codeChunks = sqliteTable("code_chunks", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  filePath: text("file_path").notNull(),
+  chunkIndex: integer("chunk_index").notNull(),
+  startLine: integer("start_line").notNull(),
+  endLine: integer("end_line").notNull(),
+  content: text("content").notNull(),
+  contentHash: text("content_hash").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
 export const mcpServers = sqliteTable("mcp_servers", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),

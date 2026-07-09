@@ -15,6 +15,7 @@ import { bashCommandScope } from "./bash-command-scope.js";
 import { GITHUB_READ_TOOLS } from "./github-tool.js";
 import { GITLAB_READ_TOOLS } from "./gitlab-tool.js";
 import { WEB_FETCH_TOOL_NAME, webFetchHost } from "./web-fetch-tool.js";
+import { SEMANTIC_SEARCH_TOOL_NAME } from "./semantic-search-tool.js";
 
 /**
  * Tools that never require approval: read-only built-ins and host tools that
@@ -32,6 +33,9 @@ const AUTO_ALLOW = new Set<string>([
   QUESTION_TOOL_NAME,
   TODO_TOOL_NAME,
   MEMORY_TOOL_NAME,
+  // Read-only search over the workspace's own chunked file content — same
+  // trust level as read/grep/find.
+  SEMANTIC_SEARCH_TOOL_NAME,
   // Spawning a subagent is safe in itself: every gated tool the subagent then
   // calls still flows through this bridge (labeled with the agent's name).
   DELEGATE_TOOL_NAME,

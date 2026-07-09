@@ -1,6 +1,7 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { createMemoryTool } from "@lamda/pi-sdk";
 import { createWebFetchTool } from "./web-fetch-tool.js";
+import { createSemanticSearchTool } from "./semantic-search-tool.js";
 
 /**
  * Workspace custom tools subagents may opt into. Deliberately excludes host
@@ -17,6 +18,7 @@ export async function collectSubagentCustomTools(
     createWebFetchTool(),
   ];
   if (!workspaceId) return tools;
+  tools.push(createSemanticSearchTool(workspaceId));
 
   const [mcpTools, lspTools, githubTools, gitlabTools] = await Promise.all([
     import("./mcp-service.js")

@@ -1,10 +1,14 @@
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
+import { toast } from "sonner"
 import { openGlobalWebSocket } from "./api"
 import { queryClient } from "@/shared/lib/query-client"
 import { gitKeys } from "@/features/git/queries"
 import { workspaceKeys, modeKeys, agentKeys } from "@/features/workspace/queries"
+import type { WorkspaceDto } from "@/features/workspace/api"
 import { automationKeys } from "@/features/automations/queries"
+import { semanticSearchKeys } from "@/features/semantic-search"
+import { useNotificationStore } from "@/features/notifications"
 
 export type ThreadStatus =
   | "streaming"
@@ -171,6 +175,11 @@ function handleGlobalMessage(e: MessageEvent): void {
       workspaceId?: string
       root?: string
       dir?: string
+      phase?: "chunking" | "embedding" | "idle"
+      current?: number
+      total?: number
+      initial?: boolean
+      processed?: number
     }
     if (data.type === "worktree_detached") {
       // The server auto-detached a thread from a worktree that was removed
@@ -285,6 +294,54 @@ function handleGlobalMessage(e: MessageEvent): void {
       // re-reads its contents from disk.
       if (data.workspaceId) {
         for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
+      }
+    }
+    if (data.type === "semantic_index_progress" && data.workspaceId && data.phase) {
+      const workspaceId = data.workspaceId
+      void queryClient.invalidateQueries({
+        queryKey: semanticSearchKeys.status(workspaceId),
+      })
+      // Also drop any cached search results — a fresh sweep may have changed them.
+      void queryClient.invalidateQueries({
+        queryKey: semanticSearchKeys.all,
+      })
+      const notificationId = `indexing-${workspaceId}`
+      if (data.phase === "idle") {
+        // Sweep finished — mark the notification read rather than removing it,
+        // so recent activity stays visible in the panel's history.
+        useNotificationStore.getState().markRead(notificationId)
+        // Only the chunking sweep's completion carries `initial`/`processed`
+        // (set only for the first sweep since start()/reindex(), not the many
+        // small incremental sweeps a busy editing session triggers), and only
+        // when it actually did work — an already-up-to-date workspace
+        // re-swept on app boot shouldn't toast. Surfaced via sonner so it also
+        // lands in the notification history (see ToastNotificationBridge).
+        if (data.initial && data.processed && data.processed > 0) {
+          const workspaces = queryClient.getQueryData<WorkspaceDto[]>(
+            workspaceKeys.all
+          )
+          const workspaceName = workspaces?.find(
+            (w) => w.id === workspaceId
+          )?.name
+          toast.success("Code index ready", {
+            description: workspaceName
+              ? `${workspaceName} — ${data.processed} file${data.processed === 1 ? "" : "s"} indexed for semantic search.`
+              : `${data.processed} file${data.processed === 1 ? "" : "s"} indexed for semantic search.`,
+          })
+        }
+      } else {
+        const phaseLabel = data.phase === "chunking" ? "Chunking" : "Embedding"
+        useNotificationStore.getState().upsert(notificationId, {
+          kind: "indexing",
+          title: "Indexing workspace code",
+          description: `${phaseLabel} for semantic search`,
+          progress: {
+            phase: phaseLabel,
+            current: data.current ?? 0,
+            total: data.total ?? 0,
+          },
+          workspaceId,
+        })
       }
     }
   } catch (error) {

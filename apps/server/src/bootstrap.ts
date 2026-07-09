@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { clearThreadWorktree, listWorkspacesWithThreads } from "@lamda/db";
 import { store } from "./store.js";
 import { workspaceIndexer } from "./services/workspace-indexer.js";
+import { semanticIndexer } from "./services/semantic-indexer.js";
 import { lamdaConfigWatcher } from "./services/lamda-config-watcher.js";
 import {
   createSessionForThread,
@@ -73,6 +74,7 @@ export async function bootstrapSessions(): Promise<void> {
   // local `.lamda` so workspace-scoped modes and prompts refresh live.
   for (const ws of workspaceList) {
     workspaceIndexer.startIndexing(ws.id, ws.path);
+    semanticIndexer.start(ws.id, ws.path);
     lamdaConfigWatcher.watchWorkspace(ws.id, ws.path);
   }
 }

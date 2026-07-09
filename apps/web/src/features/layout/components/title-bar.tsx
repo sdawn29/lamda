@@ -76,6 +76,7 @@ import { ShortcutKbd } from "@/shared/ui/kbd"
 import { TasksDropdown } from "@/features/tasks"
 import { useMainTabs } from "@/features/main-tabs"
 import { useCommandPalette } from "@/features/command-palette"
+import { NotificationBell } from "@/features/notifications"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
 import { cn } from "@/shared/lib/utils"
 
@@ -752,6 +753,11 @@ export function TitleBar() {
 
         {/* Flexible filler — draggable gap separating left and right islands. */}
         <div className="h-full min-w-4 flex-1" />
+
+        {/* ── Notifications (always visible, not workspace-scoped) ──────────── */}
+        <div className={island} style={noDrag}>
+          <NotificationBell />
+        </div>
 
         {/* ── Update notice (only when an update is pending) ───────────────── */}
         {updateStatus &&

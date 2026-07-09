@@ -44,12 +44,14 @@ import {
 } from "@/shared/lib/keyboard-shortcuts"
 import { useWorkspace, useEnvDialog } from "@/features/workspace"
 import { useWorkspaceIndex } from "@/features/workspace/queries"
+import { useSemanticSearch } from "@/features/semantic-search"
 import { useTerminalForWorkspace } from "@/features/terminal"
 import { useMainTabs } from "@/features/main-tabs"
 import { useRightSidebar } from "@/features/layout"
 import { useSidebar } from "@/shared/ui/sidebar"
 import { DEFAULT_SETTINGS_SECTION } from "@/features/settings"
 import { useTheme } from "@/shared/components/theme-provider"
+import { useDebouncedValue } from "@/shared/hooks/use-debounced-value"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
 
@@ -127,6 +129,14 @@ export function CommandPalette() {
       : allFiles
   ).slice(0, 5)
 
+  // Code (semantic + keyword) search over file contents, alongside the
+  // filename-based Files section above — debounced since it's a server hit.
+  const debouncedSearch = useDebouncedValue(search, 250)
+  const codeSearchEnabled = open && debouncedSearch.trim().length >= 3
+  const { data: codeSearchData, isFetching: codeSearchLoading } =
+    useSemanticSearch(activeWorkspace?.id, debouncedSearch, codeSearchEnabled)
+  const codeHits = codeSearchEnabled ? (codeSearchData?.results ?? []).slice(0, 5) : []
+
   const toggleSidebarBinding = useShortcutBinding(
     SHORTCUT_ACTIONS.TOGGLE_SIDEBAR
   )
@@ -181,6 +191,24 @@ export function CommandPalette() {
         const fileName = relativePath.split(/[/\\]/).pop() || relativePath
         const filePath = `${workspacePath}/${relativePath}`
         addFileTab({ title: fileName, filePath, workspacePath })
+      })
+    },
+    [run, activeWorkspace, addFileTab]
+  )
+
+  const handleOpenCodeHit = useCallback(
+    (relativePath: string, startLine: number) => {
+      run(() => {
+        const workspacePath = activeWorkspace?.path
+        if (!workspacePath) return
+        const fileName = relativePath.split(/[/\\]/).pop() || relativePath
+        const filePath = `${workspacePath}/${relativePath}`
+        addFileTab({
+          title: fileName,
+          filePath,
+          workspacePath,
+          scrollToLine: startLine,
+        })
       })
     },
     [run, activeWorkspace, addFileTab]
@@ -249,6 +277,60 @@ export function CommandPalette() {
                             </span>
                           )}
                         </span>
+                      </CommandItem>
+                    )
+                  })
+                )}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          )}
+
+          {codeSearchEnabled && (codeHits.length > 0 || codeSearchLoading) && (
+            <>
+              <CommandGroup heading="Code">
+                {codeHits.length === 0 && codeSearchLoading ? (
+                  <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
+                    <Loader2 className="size-3 animate-spin" />
+                    Searching code
+                  </div>
+                ) : (
+                  codeHits.map((hit) => {
+                    const name = hit.filePath.split(/[/\\]/).pop() || hit.filePath
+                    const dir = hit.filePath.split(/[/\\]/).slice(0, -1).join("/")
+                    return (
+                      <CommandItem
+                        // Server-ranked (semantic) results shouldn't be re-filtered
+                        // by cmdk's own client-side fuzzy match against `value` —
+                        // embedding the live search text guarantees a match.
+                        key={`${hit.filePath}:${hit.startLine}`}
+                        value={`code ${search} ${hit.filePath}`}
+                        onSelect={() =>
+                          handleOpenCodeHit(hit.filePath, hit.startLine)
+                        }
+                        className="flex-col items-start gap-1"
+                      >
+                        <div className="flex w-full min-w-0 items-center gap-2">
+                          <Icon
+                            icon={`catppuccin:${getIconName(name)}`}
+                            className="size-3.5 shrink-0"
+                            aria-hidden
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            <span>{name}</span>
+                            {dir && (
+                              <span className="ml-1 text-[0.7rem] text-muted-foreground/50">
+                                {dir}
+                              </span>
+                            )}
+                          </span>
+                          <CommandShortcut>
+                            L{hit.startLine}-{hit.endLine}
+                          </CommandShortcut>
+                        </div>
+                        <pre className="w-full overflow-hidden text-ellipsis whitespace-pre-wrap break-all rounded bg-muted/50 px-2 py-1 font-mono text-[0.7rem] text-muted-foreground">
+                          {hit.content.slice(0, 200)}
+                        </pre>
                       </CommandItem>
                     )
                   })

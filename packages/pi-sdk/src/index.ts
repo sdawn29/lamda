@@ -64,6 +64,12 @@ export {
   stripMemoryPreamble,
 } from "./memory-preamble.js";
 export type { InjectableMemory } from "./memory-preamble.js";
+export {
+  renderCodeContextBlock,
+  applyCodeContextPreamble,
+  stripCodeContextPreamble,
+} from "./code-context-preamble.js";
+export type { InjectableCodeChunk } from "./code-context-preamble.js";
 export type {
   Question,
   QuestionOption,

@@ -129,6 +129,12 @@ const HOST_GROUP: CatalogGroupDto = {
       description: "Fetch a URL and read it as text.",
       subagent: true,
     },
+    {
+      name: "semantic_search",
+      label: "semantic_search",
+      description: "Search workspace code by meaning.",
+      subagent: true,
+    },
   ],
 };
 

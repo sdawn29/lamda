@@ -26,6 +26,14 @@ export interface StoredSession {
    */
   injectedMemories?: Map<string, number>;
   /**
+   * Code chunk ids already injected into this live session's history (see
+   * `withCodeContextPreamble` in services/prompt-injection.ts). Chunk ids are
+   * content-addressed, so a chunk whose content changed gets a new id and is
+   * naturally re-eligible — no separate version tracking needed, unlike
+   * `injectedMemories`. Reset when the handle is replaced.
+   */
+  injectedCodeChunks?: Set<string>;
+  /**
    * The fully-injected text of the last prompt sent to the agent. Used by
    * session-level self-healing to re-send an interrupted prompt after rebuilding
    * a crashed handle.
@@ -133,6 +141,7 @@ class SessionStore {
     entry.handle = newHandle;
     entry.lastInjectedMode = undefined;
     entry.injectedMemories = undefined;
+    entry.injectedCodeChunks = undefined;
     return true;
   }
 

@@ -10,6 +10,7 @@ import { modesBroadcaster } from "../modes-broadcaster.js";
 import { promptsBroadcaster } from "../prompts-broadcaster.js";
 import { agentsBroadcaster } from "../agents-broadcaster.js";
 import { automationBroadcaster } from "../automation-broadcaster.js";
+import { semanticIndexBroadcaster } from "../semantic-index-broadcaster.js";
 
 const health = new Hono();
 
@@ -86,6 +87,23 @@ export function handleGlobalEventsWs(ws: WebSocket) {
     ws.send(JSON.stringify({ type: "automations_changed" }));
   });
 
+  const unsubscribeSemanticIndex = semanticIndexBroadcaster.subscribe(
+    ({ workspaceId, phase, current, total, initial, processed }) => {
+      if (ws.readyState !== 1 /* OPEN */) return;
+      ws.send(
+        JSON.stringify({
+          type: "semantic_index_progress",
+          workspaceId,
+          phase,
+          current,
+          total,
+          initial,
+          processed,
+        }),
+      );
+    },
+  );
+
   const cleanup = () => {
     unsubscribeThread();
     unsubscribeIndex();
@@ -96,6 +114,7 @@ export function handleGlobalEventsWs(ws: WebSocket) {
     unsubscribePrompts();
     unsubscribeAgents();
     unsubscribeAutomations();
+    unsubscribeSemanticIndex();
   };
 
   ws.on("close", cleanup);
