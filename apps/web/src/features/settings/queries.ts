@@ -6,6 +6,7 @@ import {
   fetchLocalProviders,
   fetchAiUsage,
   fetchMemories,
+  fetchResourceSnapshot,
   type AiUsageRange,
 } from "./api"
 
@@ -18,6 +19,7 @@ export const settingsKeys = {
   oauthProviders: [...settingsRootKey, "oauth-providers"] as const,
   localProviders: [...settingsRootKey, "local-providers"] as const,
   memories: [...settingsRootKey, "memories"] as const,
+  resources: [...settingsRootKey, "resources"] as const,
   aiUsage: (range: AiUsageRange) =>
     [...settingsRootKey, "ai-usage", range] as const,
 }
@@ -61,6 +63,15 @@ export function useAiUsage(range: AiUsageRange) {
     // Keep showing the previous range's data while the new one loads, so
     // switching ranges never flashes a loading state.
     placeholderData: keepPreviousData,
+  })
+}
+
+export function useResourceSnapshot() {
+  return useQuery({
+    queryKey: settingsKeys.resources,
+    queryFn: ({ signal }) => fetchResourceSnapshot(signal),
+    refetchInterval: 2000,
+    staleTime: 1000,
   })
 }
 

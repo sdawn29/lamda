@@ -274,6 +274,51 @@ export async function fetchAiUsage(
   return apiFetch<AiUsageStats>(`/usage?${params}`, { signal })
 }
 
+// ── Resource monitor ─────────────────────────────────────────────────────────
+
+export interface BackgroundQueueStats {
+  lane: string
+  active: boolean
+  activeLabel: string | null
+  pending: number
+  pendingLabels: string[]
+}
+
+export interface ResourceSnapshot {
+  sampledAt: number
+  system: {
+    platform: string
+    arch: string
+    cpuCount: number
+    cpuModel: string
+    cpuPercent: number | null
+    loadAverage: number[]
+    totalMemory: number
+    freeMemory: number
+    usedMemory: number
+    memoryPercent: number
+    uptimeSeconds: number
+  }
+  process: {
+    pid: number
+    cpuPercent: number | null
+    uptimeSeconds: number
+    memory: {
+      rss: number
+      heapTotal: number
+      heapUsed: number
+      external: number
+    }
+  }
+  queues: BackgroundQueueStats[]
+}
+
+export async function fetchResourceSnapshot(
+  signal?: AbortSignal
+): Promise<ResourceSnapshot> {
+  return apiFetch<ResourceSnapshot>("/resources", { signal })
+}
+
 // ── OAuth ─────────────────────────────────────────────────────────────────────
 
 export interface OAuthProvider {

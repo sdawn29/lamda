@@ -7,13 +7,16 @@ interface QueuedTask<T> {
 
 interface QueueState {
   active: boolean;
+  activeLabel: string | null;
   tasks: QueuedTask<unknown>[];
 }
 
 export interface BackgroundQueueStats {
   lane: string;
   active: boolean;
+  activeLabel: string | null;
   pending: number;
+  pendingLabels: string[];
 }
 
 /**
@@ -41,14 +44,16 @@ class BackgroundTaskQueue {
     return Array.from(this.lanes.entries()).map(([lane, state]) => ({
       lane,
       active: state.active,
+      activeLabel: state.activeLabel,
       pending: state.tasks.length,
+      pendingLabels: state.tasks.map((task) => task.label),
     }));
   }
 
   private getLane(lane: string): QueueState {
     let state = this.lanes.get(lane);
     if (!state) {
-      state = { active: false, tasks: [] };
+      state = { active: false, activeLabel: null, tasks: [] };
       this.lanes.set(lane, state);
     }
     return state;
@@ -60,6 +65,7 @@ class BackgroundTaskQueue {
     if (!task) return;
 
     state.active = true;
+    state.activeLabel = task.label;
     void (async () => {
       try {
         task.resolve(await task.run());
@@ -68,6 +74,7 @@ class BackgroundTaskQueue {
         task.reject(err);
       } finally {
         state.active = false;
+        state.activeLabel = null;
         this.drain(lane, state);
       }
     })();

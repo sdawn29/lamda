@@ -14,6 +14,7 @@ import { GitSection } from "@/features/settings/sections/git"
 import { ShortcutsSection } from "@/features/settings/sections/shortcuts"
 import { LspSection } from "@/features/settings/sections/lsp"
 import { McpSection } from "@/features/settings/sections/mcp"
+import { ResourcesSection } from "@/features/settings/sections/resources"
 import { RetrySection } from "@/features/settings/sections/retry"
 import { MemorySection } from "@/features/settings/sections/memory"
 import { CodeSearchSection } from "@/features/settings/sections/code-search"
@@ -33,6 +34,7 @@ const SECTION_COMPONENTS: Record<string, () => React.JSX.Element> = {
   shortcuts: ShortcutsSection,
   lsp: LspSection,
   mcp: McpSection,
+  resources: ResourcesSection,
   modes: ModesSection,
   agents: AgentsSection,
   memory: MemorySection,
