@@ -15,6 +15,7 @@ export interface SemanticIndexStatus {
   chunkCount: number
   embeddedCount: number
   lastIndexedAt: number | null
+  lastError: { message: string; occurredAt: number } | null
   vecAvailable: boolean
   embeddingsEnabled: boolean
   enabled: boolean

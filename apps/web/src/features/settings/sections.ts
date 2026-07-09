@@ -263,7 +263,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
       "index",
       "indexing",
       "vector",
-      "voyage",
+      "local embeddings",
       "rag",
       "retrieval",
     ],

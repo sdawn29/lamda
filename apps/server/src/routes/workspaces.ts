@@ -23,7 +23,11 @@ import {
   getSetting,
   upsertSetting,
 } from "@lamda/db";
-import { getWorkspaceCommands, embeddingsEnabled, embedQuery } from "@lamda/pi-sdk";
+import {
+  getWorkspaceCommands,
+  embeddingsEnabled,
+  embedQuery,
+} from "@lamda/pi-sdk";
 import { abortMerge, isMergeInProgress } from "@lamda/git";
 import { existsSync } from "node:fs";
 import { store } from "../store.js";
@@ -400,8 +404,8 @@ workspaces.post("/workspace/:id/reindex", async (c) => {
 });
 
 // Semantic (embedding + keyword) search over the workspace's chunked file
-// content. Best-effort: falls back to FTS/LIKE when embeddings aren't
-// configured — `mode` in the response tells the caller which path served it.
+// content. Best-effort: falls back to FTS/LIKE when local vectors aren't
+// available — `mode` in the response tells the caller which path served it.
 workspaces.get("/workspace/:id/semantic-search", async (c) => {
   const workspaceId = c.req.param("id");
   const ws = getWorkspace(workspaceId);
@@ -416,7 +420,13 @@ workspaces.get("/workspace/:id/semantic-search", async (c) => {
     queryVector = (await embedQuery(q).catch(() => null)) ?? undefined;
   }
 
-  const { hits, mode } = searchCodeChunks(workspaceId, q, queryVector, limit, path);
+  const { hits, mode } = searchCodeChunks(
+    workspaceId,
+    q,
+    queryVector,
+    limit,
+    path,
+  );
   return c.json({
     results: hits.map((h) => ({
       filePath: h.filePath,
@@ -434,9 +444,12 @@ workspaces.get("/workspace/:id/semantic-index/status", (c) => {
   const ws = getWorkspace(workspaceId);
   if (!ws) return c.json({ error: "Workspace not found" }, 404);
   const stats = getCodeIndexStats(workspaceId);
-  const override = getSetting(`semantic_index.workspace.${workspaceId}`) ?? "auto";
-  const enabled = getSetting("semantic_index.enabled") !== "false" && override !== "off";
-  const injectionEnabled = getSetting("semantic_index.injection_enabled") !== "false";
+  const override =
+    getSetting(`semantic_index.workspace.${workspaceId}`) ?? "auto";
+  const enabled =
+    getSetting("semantic_index.enabled") !== "false" && override !== "off";
+  const injectionEnabled =
+    getSetting("semantic_index.injection_enabled") !== "false";
   return c.json({
     ...stats,
     vecAvailable: isVecAvailable(),
@@ -444,6 +457,7 @@ workspaces.get("/workspace/:id/semantic-index/status", (c) => {
     enabled,
     injectionEnabled,
     override,
+    lastError: semanticIndexer.getLastError(workspaceId),
   });
 });
 

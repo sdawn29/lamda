@@ -11,7 +11,10 @@ import {
   lamdaModesDir,
   listModes,
   MODE_COLORS,
+  parseFrontmatter,
+  parseList,
   serializeModeFile,
+  unquote,
   type ModeConfig,
 } from "@lamda/pi-sdk";
 import { getWorkspace } from "@lamda/db";
@@ -82,6 +85,41 @@ const saveModeSchema = z.object({
   preamble: z.string().trim().min(1, "preamble is required"),
 });
 
+const saveRawModeSchema = z.object({
+  scope: z.enum(["global", "local"]),
+  workspaceId: z.string().optional(),
+  content: z.string().trim().min(1, "content is required"),
+});
+
+function validateRawModeContent(content: string): string | null {
+  const { fields, body } = parseFrontmatter(content);
+  const name = unquote(fields.get("name") ?? "").trim();
+  if (!name) return "name is required";
+  const description = unquote(fields.get("description") ?? "").trim();
+  if (!description) return "description is required";
+  const tools = fields.has("tools") ? parseList(fields.get("tools")!) : [];
+  if (tools.length === 0) return "at least one tool";
+  const color = fields.get("color");
+  if (
+    color &&
+    !(MODE_COLORS as readonly string[]).includes(unquote(color).toLowerCase())
+  ) {
+    return `color must be one of: ${MODE_COLORS.join(", ")}`;
+  }
+  const agentsValue = fields.has("agents")
+    ? unquote(fields.get("agents")!).trim()
+    : "";
+  const agents =
+    !fields.has("agents") || agentsValue === "null"
+      ? null
+      : parseList(fields.get("agents")!);
+  if (agents && agents.some((agentId) => !isValidAgentId(agentId))) {
+    return "agents must be valid agent ids";
+  }
+  if (!body.trim()) return "preamble is required";
+  return null;
+}
+
 modes.put("/modes/:id", async (c) => {
   const id = c.req.param("id");
   if (!isValidModeId(id)) {
@@ -137,6 +175,52 @@ modes.put("/modes/:id", async (c) => {
       }),
       "utf8",
     );
+  } catch (err) {
+    return c.json(
+      {
+        error: err instanceof Error ? err.message : "Failed to write mode file",
+      },
+      500,
+    );
+  }
+
+  modesBroadcaster.broadcast();
+  const cwd = workspacePathFor(body.workspaceId);
+  const config = listModes(cwd).find((m) => m.id === id);
+  return c.json({ mode: config ? toDto(config) : null });
+});
+
+modes.put("/modes/:id/raw", async (c) => {
+  const id = c.req.param("id");
+  if (!isValidModeId(id)) {
+    return c.json(
+      {
+        error: "Mode id must be kebab-case (lowercase letters, digits, dashes)",
+      },
+      400,
+    );
+  }
+
+  const parsed = await parseJsonBody(c, saveRawModeSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  const invalid = validateRawModeContent(body.content);
+  if (invalid) return c.json({ error: invalid }, 400);
+
+  let dir: string;
+  if (body.scope === "local") {
+    const workspacePath = workspacePathFor(body.workspaceId);
+    if (!workspacePath) {
+      return c.json({ error: "workspaceId is required for local scope" }, 400);
+    }
+    dir = lamdaLocalModesDir(workspacePath);
+  } else {
+    dir = lamdaModesDir();
+  }
+
+  try {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${id}.md`), body.content, "utf8");
   } catch (err) {
     return c.json(
       {

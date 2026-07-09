@@ -73,6 +73,26 @@ export function saveMode(
   )
 }
 
+export interface SaveRawDefinitionBody {
+  scope: "global" | "local"
+  workspaceId?: string
+  content: string
+}
+
+export function saveRawModeDefinition(
+  id: string,
+  body: SaveRawDefinitionBody
+): Promise<{ mode: ModeDto | null }> {
+  return apiFetch<{ mode: ModeDto | null }>(
+    `/modes/${encodeURIComponent(id)}/raw`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  )
+}
+
 export function deleteMode(
   id: string,
   scope: "global" | "local",
@@ -160,6 +180,20 @@ export function saveAgent(
 ): Promise<{ agent: AgentDto | null }> {
   return apiFetch<{ agent: AgentDto | null }>(
     `/agents/${encodeURIComponent(id)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  )
+}
+
+export function saveRawAgentDefinition(
+  id: string,
+  body: SaveRawDefinitionBody
+): Promise<{ agent: AgentDto | null }> {
+  return apiFetch<{ agent: AgentDto | null }>(
+    `/agents/${encodeURIComponent(id)}/raw`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

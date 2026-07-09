@@ -95,7 +95,7 @@ export function FieldSection({
   children: React.ReactNode
 }) {
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-card/60 p-3.5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <h3 className="text-xs font-medium">{title}</h3>
@@ -409,13 +409,13 @@ export function DefinitionEditorPage({
   children: React.ReactNode
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col px-8 pt-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-col px-8 pt-5">
       <div>
         <Button
           variant="ghost"
           size="sm"
           onClick={onBack}
-          className="mb-5 -ml-2 h-7 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+          className="mb-3 -ml-2 h-7 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
         >
           <ArrowLeftIcon className="size-3.5" />
           <span className="text-xs font-medium">{backLabel}</span>
@@ -451,6 +451,7 @@ export function DefinitionEditorHeader({
   dirLocal,
   idInvalid,
   canScopeLocal,
+  scopeControl,
   onPatch,
 }: {
   identity: DefinitionIdentity
@@ -462,11 +463,12 @@ export function DefinitionEditorHeader({
   dirLocal: string
   idInvalid: boolean
   canScopeLocal: boolean
+  scopeControl?: React.ReactNode
   onPatch: (patch: Partial<DefinitionIdentity>) => void
 }) {
   const dir = identity.scope === "local" ? dirLocal : dirGlobal
   return (
-    <header className="flex items-start gap-4 border-b border-border/60 pb-6">
+    <header className="flex items-start gap-4 rounded-2xl border border-border/70 bg-card/60 p-4 shadow-sm">
       <AppearancePicker
         color={identity.color}
         icon={identity.icon}
@@ -524,7 +526,9 @@ export function DefinitionEditorHeader({
           </span>
         )}
       </div>
-      {identity.isNew ? (
+      {identity.isNew && scopeControl ? (
+        scopeControl
+      ) : identity.isNew ? (
         <div className="inline-flex shrink-0 rounded-lg border bg-muted/40 p-0.5">
           {(
             [
@@ -575,7 +579,7 @@ export function DefinitionEditorFooter({
   onSubmit: () => void
 }) {
   return (
-    <footer className="sticky bottom-0 z-10 -mx-8 mt-8 flex items-center justify-between gap-4 border-t border-border/60 bg-background/90 px-8 py-3 backdrop-blur">
+    <footer className="sticky bottom-3 z-10 mt-6 flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/90 px-3.5 py-3 shadow-md backdrop-blur">
       <p className="text-3xs text-muted-foreground">{hint}</p>
       <div className="flex shrink-0 items-center gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel}>

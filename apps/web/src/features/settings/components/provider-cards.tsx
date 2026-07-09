@@ -184,7 +184,6 @@ export const API_KEY_PROVIDERS: ApiKeyProvider[] = [
   { id: "replicate", label: "Replicate", placeholder: "r8_..." },
   { id: "hyperbolic", label: "Hyperbolic", placeholder: "..." },
   { id: "tensorzero", label: "TensorZero", placeholder: "..." },
-  { id: "voyage", label: "Voyage AI", placeholder: "..." },
   { id: "codestral", label: "Codestral", placeholder: "..." },
   { id: "wings-gpu", label: "Wings GPU", placeholder: "..." },
   { id: "windsurf", label: "Windsurf", placeholder: "..." },

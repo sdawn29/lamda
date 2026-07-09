@@ -26,7 +26,7 @@ function fail(message: string) {
 /**
  * Tool that searches this workspace's chunked file content by meaning
  * (semantic embedding KNN) fused with keyword (FTS5) ranking, falling back to
- * plain keyword/substring search when embeddings aren't configured. Prefer
+ * plain keyword/substring search when local vectors aren't available. Prefer
  * this over `grep` for conceptual queries — "where do we validate emails",
  * "how are worktrees cleaned up" — where the exact wording isn't known;
  * `grep` still wins for an exact string, symbol, or error message.
@@ -44,7 +44,8 @@ Returns the most relevant chunks of code (file, line range, snippet). The index 
       properties: {
         query: {
           type: "string",
-          description: "Natural-language or keyword description of what you're looking for.",
+          description:
+            "Natural-language or keyword description of what you're looking for.",
         },
         max_results: {
           type: "number",
@@ -52,7 +53,8 @@ Returns the most relevant chunks of code (file, line range, snippet). The index 
         },
         path: {
           type: "string",
-          description: "Optional path prefix to restrict results to (e.g. \"apps/server/src\").",
+          description:
+            'Optional path prefix to restrict results to (e.g. "apps/server/src").',
         },
       },
     },
@@ -101,7 +103,7 @@ Returns the most relevant chunks of code (file, line range, snippet). The index 
         mode,
         ...(mode === "fts"
           ? {
-              note: "Keyword-only: embeddings aren't configured, so results are ranked by keyword match rather than semantic similarity.",
+              note: "Keyword-only: local vectors aren't available yet, so results are ranked by keyword match rather than semantic similarity.",
             }
           : {}),
       });

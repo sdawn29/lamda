@@ -325,6 +325,63 @@ function ftsRankedIds(queryText: string, limit: number): string[] | null {
   }
 }
 
+function normalizePathPrefix(pathPrefix?: string): string | undefined {
+  const normalized = pathPrefix?.trim().replace(/^\/+/, "");
+  return normalized || undefined;
+}
+
+function queryTerms(text: string): string[] {
+  return [...new Set(text.toLowerCase().match(/[a-z0-9]{2,}/g) ?? [])].slice(
+    0,
+    24,
+  );
+}
+
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0;
+  let count = 0;
+  let offset = 0;
+  for (;;) {
+    const found = haystack.indexOf(needle, offset);
+    if (found === -1) return count;
+    count++;
+    offset = found + needle.length;
+  }
+}
+
+function lexicalBoost(row: CodeChunkRow, terms: string[]): number {
+  if (terms.length === 0) return 0;
+  const content = row.content.toLowerCase();
+  const path = row.filePath.toLowerCase();
+  const fileName = path.slice(path.lastIndexOf("/") + 1);
+  let boost = 0;
+  for (const term of terms) {
+    if (path.includes(term)) boost += 0.018;
+    if (fileName.includes(term)) boost += 0.025;
+    boost += Math.min(0.035, countOccurrences(content, term) * 0.006);
+  }
+  return boost;
+}
+
+function diversifyHits(hits: CodeSearchHit[], limit: number): CodeSearchHit[] {
+  const selected: CodeSearchHit[] = [];
+  const perFile = new Map<string, number>();
+  for (const hit of hits) {
+    const count = perFile.get(hit.filePath) ?? 0;
+    if (count >= 2 && selected.length < Math.ceil(limit * 0.75)) continue;
+    selected.push(hit);
+    perFile.set(hit.filePath, count + 1);
+    if (selected.length >= limit) break;
+  }
+  if (selected.length >= limit) return selected;
+  for (const hit of hits) {
+    if (selected.some((s) => s.id === hit.id)) continue;
+    selected.push(hit);
+    if (selected.length >= limit) break;
+  }
+  return selected;
+}
+
 /** Substring fallback used when FTS5 is unavailable or returns nothing. */
 function searchChunksLike(
   workspaceId: string,
@@ -332,12 +389,14 @@ function searchChunksLike(
   limit: number,
   pathPrefix?: string,
 ): CodeSearchHit[] {
+  const normalizedPath = normalizePathPrefix(pathPrefix);
   const pattern = `%${query}%`;
   const conditions = [
     eq(codeChunks.workspaceId, workspaceId),
     like(codeChunks.content, pattern),
   ];
-  if (pathPrefix) conditions.push(like(codeChunks.filePath, `${pathPrefix}%`));
+  if (normalizedPath)
+    conditions.push(like(codeChunks.filePath, `${normalizedPath}%`));
   const rows = db
     .select()
     .from(codeChunks)
@@ -373,13 +432,14 @@ export function searchCodeChunks(
   limit = 8,
   pathPrefix?: string,
 ): CodeSearchResult {
-  const fts = ftsRankedIds(queryText, limit * 8);
-  const vec = queryVector ? vecSearchIds(queryVector, limit * 8) : [];
+  const normalizedPath = normalizePathPrefix(pathPrefix);
+  const fts = ftsRankedIds(queryText, limit * 12);
+  const vec = queryVector ? vecSearchIds(queryVector, limit * 12) : [];
 
   if (fts === null && vec.length === 0) {
     if (!queryText) return { hits: [], mode: "none" };
     return {
-      hits: searchChunksLike(workspaceId, queryText, limit, pathPrefix),
+      hits: searchChunksLike(workspaceId, queryText, limit, normalizedPath),
       mode: "like",
     };
   }
@@ -393,20 +453,29 @@ export function searchCodeChunks(
   if (fts) fuse(fts);
   fuse(vec.map((v) => v.id));
   const mode: CodeSearchMode = vec.length > 0 ? "hybrid" : "fts";
-  if (score.size === 0) return { hits: [], mode };
+  if (score.size === 0) {
+    return queryText
+      ? {
+          hits: searchChunksLike(workspaceId, queryText, limit, normalizedPath),
+          mode: "like",
+        }
+      : { hits: [], mode };
+  }
 
   const ids = [...score.keys()];
   const conditions = [
     inArray(codeChunks.id, ids),
     eq(codeChunks.workspaceId, workspaceId),
   ];
-  if (pathPrefix) conditions.push(like(codeChunks.filePath, `${pathPrefix}%`));
+  if (normalizedPath)
+    conditions.push(like(codeChunks.filePath, `${normalizedPath}%`));
   const rows = db
     .select()
     .from(codeChunks)
     .where(and(...conditions))
     .all() as CodeChunkRow[];
 
+  const terms = queryTerms(queryText);
   const hits = rows
     .map((r) => ({
       id: r.id,
@@ -414,12 +483,12 @@ export function searchCodeChunks(
       startLine: r.startLine,
       endLine: r.endLine,
       content: r.content,
-      score: score.get(r.id) ?? 0,
+      score: (score.get(r.id) ?? 0) + lexicalBoost(r, terms),
     }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
+  const diversified = diversifyHits(hits, limit);
 
-  return { hits, mode };
+  return { hits: diversified, mode };
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -442,7 +511,8 @@ export function getCodeIndexStats(workspaceId: string): CodeIndexStats {
   let embeddedCount = 0;
   if (isVecAvailable()) {
     try {
-      embeddedCount = db.all<{ count: number }>(sql`
+      embeddedCount =
+        db.all<{ count: number }>(sql`
         SELECT COUNT(*) as count FROM code_chunks_vec
         WHERE id IN (SELECT id FROM code_chunks WHERE workspace_id = ${workspaceId})
       `)[0]?.count ?? 0;

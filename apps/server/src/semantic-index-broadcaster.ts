@@ -1,6 +1,6 @@
 import { Broadcaster } from "./lib/broadcaster.js";
 
-export type SemanticIndexPhase = "chunking" | "embedding" | "idle";
+export type SemanticIndexPhase = "chunking" | "embedding" | "idle" | "error";
 
 export interface SemanticIndexProgress {
   workspaceId: string;
@@ -17,6 +17,10 @@ export interface SemanticIndexProgress {
   initial?: boolean;
   /** Files actually (re-)chunked during this sweep — 0 means nothing had changed. */
   processed?: number;
+  /** Chunks embedded during the embedding phase that followed this sweep. */
+  embedded?: number;
+  /** Error message when `phase` is "error". */
+  error?: string;
 }
 
 export const semanticIndexBroadcaster = new Broadcaster<

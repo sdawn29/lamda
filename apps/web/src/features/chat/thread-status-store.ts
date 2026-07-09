@@ -4,11 +4,18 @@ import { toast } from "sonner"
 import { openGlobalWebSocket } from "./api"
 import { queryClient } from "@/shared/lib/query-client"
 import { gitKeys } from "@/features/git/queries"
-import { workspaceKeys, modeKeys, agentKeys } from "@/features/workspace/queries"
+import {
+  workspaceKeys,
+  modeKeys,
+  agentKeys,
+} from "@/features/workspace/queries"
 import type { WorkspaceDto } from "@/features/workspace/api"
 import { automationKeys } from "@/features/automations/queries"
 import { semanticSearchKeys } from "@/features/semantic-search"
-import { useNotificationStore } from "@/features/notifications"
+import {
+  MANAGED_NOTIFICATION_TOAST_PREFIX,
+  useNotificationStore,
+} from "@/features/notifications"
 
 export type ThreadStatus =
   | "streaming"
@@ -164,6 +171,13 @@ let globalReconnectTimer: ReturnType<typeof setTimeout> | null = null
 let globalReconnectDelay = 1000
 const GLOBAL_MAX_RECONNECT_DELAY = 30_000
 
+function workspaceLabel(workspaceId: string, workspaceName?: string): string {
+  if (workspaceName?.trim()) return workspaceName.trim()
+  const workspaces = queryClient.getQueryData<WorkspaceDto[]>(workspaceKeys.all)
+  const cachedName = workspaces?.find((w) => w.id === workspaceId)?.name
+  return cachedName ?? `workspace ${workspaceId.slice(0, 8)}`
+}
+
 function handleGlobalMessage(e: MessageEvent): void {
   try {
     const data = JSON.parse(e.data as string) as {
@@ -173,13 +187,16 @@ function handleGlobalMessage(e: MessageEvent): void {
       reason?: ThreadAwaitingReason
       detail?: string
       workspaceId?: string
+      workspaceName?: string
       root?: string
       dir?: string
-      phase?: "chunking" | "embedding" | "idle"
+      phase?: "chunking" | "embedding" | "idle" | "error"
       current?: number
       total?: number
       initial?: boolean
       processed?: number
+      embedded?: number
+      error?: string
     }
     if (data.type === "worktree_detached") {
       // The server auto-detached a thread from a worktree that was removed
@@ -296,7 +313,11 @@ function handleGlobalMessage(e: MessageEvent): void {
         for (const fn of workspaceFileUpdateListeners) fn(data.workspaceId)
       }
     }
-    if (data.type === "semantic_index_progress" && data.workspaceId && data.phase) {
+    if (
+      data.type === "semantic_index_progress" &&
+      data.workspaceId &&
+      data.phase
+    ) {
       const workspaceId = data.workspaceId
       void queryClient.invalidateQueries({
         queryKey: semanticSearchKeys.status(workspaceId),
@@ -306,39 +327,91 @@ function handleGlobalMessage(e: MessageEvent): void {
         queryKey: semanticSearchKeys.all,
       })
       const notificationId = `indexing-${workspaceId}`
+      const name = workspaceLabel(workspaceId, data.workspaceName)
+      if (data.phase === "error") {
+        const description = `${name}: ${
+          data.error ?? "Semantic code indexing failed."
+        }`
+        useNotificationStore.getState().upsert(notificationId, {
+          kind: "indexing",
+          title: "Code index failed",
+          description,
+          variant: "error",
+          priority: "high",
+          progress: undefined,
+          workspaceId,
+        })
+        toast.error("Code index failed", {
+          id: `${MANAGED_NOTIFICATION_TOAST_PREFIX}${notificationId}`,
+          description,
+        })
+        return
+      }
       if (data.phase === "idle") {
-        // Sweep finished — mark the notification read rather than removing it,
-        // so recent activity stays visible in the panel's history.
-        useNotificationStore.getState().markRead(notificationId)
-        // Only the chunking sweep's completion carries `initial`/`processed`
+        // Only the completed cycle carries `initial`/`processed`
         // (set only for the first sweep since start()/reindex(), not the many
         // small incremental sweeps a busy editing session triggers), and only
-        // when it actually did work — an already-up-to-date workspace
-        // re-swept on app boot shouldn't toast. Surfaced via sonner so it also
-        // lands in the notification history (see ToastNotificationBridge).
-        if (data.initial && data.processed && data.processed > 0) {
-          const workspaces = queryClient.getQueryData<WorkspaceDto[]>(
-            workspaceKeys.all
-          )
-          const workspaceName = workspaces?.find(
-            (w) => w.id === workspaceId
-          )?.name
+        // when it actually did work — either chunking files or rebuilding local
+        // vectors. An already-up-to-date workspace re-swept on app boot
+        // shouldn't toast.
+        const changed =
+          (data.processed !== undefined && data.processed > 0) ||
+          (data.embedded !== undefined && data.embedded > 0)
+        if (data.initial && changed) {
+          const processed = data.processed ?? 0
+          const embedded = data.embedded ?? 0
+          const activity =
+            processed > 0
+              ? `${processed} file${processed === 1 ? "" : "s"} indexed`
+              : `${embedded} chunk${embedded === 1 ? "" : "s"} embedded`
+          const description = `${name} - ${activity} for semantic search.`
+          useNotificationStore.getState().upsert(notificationId, {
+            kind: "indexing",
+            title: "Code index ready",
+            description,
+            variant: "success",
+            priority: "normal",
+            progress: undefined,
+            workspaceId,
+          })
           toast.success("Code index ready", {
-            description: workspaceName
-              ? `${workspaceName} — ${data.processed} file${data.processed === 1 ? "" : "s"} indexed for semantic search.`
-              : `${data.processed} file${data.processed === 1 ? "" : "s"} indexed for semantic search.`,
+            id: `${MANAGED_NOTIFICATION_TOAST_PREFIX}${notificationId}`,
+            description,
+          })
+        } else {
+          // Sweep finished without user-relevant work. Keep any progress row as
+          // quiet, accurate history, but do not create a fresh success toast.
+          useNotificationStore.getState().upsert(notificationId, {
+            kind: "indexing",
+            title: "Code index up to date",
+            description: `${name} semantic search index is idle.`,
+            variant: "default",
+            priority: "low",
+            progress: undefined,
+            workspaceId,
+            read: true,
           })
         }
       } else {
         const phaseLabel = data.phase === "chunking" ? "Chunking" : "Embedding"
+        const progressTotal =
+          data.total !== undefined && data.total >= 0 ? data.total : 0
         useNotificationStore.getState().upsert(notificationId, {
           kind: "indexing",
-          title: "Indexing workspace code",
-          description: `${phaseLabel} for semantic search`,
+          title:
+            data.phase === "chunking"
+              ? "Chunking workspace code"
+              : "Embedding code index",
+          description:
+            progressTotal > 0
+              ? `${name} - ${phaseLabel} ${data.current ?? 0} / ${progressTotal}`
+              : `${name} - ${phaseLabel} semantic search index`,
+          variant: "info",
+          priority: "low",
           progress: {
             phase: phaseLabel,
             current: data.current ?? 0,
-            total: data.total ?? 0,
+            total: progressTotal,
           },
           workspaceId,
         })

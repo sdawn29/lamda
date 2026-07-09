@@ -6,6 +6,8 @@ import {
   TriangleAlertIcon,
   XIcon,
 } from "lucide-react"
+import { useEffect } from "react"
+import { useNavigate } from "@tanstack/react-router"
 import { useShallow } from "zustand/react/shallow"
 
 import { Button } from "@/shared/ui/button"
@@ -53,12 +55,29 @@ function relativeTime(ms: number): string {
 }
 
 function NotificationRow({ item }: { item: NotificationItem }) {
+  const navigate = useNavigate()
   const dismiss = useNotificationStore((s) => s.dismiss)
+  const markRead = useNotificationStore((s) => s.markRead)
   const progressPct =
     item.progress && item.progress.total > 0
       ? Math.round((item.progress.current / item.progress.total) * 100)
       : null
   const VariantIcon = item.variant ? VARIANT_ICON[item.variant] : null
+  const actionLabel = item.action?.label ?? "Open"
+  const handleAction = () => {
+    if (!item.action) return
+    markRead(item.id)
+    if (item.action.type === "open-thread") {
+      void navigate({
+        to: "/workspace/$threadId",
+        params: { threadId: item.action.threadId },
+      })
+      return
+    }
+    if (item.action.type === "open-workspace") {
+      void navigate({ to: "/new", search: { ws: item.action.workspaceId } })
+    }
+  }
 
   return (
     <div
@@ -82,7 +101,7 @@ function NotificationRow({ item }: { item: NotificationItem }) {
         <button
           type="button"
           onClick={() => dismiss(item.id)}
-          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/30 group-hover:opacity-100"
           aria-label="Dismiss notification"
         >
           <XIcon className="size-3" />
@@ -104,6 +123,19 @@ function NotificationRow({ item }: { item: NotificationItem }) {
       <span className="text-[0.65rem] text-muted-foreground/60">
         {relativeTime(item.createdAt)}
       </span>
+      {item.action && (
+        <div className="pt-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="h-5 px-1.5 text-[0.65rem]"
+            onClick={handleAction}
+          >
+            {actionLabel}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -111,6 +143,16 @@ function NotificationRow({ item }: { item: NotificationItem }) {
 export function NotificationPanel() {
   const items = useNotificationStore(useShallow(selectNotificationList))
   const clear = useNotificationStore((s) => s.clear)
+  const clearRead = useNotificationStore((s) => s.clearRead)
+  const markAllRead = useNotificationStore((s) => s.markAllRead)
+  const hasUnread = items.some((item) => !item.read)
+  const hasRead = items.some((item) => item.read)
+
+  useEffect(() => {
+    if (!hasUnread) return
+    const timer = window.setTimeout(markAllRead, 800)
+    return () => window.clearTimeout(timer)
+  }, [hasUnread, markAllRead])
 
   return (
     <div className="flex w-80 flex-col gap-1">
@@ -122,14 +164,26 @@ export function NotificationPanel() {
           </PopoverDescription>
         </div>
         {items.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-1.5 text-[0.7rem] text-muted-foreground"
-            onClick={clear}
-          >
-            Clear all
-          </Button>
+          <div className="flex items-center gap-1">
+            {hasRead && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5 text-[0.7rem] text-muted-foreground"
+                onClick={clearRead}
+              >
+                Clear read
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-[0.7rem] text-muted-foreground"
+              onClick={clear}
+            >
+              Clear all
+            </Button>
+          </div>
         )}
       </PopoverHeader>
       <div className="flex max-h-80 flex-col gap-0.5 overflow-y-auto">

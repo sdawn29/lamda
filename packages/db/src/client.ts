@@ -6,8 +6,9 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import * as schema from "./schema.js";
 
-/** Dimension of memory embedding vectors (Voyage voyage-3.5-lite default). */
+/** Dimension of locally generated retrieval vectors. */
 export const MEMORY_EMBEDDING_DIM = 1024;
+const EMBEDDING_MODEL_ID = "lamda-local-code-v1";
 
 // Whether the sqlite-vec extension loaded and the vector table exists. When
 // false, semantic memory retrieval is unavailable and callers fall back to FTS.
@@ -797,9 +798,34 @@ function createDb() {
     // FTS5 unavailable — code search falls back to LIKE search.
   }
 
+  // Embedding vectors are model-specific. Older builds used a remote provider;
+  // when the local model changes, clear vec0 rows so the background backfills
+  // rebuild compatible vectors without touching the chunk/memory tables.
+  if (vecAvailable) {
+    try {
+      const row = sqlite
+        .prepare("SELECT value FROM settings WHERE key = ?")
+        .get("embeddings.model") as { value?: string } | undefined;
+      if (row?.value !== EMBEDDING_MODEL_ID) {
+        sqlite.exec(`
+          DROP TABLE IF EXISTS agent_memories_vec;
+          DROP TABLE IF EXISTS code_chunks_vec;
+        `);
+        sqlite
+          .prepare(
+            "INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+          )
+          .run("embeddings.model", EMBEDDING_MODEL_ID);
+      }
+    } catch {
+      // If reset fails, keep startup resilient; vec creation below will decide
+      // whether semantic retrieval is available.
+    }
+  }
+
   // Memory retrieval: vec0 virtual table holding one embedding per memory,
   // keyed by the memory id, for semantic KNN search. Rows are populated
-  // asynchronously by the embedding backfill (Voyage), so an empty table just
+  // asynchronously by the embedding backfill, so an empty table just
   // means no semantic hits yet — never an error. Unlike FTS we cannot keep this
   // in sync via triggers (vec0 isn't writable from a trigger), so the embedding
   // service deletes/upserts vectors alongside memory writes.

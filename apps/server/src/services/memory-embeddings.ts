@@ -11,9 +11,9 @@ let running = false;
 
 /**
  * Compute and store embeddings for any memories that don't have one yet, in
- * batches. No-op when sqlite-vec or the embedding provider is unavailable. Safe
+ * batches. No-op when sqlite-vec is unavailable. Safe
  * to call repeatedly — guarded against concurrent runs and entirely best-effort,
- * so a provider outage just leaves rows unembedded (FTS still retrieves them).
+ * so an embedding failure just leaves rows unembedded (FTS still retrieves them).
  */
 export async function backfillMemoryEmbeddings(): Promise<void> {
   if (running || !isVecAvailable() || !embeddingsEnabled()) return;
@@ -24,7 +24,7 @@ export async function backfillMemoryEmbeddings(): Promise<void> {
       if (batch.length === 0) break;
       const texts = batch.map((m) => `${m.title}\n${m.content}`);
       const vectors = await embedDocuments(texts);
-      if (!vectors) break; // provider failed — retry on a later trigger
+      if (!vectors) break; // aborted/unavailable — retry on a later trigger
       batch.forEach((m, i) => {
         const v = vectors[i];
         if (v) upsertMemoryVector(m.id, v);

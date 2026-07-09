@@ -12,11 +12,14 @@ import {
   lamdaLocalAgentsDir,
   listAgents,
   MODE_COLORS,
+  parseFrontmatter,
   parseAgentModel,
+  parseList,
   serializeAgentFile,
   SUBAGENT_TOOL_NAMES,
   SUBAGENT_DENIED_TOOL_NAMES,
   DELEGATE_TOOL_NAME,
+  unquote,
   type AgentConfig,
 } from "@lamda/pi-sdk";
 import { getWorkspace } from "@lamda/db";
@@ -94,6 +97,46 @@ const saveAgentSchema = z.object({
   icon: z.string().trim().optional(),
   prompt: z.string().trim().min(1, "prompt is required"),
 });
+
+const saveRawAgentSchema = z.object({
+  scope: z.enum(["global", "local"]),
+  workspaceId: z.string().optional(),
+  content: z.string().trim().min(1, "content is required"),
+});
+
+function validateRawAgentContent(content: string): string | null {
+  const { fields, body } = parseFrontmatter(content);
+  const name = unquote(fields.get("name") ?? "").trim();
+  if (!name) return "name is required";
+  const description = unquote(fields.get("description") ?? "").trim();
+  if (!description) return "description is required";
+
+  const denied = new Set<string>(SUBAGENT_DENIED_TOOL_NAMES);
+  const tools = (
+    fields.has("tools") ? parseList(fields.get("tools")!) : []
+  ).filter((name) => !denied.has(name));
+  if (tools.length === 0) return "At least one tool is required";
+
+  const modelValue = unquote(fields.get("model") ?? "").trim();
+  if (modelValue) {
+    const model = parseAgentModel(modelValue);
+    if (!model) return 'model must be "provider::model"';
+    const known = getAvailableModels().some(
+      (m) => m.provider === model.provider && m.id === model.model,
+    );
+    if (!known) return `Model "${modelValue}" is not configured`;
+  }
+
+  const color = fields.get("color");
+  if (
+    color &&
+    !(MODE_COLORS as readonly string[]).includes(unquote(color).toLowerCase())
+  ) {
+    return `color must be one of: ${MODE_COLORS.join(", ")}`;
+  }
+  if (!body.trim()) return "prompt is required";
+  return null;
+}
 
 agents.put("/agents/:id", async (c) => {
   const id = c.req.param("id");
@@ -174,6 +217,57 @@ agents.put("/agents/:id", async (c) => {
       }),
       "utf8",
     );
+  } catch (err) {
+    return c.json(
+      {
+        error:
+          err instanceof Error ? err.message : "Failed to write agent file",
+      },
+      500,
+    );
+  }
+
+  agentsBroadcaster.broadcast();
+  const cwd = workspacePathFor(body.workspaceId);
+  const config = getAgentConfig(id, cwd);
+  return c.json({ agent: config ? toDto(config) : null });
+});
+
+agents.put("/agents/:id/raw", async (c) => {
+  const id = c.req.param("id");
+  if (!isValidAgentId(id)) {
+    return c.json(
+      {
+        error:
+          "Agent id must be kebab-case (lowercase letters, digits, dashes)",
+      },
+      400,
+    );
+  }
+  if (id === DELEGATE_TOOL_NAME) {
+    return c.json({ error: `"${DELEGATE_TOOL_NAME}" is a reserved id` }, 400);
+  }
+
+  const parsed = await parseJsonBody(c, saveRawAgentSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  const invalid = validateRawAgentContent(body.content);
+  if (invalid) return c.json({ error: invalid }, 400);
+
+  let dir: string;
+  if (body.scope === "local") {
+    const workspacePath = workspacePathFor(body.workspaceId);
+    if (!workspacePath) {
+      return c.json({ error: "workspaceId is required for local scope" }, 400);
+    }
+    dir = lamdaLocalAgentsDir(workspacePath);
+  } else {
+    dir = lamdaAgentsDir();
+  }
+
+  try {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${id}.md`), body.content, "utf8");
   } catch (err) {
     return c.json(
       {

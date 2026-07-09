@@ -61,7 +61,7 @@ lamdaConfigWatcher.start();
 
 bootstrapSessions()
   .then(() => {
-    // Embed any memories missing a vector (no-op without sqlite-vec / VOYAGE_API_KEY).
+    // Embed any memories missing a vector (no-op without sqlite-vec).
     scheduleEmbeddingBackfill();
 
     // Register cron jobs for every enabled automation now that sessions exist.

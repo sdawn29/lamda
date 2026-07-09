@@ -8,6 +8,7 @@ import {
   clearWorkspaceChunks,
   listChunksNeedingEmbedding,
   upsertChunkVector,
+  getCodeIndexStats,
   isVecAvailable,
   getSetting,
   type CodeChunkInput,
@@ -25,6 +26,7 @@ import { workspaceIndexer } from "./workspace-indexer.js";
 import { workspaceActivityBroadcaster } from "../workspace-activity-broadcaster.js";
 import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
 import { semanticIndexBroadcaster } from "../semantic-index-broadcaster.js";
+import { backgroundTaskQueue } from "./background-task-queue.js";
 
 const SWEEP_DEBOUNCE_MS = 2000;
 const EMBED_BATCH = 64;
@@ -56,19 +58,37 @@ interface WorkspaceState {
   awaitingInitialSweep: boolean;
 }
 
+interface SweepSummary {
+  initial: boolean;
+  processed: number;
+  total: number;
+}
+
+export interface SemanticIndexLastError {
+  message: string;
+  occurredAt: number;
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error && err.message.trim()) return err.message.trim();
+  const raw = String(err);
+  return raw.trim() || "Indexing failed.";
+}
+
 /**
  * Builds and maintains the per-workspace semantic code index: chunks files,
  * tracks a content-addressed manifest so unchanged files/chunks are skipped,
  * and backfills embeddings in the background. Chunking + FTS run whenever the
- * feature is enabled (no cost); embedding additionally requires sqlite-vec and
- * a configured Voyage key — both paths degrade silently when unavailable, same
- * convention as the memory system. Modeled on `workspace-indexer.ts`.
+ * feature is enabled; embedding additionally requires sqlite-vec. Both paths
+ * degrade silently when unavailable, same convention as the memory system.
+ * Modeled on `workspace-indexer.ts`.
  */
 class SemanticIndexer {
   private workspaces = new Map<string, WorkspaceState>();
-  // Serializes embedding backfills across workspaces so we never hammer the
-  // Voyage API with concurrent batches from multiple workspaces at once.
+  // Serializes embedding backfills across workspaces so large repos do not
+  // monopolize CPU with concurrent batches.
   private embedQueue: Promise<void> = Promise.resolve();
+  private lastErrors = new Map<string, SemanticIndexLastError>();
 
   constructor() {
     workspaceActivityBroadcaster.subscribe((workspaceId, _relPath) => {
@@ -104,11 +124,13 @@ class SemanticIndexer {
     if (!state) return;
     if (state.timer) clearTimeout(state.timer);
     this.workspaces.delete(workspaceId);
+    this.lastErrors.delete(workspaceId);
   }
 
   /** Wipe the index and rebuild it from scratch (manual "Reindex" action). */
   reindex(workspaceId: string): void {
     clearWorkspaceChunks(workspaceId);
+    this.lastErrors.delete(workspaceId);
     const state = this.workspaces.get(workspaceId);
     if (!state) return;
     // Treat the rebuild like a fresh index — its completion should be
@@ -117,7 +139,34 @@ class SemanticIndexer {
     this.scheduleSweep(workspaceId, state, 0);
   }
 
+  getLastError(workspaceId: string): SemanticIndexLastError | null {
+    return this.lastErrors.get(workspaceId) ?? null;
+  }
+
   // ─── Internal ──────────────────────────────────────────────────────────────
+
+  private reportError(
+    workspaceId: string,
+    context: string,
+    err: unknown,
+  ): void {
+    const message = errorMessage(err);
+    this.lastErrors.set(workspaceId, {
+      message,
+      occurredAt: Date.now(),
+    });
+    console.error(
+      `[semantic-indexer] ${context} failed for ${workspaceId}:`,
+      err,
+    );
+    semanticIndexBroadcaster.broadcast({
+      workspaceId,
+      phase: "error",
+      current: 0,
+      total: 0,
+      error: message,
+    });
+  }
 
   private scheduleSweep(
     workspaceId: string,
@@ -128,12 +177,15 @@ class SemanticIndexer {
     state.timer = setTimeout(() => {
       state.timer = null;
       this.sweep(workspaceId, state).catch((err) =>
-        console.error(`[semantic-indexer] sweep failed for ${workspaceId}:`, err),
+        this.reportError(workspaceId, "sweep", err),
       );
     }, delay);
   }
 
-  private async sweep(workspaceId: string, state: WorkspaceState): Promise<void> {
+  private async sweep(
+    workspaceId: string,
+    state: WorkspaceState,
+  ): Promise<void> {
     if (state.sweeping) {
       state.sweepQueued = true;
       return;
@@ -141,14 +193,26 @@ class SemanticIndexer {
     if (!isEnabled(workspaceId)) return;
     state.sweeping = true;
     try {
-      await this.runSweep(workspaceId, state);
+      const summary = await backgroundTaskQueue.enqueue(
+        "indexing",
+        `semantic-sweep:${workspaceId}`,
+        () => this.runSweep(workspaceId, state),
+      );
       // Chunking is cheap and always runs; queue the (rate-limited) embedding
       // backfill separately so a slow provider never blocks the next sweep.
       this.embedQueue = this.embedQueue
-        .then(() => this.backfillEmbeddings(workspaceId))
-        .catch((err) =>
-          console.error(`[semantic-indexer] embedding failed for ${workspaceId}:`, err),
-        );
+        .then(async () => {
+          try {
+            await backgroundTaskQueue.enqueue(
+              "indexing",
+              `semantic-embed:${workspaceId}`,
+              () => this.backfillEmbeddings(workspaceId, summary),
+            );
+          } catch (err) {
+            this.reportError(workspaceId, "embedding", err);
+          }
+        })
+        .catch((err) => this.reportError(workspaceId, "embedding", err));
     } finally {
       state.sweeping = false;
       if (state.sweepQueued) {
@@ -158,7 +222,10 @@ class SemanticIndexer {
     }
   }
 
-  private async runSweep(workspaceId: string, state: WorkspaceState): Promise<void> {
+  private async runSweep(
+    workspaceId: string,
+    state: WorkspaceState,
+  ): Promise<SweepSummary> {
     const isInitial = state.awaitingInitialSweep;
     const entries = workspaceIndexer
       .listFiles(workspaceId)
@@ -268,43 +335,64 @@ class SemanticIndexer {
     }
 
     state.awaitingInitialSweep = false;
+    return { initial: isInitial, processed, total: entries.length };
+  }
+
+  private finishCycle(
+    workspaceId: string,
+    summary: SweepSummary,
+    embedded: number,
+  ): void {
+    this.lastErrors.delete(workspaceId);
     semanticIndexBroadcaster.broadcast({
       workspaceId,
       phase: "idle",
-      current: entries.length,
-      total: entries.length,
-      initial: isInitial,
-      processed,
+      current: summary.total,
+      total: summary.total,
+      initial: summary.initial,
+      processed: summary.processed,
+      embedded,
     });
   }
 
-  private async backfillEmbeddings(workspaceId: string): Promise<void> {
+  private async backfillEmbeddings(
+    workspaceId: string,
+    summary: SweepSummary,
+  ): Promise<void> {
     if (!isVecAvailable() || !embeddingsEnabled() || !isEnabled(workspaceId)) {
+      this.finishCycle(workspaceId, summary, 0);
       return;
     }
+    let embedded = 0;
     for (;;) {
       const batch = listChunksNeedingEmbedding(workspaceId, EMBED_BATCH);
+      const before = getCodeIndexStats(workspaceId);
       if (batch.length === 0) break;
-      const vectors = await embedDocuments(batch.map((c) => c.content));
-      if (!vectors) break; // provider failed — retry on a later trigger
-      batch.forEach((c, i) => {
-        const v = vectors[i];
-        if (v) upsertChunkVector(c.id, v);
-      });
       semanticIndexBroadcaster.broadcast({
         workspaceId,
         phase: "embedding",
-        current: batch.length,
-        total: batch.length < EMBED_BATCH ? batch.length : -1,
+        current: before.embeddedCount,
+        total: before.chunkCount,
+      });
+      const vectors = await embedDocuments(batch.map((c) => c.content));
+      if (!vectors) break; // aborted/unavailable — retry on a later trigger
+      batch.forEach((c, i) => {
+        const v = vectors[i];
+        if (v) {
+          upsertChunkVector(c.id, v);
+          embedded++;
+        }
+      });
+      const after = getCodeIndexStats(workspaceId);
+      semanticIndexBroadcaster.broadcast({
+        workspaceId,
+        phase: "embedding",
+        current: after.embeddedCount,
+        total: after.chunkCount,
       });
       if (batch.length < EMBED_BATCH) break;
     }
-    semanticIndexBroadcaster.broadcast({
-      workspaceId,
-      phase: "idle",
-      current: 0,
-      total: 0,
-    });
+    this.finishCycle(workspaceId, summary, embedded);
   }
 }
 

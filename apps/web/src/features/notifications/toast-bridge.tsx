@@ -2,6 +2,8 @@ import { useEffect } from "react"
 import { useSonner, type ToastT } from "sonner"
 import { useNotificationStore, type NotificationVariant } from "./store"
 
+export const MANAGED_NOTIFICATION_TOAST_PREFIX = "notification:"
+
 function variantFor(type: ToastT["type"]): NotificationVariant {
   switch (type) {
     case "success":
@@ -51,6 +53,12 @@ export function ToastNotificationBridge() {
 
   useEffect(() => {
     for (const t of toasts) {
+      if (
+        typeof t.id === "string" &&
+        t.id.startsWith(MANAGED_NOTIFICATION_TOAST_PREFIX)
+      ) {
+        continue
+      }
       // Loading toasts are transient placeholders (usually replaced in place
       // by a success/error toast with the same id) — not worth a history entry.
       if (t.type === "loading") continue
@@ -59,6 +67,7 @@ export function ToastNotificationBridge() {
         title: asText(t.title) ?? titleFor(t.type),
         description: asText(t.description),
         variant: variantFor(t.type),
+        priority: t.type === "error" || t.type === "warning" ? "normal" : "low",
       })
     }
     // Deliberately no dependency on the store's `upsert` identity concerns —

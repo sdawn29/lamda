@@ -55,9 +55,9 @@ async function withMemoryPreamble(
   entry: StoredSession,
   userText: string,
 ): Promise<string> {
-  // Embed the prompt for semantic retrieval. Best-effort and timeout-guarded:
-  // returns null (→ FTS-only) when no embedding provider is configured or the
-  // call is slow/fails, so the hot path never blocks on it.
+  // Embed the prompt for semantic retrieval. Best-effort: returns null
+  // (→ FTS-only) if local embedding is aborted/unavailable, so the hot path
+  // never depends on it.
   const queryVector =
     (await embedQuery(userText).catch(() => null)) ?? undefined;
 
@@ -108,7 +108,8 @@ async function withCodeContextPreamble(
   userText: string,
 ): Promise<string> {
   if (!entry.workspaceId) return userText;
-  if (getSetting("semantic_index.injection_enabled") === "false") return userText;
+  if (getSetting("semantic_index.injection_enabled") === "false")
+    return userText;
   if (
     userText.length < MIN_PROMPT_CHARS ||
     usableTokenCount(userText) < MIN_PROMPT_TOKENS
@@ -159,6 +160,9 @@ export async function withInjections(
 ): Promise<string> {
   return withModePreamble(
     entry,
-    await withMemoryPreamble(entry, await withCodeContextPreamble(entry, userText)),
+    await withMemoryPreamble(
+      entry,
+      await withCodeContextPreamble(entry, userText),
+    ),
   );
 }

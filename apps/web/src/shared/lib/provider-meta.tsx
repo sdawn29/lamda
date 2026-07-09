@@ -31,7 +31,6 @@ import {
   Vercel,
   VertexAI,
   Vllm,
-  Voyage,
   Windsurf,
   XAI,
   XiaomiMiMo,
@@ -241,10 +240,6 @@ const PROVIDER_META: Record<string, { label: string; icon: React.ReactNode }> =
           <path d="M12 2L4 6v12l8 4 8-4V6l-8-4zm0 2.5L18 8l-6 3-6-3 6-3.5zm-6 6l6 3v6l-6-3v-6zm6 9v-6l6 3v6l-6-3z" />
         </svg>
       ),
-    },
-    voyage: {
-      label: "Voyage AI",
-      icon: <Voyage.Color size={14} />,
     },
     codestral: {
       label: "Codestral",

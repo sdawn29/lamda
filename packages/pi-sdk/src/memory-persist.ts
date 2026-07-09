@@ -31,7 +31,7 @@ import { embedDocuments } from "./embeddings.js";
 
 /**
  * vec0 L2 distance below which two memories are treated as the same fact phrased
- * differently. Voyage embeddings are unit-normalised, so this corresponds to a
+ * differently. Local embeddings are unit-normalised, so this corresponds to a
  * cosine similarity of ~0.9 (d² = 2·(1 − cos)). Deliberately strict to avoid
  * merging distinct-but-related facts.
  */

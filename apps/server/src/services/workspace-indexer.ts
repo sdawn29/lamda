@@ -10,6 +10,7 @@ import { isGitRepo, listWorkspaceFiles } from "@lamda/git";
 import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
 import { gitStatusBroadcaster } from "../git-status-broadcaster.js";
 import { workspaceActivityBroadcaster } from "../workspace-activity-broadcaster.js";
+import { backgroundTaskQueue } from "./background-task-queue.js";
 
 // Directories never worth indexing for fuzzy search. `git ls-files` already
 // honors .gitignore, so these only matter for the non-git fallback scan and for
@@ -245,16 +246,22 @@ class WorkspaceIndexer {
     }
     state.refreshInProgress = true;
     try {
-      const filePaths = (await isGitRepo(state.path))
-        ? await listWorkspaceFiles(state.path)
-        : await this.fallbackScan(state.path);
+      await backgroundTaskQueue.enqueue(
+        "indexing",
+        `workspace-refresh:${workspaceId}`,
+        async () => {
+          const filePaths = (await isGitRepo(state.path))
+            ? await listWorkspaceFiles(state.path)
+            : await this.fallbackScan(state.path);
 
-      const next = buildEntries(filePaths);
-      if (!entriesEqual(state.entries, next)) {
-        state.entries = next;
-        replaceWorkspaceFiles(workspaceId, next);
-        workspaceIndexBroadcaster.broadcast(workspaceId);
-      }
+          const next = buildEntries(filePaths);
+          if (!entriesEqual(state.entries, next)) {
+            state.entries = next;
+            replaceWorkspaceFiles(workspaceId, next);
+            workspaceIndexBroadcaster.broadcast(workspaceId);
+          }
+        },
+      );
     } finally {
       state.refreshInProgress = false;
       if (state.refreshQueued) {

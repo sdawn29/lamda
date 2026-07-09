@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { WebSocket } from "ws";
 import { getAvailableModels } from "@lamda/pi-sdk";
+import { getWorkspace } from "@lamda/db";
 import { threadStatusBroadcaster } from "../thread-status-broadcaster.js";
 import { workspaceIndexBroadcaster } from "../workspace-index-broadcaster.js";
 import { workspaceDirBroadcaster } from "../workspace-dir-broadcaster.js";
@@ -11,10 +12,15 @@ import { promptsBroadcaster } from "../prompts-broadcaster.js";
 import { agentsBroadcaster } from "../agents-broadcaster.js";
 import { automationBroadcaster } from "../automation-broadcaster.js";
 import { semanticIndexBroadcaster } from "../semantic-index-broadcaster.js";
+import { backgroundTaskQueue } from "../services/background-task-queue.js";
 
 const health = new Hono();
 
 health.get("/models", (c) => c.json({ models: getAvailableModels() }));
+
+health.get("/background-queue", (c) =>
+  c.json({ queues: backgroundTaskQueue.stats() }),
+);
 
 export function handleGlobalEventsWs(ws: WebSocket) {
   const unsubscribeThread = threadStatusBroadcaster.subscribe(
@@ -88,17 +94,30 @@ export function handleGlobalEventsWs(ws: WebSocket) {
   });
 
   const unsubscribeSemanticIndex = semanticIndexBroadcaster.subscribe(
-    ({ workspaceId, phase, current, total, initial, processed }) => {
+    ({
+      workspaceId,
+      phase,
+      current,
+      total,
+      initial,
+      processed,
+      embedded,
+      error,
+    }) => {
       if (ws.readyState !== 1 /* OPEN */) return;
+      const workspaceName = getWorkspace(workspaceId)?.name;
       ws.send(
         JSON.stringify({
           type: "semantic_index_progress",
           workspaceId,
+          workspaceName,
           phase,
           current,
           total,
           initial,
           processed,
+          embedded,
+          error,
         }),
       );
     },

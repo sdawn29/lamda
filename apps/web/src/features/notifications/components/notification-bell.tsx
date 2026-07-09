@@ -14,10 +14,10 @@ import { NotificationPanel } from "./notification-panel"
  */
 export function NotificationBell() {
   const unreadCount = useNotificationStore(selectUnreadCount)
-  const markAllRead = useNotificationStore((s) => s.markAllRead)
+  const prune = useNotificationStore((s) => s.prune)
 
   return (
-    <Popover onOpenChange={(open) => open && markAllRead()}>
+    <Popover onOpenChange={(open) => open && prune()}>
       <Tooltip>
         <TooltipTrigger
           render={
@@ -27,11 +27,18 @@ export function NotificationBell() {
                   variant="ghost"
                   size="icon"
                   className="relative size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                  aria-label="Notifications"
+                  aria-label={
+                    unreadCount > 0
+                      ? `Notifications, ${unreadCount} unread`
+                      : "Notifications"
+                  }
                 >
                   <BellIcon className="size-4" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 flex size-1.5 rounded-full bg-primary" />
+                    <>
+                      <span className="absolute top-1 right-1 flex size-1.5 rounded-full bg-primary" />
+                      <span className="sr-only">{unreadCount} unread</span>
+                    </>
                   )}
                 </Button>
               }

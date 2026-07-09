@@ -17,3 +17,6 @@ declare module "monaco-editor/esm/vs/language/typescript/monaco.contribution" {
   export const typescriptDefaults: TsLanguageServiceDefaults
   export const javascriptDefaults: TsLanguageServiceDefaults
 }
+
+declare module "monaco-editor/esm/vs/basic-languages/mdx/mdx.contribution"
+declare module "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"

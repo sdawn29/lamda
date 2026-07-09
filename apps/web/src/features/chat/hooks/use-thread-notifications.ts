@@ -2,6 +2,10 @@ import { useEffect, useRef } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 
+import {
+  MANAGED_NOTIFICATION_TOAST_PREFIX,
+  useNotificationStore,
+} from "@/features/notifications"
 import { useWorkspaces } from "@/features/workspace/queries"
 import type { WorkspaceDto } from "@/features/workspace/api"
 import {
@@ -19,6 +23,8 @@ interface ThreadLocation {
 // updates / dismisses the existing toast instead of stacking a new one.
 const awaitingToastId = (threadId: string) => `thread-awaiting-${threadId}`
 const errorToastId = (threadId: string) => `thread-error-${threadId}`
+const notificationToastId = (id: string) =>
+  `${MANAGED_NOTIFICATION_TOAST_PREFIX}${id}`
 
 function findThread(
   workspaces: WorkspaceDto[] | undefined,
@@ -131,8 +137,14 @@ export function useThreadNotifications(): void {
 
         // Tidy up: once a thread leaves an attention state (resumed, answered,
         // or recovered), drop its lingering toast so it never outlives reality.
-        if (prev === "awaiting") toast.dismiss(awaitingToastId(threadId))
-        if (prev === "error") toast.dismiss(errorToastId(threadId))
+        if (prev === "awaiting") {
+          toast.dismiss(notificationToastId(awaitingToastId(threadId)))
+          useNotificationStore.getState().markRead(awaitingToastId(threadId))
+        }
+        if (prev === "error") {
+          toast.dismiss(notificationToastId(errorToastId(threadId)))
+          useNotificationStore.getState().markRead(errorToastId(threadId))
+        }
 
         // Only notify for states that need the user, and never for the thread
         // already on screen (its inline UI already shows the prompt/error).
@@ -154,18 +166,38 @@ export function useThreadNotifications(): void {
         }
 
         if (status === "awaiting") {
+          const notificationId = awaitingToastId(threadId)
+          useNotificationStore.getState().upsert(notificationId, {
+            kind: "thread",
+            title,
+            description,
+            variant: "warning",
+            priority: "high",
+            action: { type: "open-thread", label: "Open", threadId },
+            threadId,
+          })
           // Amber "warning" matches the app's needs-attention motif (the
           // sidebar's amber awaiting indicator, worktree "needs attention" toasts).
           toast.warning(title, {
             // Per-thread id so a re-prompt replaces rather than stacks.
-            id: awaitingToastId(threadId),
+            id: notificationToastId(notificationId),
             description,
             duration: 10000,
             action: { label: "Open", onClick: open },
           })
         } else {
+          const notificationId = errorToastId(threadId)
+          useNotificationStore.getState().upsert(notificationId, {
+            kind: "thread",
+            title,
+            description,
+            variant: "error",
+            priority: "high",
+            action: { type: "open-thread", label: "Open", threadId },
+            threadId,
+          })
           toast.error(title, {
-            id: errorToastId(threadId),
+            id: notificationToastId(notificationId),
             description,
             duration: 8000,
             action: { label: "Open", onClick: open },
