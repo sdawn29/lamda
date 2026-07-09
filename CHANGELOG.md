@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.48.0](../../releases/tag/v0.48.0) — 2026-07-09
+
+### Features
+
+* **resources:** implement resource monitoring with CPU, memory, and background work metrics
+* **api:** add saveRawModeDefinition and saveRawAgentDefinition functions for raw mode and agent definitions
+* implement persistent notification system with notification bell and panel
+* **web-fetch:** add web_fetch tool for fetching and processing web content
+* add tool catalog and allowlist management
+
+### Code Refactoring
+
+* **chat:** adjust ApprovalModeCombobox placement and styling
+
 ## [0.47.0](../../releases/tag/v0.47.0) — 2026-07-08
 
 ### Features
