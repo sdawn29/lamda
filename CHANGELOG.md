@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.49.0](../../releases/tag/v0.49.0) — 2026-07-10
+
+### Features
+
+* enhance app sidebar for mobile responsiveness
+
 ## [0.48.0](../../releases/tag/v0.48.0) — 2026-07-09
 
 ### Features
