@@ -244,6 +244,17 @@ export const SubagentCard = memo(function SubagentCard({
   const activity = rawActivity ? toolDisplayName(rawActivity) : null
   const toolCount = details?.stats?.toolCalls ?? 0
 
+  // Keep a lone agent's live transcript bounded just like the focus panel used
+  // for parallel agents. Follow new output while pinned to the bottom, but
+  // release the pin as soon as the user scrolls up to inspect earlier steps.
+  const transcriptScrollRef = useRef<HTMLDivElement>(null)
+  const transcriptPinnedRef = useRef(true)
+  useEffect(() => {
+    if (status !== "running" || !transcriptPinnedRef.current) return
+    const element = transcriptScrollRef.current
+    if (element) element.scrollTop = element.scrollHeight
+  }, [status, details])
+
   const failed = status === "error"
   const aborted = status === "aborted"
 
@@ -327,7 +338,17 @@ export const SubagentCard = memo(function SubagentCard({
       </button>
 
       <CollapsibleBody open={expanded}>
-        <div className={NESTED_BODY_CLASS}>
+        <div
+          ref={transcriptScrollRef}
+          onScroll={() => {
+            const element = transcriptScrollRef.current
+            if (!element) return
+            transcriptPinnedRef.current =
+              element.scrollHeight - element.scrollTop - element.clientHeight <
+              24
+          }}
+          className={cn(NESTED_BODY_CLASS, "max-h-80 overflow-y-auto pr-2")}
+        >
           <SubagentTranscript msg={msg} rootPath={rootPath} />
         </div>
       </CollapsibleBody>

@@ -93,7 +93,10 @@ type UpdateStatus =
   | { phase: "ready"; version: string; releaseNotes: string | null }
   | { phase: "error"; message: string };
 
-const SERVER_READY_TIMEOUT_MS = 15_000;
+// Startup can include database migrations, native module loading, and local
+// model/tool discovery. Keep the splash visible rather than failing a healthy
+// launch on slower machines.
+const SERVER_READY_TIMEOUT_MS = 60_000;
 const STDERR_TAIL_LIMIT = 8_000;
 
 let serverProcess: ChildProcess | null = null;

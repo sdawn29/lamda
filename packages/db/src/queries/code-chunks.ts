@@ -63,117 +63,131 @@ export function replaceFileChunks(
   chunks: CodeChunkInput[],
   fileMeta: CodeFileMeta,
 ): void {
-  db.transaction(() => {
-    const existing = db
-      .select({ id: codeChunks.id })
-      .from(codeChunks)
-      .where(
-        and(
-          eq(codeChunks.workspaceId, workspaceId),
-          eq(codeChunks.filePath, filePath),
-        ),
-      )
-      .all()
-      .map((r) => r.id);
-
-    const nextIds = new Set(chunks.map((c) => c.id));
-    const toDelete = existing.filter((id) => !nextIds.has(id));
-    if (toDelete.length > 0) {
-      db.delete(codeChunks).where(inArray(codeChunks.id, toDelete)).run();
-      deleteChunkVectors(toDelete);
-    }
-
-    const existingIds = new Set(existing);
-    const toInsert = chunks.filter((c) => !existingIds.has(c.id));
-    const now = Date.now();
-    for (let i = 0; i < toInsert.length; i += CHUNK_INSERT_BATCH) {
-      const batch = toInsert.slice(i, i + CHUNK_INSERT_BATCH);
-      db.insert(codeChunks)
-        .values(
-          batch.map((c) => ({
-            id: c.id,
-            workspaceId,
-            filePath,
-            chunkIndex: c.chunkIndex,
-            startLine: c.startLine,
-            endLine: c.endLine,
-            content: c.content,
-            contentHash: c.contentHash,
-            createdAt: now,
-          })),
+  db.transaction(
+    () => {
+      const existing = db
+        .select({ id: codeChunks.id })
+        .from(codeChunks)
+        .where(
+          and(
+            eq(codeChunks.workspaceId, workspaceId),
+            eq(codeChunks.filePath, filePath),
+          ),
         )
-        .onConflictDoNothing()
-        .run();
-    }
+        .all()
+        .map((r) => r.id);
 
-    db.insert(codeFiles)
-      .values({
-        workspaceId,
-        filePath,
-        fileHash: fileMeta.fileHash,
-        mtimeMs: fileMeta.mtimeMs,
-        size: fileMeta.size,
-        chunkCount: chunks.length,
-        indexedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [codeFiles.workspaceId, codeFiles.filePath],
-        set: {
+      const nextIds = new Set(chunks.map((c) => c.id));
+      const toDelete = existing.filter((id) => !nextIds.has(id));
+      if (toDelete.length > 0) {
+        db.delete(codeChunks).where(inArray(codeChunks.id, toDelete)).run();
+        deleteChunkVectors(toDelete);
+      }
+
+      const existingIds = new Set(existing);
+      const toInsert = chunks.filter((c) => !existingIds.has(c.id));
+      const now = Date.now();
+      for (let i = 0; i < toInsert.length; i += CHUNK_INSERT_BATCH) {
+        const batch = toInsert.slice(i, i + CHUNK_INSERT_BATCH);
+        db.insert(codeChunks)
+          .values(
+            batch.map((c) => ({
+              id: c.id,
+              workspaceId,
+              filePath,
+              chunkIndex: c.chunkIndex,
+              startLine: c.startLine,
+              endLine: c.endLine,
+              content: c.content,
+              contentHash: c.contentHash,
+              createdAt: now,
+            })),
+          )
+          .onConflictDoNothing()
+          .run();
+      }
+
+      db.insert(codeFiles)
+        .values({
+          workspaceId,
+          filePath,
           fileHash: fileMeta.fileHash,
           mtimeMs: fileMeta.mtimeMs,
           size: fileMeta.size,
           chunkCount: chunks.length,
           indexedAt: now,
-        },
-      })
-      .run();
-  });
+        })
+        .onConflictDoUpdate({
+          target: [codeFiles.workspaceId, codeFiles.filePath],
+          set: {
+            fileHash: fileMeta.fileHash,
+            mtimeMs: fileMeta.mtimeMs,
+            size: fileMeta.size,
+            chunkCount: chunks.length,
+            indexedAt: now,
+          },
+        })
+        .run();
+    },
+    // These transactions read the current manifest before mutating it. In WAL
+    // mode a deferred transaction can lose the read→write upgrade race to a
+    // second app/server process, producing SQLITE_BUSY immediately despite the
+    // connection's busy_timeout. Acquire the writer slot up front so SQLite
+    // waits at BEGIN instead of invalidating the transaction snapshot.
+    { behavior: "immediate" },
+  );
 }
 
 /** Remove a file's chunks (and manifest row) entirely — used when a file is deleted. */
 export function deleteFileChunks(workspaceId: string, filePath: string): void {
-  db.transaction(() => {
-    const ids = db
-      .select({ id: codeChunks.id })
-      .from(codeChunks)
-      .where(
-        and(
-          eq(codeChunks.workspaceId, workspaceId),
-          eq(codeChunks.filePath, filePath),
-        ),
-      )
-      .all()
-      .map((r) => r.id);
-    if (ids.length > 0) {
-      db.delete(codeChunks).where(inArray(codeChunks.id, ids)).run();
-      deleteChunkVectors(ids);
-    }
-    db.delete(codeFiles)
-      .where(
-        and(
-          eq(codeFiles.workspaceId, workspaceId),
-          eq(codeFiles.filePath, filePath),
-        ),
-      )
-      .run();
-  });
+  db.transaction(
+    () => {
+      const ids = db
+        .select({ id: codeChunks.id })
+        .from(codeChunks)
+        .where(
+          and(
+            eq(codeChunks.workspaceId, workspaceId),
+            eq(codeChunks.filePath, filePath),
+          ),
+        )
+        .all()
+        .map((r) => r.id);
+      if (ids.length > 0) {
+        db.delete(codeChunks).where(inArray(codeChunks.id, ids)).run();
+        deleteChunkVectors(ids);
+      }
+      db.delete(codeFiles)
+        .where(
+          and(
+            eq(codeFiles.workspaceId, workspaceId),
+            eq(codeFiles.filePath, filePath),
+          ),
+        )
+        .run();
+    },
+    { behavior: "immediate" },
+  );
 }
 
 /** Wipe the entire code index for a workspace (used by manual reindex). */
 export function clearWorkspaceChunks(workspaceId: string): void {
-  db.transaction(() => {
-    const ids = db
-      .select({ id: codeChunks.id })
-      .from(codeChunks)
-      .where(eq(codeChunks.workspaceId, workspaceId))
-      .all()
-      .map((r) => r.id);
-    if (ids.length > 0) {
-      db.delete(codeChunks).where(inArray(codeChunks.id, ids)).run();
-      deleteChunkVectors(ids);
-    }
-    db.delete(codeFiles).where(eq(codeFiles.workspaceId, workspaceId)).run();
-  });
+  db.transaction(
+    () => {
+      const ids = db
+        .select({ id: codeChunks.id })
+        .from(codeChunks)
+        .where(eq(codeChunks.workspaceId, workspaceId))
+        .all()
+        .map((r) => r.id);
+      if (ids.length > 0) {
+        db.delete(codeChunks).where(inArray(codeChunks.id, ids)).run();
+        deleteChunkVectors(ids);
+      }
+      db.delete(codeFiles).where(eq(codeFiles.workspaceId, workspaceId)).run();
+    },
+    { behavior: "immediate" },
+  );
 }
 
 /**

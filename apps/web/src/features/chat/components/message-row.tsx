@@ -37,6 +37,7 @@ import { Button } from "@/shared/ui/button"
 import { getProviderMeta } from "@/shared/lib/provider-meta"
 import { formatDuration, formatTime } from "@/shared/lib/formatters"
 import type { SlashCommand } from "../api"
+import type { AgentDto } from "@/features/workspace/api"
 import {
   type AssistantMessage,
   type CompactionMessage,
@@ -349,6 +350,7 @@ export function getMessageKey(message: Message, index: number): string {
 export interface MessageRowProps {
   message: Message
   commandsByName: ReadonlyMap<string, SlashCommand>
+  agentsById?: ReadonlyMap<string, AgentDto>
   showThinking: boolean
   isNewMessage?: boolean
   /** Stagger offset (ms) applied as CSS animation-delay when isNewMessage is true. */
@@ -405,6 +407,7 @@ function CompactionBlock({ message }: { message: CompactionMessage }) {
 export const MessageRow = memo(function MessageRow({
   message,
   commandsByName,
+  agentsById,
   showThinking,
   isNewMessage = true,
   entryDelayMs = 0,
@@ -484,6 +487,7 @@ export const MessageRow = memo(function MessageRow({
             <UserMessageContent
               content={message.content}
               commandsByName={commandsByName}
+              agentsById={agentsById}
               attachments={userMsg.attachments}
               threadId={threadId}
             />

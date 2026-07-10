@@ -32,7 +32,7 @@ export function MessageChip({
       className={cn(
         // Mirror the composer's CHIP_CLASS (rich-input.tsx) so a chip looks
         // the same after sending as it did while typing.
-        "mx-0.5 rounded-md border-transparent bg-foreground/5! px-1.5 align-middle text-xs! text-foreground/80 transition-colors select-text hover:bg-foreground/10! [&>svg]:size-3.5!",
+        "mx-0.5 rounded-md border-transparent bg-foreground/5 px-1.5 align-middle text-xs! text-foreground/80 transition-colors select-text hover:bg-foreground/10 [&>svg]:size-3.5!",
         onClick &&
           "cursor-pointer select-none hover:bg-primary/10! hover:text-foreground",
         className

@@ -928,7 +928,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
               />
             </TooltipContent>
           </Tooltip>
-          <SidebarGroupContent className="min-h-0 overflow-y-auto">
+          <SidebarGroupContent className="min-h-0 overflow-x-hidden overflow-y-auto">
             <SidebarMenu>
               {workspaces.length === 0 ? (
                 <div className="my-3 flex flex-col items-center gap-2.5 px-2 text-center">

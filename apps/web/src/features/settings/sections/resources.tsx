@@ -109,7 +109,7 @@ function Sparkline({ points }: { points: (number | null)[] }) {
   const last = coords[coords.length - 1]
 
   return (
-    <div className="relative h-8 w-20 shrink-0" aria-hidden>
+    <div className="relative h-8 w-20 min-w-8 shrink" aria-hidden>
       <svg
         viewBox="0 0 100 32"
         preserveAspectRatio="none"
@@ -146,13 +146,15 @@ function StatTile({
   points?: (number | null)[]
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card/50 p-3">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        <span className="text-xl font-semibold leading-tight">{value}</span>
-        <span className="truncate text-xs text-muted-foreground">{detail}</span>
+    <div className="flex flex-col gap-0.5 rounded-lg border border-border/60 bg-card/50 p-3">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="whitespace-nowrap text-xl font-semibold leading-tight">
+          {value}
+        </span>
+        {points && <Sparkline points={points} />}
       </div>
-      {points && <Sparkline points={points} />}
+      <span className="text-xs text-muted-foreground">{detail}</span>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import {
   remarkPlugins,
 } from "./markdown-components"
 import { useWordReveal } from "../hooks/use-word-reveal"
+import { cleanThinkingContent } from "../lib/thinking-content"
 
 export const ThinkingBlock = memo(function ThinkingBlock({
   thinking,
@@ -14,7 +15,10 @@ export const ThinkingBlock = memo(function ThinkingBlock({
   thinking: string
   isNew?: boolean
 }) {
-  const { text: displayContent } = useWordReveal(thinking, isNew)
+  const { text: displayContent } = useWordReveal(
+    cleanThinkingContent(thinking),
+    isNew
+  )
 
   return (
     <div className="opacity-50">

@@ -190,13 +190,17 @@ export function useAgents(workspaceId: string | undefined) {
  * pickers. Short staleTime so a just-connected MCP server's tools appear on
  * the next editor open.
  */
-export function useToolCatalog(workspaceId: string | undefined) {
+export function useToolCatalog(
+  workspaceId: string | undefined,
+  enabled = true
+) {
   return useQuery({
     queryKey: toolCatalogKeys.list(workspaceId),
     queryFn: async (): Promise<ToolCatalogGroup[]> => {
       const { groups } = await listToolCatalog(workspaceId)
       return groups
     },
+    enabled,
     staleTime: 30_000,
   })
 }

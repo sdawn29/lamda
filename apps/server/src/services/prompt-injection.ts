@@ -5,6 +5,8 @@ import {
   applyCodeContextPreamble,
   renderCodeContextBlock,
   normalizeMode,
+  getModeConfig,
+  listAgents,
   embedQuery,
   embeddingsEnabled,
 } from "@lamda/pi-sdk";
@@ -39,6 +41,45 @@ function withModePreamble(entry: StoredSession, userText: string): string {
     return applyModePreamble(mode, userText, entry.cwd);
   }
   return userText;
+}
+
+/**
+ * Turn known `#agent-id` tokens into an explicit delegation request while
+ * keeping the clean mention in the persisted user message. Unknown or
+ * mode-disallowed ids remain ordinary text.
+ */
+function withSubagentMentions(
+  entry: StoredSession,
+  userText: string,
+): string {
+  const mode = normalizeMode(getThread(entry.threadId)?.mode);
+  const modeConfig = mode ? getModeConfig(mode, entry.cwd) : null;
+  if (!modeConfig?.tools.includes("delegate")) return userText;
+
+  const allowed = modeConfig.agents;
+  const knownIds = new Set(
+    listAgents(entry.cwd)
+      .filter((agent) => allowed === null || allowed.includes(agent.id))
+      .map((agent) => agent.id),
+  );
+  if (knownIds.size === 0) return userText;
+
+  const mentioned = Array.from(
+    new Set(
+      Array.from(
+        userText.matchAll(/(?:^|\s)#([a-z0-9][a-z0-9-]*)\b/g),
+        (match) => match[1],
+      ).filter((id): id is string => !!id && knownIds.has(id)),
+    ),
+  );
+  if (mentioned.length === 0) return userText;
+
+  return `<lamda-subagent-request>
+The user explicitly invoked these subagents: ${mentioned.join(", ")}.
+Delegate the relevant part of the request to each named subagent before responding. Treat the rest of the user's message as the task context.
+</lamda-subagent-request>
+
+${userText}`;
 }
 
 /**
@@ -150,9 +191,9 @@ async function withCodeContextPreamble(
 
 /**
  * All host-side context injections applied to outgoing user text, composed so
- * the mode preamble stays outermost and code context stays innermost (stored
- * text = mode preamble + memory block + code context block + user text),
- * matching the strip order used when seeding forked threads.
+ * the mode preamble stays outermost and code context stays innermost. Explicit
+ * `#subagent` requests wrap the retrieval context after retrieval has already
+ * run against the clean prompt, so the host directive cannot skew search.
  */
 export async function withInjections(
   entry: StoredSession,
@@ -160,9 +201,12 @@ export async function withInjections(
 ): Promise<string> {
   return withModePreamble(
     entry,
-    await withMemoryPreamble(
+    withSubagentMentions(
       entry,
-      await withCodeContextPreamble(entry, userText),
+      await withMemoryPreamble(
+        entry,
+        await withCodeContextPreamble(entry, userText),
+      ),
     ),
   );
 }

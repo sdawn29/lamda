@@ -50,11 +50,17 @@ import {
   chatKeys,
   type WorkspaceEntry,
 } from "../queries"
-import { useWorkspaceIndex, useModes } from "@/features/workspace/queries"
+import {
+  useAgents,
+  useWorkspaceIndex,
+  useModes,
+} from "@/features/workspace/queries"
+import type { AgentDto } from "@/features/workspace/api"
 import { useEnvDialog } from "@/features/workspace"
 import { ModelCombobox } from "./model-combobox"
 import { ModeCombobox, getModeOption, modeOptionFromDto } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
+import { ModeToolsDialog } from "./mode-tools-dialog"
 import { ThinkingCombobox, type ThinkingLevel } from "./thinking-combobox"
 export type { ThinkingLevel } from "./thinking-combobox"
 import {
@@ -64,12 +70,15 @@ import {
 import type { Mode, ApprovalMode } from "@/features/workspace/api"
 import {
   RichInput,
+  buildAgentMentionChip,
   buildMentionChip,
   buildSlashCommandChip,
   type RichInputHandle,
+  type AgentMention,
   type AtMention,
   type SlashMention,
 } from "./rich-input"
+import { AgentMentionDropdown } from "./agent-mention-dropdown"
 import { FileMentionDropdown } from "./file-mention-dropdown"
 import {
   SlashCommandDropdown,
@@ -150,7 +159,7 @@ export const ChatComposer = memo(
       isLoading = false,
       isAborting = false,
       onStop,
-      placeholder = "Ask anything @ for files, / for commands",
+      placeholder = "Ask anything @ files, # subagents, / commands",
       initialValue,
       initialValueKey,
       onValueChange,
@@ -191,6 +200,9 @@ export const ChatComposer = memo(
     >(null)
     const [slashMention, setSlashMention] = React.useState<
       (SlashMention & { selectedIndex: number }) | null
+    >(null)
+    const [agentMention, setAgentMention] = React.useState<
+      (AgentMention & { selectedIndex: number }) | null
     >(null)
     const [attachments, setAttachments] = React.useState<PendingAttachment[]>(
       []
@@ -339,6 +351,7 @@ export const ChatComposer = memo(
 
     const fileMentionOpen = atMention !== null
     const slashCommandOpen = slashMention !== null
+    const agentMentionOpen = agentMention !== null
 
     const { data: indexedFiles, isLoading: filesLoading } = useWorkspaceIndex(
       workspaceId,
@@ -346,6 +359,28 @@ export const ChatComposer = memo(
     )
     const { data: modeData } = useModes(workspaceId)
     const modeList = React.useMemo(() => modeData ?? [], [modeData])
+    const { data: agentData, isLoading: agentsLoading } = useAgents(workspaceId)
+    const availableAgents = React.useMemo(() => {
+      const agents = agentData ?? []
+      const activeMode = modeList.find((entry) => entry.id === mode)
+      if (!activeMode || !activeMode.tools.includes("delegate")) return []
+      const allowed = activeMode.agents
+      const filtered =
+        allowed === null
+          ? agents
+          : agents.filter((agent) => allowed.includes(agent.id))
+      if (!agentMention) return filtered
+      const query = agentMention.filter.toLowerCase()
+      if (!query) return filtered
+      return filtered.filter(
+        (agent) =>
+          agent.id.toLowerCase().includes(query) ||
+          agent.label.toLowerCase().includes(query) ||
+          agent.description.toLowerCase().includes(query)
+      )
+    }, [agentData, agentMention, mode, modeList])
+    const activeModeLabel =
+      modeList.find((entry) => entry.id === mode)?.label ?? mode
     const fileData = React.useMemo((): WorkspaceEntry[] => {
       if (!indexedFiles) return []
       return indexedFiles.map((f) => ({
@@ -773,6 +808,7 @@ export const ChatComposer = memo(
       setAttachments([])
       setAtMention(null)
       setSlashMention(null)
+      setAgentMention(null)
       richInputRef.current?.focus()
     }
 
@@ -895,6 +931,18 @@ export const ChatComposer = memo(
       }))
     }
 
+    function handleAgentMentionChange(mention: AgentMention | null) {
+      if (!mention) {
+        setAgentMention(null)
+        return
+      }
+      setAgentMention((prev) => ({
+        ...mention,
+        selectedIndex:
+          mention.filter !== prev?.filter ? 0 : (prev?.selectedIndex ?? 0),
+      }))
+    }
+
     function deleteSlashTrigger() {
       const current = slashMention
       if (!current?.textNode) return null
@@ -969,6 +1017,32 @@ export const ChatComposer = memo(
       richInputRef.current?.focus()
     }
 
+    function handleSelectAgent(agent: AgentDto) {
+      const current = agentMention
+      if (!current?.textNode) return
+      const { textNode, startOffset, filter } = current
+      const range = document.createRange()
+      range.setStart(textNode, startOffset)
+      range.setEnd(textNode, startOffset + 1 + filter.length)
+      range.deleteContents()
+
+      const chip = buildAgentMentionChip(agent)
+      range.insertNode(chip)
+
+      const space = document.createTextNode(" ")
+      chip.after(space)
+      const newRange = document.createRange()
+      newRange.setStart(space, 1)
+      newRange.collapse(true)
+      window.getSelection()?.removeAllRanges()
+      window.getSelection()?.addRange(newRange)
+
+      setAgentMention(null)
+      setIsEmpty(false)
+      onValueChange?.(richInputRef.current?.getValue() ?? "")
+      richInputRef.current?.focus()
+    }
+
     const modeStyles = getModeOption(mode, modeList)
     const modeSendButton = modeStyles.sendButton
     const stopBinding = useShortcutBinding(SHORTCUT_ACTIONS.STOP_GENERATION)
@@ -1003,6 +1077,15 @@ export const ChatComposer = memo(
             }
             noSkillsHint={noSkillsAvailable && filteredActions.length === 0}
             onSelect={handleSelectItem}
+          />
+
+          <AgentMentionDropdown
+            agents={availableAgents}
+            open={agentMentionOpen}
+            isLoading={agentsLoading}
+            selectedIndex={agentMention?.selectedIndex ?? 0}
+            modeLabel={activeModeLabel}
+            onSelect={handleSelectAgent}
           />
 
           <FileMentionDropdown
@@ -1048,8 +1131,10 @@ export const ChatComposer = memo(
                   slashMention !== null &&
                   (slashItems.length > 0 || commandsLoading)
                 }
+                agentActive={agentMention !== null && availableAgents.length > 0}
                 onAtMentionChange={handleAtMentionChange}
                 onSlashMentionChange={handleSlashMentionChange}
+                onAgentMentionChange={handleAgentMentionChange}
                 onSend={handleSend}
                 onInput={handleInput}
                 onPasteFiles={(files) => void handleAddFiles(files)}
@@ -1063,11 +1148,26 @@ export const ChatComposer = memo(
                   const item = slashItemsRef.current[idx]
                   if (item) handleSelectItem(item)
                 }}
+                onAgentEnter={() => {
+                  const idx = agentMention?.selectedIndex ?? 0
+                  const agent = availableAgents[idx]
+                  if (agent) handleSelectAgent(agent)
+                }}
                 onArrowUp={() => {
                   if (slashMention !== null) {
                     setSlashMention((prev) => {
                       if (!prev) return prev
                       const n = slashItemsRef.current.length
+                      if (n === 0) return prev
+                      return {
+                        ...prev,
+                        selectedIndex: (prev.selectedIndex - 1 + n) % n,
+                      }
+                    })
+                  } else if (agentMention !== null) {
+                    setAgentMention((prev) => {
+                      if (!prev) return prev
+                      const n = availableAgents.length
                       if (n === 0) return prev
                       return {
                         ...prev,
@@ -1100,6 +1200,16 @@ export const ChatComposer = memo(
                         selectedIndex: (prev.selectedIndex + 1) % n,
                       }
                     })
+                  } else if (agentMention !== null) {
+                    setAgentMention((prev) => {
+                      if (!prev) return prev
+                      const n = availableAgents.length
+                      if (n === 0) return prev
+                      return {
+                        ...prev,
+                        selectedIndex: (prev.selectedIndex + 1) % n,
+                      }
+                    })
                   } else {
                     setAtMention((prev) =>
                       prev
@@ -1117,6 +1227,7 @@ export const ChatComposer = memo(
                   exitHistory()
                   setAtMention(null)
                   setSlashMention(null)
+                  setAgentMention(null)
                 }}
                 onHistoryPrev={(atStart) => navigateHistory("prev", atStart)}
                 onHistoryNext={() => navigateHistory("next", false)}
@@ -1168,11 +1279,17 @@ export const ChatComposer = memo(
                   />
                 )}
                 {onModeChange && (
-                  <ModeCombobox
-                    selected={mode}
-                    onSelect={onModeChange}
-                    modes={modeList}
-                  />
+                  <>
+                    <ModeCombobox
+                      selected={mode}
+                      onSelect={onModeChange}
+                      modes={modeList}
+                    />
+                    <ModeToolsDialog
+                      mode={modeList.find((item) => item.id === mode)}
+                      workspaceId={workspaceId}
+                    />
+                  </>
                 )}
               </div>
 

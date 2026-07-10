@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { ContainerIcon, FileTextIcon } from "lucide-react"
 import { Icon } from "@iconify/react"
 
@@ -5,16 +6,18 @@ import { cn } from "@/shared/lib/utils"
 import { getIconName } from "@/shared/ui/file-icon"
 import { SectionLabel } from "@/shared/ui/section-label"
 import { useMainTabsStore } from "@/features/main-tabs"
+import type { AgentDto } from "@/features/workspace/api"
 import { attachmentUrl, type SlashCommand } from "../api"
 import type { UserMessage } from "../types"
 import { MessageChip } from "./message-chip"
+import { colorStyle, resolveModeIcon } from "./mode-combobox"
 import {
   FILE_CONTEXT_RE,
   parseFileCommentContext,
   type FileCommentContext,
 } from "../lib/file-context"
 
-const TOKEN_RE = /(@[^\s]+|\/[^\s]+)/g
+const TOKEN_RE = /(@[^\s]+|\/[^\s]+|#[a-z0-9][a-z0-9-]*)/gi
 
 function isFileMention(path: string): boolean {
   const basename = path.split("/").pop() ?? path
@@ -107,6 +110,29 @@ function SlashCommandChip({ command }: { command: SlashCommand }) {
             )}
           </div>
         </>
+      }
+    />
+  )
+}
+
+function AgentChip({ agent }: { agent: AgentDto }) {
+  const visual = useMemo(
+    () => ({ Icon: resolveModeIcon(agent.icon) }),
+    [agent.icon]
+  )
+  const style = colorStyle(agent.color)
+  return (
+    <MessageChip
+      className={cn(style.softBg, style.iconAccent)}
+      icon={<visual.Icon data-icon="inline-start" aria-hidden />}
+      label={<span className="font-mono">{agent.label}</span>}
+      detail={
+        <div className="flex flex-col gap-1">
+          <SectionLabel>Subagent</SectionLabel>
+          {agent.description && (
+            <span className="text-xs leading-relaxed">{agent.description}</span>
+          )}
+        </div>
       }
     />
   )
@@ -229,11 +255,13 @@ function AttachmentList({
 export function UserMessageContent({
   content,
   commandsByName,
+  agentsById,
   attachments,
   threadId,
 }: {
   content: string
   commandsByName?: ReadonlyMap<string, SlashCommand>
+  agentsById?: ReadonlyMap<string, AgentDto>
   attachments?: UserMessage["attachments"]
   threadId?: string
 }) {
@@ -266,6 +294,15 @@ export function UserMessageContent({
           ) : (
             token
           )
+        )
+        tokenLastIndex = start + token.length
+        continue
+      }
+
+      if (token.startsWith("#")) {
+        const agent = agentsById?.get(token.slice(1))
+        parts.push(
+          agent ? <AgentChip key={`token-${key++}`} agent={agent} /> : token
         )
         tokenLastIndex = start + token.length
         continue

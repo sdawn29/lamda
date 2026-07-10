@@ -83,7 +83,11 @@ import type { ApprovalMode, Mode } from "@/features/workspace/api"
 import { FileChangesCard } from "./file-changes-card"
 import { forkSession, listMessages } from "../api"
 import { blocksToMessages, type MessageBlock } from "../types"
-import { workspaceKeys, useModes } from "@/features/workspace/queries"
+import {
+  workspaceKeys,
+  useAgents,
+  useModes,
+} from "@/features/workspace/queries"
 import { MESSAGES_PAGE_SIZE, type MessagesInfiniteData } from "../queries"
 import {
   TodoPanel,
@@ -394,6 +398,7 @@ export function ChatView({
 
   // ── Queries ───────────────────────────────────────────────────────────────────
   const { data: commandsData } = useSlashCommands(sessionId)
+  const { data: agentsData } = useAgents(workspaceId)
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
   const abortSessionMutation = useAbortSession(sessionId)
@@ -435,6 +440,10 @@ export function ChatView({
     () =>
       new Map((commandsData ?? []).map((command) => [command.name, command])),
     [commandsData]
+  )
+  const agentsById = useMemo(
+    () => new Map((agentsData ?? []).map((agent) => [agent.id, agent])),
+    [agentsData]
   )
 
   const groupedMessages = useMemo(
@@ -1013,6 +1022,7 @@ export function ChatView({
                       <MessageRow
                         message={message}
                         commandsByName={commandsByName}
+                        agentsById={agentsById}
                         showThinking={
                           group.suppressThinking ? false : showThinkingSetting
                         }

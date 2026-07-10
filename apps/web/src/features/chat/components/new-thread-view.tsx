@@ -56,7 +56,11 @@ import {
   updateThreadTitle,
   enterThreadWorktree,
 } from "@/features/workspace/api"
-import { workspacesQueryKey, useModes } from "@/features/workspace/queries"
+import {
+  workspacesQueryKey,
+  useAgents,
+  useModes,
+} from "@/features/workspace/queries"
 import type { ApprovalMode, Mode, WorkspaceDto } from "@/features/workspace/api"
 import { useAppSettings } from "@/features/settings/queries"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
@@ -171,6 +175,11 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
 
   const selectedWorkspace = workspaces.find((w) => w.id === workspaceId)
   const { data: modeData } = useModes(workspaceId)
+  const { data: agentsData } = useAgents(workspaceId)
+  const agentsById = useMemo(
+    () => new Map((agentsData ?? []).map((agent) => [agent.id, agent])),
+    [agentsData]
+  )
   const modeList = useMemo(() => modeData ?? [], [modeData])
   // New-thread branch selection is workspace-scoped. Never proxy through an
   // arbitrary existing session: it may be stale or attached to another
@@ -662,6 +671,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
                 >
                   <UserMessageContent
                     content={pendingSend.text}
+                    agentsById={agentsById}
                     attachments={pendingSend.attachments}
                   />
                 </div>

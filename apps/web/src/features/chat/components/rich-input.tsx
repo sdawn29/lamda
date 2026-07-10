@@ -1,8 +1,14 @@
 import * as React from "react"
-import { ContainerIcon, FileTextIcon, type LucideIcon } from "lucide-react"
+import {
+  ContainerIcon,
+  FileTextIcon,
+  type LucideIcon,
+} from "lucide-react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { getIconName, buildCatppuccinSvgElement } from "@/shared/ui/file-icon"
 import { cn } from "@/shared/lib/utils"
+import type { AgentDto } from "@/features/workspace/api"
+import { colorStyle, resolveModeIcon } from "./mode-combobox"
 import type { SlashCommand } from "../api"
 import {
   FILE_CONTEXT_RE,
@@ -34,6 +40,12 @@ export interface SlashMention {
   startOffset: number
 }
 
+export interface AgentMention {
+  filter: string
+  textNode: Text
+  startOffset: number
+}
+
 function readRichInputValue(root: Node): string {
   let text = ""
   const walk = (nodes: NodeListOf<ChildNode>) => {
@@ -48,6 +60,8 @@ function readRichInputValue(root: Node): string {
           text += `@${el.dataset.filePath}`
         } else if (el.dataset.commandName) {
           text += `/${el.dataset.commandName}`
+        } else if (el.dataset.agentId) {
+          text += `#${el.dataset.agentId}`
         } else if (el.dataset.contextPath && el.dataset.contextLine) {
           text += formatFileCommentContext({
             path: el.dataset.contextPath,
@@ -167,6 +181,24 @@ export function buildSlashCommandChip(cmd: SlashCommand): HTMLSpanElement {
   return chip
 }
 
+export function buildAgentMentionChip(agent: AgentDto): HTMLSpanElement {
+  const style = colorStyle(agent.color)
+  const Icon = resolveModeIcon(agent.icon)
+  const chip = buildChipBase(cn(style.softBg, style.iconAccent))
+  const name = document.createElement("span")
+  name.className = "font-mono"
+  name.textContent = agent.label
+
+  chip.dataset.agentId = agent.id
+  chip.dataset.agentLabel = agent.label
+  if (agent.description) chip.dataset.agentDescription = agent.description
+  chip.title = [`Subagent #${agent.id}`, agent.description]
+    .filter(Boolean)
+    .join("\n")
+  chip.append(buildLucideIcon(Icon), name)
+  return chip
+}
+
 function buildFileContextChip(context: FileCommentContext): HTMLSpanElement {
   const basename = context.path.split("/").pop() ?? context.path
   const chip = buildChipBase()
@@ -245,11 +277,14 @@ export const RichInput = React.forwardRef<
     placeholder: string
     mentionActive: boolean
     slashActive: boolean
+    agentActive: boolean
     onAtMentionChange: (mention: AtMention | null) => void
     onSlashMentionChange: (mention: SlashMention | null) => void
+    onAgentMentionChange: (mention: AgentMention | null) => void
     onSend: () => void
     onMentionEnter: () => void
     onSlashEnter: () => void
+    onAgentEnter: () => void
     onArrowUp: () => void
     onArrowDown: () => void
     onEscape: () => void
@@ -272,11 +307,14 @@ export const RichInput = React.forwardRef<
     placeholder,
     mentionActive,
     slashActive,
+    agentActive,
     onAtMentionChange,
     onSlashMentionChange,
+    onAgentMentionChange,
     onSend,
     onMentionEnter,
     onSlashEnter,
+    onAgentEnter,
     onArrowUp,
     onArrowDown,
     onEscape,
@@ -444,6 +482,54 @@ export const RichInput = React.forwardRef<
     })
   }
 
+  function detectAgentMention() {
+    const div = divRef.current
+    if (!div) {
+      onAgentMentionChange(null)
+      return
+    }
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount) {
+      onAgentMentionChange(null)
+      return
+    }
+    const range = sel.getRangeAt(0)
+    if (!range.collapsed) {
+      onAgentMentionChange(null)
+      return
+    }
+    const { startContainer, startOffset } = range
+    if (
+      startContainer.nodeType !== Node.TEXT_NODE ||
+      !div.contains(startContainer)
+    ) {
+      onAgentMentionChange(null)
+      return
+    }
+    const text = startContainer.textContent ?? ""
+    const beforeCaret = text.slice(0, startOffset)
+    const lastHash = beforeCaret.lastIndexOf("#")
+    if (lastHash === -1) {
+      onAgentMentionChange(null)
+      return
+    }
+    const between = beforeCaret.slice(lastHash + 1)
+    if (/\s/.test(between)) {
+      onAgentMentionChange(null)
+      return
+    }
+    const charBefore = beforeCaret[lastHash - 1]
+    if (charBefore !== undefined && !/[\s\u200B]/.test(charBefore)) {
+      onAgentMentionChange(null)
+      return
+    }
+    onAgentMentionChange({
+      filter: between,
+      textNode: startContainer as Text,
+      startOffset: lastHash,
+    })
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (slashActive) {
       if (e.key === "ArrowUp") {
@@ -464,6 +550,27 @@ export const RichInput = React.forwardRef<
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault()
         onSlashEnter()
+        return
+      }
+    } else if (agentActive) {
+      if (e.key === "ArrowUp") {
+        e.preventDefault()
+        onArrowUp()
+        return
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        onArrowDown()
+        return
+      }
+      if (e.key === "Escape") {
+        e.preventDefault()
+        onEscape()
+        return
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault()
+        onAgentEnter()
         return
       }
     } else if (mentionActive) {
@@ -533,7 +640,8 @@ export const RichInput = React.forwardRef<
         if (
           prev instanceof HTMLElement &&
           (prev.dataset.filePath !== undefined ||
-            prev.dataset.commandName !== undefined)
+            prev.dataset.commandName !== undefined ||
+            prev.dataset.agentId !== undefined)
         ) {
           e.preventDefault()
           prev.remove()
@@ -546,7 +654,8 @@ export const RichInput = React.forwardRef<
         if (
           prevNode instanceof HTMLElement &&
           ((prevNode as HTMLElement).dataset?.filePath !== undefined ||
-            (prevNode as HTMLElement).dataset?.commandName !== undefined)
+            (prevNode as HTMLElement).dataset?.commandName !== undefined ||
+            (prevNode as HTMLElement).dataset?.agentId !== undefined)
         ) {
           e.preventDefault()
           prevNode.remove()
@@ -560,6 +669,7 @@ export const RichInput = React.forwardRef<
   function handleInput() {
     detectAtMention()
     detectSlashCommand()
+    detectAgentMention()
     syncEmptyState()
     onInput()
   }

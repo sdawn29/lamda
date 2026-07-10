@@ -24,7 +24,14 @@ function buildDelegateDescription(agents: AgentConfig[]): string {
     .join("\n");
   return `Delegate a task to a subagent that handles it autonomously and reports back.
 
-The subagent runs in this conversation's working directory with its own context window and its agent-specific toolset. It cannot ask the user questions and cannot spawn further subagents. Nothing but its final message comes back to you, so \`prompt\` must be fully self-contained: include all the context it needs and state exactly what it should return.
+The subagent runs in this conversation's working directory with its own context window and its agent-specific toolset. It cannot ask the user questions and cannot spawn further subagents. Nothing but its final message comes back to you, so \`prompt\` must be a detailed, self-contained brief. Include:
+- objective and concrete deliverable;
+- relevant user intent, facts already established, files/symbols, and external context;
+- scope boundaries, constraints, and decisions already made;
+- the investigation or implementation expected, including assumptions it may make; and
+- the report format, evidence, and validation required on completion.
+
+Do not send vague prompts such as "look into this" or force the subagent to rediscover context the parent already has. Split independent work into separate detailed prompts and synthesize their reports yourself.
 
 To run subagents in parallel, emit multiple delegate calls in a single message (at most 4 execute concurrently; extras wait in a queue). Prefer the cheapest agent that can do the job — use \`explore\` for read-only codebase questions, \`research\` for reading external docs and web pages, and reserve \`general\` for work that needs edits or shell access. The active mode may restrict which agents can be launched (read-only modes only allow read-only agents); a disallowed launch fails with the permitted list.
 
@@ -70,7 +77,7 @@ export function createDelegateTool(
         prompt: {
           type: "string",
           description:
-            "The complete, self-contained task. The agent cannot see this conversation — include all needed context and say exactly what to return.",
+            "A detailed, self-contained brief. Include the objective, relevant context/files, scope and constraints, expected work, and required report/validation. The agent cannot see this conversation or ask the user questions.",
         },
       },
     },
