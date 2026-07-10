@@ -71,7 +71,25 @@ describe("getAgentConfig", () => {
     expect(general?.tools).toEqual([...SUBAGENT_TOOL_NAMES, "memory"]);
 
     const explore = getAgentConfig("explore");
-    expect(explore?.tools).toEqual(["read", "grep", "find", "ls", "memory"]);
+    expect(explore?.tools).toEqual([
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "memory",
+      "semantic_search",
+    ]);
+
+    const research = getAgentConfig("research");
+    expect(research?.tools).toEqual([
+      "web_fetch",
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "memory",
+      "semantic_search",
+    ]);
   });
 
   it("returns undefined for unknown or invalid ids", () => {
@@ -167,7 +185,14 @@ describe("getAgentConfig", () => {
     expect(config?.label).toBe("Custom Explore");
     expect(config?.systemPrompt).toBe("Custom prompt");
     // Omitted fields fall back to the built-in default.
-    expect(config?.tools).toEqual(["read", "grep", "find", "ls", "memory"]);
+    expect(config?.tools).toEqual([
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "memory",
+      "semantic_search",
+    ]);
   });
 });
 
@@ -185,7 +210,7 @@ describe("listAgents", () => {
     );
 
     const ids = listAgents(cwd).map((a) => a.id);
-    expect(ids).toEqual(["general", "explore", "alpha", "zeta"]);
+    expect(ids).toEqual(["general", "explore", "research", "alpha", "zeta"]);
   });
 
   it("ignores invalid ids and non-md files", () => {
@@ -193,7 +218,11 @@ describe("listAgents", () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "Bad_Name.md"), "x", "utf8");
     writeFileSync(join(dir, "notes.txt"), "x", "utf8");
-    expect(listAgents().map((a) => a.id)).toEqual(["general", "explore"]);
+    expect(listAgents().map((a) => a.id)).toEqual([
+      "general",
+      "explore",
+      "research",
+    ]);
   });
 });
 
@@ -211,5 +240,74 @@ describe("ensureAgentFiles", () => {
     );
     ensureAgentFiles();
     expect(getAgentConfig("general")?.label).toBe("Mine");
+  });
+
+  it("refreshes stale generated built-in files with current tool allowlists", () => {
+    const explore = getAgentConfig("explore");
+    expect(explore).toBeDefined();
+    writeAgentFile(
+      join(home, ".lamda", "agents"),
+      "explore",
+      serializeAgentFile({
+        label: "Explore",
+        description:
+          'Read-only codebase scout for searches and "where/how is X done" questions. Fast and safe: it can read and search but never modifies anything.',
+        systemPrompt: explore!.systemPrompt,
+        tools: ["read", "grep", "find", "ls", "memory"],
+        color: "teal",
+        icon: "telescope",
+      }),
+    );
+
+    ensureAgentFiles();
+
+    expect(getAgentConfig("explore")?.tools).toEqual(
+      expect.arrayContaining(["semantic_search"]),
+    );
+  });
+
+  it("does not refresh a user-edited built-in file", () => {
+    writeAgentFile(
+      join(home, ".lamda", "agents"),
+      "explore",
+      serializeAgentFile({
+        label: "Explore",
+        description:
+          'Read-only codebase scout for searches and "where/how is X done" questions. Fast and safe: it can read and search but never modifies anything.',
+        systemPrompt: "My custom explore prompt.",
+        tools: ["read"],
+        color: "teal",
+        icon: "telescope",
+      }),
+    );
+
+    ensureAgentFiles();
+
+    expect(getAgentConfig("explore")?.systemPrompt).toBe(
+      "My custom explore prompt.",
+    );
+    expect(getAgentConfig("explore")?.tools).toEqual(["read"]);
+  });
+
+  it("does not refresh a built-in file with a custom tool-only edit", () => {
+    const explore = getAgentConfig("explore");
+    expect(explore).toBeDefined();
+    writeAgentFile(
+      join(home, ".lamda", "agents"),
+      "explore",
+      serializeAgentFile({
+        label: "Explore",
+        description:
+          'Read-only codebase scout for searches and "where/how is X done" questions. Fast and safe: it can read and search but never modifies anything.',
+        systemPrompt: explore!.systemPrompt,
+        tools: ["read"],
+        color: "teal",
+        icon: "telescope",
+      }),
+    );
+
+    ensureAgentFiles();
+
+    expect(getAgentConfig("explore")?.tools).toEqual(["read"]);
   });
 });

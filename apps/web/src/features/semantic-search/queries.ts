@@ -31,7 +31,11 @@ export function useSemanticSearch(
 }
 
 /** Indexing status/stats for a workspace's code index — files/chunks/embedded counts. */
-export function useSemanticIndexStatus(workspaceId: string | undefined) {
+export function useSemanticIndexStatus(
+  workspaceId: string | undefined,
+  opts?: { poll?: boolean }
+) {
+  const poll = opts?.poll ?? false
   return useQuery({
     queryKey: workspaceId
       ? semanticSearchKeys.status(workspaceId)
@@ -39,5 +43,21 @@ export function useSemanticIndexStatus(workspaceId: string | undefined) {
     queryFn: () => fetchSemanticIndexStatus(workspaceId!),
     enabled: !!workspaceId,
     staleTime: 15_000,
+    refetchInterval: poll
+      ? (query) => {
+          const data = query.state.data
+          if (
+            data &&
+            data.enabled &&
+            data.vecAvailable &&
+            data.embeddingsEnabled &&
+            data.chunkCount > 0 &&
+            data.embeddedCount < data.chunkCount
+          ) {
+            return 2000
+          }
+          return false
+        }
+      : undefined,
   })
 }

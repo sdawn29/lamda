@@ -260,6 +260,53 @@ function resolveAgentFile(
   return null;
 }
 
+function agentFileMatchesDefaultSeed(
+  raw: string,
+  defaults: AgentConfig,
+): boolean {
+  const { fields, body } = parseFrontmatter(raw);
+  const tools = sanitizeTools([
+    ...(fields.has("tools") ? parseList(fields.get("tools")!) : defaults.tools),
+    ...(fields.has("customTools") ? parseList(fields.get("customTools")!) : []),
+  ]);
+  return (
+    (fields.has("name") ? unquote(fields.get("name")!) : defaults.label) ===
+      defaults.label &&
+    (fields.has("description")
+      ? unquote(fields.get("description")!)
+      : defaults.description) === defaults.description &&
+    (parseAgentModel(unquote(fields.get("model") ?? "")) ??
+      defaults.model) === defaults.model &&
+    (normalizeColor(fields.get("color")) ?? defaults.color) ===
+      defaults.color &&
+    (fields.has("icon") ? unquote(fields.get("icon")!) : defaults.icon) ===
+      defaults.icon &&
+    body === defaults.systemPrompt &&
+    !sameStringList(tools, defaults.tools) &&
+    isKnownStaleAgentSeed(defaults.id, tools)
+  );
+}
+
+function sameStringList(
+  actual: readonly string[],
+  expected: readonly string[],
+): boolean {
+  return (
+    actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index])
+  );
+}
+
+function isKnownStaleAgentSeed(
+  id: string,
+  tools: readonly string[],
+): boolean {
+  if (id === "explore") {
+    return sameStringList(tools, ["read", "grep", "find", "ls", "memory"]);
+  }
+  return false;
+}
+
 // Cache of file-loaded configs keyed by `${cwd}::${id}`, invalidated by file
 // path + mtime so a manual edit to an agent file takes effect on the next
 // spawn without a server restart (mirroring `getModeConfig`).
@@ -372,7 +419,9 @@ export function listAgents(cwd?: string): AgentConfig[] {
 /**
  * Seed each built-in agent's default definition into `~/.lamda/agents/<id>.md`
  * when that file doesn't yet exist, so agents are discoverable and editable on
- * disk. Existing files are never overwritten — user edits always win.
+ * disk. Existing built-in files are refreshed only when they still look like an
+ * auto-generated seed (same metadata + body), so stale tool allowlists are
+ * upgraded while user-edited definitions still win.
  * Best-effort: any filesystem failure is swallowed so a read-only home dir
  * can't break startup. Call once at server startup.
  */
@@ -384,9 +433,13 @@ export function ensureAgentFiles(): void {
   }
   for (const id of BUILTIN_AGENTS) {
     const path = lamdaAgentFilePath(id);
-    if (existsSync(path)) continue;
+    const defaults = DEFAULT_AGENT_CONFIG[id];
     try {
-      writeFileSync(path, serializeAgentFile(DEFAULT_AGENT_CONFIG[id]), "utf8");
+      if (existsSync(path)) {
+        const raw = readFileSync(path, "utf8");
+        if (!agentFileMatchesDefaultSeed(raw, defaults)) continue;
+      }
+      writeFileSync(path, serializeAgentFile(defaults), "utf8");
     } catch {
       // Seeding is best-effort; the in-memory default still applies.
     }

@@ -19,6 +19,7 @@ import {
   createWorkspaceTask,
   searchCodeChunks,
   getCodeIndexStats,
+  clearWorkspaceChunks,
   isVecAvailable,
   getSetting,
   upsertSetting,
@@ -520,6 +521,9 @@ workspaces.delete("/workspace/:id", async (c) => {
   semanticIndexer.stop(workspaceId);
   fileTreeService.stopWorkspace(workspaceId);
   lamdaConfigWatcher.stopWorkspace(workspaceId);
+  // code_chunks_vec has no FK cascade — clear vectors explicitly before the
+  // row cascade.
+  clearWorkspaceChunks(workspaceId);
   deleteWorkspace(workspaceId);
   return new Response(null, { status: 204 });
 });

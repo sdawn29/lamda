@@ -377,6 +377,89 @@ function resolveModeFile(
   return null;
 }
 
+function modeFileMatchesDefaultSeed(
+  raw: string,
+  defaults: ModeConfig,
+): boolean {
+  const { frontmatter, body } = parseModeFile(raw);
+  const tools = frontmatter.tools ?? defaults.tools;
+  const agents = frontmatter.agents ?? defaults.agents;
+  return (
+    (frontmatter.label ?? defaults.label) === defaults.label &&
+    (frontmatter.description ?? defaults.description) ===
+      defaults.description &&
+    (frontmatter.color ?? defaults.color) === defaults.color &&
+    (frontmatter.icon ?? defaults.icon) === defaults.icon &&
+    body === defaults.preamble &&
+    !sameStringList(tools, defaults.tools) &&
+    isKnownStaleModeSeed(defaults.id, tools, agents)
+  );
+}
+
+function sameStringList(
+  actual: readonly string[] | null,
+  expected: readonly string[] | null,
+): boolean {
+  if (actual === null || expected === null) return actual === expected;
+  return (
+    actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index])
+  );
+}
+
+function isKnownStaleModeSeed(
+  mode: string,
+  tools: readonly string[],
+  agents: readonly string[] | null,
+): boolean {
+  if (mode === "ask") {
+    return (
+      sameStringList(tools, [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "question",
+        "memory",
+        "delegate",
+      ]) && sameStringList(agents, ["explore"])
+    );
+  }
+  if (mode === "plan") {
+    return (
+      sameStringList(tools, [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "plan",
+        "question",
+        "memory",
+        "delegate",
+      ]) && sameStringList(agents, ["explore"])
+    );
+  }
+  if (mode === "agent") {
+    return (
+      sameStringList(tools, [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "todo",
+        "grep",
+        "find",
+        "ls",
+        "question",
+        "memory",
+        "delegate",
+      ]) && agents === null
+    );
+  }
+  return false;
+}
+
 // Cache of file-loaded configs keyed by `${cwd}::${mode}`, invalidated by file
 // path + mtime so a manual edit to a mode file takes effect on the next turn
 // without a server restart (mirroring how `.lamda/tool-approvals.json` is
@@ -475,7 +558,9 @@ export function listModes(cwd?: string): ModeConfig[] {
 /**
  * Seed each built-in mode's default definition into `~/.lamda/modes/<mode>.md`
  * when that file doesn't yet exist, so modes are discoverable and editable on
- * disk. Existing files are never overwritten — user edits always win.
+ * disk. Existing built-in files are refreshed only when they still look like an
+ * auto-generated seed (same metadata + body), so stale tool allowlists are
+ * upgraded while user-edited definitions still win.
  * Best-effort: any filesystem failure is swallowed so a read-only home dir can't
  * break startup. Call once at server startup.
  */
@@ -487,9 +572,13 @@ export function ensureModeFiles(): void {
   }
   for (const mode of BUILTIN_MODES) {
     const path = lamdaModeFilePath(mode);
-    if (existsSync(path)) continue;
+    const defaults = DEFAULT_MODE_CONFIG[mode];
     try {
-      writeFileSync(path, serializeModeFile(DEFAULT_MODE_CONFIG[mode]), "utf8");
+      if (existsSync(path)) {
+        const raw = readFileSync(path, "utf8");
+        if (!modeFileMatchesDefaultSeed(raw, defaults)) continue;
+      }
+      writeFileSync(path, serializeModeFile(defaults), "utf8");
     } catch {
       // Seeding is best-effort; the in-memory default still applies.
     }

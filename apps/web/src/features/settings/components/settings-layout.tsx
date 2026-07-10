@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode } from "react"
+import { type CSSProperties, type ReactNode, useState } from "react"
 
 import { SettingsSidebar } from "./settings-sidebar"
 import { SettingsTitleBar } from "./settings-title-bar"
@@ -9,6 +9,8 @@ interface SettingsLayoutProps {
 }
 
 export function SettingsLayout({ children }: SettingsLayoutProps) {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+
   return (
     <div className="relative flex h-svh w-full overflow-hidden bg-sidebar">
       {/* Draggable window strip behind the titlebar island (frameless window /
@@ -19,7 +21,10 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
       />
       <SettingsTitleBar />
       <div className="flex min-h-0 w-full flex-1 gap-2 px-2 pt-12 pb-2">
-        <SettingsSidebar />
+        <SettingsSidebar
+          collapsed={isSidebarCollapsed}
+          onCollapsedChange={setIsSidebarCollapsed}
+        />
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-md">
           <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         </main>

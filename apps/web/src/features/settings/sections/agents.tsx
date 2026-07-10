@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useSearch } from "@tanstack/react-router"
 import {
   ArrowLeftIcon,
-  ArrowRightIcon,
   BotIcon,
   CheckIcon,
   EyeIcon,
@@ -12,12 +11,10 @@ import {
   PlusIcon,
   RotateCcwIcon,
   SquareTerminalIcon,
-  Trash2Icon,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { cn } from "@/shared/lib/utils"
-import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import {
   Select,
@@ -51,6 +48,9 @@ import {
   DefinitionEditorFooter,
   DefinitionEditorHeader,
   DefinitionEditorPage,
+  DefinitionList,
+  DefinitionRow,
+  DefinitionRowSkeleton,
   DeleteDefinitionDialog,
   FieldSection,
   KEBAB_ID_PATTERN,
@@ -62,10 +62,6 @@ import {
   serializeRawAgentDefinition,
 } from "../components/raw-definition-editor"
 import { ToolPicker } from "../components/tool-picker"
-import {
-  colorStyle,
-  resolveModeIcon,
-} from "@/features/chat/components/mode-combobox"
 
 /**
  * Builtin tools a subagent may be granted — mirrors SUBAGENT_TOOL_NAMES
@@ -172,7 +168,7 @@ function emptyForm(): AgentFormState {
     name: "",
     description: "",
     model: null,
-    tools: ["read", "grep", "find", "ls"],
+    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "memory"],
     color: "violet",
     icon: "bot",
     prompt: "",
@@ -204,60 +200,6 @@ function agentMeta(agent: AgentDto): string {
   return parts.join(" · ")
 }
 
-function DefinitionCardSkeleton() {
-  return (
-    <div className="rounded-2xl border border-border/60 bg-card/50 p-3.5 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="size-8 rounded-xl bg-muted" />
-        <div className="flex flex-1 flex-col gap-2 pt-0.5">
-          <div className="h-3.5 w-32 rounded bg-muted" />
-          <div className="h-3 w-56 rounded bg-muted/70" />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function WorkspaceScopeCard({
-  workspace,
-  count,
-  onSelect,
-}: {
-  workspace: WorkspaceDto
-  count?: number
-  onSelect: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card/70 px-3.5 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-border hover:bg-card hover:shadow-md focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-    >
-      <span className="flex min-w-0 items-center gap-3">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background text-muted-foreground shadow-sm">
-          <BotIcon className="size-3.5" />
-        </span>
-        <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-sm leading-snug font-medium">
-            {workspace.name}
-          </span>
-          <span className="truncate text-xs text-muted-foreground">
-            {workspace.path}
-          </span>
-        </span>
-      </span>
-      <span className="flex shrink-0 items-center gap-2">
-        {count !== undefined && (
-          <span className="text-3xs text-muted-foreground">
-            {count} subagent{count === 1 ? "" : "s"}
-          </span>
-        )}
-        <ArrowRightIcon className="size-3.5 text-muted-foreground/40" />
-      </span>
-    </button>
-  )
-}
-
 function AgentCreateLocationSelect({
   workspaces,
   workspaceId,
@@ -279,13 +221,13 @@ function AgentCreateLocationSelect({
   return (
     <Select
       value={value}
-      onValueChange={(next) =>
-        onChange(
-          next === "global"
-            ? { scope: "global" }
-            : { scope: "local", workspaceId: next }
-        )
-      }
+      onValueChange={(next) => {
+        if (!next || next === "global") {
+          onChange({ scope: "global" })
+          return
+        }
+        onChange({ scope: "local", workspaceId: next })
+      }}
     >
       <SelectTrigger size="sm" className="h-8 max-w-52 min-w-40">
         <SelectValue>{label}</SelectValue>
@@ -306,83 +248,6 @@ function AgentCreateLocationSelect({
   )
 }
 
-function AgentCard({
-  agent,
-  meta,
-  onOpen,
-  onDelete,
-  deleting,
-}: {
-  agent: AgentDto
-  meta: string
-  onOpen: () => void
-  onDelete: () => void
-  deleting: boolean
-}) {
-  const visual = useMemo(
-    () => ({ Icon: resolveModeIcon(agent.icon) }),
-    [agent.icon]
-  )
-  const style = colorStyle(agent.color)
-  const DeleteIcon = agent.builtin ? RotateCcwIcon : Trash2Icon
-  return (
-    <div className="group relative rounded-2xl border border-border/70 bg-card/70 p-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-border hover:bg-card hover:shadow-md">
-      <button
-        type="button"
-        aria-label={`Edit ${agent.label}`}
-        className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        onClick={onOpen}
-      />
-      <div className="pointer-events-none relative flex min-w-0 items-start gap-3">
-        <span
-          className={cn(
-            "flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/40 shadow-sm",
-            style.softBg,
-            style.iconAccent
-          )}
-        >
-          <visual.Icon className="size-3.5" />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className="truncate text-sm leading-snug font-medium">
-              {agent.label}
-            </span>
-            <code className="shrink-0 rounded bg-muted px-1 py-px font-mono text-3xs text-muted-foreground">
-              {agent.id}
-            </code>
-            {agent.builtin && (
-              <Badge variant="secondary" className="h-4 px-1.5 text-3xs">
-                built-in
-              </Badge>
-            )}
-            {agent.source === "local" && (
-              <Badge variant="outline" className="h-4 px-1.5 text-3xs">
-                workspace
-              </Badge>
-            )}
-          </span>
-          <span className="line-clamp-2 text-xs/relaxed text-muted-foreground">
-            {agent.description || "No description"}
-          </span>
-          <span className="text-3xs text-muted-foreground/70">{meta}</span>
-        </span>
-        <ArrowRightIcon className="mt-1 size-3.5 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-      </div>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="absolute right-9 bottom-2.5 z-10 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100"
-        onClick={onDelete}
-        disabled={deleting}
-        title={agent.builtin ? "Reset to the built-in default" : "Delete"}
-      >
-        <DeleteIcon className="size-3.5" />
-      </Button>
-    </div>
-  )
-}
-
 /**
  * Access section: the three preset cards plus a per-tool escape hatch. The
  * chips stay hidden until the user asks for them (or the toolset no longer
@@ -390,9 +255,11 @@ function AgentCard({
  */
 function AccessPicker({
   tools,
+  className,
   onChange,
 }: {
   tools: string[]
+  className?: string
   onChange: (tools: string[]) => void
 }) {
   const preset = presetForTools(tools)
@@ -403,6 +270,7 @@ function AccessPicker({
 
   return (
     <FieldSection
+      className={className}
       title="Access level"
       hint="What the agent is physically able to do — the prompt only steers, this enforces."
       action={
@@ -417,7 +285,7 @@ function AccessPicker({
         </Button>
       }
     >
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-1.5 sm:grid-cols-3">
         {ACCESS_PRESETS.map(({ id, label, blurb, Icon }) => {
           const active = preset === id
           return (
@@ -426,9 +294,9 @@ function AccessPicker({
               type="button"
               aria-pressed={active}
               className={cn(
-                "flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors",
+                "flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors",
                 active
-                  ? "border-primary/50 bg-primary/5"
+                  ? "border-primary/40 bg-primary/5"
                   : "border-border/60 hover:border-border hover:bg-accent/40"
               )}
               onClick={() =>
@@ -474,8 +342,9 @@ function AccessPicker({
                 <button
                   key={tool}
                   type="button"
+                  aria-pressed={active}
                   className={cn(
-                    "rounded-md border px-2 py-1 font-mono text-2xs transition-colors",
+                    "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-2xs transition-colors",
                     active
                       ? "border-primary/40 bg-primary/10 text-foreground"
                       : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
@@ -488,6 +357,12 @@ function AccessPicker({
                     )
                   }
                 >
+                  <CheckIcon
+                    className={cn(
+                      "size-3",
+                      active ? "text-primary" : "opacity-0"
+                    )}
+                  />
                   {tool}
                 </button>
               )
@@ -541,26 +416,26 @@ function AgentListPage() {
     })
 
   return (
-    <div className="flex flex-col gap-4">
-      <section className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card/60 p-4 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background text-muted-foreground shadow-sm">
-              <BotIcon className="size-3.5" />
+    <div className="flex flex-col gap-8">
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+            <span className="truncate">
+              {isWorkspacePage
+                ? `${activeWorkspace?.name ?? "Workspace"} — ${
+                    isLoading && visibleAgents.length === 0
+                      ? "loading…"
+                      : `${visibleAgents.length} local subagent${visibleAgents.length === 1 ? "" : "s"}`
+                  }`
+                : isLoading && visibleAgents.length === 0
+                  ? "Loading…"
+                  : `${visibleAgents.length} subagent${visibleAgents.length === 1 ? "" : "s"}`}
             </span>
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <h2 className="text-sm font-medium tracking-tight">
-                {isWorkspacePage
-                  ? `${activeWorkspace?.name ?? "Workspace"} agents`
-                  : "Global agents"}
-              </h2>
-              <p className="max-w-2xl text-xs/relaxed text-muted-foreground">
-                {isWorkspacePage
-                  ? "Workspace-local subagents live in this project's .lamda/agents folder."
-                  : "Global subagents are available in every workspace. Choose a workspace below to manage local agents."}
-              </p>
-            </div>
-          </div>
+            <span aria-hidden="true">·</span>
+            <code className="font-mono text-2xs">
+              {isWorkspacePage ? ".lamda/agents" : "~/.lamda/agents"}
+            </code>
+          </p>
           <div className="flex shrink-0 items-center gap-2">
             {isWorkspacePage && (
               <Button
@@ -584,34 +459,73 @@ function AgentListPage() {
             </Button>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-3 border-t border-border/50 pt-3">
-          <span className="text-xs text-muted-foreground">
-            {isLoading && visibleAgents.length === 0
-              ? "Loading..."
-              : `${visibleAgents.length} subagent${visibleAgents.length === 1 ? "" : "s"}`}
-          </span>
-          <span className="truncate text-3xs text-muted-foreground/70">
-            {isWorkspacePage ? ".lamda/agents" : "~/.lamda/agents"}
-          </span>
-        </div>
+
+        {isLoading && visibleAgents.length === 0 ? (
+          <DefinitionList>
+            <DefinitionRowSkeleton />
+            <DefinitionRowSkeleton />
+            <DefinitionRowSkeleton />
+          </DefinitionList>
+        ) : visibleAgents.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border/70 px-6 py-8 text-center">
+            <BotIcon className="size-5 text-muted-foreground" />
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">
+                {isWorkspacePage
+                  ? "No workspace subagents"
+                  : "No global subagents"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Create one with New agent.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <DefinitionList>
+            {visibleAgents.map((agent) => (
+              <DefinitionRow
+                key={`${agent.source}:${agent.id}`}
+                icon={agent.icon}
+                color={agent.color}
+                name={agent.label}
+                id={agent.id}
+                builtin={agent.builtin}
+                workspace={agent.source === "local"}
+                description={agent.description}
+                meta={agentMeta(agent)}
+                onEdit={() => openEditor(agent.id)}
+                onDelete={() => setPendingDelete(agent)}
+                deleting={remove.isPending}
+              />
+            ))}
+          </DefinitionList>
+        )}
       </section>
 
       {!isWorkspacePage && workspaces.length > 0 && (
-        <section className="flex flex-col gap-2.5">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-xs font-medium text-muted-foreground">
-              Workspaces
-            </h3>
-            <span className="text-3xs text-muted-foreground/70">
-              Open a workspace to manage its local agent files.
-            </span>
-          </div>
-          <div className="flex flex-col gap-2">
+        <section className="flex flex-col gap-3">
+          <header className="flex flex-col gap-0.5">
+            <h2 className="text-sm font-medium tracking-tight">
+              Workspace overrides
+            </h2>
+            <p className="text-xs/relaxed text-muted-foreground">
+              Workspace-local subagent files override or extend the global set.
+              Open a workspace to edit them.
+            </p>
+          </header>
+          <DefinitionList>
             {workspaces.map((workspace) => (
-              <WorkspaceScopeCard
+              <DefinitionRow
                 key={workspace.id}
-                workspace={workspace}
-                onSelect={() =>
+                icon="bot"
+                color="slate"
+                name={workspace.name}
+                id="workspace"
+                builtin={false}
+                workspace
+                description={workspace.path}
+                meta=".lamda/agents"
+                onEdit={() =>
                   void navigate({
                     to: "/settings/$section",
                     params: { section: "agents" },
@@ -621,51 +535,9 @@ function AgentListPage() {
                 }
               />
             ))}
-          </div>
+          </DefinitionList>
         </section>
       )}
-
-      <section className="flex flex-col gap-2.5">
-        <div className="flex flex-col gap-2.5">
-          {isLoading && visibleAgents.length === 0 ? (
-            <>
-              <DefinitionCardSkeleton />
-              <DefinitionCardSkeleton />
-              <DefinitionCardSkeleton />
-            </>
-          ) : visibleAgents.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border/60 px-6 py-9 text-center">
-              <BotIcon className="size-5 text-muted-foreground" />
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">
-                  {isWorkspacePage
-                    ? "No local subagents yet"
-                    : "No global subagents yet"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Create one with New agent.
-                </p>
-              </div>
-            </div>
-          ) : (
-            visibleAgents.map((agent) => (
-              <AgentCard
-                key={`${agent.source}:${agent.id}`}
-                meta={agentMeta(agent)}
-                agent={agent}
-                onOpen={() => openEditor(agent.id)}
-                onDelete={() => setPendingDelete(agent)}
-                deleting={remove.isPending}
-              />
-            ))
-          )}
-        </div>
-        <p className="text-2xs/relaxed text-muted-foreground/70">
-          {isWorkspacePage
-            ? "These subagents are scoped to the selected workspace and stored in its .lamda/agents folder."
-            : "Global subagents are launched by the delegate tool and stored in ~/.lamda/agents."}
-        </p>
-      </section>
 
       <DeleteDefinitionDialog
         kind="agent"
@@ -700,21 +572,16 @@ function AgentEditorPage({ agentParam }: { agentParam: string }) {
 
   const isNew = agentParam === "new"
   const agent = isNew ? null : (agents.find((a) => a.id === agentParam) ?? null)
-  const [form, setForm] = useState<AgentFormState | null>(() =>
+  const [draftForm, setForm] = useState<AgentFormState | null>(() =>
     isNew ? { ...emptyForm(), scope: ws ? "local" : "global" } : null
   )
+  const form = draftForm ?? (!isNew && agent ? formFromAgent(agent) : null)
   const [editorMode, setEditorMode] = useState<"form" | "raw">("form")
   const [rawContent, setRawContent] = useState("")
   const rawAgent = useMemo(
     () => parseRawAgentDefinition(rawContent),
     [rawContent]
   )
-
-  // Editing an existing agent loads async — adopt it into the form once the
-  // list arrives.
-  useEffect(() => {
-    if (!isNew && form === null && agent) setForm(formFromAgent(agent))
-  }, [isNew, form, agent])
 
   // Groups a subagent may pick from: everything except the builtins (the
   // access presets above manage those), keeping only subagent-grantable
@@ -914,13 +781,14 @@ function AgentEditorPage({ agentParam }: { agentParam: string }) {
         onPatch={(patch) => setForm({ ...form, ...patch })}
       />
 
-      <div className="flex justify-end pt-3">
+      <div className="flex justify-end pt-2.5">
         <RawEditorToggle value={editorMode} onChange={switchEditorMode} />
       </div>
 
       {editorMode === "form" ? (
-        <div className="flex flex-col gap-3 pt-3">
+        <div className="flex flex-col divide-y divide-border/50">
           <FieldSection
+            className="py-5"
             title="When should the assistant use it?"
             hint="Read by the assistant when routing a task — say what this agent does and when to prefer it."
           >
@@ -934,35 +802,10 @@ function AgentEditorPage({ agentParam }: { agentParam: string }) {
             />
           </FieldSection>
 
-          <AccessPicker
-            tools={form.tools}
-            onChange={(tools) => setForm({ ...form, tools })}
-          />
-
           <FieldSection
-            title="Workspace tools"
-            hint="Memory, MCP, LSP, and git-host tools this agent may also use. “All + future” trusts a whole server, including tools it adds later."
-          >
-            {catalogLoading ? (
-              <span className="text-2xs text-muted-foreground">
-                Loading workspace tools…
-              </span>
-            ) : subagentGroups.length === 0 ? (
-              <span className="text-2xs text-muted-foreground">
-                No workspace tools are available here.
-              </span>
-            ) : (
-              <ToolPicker
-                groups={subagentGroups}
-                selected={form.tools}
-                onChange={(tools) => setForm({ ...form, tools })}
-              />
-            )}
-          </FieldSection>
-
-          <FieldSection
+            className="py-5"
             title="Model"
-            hint="Leave on inherit unless this agent should run on a specific (e.g. cheaper) model."
+            hint="Leave on inherit unless this agent should run on a specific model."
           >
             <div className="flex items-center gap-1">
               <ModelCombobox
@@ -990,9 +833,38 @@ function AgentEditorPage({ agentParam }: { agentParam: string }) {
             </div>
           </FieldSection>
 
+          <AccessPicker
+            className="py-5"
+            tools={form.tools}
+            onChange={(tools) => setForm({ ...form, tools })}
+          />
+
           <FieldSection
-            title="Instructions"
-            hint="The agent's system prompt. It runs headlessly: it can't ask questions, and only its final message comes back."
+            className="py-5"
+            title="Workspace tools"
+            hint="Memory, MCP, LSP, and git-host tools this agent may also use. “All + future” trusts a whole server, including tools it adds later."
+          >
+            {catalogLoading ? (
+              <span className="text-2xs text-muted-foreground">
+                Loading workspace tools…
+              </span>
+            ) : subagentGroups.length === 0 ? (
+              <span className="text-2xs text-muted-foreground">
+                No workspace tools are available here.
+              </span>
+            ) : (
+              <ToolPicker
+                groups={subagentGroups}
+                selected={form.tools}
+                onChange={(tools) => setForm({ ...form, tools })}
+              />
+            )}
+          </FieldSection>
+
+          <FieldSection
+            className="py-5"
+            title="Prompt"
+            hint="The system prompt used when this subagent runs headlessly — it can't ask questions, and only its final message comes back."
           >
             <Textarea
               value={form.prompt}
@@ -1006,13 +878,17 @@ function AgentEditorPage({ agentParam }: { agentParam: string }) {
           </FieldSection>
         </div>
       ) : (
-        <div className="pt-3">
+        <FieldSection
+          className="py-5"
+          title="Raw definition"
+          hint="Edit the markdown file exactly as it will be saved."
+        >
           <RawDefinitionEditor
             value={rawContent}
             diagnostics={rawAgent.diagnostics}
             onChange={setRawContent}
           />
-        </div>
+        </FieldSection>
       )}
 
       <DefinitionEditorFooter

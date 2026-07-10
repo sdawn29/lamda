@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react"
-import { Search, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Search, X } from "lucide-react"
 import { Link, useMatchRoute } from "@tanstack/react-router"
 
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { SectionLabel } from "@/shared/ui/section-label"
 import { Input } from "@/shared/ui/input"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import { cn } from "@/shared/lib/utils"
 import {
   matchesSearch,
@@ -14,7 +15,13 @@ import {
   type SettingsSectionMeta,
 } from "../sections"
 
-function SidebarLink({ section }: { section: SettingsSectionMeta }) {
+function SidebarLink({
+  collapsed,
+  section,
+}: {
+  collapsed: boolean
+  section: SettingsSectionMeta
+}) {
   const Icon = section.icon
   const matchRoute = useMatchRoute()
   const isActive = !!matchRoute({
@@ -22,13 +29,15 @@ function SidebarLink({ section }: { section: SettingsSectionMeta }) {
     params: { section: section.slug },
   })
 
-  return (
+  const link = (
     <Link
       to="/settings/$section"
       params={{ section: section.slug }}
       preload="intent"
+      aria-label={collapsed ? section.label : undefined}
       className={cn(
-        "group relative flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm transition-colors",
+        "group relative flex h-8 w-full items-center rounded-md text-sm transition-colors",
+        collapsed ? "justify-center px-2" : "gap-2 px-2",
         isActive
           ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
           : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
@@ -36,16 +45,33 @@ function SidebarLink({ section }: { section: SettingsSectionMeta }) {
     >
       <Icon
         className={cn(
-          "h-3.5 w-3.5 shrink-0 transition-colors",
+          "size-3.5 shrink-0 transition-colors",
           isActive ? "text-foreground" : "text-muted-foreground/80"
         )}
       />
-      <span className="truncate">{section.label}</span>
+      {!collapsed && <span className="truncate">{section.label}</span>}
     </Link>
+  )
+
+  if (!collapsed) return link
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={link} />
+      <TooltipContent side="right">{section.label}</TooltipContent>
+    </Tooltip>
   )
 }
 
-export function SettingsSidebar() {
+interface SettingsSidebarProps {
+  collapsed: boolean
+  onCollapsedChange: (collapsed: boolean) => void
+}
+
+export function SettingsSidebar({
+  collapsed,
+  onCollapsedChange,
+}: SettingsSidebarProps) {
   const [search, setSearch] = useState("")
 
   const filtered = useMemo(
@@ -67,30 +93,55 @@ export function SettingsSidebar() {
   }, [filtered])
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-md">
-      {/* Search */}
-      <div className="px-3 pt-3 pb-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
-          <Input
-            placeholder="Search settings"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-7 bg-sidebar-accent/40 pr-7 pl-7 text-xs shadow-none"
-          />
-          {search && (
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setSearch("")}
-              className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X />
-              <span className="sr-only">Clear search</span>
-            </Button>
-          )}
-        </div>
+    <aside
+      className={cn(
+        "flex h-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-md transition-[width] duration-200",
+        collapsed ? "w-12" : "w-60"
+      )}
+    >
+      <div
+        className={cn(
+          "flex shrink-0",
+          collapsed ? "justify-center p-2" : "justify-end px-2 pt-2"
+        )}
+      >
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={() => onCollapsedChange(!collapsed)}
+          aria-label={
+            collapsed ? "Expand settings sidebar" : "Collapse settings sidebar"
+          }
+        >
+          {collapsed ? <ChevronRight /> : <ChevronLeft />}
+        </Button>
       </div>
+
+      {/* Search */}
+      {!collapsed && (
+        <div className="px-3 pt-2 pb-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
+            <Input
+              placeholder="Search settings"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-7 bg-sidebar-accent/40 pr-7 pl-7 text-xs shadow-none"
+            />
+            {search && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => setSearch("")}
+                className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X />
+                <span className="sr-only">Clear search</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
@@ -101,7 +152,11 @@ export function SettingsSidebar() {
         ) : search.trim() ? (
           <div className="flex flex-col gap-0.5 pt-1">
             {filtered.map((section) => (
-              <SidebarLink key={section.slug} section={section} />
+              <SidebarLink
+                key={section.slug}
+                collapsed={collapsed}
+                section={section}
+              />
             ))}
           </div>
         ) : (
@@ -109,13 +164,22 @@ export function SettingsSidebar() {
             const items = visibleByGroup.get(group.id)
             if (!items?.length) return null
             return (
-              <div key={group.id} className="mt-3 first:mt-1">
-                <SectionLabel className="mb-1 block px-2">
-                  {group.label}
-                </SectionLabel>
+              <div
+                key={group.id}
+                className={cn("first:mt-1", collapsed ? "mt-2" : "mt-3")}
+              >
+                {!collapsed && (
+                  <SectionLabel className="mb-1 block px-2">
+                    {group.label}
+                  </SectionLabel>
+                )}
                 <div className="flex flex-col gap-0.5">
                   {items.map((section) => (
-                    <SidebarLink key={section.slug} section={section} />
+                    <SidebarLink
+                      key={section.slug}
+                      collapsed={collapsed}
+                      section={section}
+                    />
                   ))}
                 </div>
               </div>
@@ -125,7 +189,12 @@ export function SettingsSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-4 py-2.5">
+      <div
+        className={cn(
+          "flex shrink-0 items-center border-t border-border py-2.5",
+          collapsed ? "justify-center px-2" : "justify-between gap-2 px-4"
+        )}
+      >
         <div className="flex items-center gap-1.5">
           <span
             className="text-base leading-none font-black"
@@ -133,19 +202,22 @@ export function SettingsSidebar() {
           >
             Λ
           </span>
-          <span className="text-2xs font-medium text-muted-foreground">
-            Lamda
-          </span>
+          {!collapsed && (
+            <span className="text-2xs font-medium text-muted-foreground">
+              Lamda
+            </span>
+          )}
         </div>
-        {import.meta.env.DEV ? (
-          <Badge variant="outline" className="font-mono text-3xs">
-            dev
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="font-mono text-3xs">
-            v{__APP_VERSION__}
-          </Badge>
-        )}
+        {!collapsed &&
+          (import.meta.env.DEV ? (
+            <Badge variant="outline" className="font-mono text-3xs">
+              dev
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="font-mono text-3xs">
+              v{__APP_VERSION__}
+            </Badge>
+          ))}
       </div>
     </aside>
   )

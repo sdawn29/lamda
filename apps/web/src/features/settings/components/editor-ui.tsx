@@ -82,28 +82,34 @@ export function slugify(name: string): string {
     .replace(/^-+|-+$/g, "")
 }
 
-/** A titled block in an editor body: heading + optional hint + content. */
+/**
+ * A titled block in an editor body: heading + optional hint + content. Flat —
+ * no box chrome — so editors read like the rest of the settings pages;
+ * stack them in a `divide-y` container with per-section padding.
+ */
 export function FieldSection({
   title,
   hint,
   action,
+  className,
   children,
 }: {
   title: string
   hint?: string
   action?: React.ReactNode
+  className?: string
   children: React.ReactNode
 }) {
   return (
-    <section className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-card/60 p-3.5 shadow-sm">
+    <section className={cn("flex flex-col gap-2.5", className)}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
-          <h3 className="text-xs font-medium">{title}</h3>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h3 className="text-sm leading-snug font-medium">{title}</h3>
           {hint && (
-            <p className="text-3xs font-normal text-muted-foreground">{hint}</p>
+            <p className="text-xs/relaxed text-muted-foreground">{hint}</p>
           )}
         </div>
-        {action}
+        {action && <div className="flex shrink-0 items-center">{action}</div>}
       </div>
       {children}
     </section>
@@ -138,14 +144,14 @@ export function AppearancePicker({
             type="button"
             title="Change color and icon"
             className={cn(
-              "group relative flex size-14 shrink-0 items-center justify-center rounded-xl transition-shadow outline-none hover:ring-2 hover:ring-ring/50 focus-visible:ring-2 focus-visible:ring-ring",
+              "group relative flex size-12 shrink-0 items-center justify-center rounded-xl transition-shadow outline-none hover:ring-2 hover:ring-ring/50 focus-visible:ring-2 focus-visible:ring-ring",
               style.softBg,
               style.iconAccent
             )}
           />
         }
       >
-        <visual.Icon className="size-6" />
+        <visual.Icon className="size-5" />
         <span className="absolute -right-1.5 -bottom-1.5 flex size-5 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm transition-colors group-hover:text-foreground">
           <PencilIcon className="size-2.5" />
         </span>
@@ -250,7 +256,7 @@ export function DefinitionRow({
   const visual = useMemo(() => ({ Icon: resolveModeIcon(icon) }), [icon])
   const style = colorStyle(color)
   return (
-    <div className="group relative flex items-center gap-3 px-2.5 py-2.5 transition-colors hover:bg-muted/40">
+    <div className="group relative flex items-center gap-3 px-3 py-2 transition-colors hover:bg-muted/40">
       {/* Full-row click target under the content; only the delete button
           keeps pointer events, so everything else falls through to this. */}
       <button
@@ -315,11 +321,11 @@ export function DefinitionRow({
   )
 }
 
-/** Hairline-divided container for `DefinitionRow`s, bled to the page gutter
- *  so row hover backgrounds don't hug the text. */
+/** Island container for `DefinitionRow`s: one bordered card holding the
+ *  hairline-divided rows, matching the app's floating-island surfaces. */
 export function DefinitionList({ children }: { children: React.ReactNode }) {
   return (
-    <div className="-mx-2.5 flex flex-col divide-y divide-border/50">
+    <div className="flex flex-col divide-y divide-border/50 overflow-hidden rounded-xl border border-border/60 bg-card/50">
       {children}
     </div>
   )
@@ -328,7 +334,7 @@ export function DefinitionList({ children }: { children: React.ReactNode }) {
 /** Loading placeholder matching DefinitionRow's shape. */
 export function DefinitionRowSkeleton() {
   return (
-    <div className="flex items-center gap-3 px-2.5 py-2.5">
+    <div className="flex items-center gap-3 px-3 py-2">
       <Skeleton className="size-7 rounded-md" />
       <div className="flex flex-1 flex-col gap-1.5">
         <Skeleton className="h-3.5 w-32" />
@@ -409,7 +415,7 @@ export function DefinitionEditorPage({
   children: React.ReactNode
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col px-8 pt-5">
+    <div className="mx-auto flex w-full max-w-2xl flex-col px-8 pt-5 pb-6">
       <div>
         <Button
           variant="ghost"
@@ -468,7 +474,7 @@ export function DefinitionEditorHeader({
 }) {
   const dir = identity.scope === "local" ? dirLocal : dirGlobal
   return (
-    <header className="flex items-start gap-4 rounded-2xl border border-border/70 bg-card/60 p-4 shadow-sm">
+    <header className="flex items-start gap-3.5 rounded-xl border border-border/60 bg-card p-3.5 shadow-sm">
       <AppearancePicker
         color={identity.color}
         icon={identity.icon}
@@ -480,7 +486,7 @@ export function DefinitionEditorHeader({
           placeholder={namePlaceholder}
           autoFocus={identity.isNew}
           aria-label="Name"
-          className="w-full bg-transparent text-lg font-semibold tracking-tight outline-none placeholder:text-muted-foreground/40"
+          className="w-full bg-transparent text-base font-semibold tracking-tight outline-none placeholder:text-muted-foreground/40"
           onChange={(e) =>
             onPatch({
               name: e.target.value,
@@ -579,7 +585,7 @@ export function DefinitionEditorFooter({
   onSubmit: () => void
 }) {
   return (
-    <footer className="sticky bottom-3 z-10 mt-6 flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/90 px-3.5 py-3 shadow-md backdrop-blur">
+    <footer className="sticky bottom-3 z-10 mt-5 flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/90 px-3.5 py-2.5 shadow-md backdrop-blur">
       <p className="text-3xs text-muted-foreground">{hint}</p>
       <div className="flex shrink-0 items-center gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel}>

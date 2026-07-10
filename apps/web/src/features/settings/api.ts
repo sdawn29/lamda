@@ -284,6 +284,32 @@ export interface BackgroundQueueStats {
   pendingLabels: string[]
 }
 
+export interface ResourceHistoryPoint {
+  sampledAt: number
+  systemCpu: number | null
+  appCpu: number | null
+  systemMemory: number
+  rss: number
+  heapUsed: number
+  heapTotal: number
+  external: number
+  loopDelayMs: number | null
+  loopDelayMaxMs: number | null
+  activeLanes: number
+  queuedJobs: number
+}
+
+export interface ResourceStorageStats {
+  dataDir: string
+  computedAt: number
+  databaseBytes: number
+  attachmentsBytes: number
+  worktreesBytes: number
+  otherBytes: number
+  totalBytes: number
+  fileCount: number
+}
+
 export interface ResourceSnapshot {
   sampledAt: number
   system: {
@@ -301,16 +327,26 @@ export interface ResourceSnapshot {
   }
   process: {
     pid: number
+    nodeVersion: string
     cpuPercent: number | null
     uptimeSeconds: number
+    eventLoop: {
+      meanMs: number | null
+      maxMs: number | null
+      p99Ms: number | null
+    }
+    heapLimit: number
     memory: {
       rss: number
       heapTotal: number
       heapUsed: number
       external: number
+      arrayBuffers: number
     }
   }
   queues: BackgroundQueueStats[]
+  history: ResourceHistoryPoint[]
+  storage: ResourceStorageStats | null
 }
 
 export async function fetchResourceSnapshot(
