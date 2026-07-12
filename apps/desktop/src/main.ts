@@ -79,19 +79,23 @@ type ServerStatus = {
   error: string | null;
 };
 
+// One release's changelog. Updates that skip versions carry one entry per
+// missed release (newest first) so the client can show the full gap.
+type ReleaseNote = { version: string; note: string | null };
+
 type UpdateStatus =
   | { phase: "idle" }
   | { phase: "checking" }
-  | { phase: "available"; version: string; releaseNotes: string | null }
+  | { phase: "available"; version: string; releaseNotes: ReleaseNote[] | null }
   | {
       phase: "downloading";
       version: string;
       percent: number;
       bytesPerSecond: number;
       total: number;
-      releaseNotes: string | null;
+      releaseNotes: ReleaseNote[] | null;
     }
-  | { phase: "ready"; version: string; releaseNotes: string | null }
+  | { phase: "ready"; version: string; releaseNotes: ReleaseNote[] | null }
   | { phase: "error"; message: string };
 
 type AppSettings = {
@@ -121,7 +125,7 @@ let quitting = false;
 let preloadPathPromise: Promise<string> | null = null;
 let updateStatus: UpdateStatus = { phase: "idle" };
 let pendingUpdateVersion = "";
-let pendingReleaseNotes: string | null = null;
+let pendingReleaseNotes: ReleaseNote[] | null = null;
 let appSettings: AppSettings = { ...DEFAULT_APP_SETTINGS };
 let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
 let updateCheckInFlight = false;
@@ -365,10 +369,37 @@ async function runUpdateCheck(): Promise<void> {
   }
 }
 
+// electron-updater's `releaseNotes` is a plain string for a single release or
+// (with `fullChangelog`) an array covering every release between the installed
+// and latest version. Normalize both into one serializable shape.
+function normalizeReleaseNotes(
+  latestVersion: string,
+  notes:
+    | string
+    | Array<{ version: string; note: string | null }>
+    | null
+    | undefined,
+): ReleaseNote[] | null {
+  if (typeof notes === "string") {
+    return notes.trim() ? [{ version: latestVersion, note: notes }] : null;
+  }
+  if (Array.isArray(notes) && notes.length > 0) {
+    return notes.map((entry) => ({
+      version: entry.version,
+      note: entry.note ?? null,
+    }));
+  }
+  return null;
+}
+
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
 
   applyAutoUpdatePolicy();
+  // GitHub provider: fetch the notes of every release since the installed
+  // version, not just the latest — clients that skipped versions see the
+  // changelog for each release they missed.
+  autoUpdater.fullChangelog = true;
 
   autoUpdater.on("checking-for-update", () => {
     setUpdateStatus({ phase: "checking" });
@@ -376,8 +407,10 @@ function setupAutoUpdater() {
 
   autoUpdater.on("update-available", (info) => {
     pendingUpdateVersion = info.version;
-    pendingReleaseNotes =
-      typeof info.releaseNotes === "string" ? info.releaseNotes : null;
+    pendingReleaseNotes = normalizeReleaseNotes(
+      info.version,
+      info.releaseNotes,
+    );
     setUpdateStatus({
       phase: "available",
       version: info.version,

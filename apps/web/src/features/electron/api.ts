@@ -120,6 +120,7 @@ export function subscribeToFullscreen(
 }
 
 export type ElectronUpdateStatus = UpdateStatus
+export type ElectronReleaseNote = ReleaseNote
 
 export async function getUpdateStatus(): Promise<ElectronUpdateStatus> {
   return (await getElectronAPI()?.getUpdateStatus()) ?? { phase: "idle" }

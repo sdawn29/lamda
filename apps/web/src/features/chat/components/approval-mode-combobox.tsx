@@ -27,6 +27,8 @@ interface ApprovalModeOption {
   iconAccent: string
   /** Accent tint applied to the selected row in the menu. */
   selectedBg: string
+  /** Soft background tint behind the icon tile in menus. */
+  softBg: string
   /** Translucent background tint applied to the trigger button. */
   triggerBg: string
 }
@@ -40,6 +42,7 @@ export const APPROVAL_MODE_OPTIONS: ApprovalModeOption[] = [
     icon: <ShieldCheckIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-muted-foreground",
     selectedBg: "data-[checked=true]:bg-muted",
+    softBg: "bg-muted/70",
     triggerBg: "",
   },
   {
@@ -51,6 +54,7 @@ export const APPROVAL_MODE_OPTIONS: ApprovalModeOption[] = [
     icon: <FilePenIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-sky-600 dark:text-sky-400",
     selectedBg: "data-[checked=true]:bg-sky-500/10",
+    softBg: "bg-sky-500/10 dark:bg-sky-500/15",
     triggerBg:
       "bg-sky-500/10 hover:bg-sky-500/15 aria-expanded:bg-sky-500/20 dark:bg-sky-500/15 dark:hover:bg-sky-500/20 dark:aria-expanded:bg-sky-500/25",
   },
@@ -62,6 +66,7 @@ export const APPROVAL_MODE_OPTIONS: ApprovalModeOption[] = [
     icon: <ShieldOffIcon className="size-3.5 shrink-0" />,
     iconAccent: "text-amber-600 dark:text-amber-400",
     selectedBg: "data-[checked=true]:bg-amber-500/10",
+    softBg: "bg-amber-500/10 dark:bg-amber-500/15",
     triggerBg:
       "bg-amber-500/10 hover:bg-amber-500/15 aria-expanded:bg-amber-500/20 dark:bg-amber-500/15 dark:hover:bg-amber-500/20 dark:aria-expanded:bg-amber-500/25",
   },
@@ -102,10 +107,7 @@ export function ApprovalModeCombobox({
               {selectedOption.icon}
             </span>
             <span
-              className={cn(
-                "max-w-32 truncate",
-                selectedOption.iconAccent
-              )}
+              className={cn("max-w-32 truncate", selectedOption.iconAccent)}
             >
               {selectedOption.label}
             </span>

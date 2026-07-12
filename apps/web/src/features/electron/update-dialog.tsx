@@ -1,4 +1,4 @@
-import Markdown from "react-markdown"
+import Markdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeRaw from "rehype-raw"
 import rehypeSanitize from "rehype-sanitize"
@@ -18,7 +18,7 @@ import { Progress, ProgressLabel, ProgressValue } from "@/shared/ui/progress"
 import { cn } from "@/shared/lib/utils"
 
 import { useDownloadUpdate, useInstallUpdate } from "./mutations"
-import type { ElectronUpdateStatus } from "./api"
+import type { ElectronReleaseNote, ElectronUpdateStatus } from "./api"
 
 const remarkPlugins: PluggableList = [remarkGfm]
 // GitHub's release feed (the source for electron-updater's `releaseNotes`)
@@ -26,21 +26,50 @@ const remarkPlugins: PluggableList = [remarkGfm]
 // rendering. Plain-markdown notes still pass through untouched.
 const rehypePlugins: PluggableList = [rehypeRaw, rehypeSanitize]
 
+// Release notes are read-only inside the app: links (markdown or raw HTML)
+// render as plain text so nothing in the changelog is clickable.
+const markdownComponents: Components = {
+  a: ({ children }) => <span>{children}</span>,
+}
+
 const proseClass =
-  "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.4] prose-headings:my-0 prose-p:leading-[1.6] prose-p:mt-0 prose-p:mb-[0.75em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.6] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
+  "prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-headings:text-sm prose-headings:leading-[1.4] prose-headings:my-0 prose-p:leading-[1.6] prose-p:mt-0 prose-p:mb-[0.75em] prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-blockquote:my-0 [&_li]:leading-[1.6] [&_li]:text-sm [&_li>p]:my-0 [&>*+*]:mt-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+
+function NoteBody({ note }: { note: string | null }) {
+  if (!note || !note.trim()) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No changelog was published for this release.
+      </p>
+    )
+  }
+  return (
+    <div className={proseClass}>
+      <Markdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={markdownComponents}
+      >
+        {note}
+      </Markdown>
+    </div>
+  )
+}
 
 /**
- * Renders update release notes (the changelog) as markdown. Returns a muted
- * fallback when no notes were published for the release.
+ * Renders update release notes as markdown. When the update spans several
+ * releases (the client skipped versions), each release gets its own section
+ * under a version rule so the whole gap is covered. Links are inert.
  */
 export function ReleaseNotes({
   notes,
   className,
 }: {
-  notes: string | null | undefined
+  notes: ElectronReleaseNote[] | null | undefined
   className?: string
 }) {
-  if (!notes || !notes.trim()) {
+  const entries = notes ?? []
+  if (entries.length === 0) {
     return (
       <p className={cn("text-xs text-muted-foreground", className)}>
         No changelog was published for this release.
@@ -48,16 +77,34 @@ export function ReleaseNotes({
     )
   }
 
+  if (entries.length === 1) {
+    return (
+      <div className={className}>
+        <NoteBody note={entries[0].note} />
+      </div>
+    )
+  }
+
   return (
-    <div className={cn(proseClass, className)}>
-      <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins}>
-        {notes}
-      </Markdown>
+    <div className={cn("flex flex-col gap-4", className)}>
+      {entries.map((entry) => (
+        <section key={entry.version}>
+          <div className="mb-1.5 flex items-center gap-2">
+            <span className="text-2xs font-semibold text-muted-foreground tabular-nums">
+              v{entry.version}
+            </span>
+            <span aria-hidden className="h-px flex-1 bg-border/60" />
+          </div>
+          <NoteBody note={entry.note} />
+        </section>
+      ))}
     </div>
   )
 }
 
-function releaseNotesFor(status: ElectronUpdateStatus): string | null {
+function releaseNotesFor(
+  status: ElectronUpdateStatus
+): ElectronReleaseNote[] | null {
   switch (status.phase) {
     case "available":
     case "downloading":
@@ -90,6 +137,7 @@ export function UpdateDialog({
     status.phase === "ready"
       ? status.version
       : null
+  const releaseCount = releaseNotesFor(status)?.length ?? 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -104,6 +152,8 @@ export function UpdateDialog({
               : status.phase === "downloading"
                 ? "The update is downloading."
                 : "A new version is available to download."}
+            {releaseCount > 1 &&
+              ` Includes changes from ${releaseCount} releases since your version.`}
           </DialogDescription>
         </DialogHeader>
 

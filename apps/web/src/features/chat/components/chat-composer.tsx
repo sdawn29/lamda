@@ -60,11 +60,10 @@ import { useEnvDialog, useWorkspace } from "@/features/workspace"
 import { useGitStatus, statusLabel } from "@/features/git"
 import { buildChangedFileMap } from "../file-chip-context"
 import { useMainTabsStore } from "@/features/main-tabs"
-import { ModelCombobox } from "./model-combobox"
-import { ModeCombobox, getModeOption, modeOptionFromDto } from "./mode-combobox"
+import { getModeOption, modeOptionFromDto } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
-import { ModeToolsDialog } from "./mode-tools-dialog"
-import { ThinkingCombobox, type ThinkingLevel } from "./thinking-combobox"
+import { ComposerSettingsMenu } from "./composer-settings-menu"
+import type { ThinkingLevel } from "./thinking-combobox"
 export type { ThinkingLevel } from "./thinking-combobox"
 import {
   useComposerPrefsStore,
@@ -1310,36 +1309,21 @@ export const ChatComposer = memo(
 
             <div className="@container/composer-controls flex items-center justify-between gap-2 px-1.5 pb-1.5">
               <div className="flex min-w-0 items-center gap-0.5">
-                <ModelCombobox
+                <ComposerSettingsMenu
                   groups={grouped}
-                  selected={selectedModel}
-                  onSelect={(compositeKey) => {
+                  selectedModel={selectedModel}
+                  onSelectModel={(compositeKey) => {
                     if (!isControlled) setInternalModelId(compositeKey)
                     onModelChange?.(compositeKey)
                   }}
-                  disabled={models.length === 0}
+                  thinkingLevel={selectedThinkingLevel}
+                  onThinkingLevelChange={setThinkingLevel}
+                  availableLevels={availableLevels}
+                  mode={mode}
+                  modes={modeList}
+                  onModeChange={onModeChange}
+                  workspaceId={workspaceId}
                 />
-
-                {selectedModel?.reasoning && (
-                  <ThinkingCombobox
-                    selected={selectedThinkingLevel}
-                    onSelect={setThinkingLevel}
-                    availableLevels={availableLevels}
-                  />
-                )}
-                {onModeChange && (
-                  <>
-                    <ModeCombobox
-                      selected={mode}
-                      onSelect={onModeChange}
-                      modes={modeList}
-                    />
-                    <ModeToolsDialog
-                      mode={modeList.find((item) => item.id === mode)}
-                      workspaceId={workspaceId}
-                    />
-                  </>
-                )}
               </div>
 
               <div className="flex min-w-0 items-center justify-end gap-2">

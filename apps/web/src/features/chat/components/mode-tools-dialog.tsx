@@ -1,6 +1,5 @@
 import * as React from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { ListChecksIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { ToolPicker } from "@/features/settings/components/tool-picker"
@@ -15,11 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 
 interface ModeToolsDialogProps {
   mode: ModeDto | undefined
   workspaceId?: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
 function sameTools(left: string[], right: string[]): boolean {
@@ -28,27 +28,27 @@ function sameTools(left: string[], right: string[]): boolean {
   return left.every((tool) => rightSet.has(tool))
 }
 
-/** Compact composer entry point for editing the active mode's tool allowlist. */
-export function ModeToolsDialog({ mode, workspaceId }: ModeToolsDialogProps) {
+/** Dialog for editing the active mode's tool allowlist — opened from the composer settings menu. */
+export function ModeToolsDialog({
+  mode,
+  workspaceId,
+  open,
+  onOpenChange,
+}: ModeToolsDialogProps) {
   const queryClient = useQueryClient()
-  const [open, setOpen] = React.useState(false)
   const [tools, setTools] = React.useState<string[]>([])
   const { data: catalog = [], isLoading: catalogLoading } = useToolCatalog(
     workspaceId,
     open
   )
 
-  const resetDraft = React.useCallback(() => {
-    setTools(mode ? [...mode.tools] : [])
-  }, [mode])
-
-  const handleOpenChange = React.useCallback(
-    (nextOpen: boolean) => {
-      if (nextOpen) resetDraft()
-      setOpen(nextOpen)
-    },
-    [resetDraft]
-  )
+  // Seed the draft from the active mode on each open (adjust-during-render so
+  // the first open frame already shows the mode's current allowlist).
+  const [wasOpen, setWasOpen] = React.useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setTools(mode ? [...mode.tools] : [])
+  }
 
   const save = useMutation({
     mutationFn: async () => {
@@ -67,7 +67,7 @@ export function ModeToolsDialog({ mode, workspaceId }: ModeToolsDialogProps) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: modeKeys.all })
-      setOpen(false)
+      onOpenChange(false)
       toast.success(`${mode?.label ?? "Mode"} tools updated`)
     },
     onError: (error) => {
@@ -83,74 +83,53 @@ export function ModeToolsDialog({ mode, workspaceId }: ModeToolsDialogProps) {
     mode?.source === "local" ? "this workspace" : "all workspaces"
 
   return (
-    <>
-      <Tooltip>
-        <TooltipTrigger
-          render={
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[min(80vh,44rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{mode?.label ?? "Mode"} tools</DialogTitle>
+          <DialogDescription>
+            Choose which tools are available in this mode. Changes apply to{" "}
+            {scopeLabel}.
+          </DialogDescription>
+        </DialogHeader>
+
+        {catalogLoading ? (
+          <p className="py-8 text-center text-muted-foreground">
+            Loading tools…
+          </p>
+        ) : (
+          <ToolPicker
+            key={mode?.id}
+            groups={catalog}
+            selected={tools}
+            onChange={setTools}
+          />
+        )}
+
+        <DialogFooter className="items-center sm:justify-between">
+          <span className="text-muted-foreground">
+            {tools.length === 0
+              ? "Allow at least one tool."
+              : `${tools.length} allowlist ${tools.length === 1 ? "entry" : "entries"}`}
+          </span>
+          <div className="flex gap-2">
             <Button
               type="button"
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Customize allowed tools"
-              disabled={!mode}
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => handleOpenChange(true)}
+              variant="outline"
+              onClick={() => onOpenChange(false)}
             >
-              <ListChecksIcon />
+              Cancel
             </Button>
-          }
-        />
-        <TooltipContent>Customize allowed tools</TooltipContent>
-      </Tooltip>
-
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-h-[min(80vh,44rem)] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{mode?.label ?? "Mode"} tools</DialogTitle>
-            <DialogDescription>
-              Choose which tools are available in this mode. Changes apply to{" "}
-              {scopeLabel}.
-            </DialogDescription>
-          </DialogHeader>
-
-          {catalogLoading ? (
-            <p className="py-8 text-center text-muted-foreground">
-              Loading tools…
-            </p>
-          ) : (
-            <ToolPicker
-              key={mode?.id}
-              groups={catalog}
-              selected={tools}
-              onChange={setTools}
-            />
-          )}
-
-          <DialogFooter className="items-center sm:justify-between">
-            <span className="text-muted-foreground">
-              {tools.length === 0
-                ? "Allow at least one tool."
-                : `${tools.length} allowlist ${tools.length === 1 ? "entry" : "entries"}`}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                disabled={tools.length === 0 || unchanged || save.isPending}
-                onClick={() => save.mutate()}
-              >
-                {save.isPending ? "Saving…" : "Save tools"}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+            <Button
+              type="button"
+              disabled={tools.length === 0 || unchanged || save.isPending}
+              onClick={() => save.mutate()}
+            >
+              {save.isPending ? "Saving…" : "Save tools"}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

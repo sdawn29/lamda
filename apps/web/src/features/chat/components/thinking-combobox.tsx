@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 
 export type ThinkingLevel = "low" | "medium" | "high" | "xhigh"
 
-const ALL_THINKING_LEVELS: {
+export const ALL_THINKING_LEVELS: {
   value: ThinkingLevel
   label: string
   icon: React.ReactNode

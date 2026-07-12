@@ -14,19 +14,21 @@ interface ServerStatus {
   error: string | null
 }
 
+type ReleaseNote = { version: string; note: string | null }
+
 type UpdateStatus =
   | { phase: "idle" }
   | { phase: "checking" }
-  | { phase: "available"; version: string; releaseNotes: string | null }
+  | { phase: "available"; version: string; releaseNotes: ReleaseNote[] | null }
   | {
       phase: "downloading"
       version: string
       percent: number
       bytesPerSecond: number
       total: number
-      releaseNotes: string | null
+      releaseNotes: ReleaseNote[] | null
     }
-  | { phase: "ready"; version: string; releaseNotes: string | null }
+  | { phase: "ready"; version: string; releaseNotes: ReleaseNote[] | null }
   | { phase: "error"; message: string }
 
 interface ElectronAPI {
