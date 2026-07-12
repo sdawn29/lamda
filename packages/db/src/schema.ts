@@ -397,6 +397,25 @@ export const codeChunks = sqliteTable("code_chunks", {
   createdAt: integer("created_at").notNull(),
 });
 
+// ── Checkpoints ───────────────────────────────────────────────────────────────
+
+/**
+ * One row per shadow-commit snapshot of a thread's working tree, taken right
+ * before a top-level user prompt is sent to the agent (see
+ * `createShadowSnapshot` in `@lamda/git`). `commitSha` is a commit object
+ * anchored under `refs/lamda/checkpoints/<threadId>` — never a real branch —
+ * so restoring never touches the user's actual git history.
+ */
+export const checkpoints = sqliteTable("checkpoints", {
+  id: text("id").primaryKey(),
+  threadId: text("thread_id")
+    .notNull()
+    .references(() => threads.id, { onDelete: "cascade" }),
+  commitSha: text("commit_sha").notNull(),
+  label: text("label").notNull().default(""),
+  createdAt: integer("created_at").notNull(),
+});
+
 export const mcpServers = sqliteTable("mcp_servers", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),

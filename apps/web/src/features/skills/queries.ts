@@ -7,6 +7,7 @@ import {
   fetchSkillDetails,
   fetchSkillInstallJobs,
   fetchSkillSearch,
+  fetchSkillUpdates,
   installSkill,
   removeSkill,
 } from "./api"
@@ -18,6 +19,7 @@ export const skillsKeys = {
   details: (source: string) => ["skills", "details", source] as const,
   installed: ["skills", "installed"] as const,
   installs: ["skills", "installs"] as const,
+  updates: ["skills", "updates"] as const,
 }
 
 /** Debounces a fast-changing value (e.g. search input) by `delayMs`. */
@@ -65,6 +67,20 @@ export function useInstalledSkills() {
   })
 }
 
+/**
+ * Names of installed skills with a registry update available. The server
+ * caches its own registry lookups for ~1h, so a shorter client staleTime
+ * just controls how often the (cheap, server-cached) endpoint is re-hit —
+ * not how often the registry itself is checked.
+ */
+export function useSkillUpdates() {
+  return useQuery({
+    queryKey: skillsKeys.updates,
+    queryFn: ({ signal }) => fetchSkillUpdates(signal),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 // Module-level (not per-component-instance) so a failed job is only ever
 // toasted once even though useSkillInstallJobs is mounted on both the store
 // page and the detail page.
@@ -89,6 +105,7 @@ export function useSkillInstallJobs() {
   useEffect(() => {
     if (runningCount < prevRunning.current) {
       void queryClient.invalidateQueries({ queryKey: skillsKeys.installed })
+      void queryClient.invalidateQueries({ queryKey: skillsKeys.updates })
     }
     prevRunning.current = runningCount
   }, [runningCount, queryClient])

@@ -51,6 +51,8 @@ interface ElectronAPI {
   downloadUpdate: () => Promise<void>
   installUpdate: () => Promise<void>
   onUpdateStatusChange: (callback: (status: UpdateStatus) => void) => () => void
+  getAutoUpdateEnabled: () => Promise<boolean>
+  setAutoUpdateEnabled: (enabled: boolean) => Promise<void>
   onNativeMenuAction?: (callback: (action: string) => void) => () => void
   onSystemResume?: (callback: () => void) => () => void
 }

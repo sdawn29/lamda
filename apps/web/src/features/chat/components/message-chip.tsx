@@ -12,19 +12,26 @@ export function MessageChip({
   icon,
   label,
   meta,
+  statusDot,
   detail,
   detailClassName,
   className,
   onClick,
+  onOpenChange,
 }: {
   icon?: ReactNode
   label: ReactNode
   meta?: ReactNode
+  /** Small status affordance rendered after the label — e.g. the colored
+   *  git-status letter on file chips. */
+  statusDot?: ReactNode
   detail?: ReactNode
   detailClassName?: string
   className?: string
   /** When set, the chip becomes an interactive button. */
   onClick?: () => void
+  /** Forwarded to the underlying Tooltip — fires when it opens/closes. */
+  onOpenChange?: (open: boolean) => void
 }) {
   const badge = (
     <Badge
@@ -40,6 +47,7 @@ export function MessageChip({
     >
       {icon}
       <span>{label}</span>
+      {statusDot}
       {meta && (
         <span className="font-mono text-3xs text-muted-foreground">{meta}</span>
       )}
@@ -62,7 +70,7 @@ export function MessageChip({
 
   return (
     <TooltipProvider delay={250}>
-      <Tooltip>
+      <Tooltip onOpenChange={onOpenChange}>
         <TooltipTrigger render={chip} />
         <TooltipContent
           side="top"

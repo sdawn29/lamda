@@ -39,6 +39,7 @@ import {
 } from "@lamda/pi-sdk";
 import {
   gitDeleteCheckpointRef,
+  deleteThreadCheckpointRef,
   getRepoRoot,
   getCurrentBranch,
   checkoutBranch,
@@ -399,6 +400,10 @@ threads.delete("/thread/:id", async (c) => {
     await Promise.all(
       orphanedShas.map((sha) => gitDeleteCheckpointRef(workspace.path, sha)),
     );
+    // Shadow-snapshot checkpoints (separate feature — see checkpoints.ts):
+    // their DB rows cascade with the thread, but the ref anchoring the commit
+    // chain lives in git and needs its own cleanup.
+    await deleteThreadCheckpointRef(workspace.path, threadId);
   }
 
   deleteThread(threadId);

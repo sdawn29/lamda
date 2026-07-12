@@ -9,6 +9,7 @@ import {
   getInstallJobs,
   getPopularSkills,
   getSkillDetails,
+  getSkillUpdates,
   listInstalledSkills,
   removeInstalledSkill,
   searchSkillsRegistry,
@@ -71,6 +72,27 @@ skillsRouter.get("/details", async (c) => {
 /** GET /skills/installed — skills currently in ~/.lamda/skills. */
 skillsRouter.get("/installed", (c) => {
   return c.json({ skills: listInstalledSkills() });
+});
+
+/**
+ * GET /skills/updates — names of installed skills whose registry source has
+ * a newer content hash than what was recorded at install time (see
+ * `getSkillUpdates`). Skills with no known source, or installed before
+ * update tracking existed, are silently excluded rather than guessed at.
+ */
+skillsRouter.get("/updates", async (c) => {
+  try {
+    const updates = await getSkillUpdates();
+    return c.json({ updates });
+  } catch (err) {
+    return c.json(
+      {
+        error:
+          err instanceof Error ? err.message : "Failed to check for updates",
+      },
+      502,
+    );
+  }
 });
 
 /**

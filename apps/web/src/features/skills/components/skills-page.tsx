@@ -10,6 +10,7 @@ import {
   useRemoveSkill,
   useSkillInstallJobs,
   useSkillSearch,
+  useSkillUpdates,
 } from "../queries"
 import { useSkillsSearchStore } from "../store"
 import type { InstalledSkill, SkillSearchResult } from "../types"
@@ -25,10 +26,12 @@ export function SkillsPage() {
   const { data: popular, isLoading: loadingPopular } = usePopularSkills()
   const { data: installed = [] } = useInstalledSkills()
   const { data: jobs = [] } = useSkillInstallJobs()
+  const { data: updatable = [] } = useSkillUpdates()
   const install = useInstallSkill()
   const remove = useRemoveSkill()
 
   const installedNames = new Set(installed.map((s) => s.name.toLowerCase()))
+  const updatableNames = new Set(updatable)
   const runningJobFor = (id: string) =>
     jobs.find((j) => j.source === id && j.status === "running")
 
@@ -39,6 +42,17 @@ export function SkillsPage() {
           description: err instanceof Error ? err.message : String(err),
         }),
       onSuccess: () => toast.message(`Installing "${result.name}"`),
+    })
+  }
+
+  const handleUpdate = (skill: InstalledSkill) => {
+    if (!skill.source) return
+    install.mutate(skill.source, {
+      onError: (err) =>
+        toast.error("Could not start update", {
+          description: err instanceof Error ? err.message : String(err),
+        }),
+      onSuccess: () => toast.message(`Updating "${skill.name}"`),
     })
   }
 
@@ -113,6 +127,14 @@ export function SkillsPage() {
                   key={skill.name}
                   skill={skill}
                   removing={remove.isPending && remove.variables === skill.name}
+                  updateAvailable={updatableNames.has(skill.name)}
+                  updating={
+                    !!skill.source &&
+                    ((install.isPending &&
+                      install.variables === skill.source) ||
+                      runningJobFor(skill.source)?.status === "running")
+                  }
+                  onUpdate={() => handleUpdate(skill)}
                   onRemove={() => handleRemove(skill)}
                   onClick={
                     skill.source ? () => openDetails(skill.source!) : undefined

@@ -9,6 +9,7 @@ import {
   fetchThinkingLevels,
   fetchSessionStats,
   fetchSessionStatus,
+  listCheckpoints,
 } from "./api"
 import {
   blocksToMessages,
@@ -16,6 +17,7 @@ import {
   type Message,
   type ToolMessage,
 } from "./types"
+import { appendToken, getServerUrl } from "@/shared/lib/client"
 export type { WorkspaceEntry } from "./api"
 
 const chatRootKey = ["chat"] as const
@@ -40,6 +42,10 @@ export const chatKeys = {
     [...chatSessionKey(sessionId), "thinking-levels"] as const,
   status: (sessionId: string) =>
     [...chatSessionKey(sessionId), "status"] as const,
+  // Keyed by threadId (not sessionId): checkpoints are durable per-thread
+  // rows, unlike the rest of this feature which keys off the live session.
+  checkpoints: (threadId: string) =>
+    [...chatRootKey, "thread", threadId, "checkpoints"] as const,
 }
 
 // ── Messages ─────────────────────────────────────────────────────────────────
@@ -265,5 +271,64 @@ export function useSessionStatus(sessionId: string | undefined) {
     gcTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
+  })
+}
+
+// ── Checkpoints ───────────────────────────────────────────────────────────
+
+export function useThreadCheckpoints(threadId: string | undefined) {
+  return useQuery({
+    queryKey: threadId ? chatKeys.checkpoints(threadId) : chatKeys.all,
+    queryFn: () => listCheckpoints(threadId!),
+    enabled: !!threadId,
+    staleTime: 10_000,
+  })
+}
+
+// ── File peek (hover preview on file chips) ────────────────────────────────
+
+export interface FilePeek {
+  content: string
+  notFound: boolean
+}
+
+// Uses the raw /file endpoint (not apiFetch, which assumes JSON) — same
+// fetch+appendToken pattern as the main-tabs file viewer. Any non-2xx or
+// network failure collapses into `notFound: true` since the chip only needs
+// a binary found/not-found signal, not the distinction between a 403 (outside
+// workspace) and a 500 (stat() ENOENT).
+async function fetchFilePeek(path: string): Promise<FilePeek> {
+  const serverUrl = await getServerUrl()
+  let response: Response
+  try {
+    response = await fetch(
+      appendToken(`${serverUrl}/file?path=${encodeURIComponent(path)}`)
+    )
+  } catch {
+    return { content: "", notFound: true }
+  }
+  if (!response.ok) return { content: "", notFound: true }
+  const content = await response.text()
+  return { content, notFound: false }
+}
+
+export const filePeekKey = (path: string) =>
+  [...chatRootKey, "file-peek", path] as const
+
+/**
+ * Lazily fetches a file's content for the hover-peek shown in a file chip's
+ * tooltip. Callers pass `enabled: false` until the tooltip has opened once,
+ * then keep it `true` — the long staleTime means later hovers of the same
+ * chip (or repeat mentions of the same file) are served from cache instead
+ * of refetching on every hover.
+ */
+export function useFilePeek(path: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: filePeekKey(path ?? ""),
+    queryFn: () => fetchFilePeek(path!),
+    enabled: enabled && !!path,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
   })
 }

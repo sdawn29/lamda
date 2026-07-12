@@ -8,6 +8,7 @@ import {
   CopyIcon,
   GitForkIcon,
   HistoryIcon,
+  RotateCcwIcon,
   SparklesIcon,
   Undo2,
   Loader2,
@@ -23,6 +24,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/shared/ui/alert-dialog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 
 import { ToolCallBlock } from "./tool-call-block"
 import {
@@ -369,6 +371,14 @@ export interface MessageRowProps {
   isReverting?: boolean
   /** Checkpoint produced by the turn(s) this user message started, if any. */
   checkpoint?: { fileCount: number; hasCheckpoint: boolean }
+  /**
+   * Restores the working tree to the snapshot taken right before this message
+   * was sent — files only, the conversation itself is untouched. Distinct
+   * from `onRevert`, which also undoes the conversation.
+   */
+  onRestoreCheckpoint?: (blockId: string) => Promise<void>
+  canRestoreCheckpoint?: boolean
+  isRestoringCheckpoint?: boolean
 }
 
 function AbortBlock({ message: _ }: { message: AbortMessage }) {
@@ -421,9 +431,13 @@ export const MessageRow = memo(function MessageRow({
   onRevert,
   isReverting = false,
   checkpoint,
+  onRestoreCheckpoint,
+  canRestoreCheckpoint = false,
+  isRestoringCheckpoint = false,
 }: MessageRowProps) {
   const [isForking, setIsForking] = useState(false)
   const [confirmRevertOpen, setConfirmRevertOpen] = useState(false)
+  const [confirmRestoreOpen, setConfirmRestoreOpen] = useState(false)
 
   if (message.role === "tool") {
     return (
@@ -432,6 +446,7 @@ export const MessageRow = memo(function MessageRow({
         isNew={isNewMessage}
         entryDelayMs={entryDelayMs}
         rootPath={rootPath}
+        agentsById={agentsById}
       />
     )
   }
@@ -448,6 +463,8 @@ export const MessageRow = memo(function MessageRow({
     const userMsg = message as UserMessage
     const canFork = !!onFork && !!userMsg.id
     const canRevert = !!onRevert && !!userMsg.id
+    const canRestore =
+      !!onRestoreCheckpoint && !!userMsg.id && canRestoreCheckpoint
 
     const handleFork = async () => {
       if (!canFork || isForking) return
@@ -463,6 +480,12 @@ export const MessageRow = memo(function MessageRow({
       if (!canRevert) return
       setConfirmRevertOpen(false)
       await onRevert(userMsg.id!)
+    }
+
+    const handleConfirmRestore = async () => {
+      if (!canRestore) return
+      setConfirmRestoreOpen(false)
+      await onRestoreCheckpoint(userMsg.id!)
     }
 
     return (
@@ -526,6 +549,32 @@ export const MessageRow = memo(function MessageRow({
                 {isReverting ? <Loader2 className="animate-spin" /> : <Undo2 />}
               </Button>
             )}
+            {canRestore && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setConfirmRestoreOpen(true)}
+                      disabled={isRestoringCheckpoint}
+                      aria-label="Restore checkpoint"
+                      className="opacity-0 group-hover:opacity-100"
+                    >
+                      {isRestoringCheckpoint ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <RotateCcwIcon />
+                      )}
+                    </Button>
+                  }
+                />
+                <TooltipContent side="top">
+                  Restore files to this checkpoint
+                </TooltipContent>
+              </Tooltip>
+            )}
             {canFork && (
               <Button
                 type="button"
@@ -579,6 +628,35 @@ export const MessageRow = memo(function MessageRow({
                 onClick={handleConfirmRevert}
               >
                 Revert
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={confirmRestoreOpen}
+          onOpenChange={setConfirmRestoreOpen}
+        >
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogMedia className="bg-destructive/10">
+                <RotateCcwIcon className="text-destructive" />
+              </AlertDialogMedia>
+              <AlertDialogTitle>Restore this checkpoint?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your files will be reset to how they were right before this
+                message was sent. The conversation itself is not touched, and
+                the current state is saved as a checkpoint first so this can be
+                undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={handleConfirmRestore}
+              >
+                Restore
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

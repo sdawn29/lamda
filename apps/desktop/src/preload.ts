@@ -76,6 +76,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("update-status-changed", handler);
     return () => ipcRenderer.removeListener("update-status-changed", handler);
   },
+  getAutoUpdateEnabled: (): Promise<boolean> =>
+    ipcRenderer.invoke("get-auto-update-enabled"),
+  setAutoUpdateEnabled: (enabled: boolean): Promise<void> =>
+    ipcRenderer.invoke("set-auto-update-enabled", enabled),
   onNativeMenuAction: (callback: (action: string) => void) => {
     const handler = (_: unknown, action: string) => callback(action);
     ipcRenderer.on("native-menu-action", handler);

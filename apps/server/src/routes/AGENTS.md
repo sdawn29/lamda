@@ -186,7 +186,6 @@ Sessions also support a unified WebSocket command channel at `/ws/session/:id/co
 | `git:status`         | `{sessionId, status}`                            | Git status update      |
 | `git:progress`       | `{sessionId, operation, current, total}`         | Progress update        |
 | `server_error`       | `{message}`                                      | Error response         |
-| `workspace:progress` | `{workspaceId, operation, current, total}`       | Indexing progress      |
 
 ### TypeScript Types
 
@@ -206,7 +205,6 @@ export type ServerMessage =
   | GitStatusMessage
   | GitProgressMessage
   | GitResultMessage
-  | WorkspaceProgressMessage
   | CommandAckMessage;
 ```
 

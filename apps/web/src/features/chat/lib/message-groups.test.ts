@@ -3,9 +3,19 @@ import {
   groupChatMessages,
   isPlanOnlyTurn,
   buildTurnCardsByGroup,
+  buildCheckpointIdByUserBlock,
 } from "./message-groups"
-import type { AssistantMessage, Message, ToolMessage } from "../types"
+import type {
+  AssistantMessage,
+  Message,
+  ToolMessage,
+  UserMessage,
+} from "../types"
 import type { TurnFileSummary, TurnSummary } from "@/features/git/api"
+
+function user(overrides: Partial<UserMessage> = {}): UserMessage {
+  return { role: "user", content: "hi", ...overrides }
+}
 
 function assistant(
   overrides: Partial<AssistantMessage> = {}
@@ -209,5 +219,49 @@ describe("buildTurnCardsByGroup", () => {
       /* committedBefore */ 100
     )
     expect(cardsByGroup.size).toBe(0)
+  })
+})
+
+describe("buildCheckpointIdByUserBlock", () => {
+  it("matches a user message to the checkpoint with the same createdAt", () => {
+    const messages: Message[] = [user({ id: "u1", createdAt: 1000 })]
+    const map = buildCheckpointIdByUserBlock(messages, [
+      { id: "c1", createdAt: 1000 },
+    ])
+    expect(map.get("u1")).toBe("c1")
+  })
+
+  it("falls back to the nearest checkpoint within tolerance", () => {
+    const messages: Message[] = [user({ id: "u1", createdAt: 1000 })]
+    const map = buildCheckpointIdByUserBlock(messages, [
+      { id: "too-far", createdAt: 20_000 },
+      { id: "closest", createdAt: 1002 },
+    ])
+    expect(map.get("u1")).toBe("closest")
+  })
+
+  it("leaves a user message unmatched when every checkpoint is outside tolerance", () => {
+    const messages: Message[] = [user({ id: "u1", createdAt: 1000 })]
+    const map = buildCheckpointIdByUserBlock(messages, [
+      { id: "c1", createdAt: 50_000 },
+    ])
+    expect(map.has("u1")).toBe(false)
+  })
+
+  it("ignores non-user messages and user messages without an id or createdAt", () => {
+    const messages: Message[] = [
+      assistant({ createdAt: 1000 }),
+      user({ createdAt: 1000 }), // no id
+      user({ id: "u1" }), // no createdAt
+    ]
+    const map = buildCheckpointIdByUserBlock(messages, [
+      { id: "c1", createdAt: 1000 },
+    ])
+    expect(map.size).toBe(0)
+  })
+
+  it("returns an empty map when there are no checkpoints", () => {
+    const messages: Message[] = [user({ id: "u1", createdAt: 1000 })]
+    expect(buildCheckpointIdByUserBlock(messages, []).size).toBe(0)
   })
 })

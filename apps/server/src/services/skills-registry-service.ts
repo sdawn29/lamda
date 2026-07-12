@@ -88,6 +88,14 @@ export interface SkillDetails {
   /** SKILL.md body (markdown, frontmatter stripped). */
   body: string;
   files: SkillDetailFile[];
+  /**
+   * skills.sh's content hash for this download (stable across repeat
+   * fetches, changes when the skill's files change). Not a semver — it's
+   * the only version-ish signal the registry exposes — but it's enough to
+   * detect "the registry has something different than what's installed".
+   * Used internally for update detection; see `getSkillUpdates`.
+   */
+  hash?: string;
 }
 
 export async function searchSkillsRegistry(
@@ -209,7 +217,17 @@ function readSkillFrontmatter(skillMdPath: string): {
 const MANIFEST_FILENAME = ".install-manifest.json";
 
 interface InstallManifest {
-  [name: string]: { source: string; installedAt: number };
+  [name: string]: {
+    source: string;
+    installedAt: number;
+    /**
+     * The registry's content hash (see `SkillDetails.hash`) captured at
+     * install time, when available. The baseline `getSkillUpdates` diffs
+     * against — skills installed before this existed have no hash and are
+     * simply skipped by update checks rather than guessed at.
+     */
+    hash?: string;
+  };
 }
 
 function readManifest(): InstallManifest {
@@ -231,9 +249,13 @@ function writeManifest(manifest: InstallManifest): void {
   }
 }
 
-function recordInstallSource(name: string, source: string): void {
+function recordInstallSource(
+  name: string,
+  source: string,
+  hash?: string,
+): void {
   const manifest = readManifest();
-  manifest[name] = { source, installedAt: Date.now() };
+  manifest[name] = { source, installedAt: Date.now(), hash };
   writeManifest(manifest);
 }
 
@@ -293,6 +315,7 @@ export async function getSkillDetails(
   if (!res.ok) return null;
   const body = (await res.json()) as {
     files: Array<{ path: string; contents: string }>;
+    hash?: string;
   };
 
   const skillMdFile = body.files.find(
@@ -306,6 +329,7 @@ export async function getSkillDetails(
     name: parsed.name ?? skillId,
     description: parsed.description ?? "",
     body: parsed.body,
+    hash: body.hash,
     files: body.files.map((f) => ({
       path: f.path,
       size: Buffer.byteLength(f.contents, "utf8"),
@@ -313,6 +337,54 @@ export async function getSkillDetails(
   };
   detailsCache.set(source, { at: Date.now(), details });
   return details;
+}
+
+// ─── Update detection ───────────────────────────────────────────────────────
+//
+// skills.sh has no version/semver field and no "updatedAt" on search or
+// download responses (verified against the live API) — the only version-ish
+// signal it exposes is the content `hash` on a download response, which is
+// stable across repeat fetches and changes when the skill's files change.
+// So "has an update" is defined as: the registry's current hash for this
+// skill's source differs from the hash recorded at install time. Skills
+// installed before this existed (or installed from a bare "owner/repo"
+// source, which `getSkillDetails` can't resolve) have no baseline hash and
+// are skipped rather than guessed at.
+//
+// Cached per skill for an hour, independent of `detailsCache`'s 5-minute
+// TTL, so the skills page can be reopened repeatedly without re-hitting the
+// registry more than once an hour per installed skill.
+
+const UPDATE_CACHE_TTL_MS = 60 * 60 * 1000;
+const updateCache = new Map<string, { at: number; hasUpdate: boolean }>();
+
+/** Names of installed skills whose registry source has changed since install. */
+export async function getSkillUpdates(): Promise<string[]> {
+  const manifest = readManifest();
+  const candidates = Object.entries(manifest).filter(
+    ([, m]) => m.source && m.hash,
+  );
+
+  const results = await Promise.allSettled(
+    candidates.map(async ([name, m]) => {
+      // The baseline hash is part of the key so a successful update (which
+      // rewrites the manifest hash) is automatically a cache miss — no stale
+      // "update available" served for up to an hour after updating.
+      const cacheKey = `${name}:${m.source}:${m.hash}`;
+      const cached = updateCache.get(cacheKey);
+      if (cached && Date.now() - cached.at < UPDATE_CACHE_TTL_MS) {
+        return cached.hasUpdate ? name : null;
+      }
+      const details = await getSkillDetails(m.source);
+      const hasUpdate = !!details?.hash && details.hash !== m.hash;
+      updateCache.set(cacheKey, { at: Date.now(), hasUpdate });
+      return hasUpdate ? name : null;
+    }),
+  );
+
+  return results.flatMap((r) =>
+    r.status === "fulfilled" && r.value ? [r.value] : [],
+  );
 }
 
 /** True only when `child` resolves to a direct descendant of `base`. */
@@ -410,6 +482,20 @@ async function installSkillFromRegistry(
       };
     }
 
+    // Best-effort: capture the registry's current content hash as the
+    // baseline for update detection (see `getSkillUpdates`). The CLI itself
+    // never surfaces a version signal, so this is a separate read-only fetch
+    // against the same source just installed; a failure here only means
+    // this skill won't get "update available" badges, not that the install
+    // failed.
+    let installedHash: string | undefined;
+    try {
+      const details = await getSkillDetails(source);
+      installedHash = details?.hash;
+    } catch {
+      // ignored — see comment above
+    }
+
     const globalDir = lamdaGlobalSkillsDir();
     let installed: InstalledSkill | null = null;
     for (const name of installedNames) {
@@ -422,7 +508,7 @@ async function installSkillFromRegistry(
       // we'd copy the link itself and it would dangle once tempDir is removed.
       cpSync(from, to, { recursive: true, dereference: true });
       const fm = readSkillFrontmatter(join(to, "SKILL.md"));
-      recordInstallSource(name, source);
+      recordInstallSource(name, source, installedHash);
       installed = {
         name,
         description: fm.description ?? "",

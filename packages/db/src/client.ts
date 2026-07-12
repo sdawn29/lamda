@@ -219,6 +219,14 @@ function createDb() {
       trigger       TEXT NOT NULL DEFAULT 'scheduled' CHECK(trigger IN ('scheduled', 'manual'))
     );
 
+    CREATE TABLE IF NOT EXISTS checkpoints (
+      id           TEXT PRIMARY KEY,
+      thread_id    TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+      commit_sha   TEXT NOT NULL,
+      label        TEXT NOT NULL DEFAULT '',
+      created_at   INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS mcp_servers (
       id           TEXT PRIMARY KEY,
       name         TEXT NOT NULL UNIQUE,
@@ -349,6 +357,7 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS thread_todos_goal_idx ON thread_todos(goal_id);
     CREATE INDEX IF NOT EXISTS agent_memories_scope_idx ON agent_memories(scope, workspace_id);
     CREATE INDEX IF NOT EXISTS code_chunks_ws_file_idx ON code_chunks(workspace_id, file_path);
+    CREATE INDEX IF NOT EXISTS checkpoints_thread_idx ON checkpoints(thread_id, created_at);
   `);
 
   // Every ALTER TABLE below is idempotent (guarded by a column check), so each

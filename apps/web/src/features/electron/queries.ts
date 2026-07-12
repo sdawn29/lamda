@@ -7,6 +7,7 @@ import {
 import { useEffect } from "react"
 
 import {
+  getAutoUpdateEnabled,
   getElectronPlatform,
   getFullscreen,
   getOpenWithAppIcon,
@@ -32,6 +33,7 @@ export const electronKeys = {
   openWithAppIcon: (appId: string) =>
     [...electronRootKey, "open-with-app-icon", appId] as const,
   updateStatus: [...electronRootKey, "update-status"] as const,
+  autoUpdateEnabled: [...electronRootKey, "auto-update-enabled"] as const,
 }
 
 export function electronPlatformQueryOptions() {
@@ -174,6 +176,19 @@ export function useElectronUpdateStatus() {
   }, [queryClient])
 
   return query
+}
+
+export function electronAutoUpdateEnabledQueryOptions() {
+  return queryOptions({
+    queryKey: electronKeys.autoUpdateEnabled,
+    queryFn: getAutoUpdateEnabled,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+export function useAutoUpdateEnabled() {
+  return useQuery(electronAutoUpdateEnabledQueryOptions())
 }
 
 export type { OpenWithApp }

@@ -1,4 +1,5 @@
-import { Loader2, Trash2 } from "lucide-react"
+import { Loader2, RefreshCw, Trash2 } from "lucide-react"
+import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import { cn } from "@/shared/lib/utils"
@@ -8,12 +9,20 @@ import type { InstalledSkill } from "../types"
 export function InstalledSkillCard({
   skill,
   removing,
+  updateAvailable,
+  updating,
   onRemove,
+  onUpdate,
   onClick,
 }: {
   skill: InstalledSkill
   removing?: boolean
+  /** True when the registry has a newer version than what's installed. */
+  updateAvailable?: boolean
+  updating?: boolean
   onRemove: () => void
+  /** Reinstalls from `skill.source` to pick up the newer version. */
+  onUpdate?: () => void
   onClick?: () => void
 }) {
   const clickable = !!onClick
@@ -35,13 +44,48 @@ export function InstalledSkillCard({
         <SkillAvatar name={skill.name} className="size-9" />
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-xs font-medium">{skill.name}</span>
-          <span className="line-clamp-1 text-3xs text-muted-foreground/60">
-            {skill.description || "No description."}
-          </span>
         </div>
+        {updateAvailable && (
+          <Badge
+            variant="secondary"
+            className="shrink-0 border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+          >
+            Update available
+          </Badge>
+        )}
       </div>
 
-      <div className="flex items-center justify-end">
+      <p className="line-clamp-2 text-2xs leading-snug text-muted-foreground">
+        {skill.description || "No description."}
+      </p>
+
+      <div className="flex items-center justify-end gap-1">
+        {updateAvailable && onUpdate && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  disabled={updating}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onUpdate()
+                  }}
+                >
+                  {updating ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-3" />
+                  )}
+                  Update
+                </Button>
+              }
+            />
+            <TooltipContent>Reinstall from {skill.source}</TooltipContent>
+          </Tooltip>
+        )}
         <Tooltip>
           <TooltipTrigger
             render={

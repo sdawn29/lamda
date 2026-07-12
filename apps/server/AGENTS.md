@@ -105,7 +105,6 @@ All session operations can be sent via `/ws/session/:id/commands`:
 - `git:status` — Git status update (after operations)
 - `git:progress` — Git operation progress
 - `server_error` — Error response
-- `workspace:progress` — Workspace indexing progress
 
 ### Core Services
 

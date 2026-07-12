@@ -3,12 +3,15 @@ import { AlertTriangle, Check, Download, RefreshCw } from "lucide-react"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Button } from "@/shared/ui/button"
 import { Progress, ProgressLabel, ProgressValue } from "@/shared/ui/progress"
+import { Switch } from "@/shared/ui/switch"
 import {
   ReleaseNotes,
+  useAutoUpdateEnabled,
   useCheckForUpdates,
   useDownloadUpdate,
   useElectronUpdateStatus,
   useInstallUpdate,
+  useSetAutoUpdateEnabled,
   type ElectronUpdateStatus,
 } from "@/features/electron"
 import { cn } from "@/shared/lib/utils"
@@ -24,6 +27,8 @@ export function UpdatesSection() {
   const checkForUpdates = useCheckForUpdates()
   const downloadUpdate = useDownloadUpdate()
   const installUpdate = useInstallUpdate()
+  const { data: autoUpdateEnabled } = useAutoUpdateEnabled()
+  const setAutoUpdateEnabled = useSetAutoUpdateEnabled()
   const isElectron = !!window.electronAPI
 
   return (
@@ -54,6 +59,22 @@ export function UpdatesSection() {
           </Button>
         )}
       </SettingsRow>
+
+      {isElectron && (
+        <SettingsRow
+          title="Automatic updates"
+          description="Download and install updates in the background."
+        >
+          <Switch
+            checked={autoUpdateEnabled ?? true}
+            onCheckedChange={(checked) =>
+              setAutoUpdateEnabled.mutate(checked)
+            }
+            disabled={setAutoUpdateEnabled.isPending}
+            aria-label="Automatic updates"
+          />
+        </SettingsRow>
+      )}
 
       {isElectron && status && status.phase !== "idle" && (
         <div className="py-3.5">

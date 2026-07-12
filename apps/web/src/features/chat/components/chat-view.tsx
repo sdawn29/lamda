@@ -23,6 +23,7 @@ import {
   useSlashCommands,
   useSessionStats,
   useSessionStatus,
+  useThreadCheckpoints,
   messagesQueryKey,
   chatKeys,
 } from "../queries"
@@ -32,6 +33,7 @@ import {
   useSendPrompt,
   useSteer,
   useRevertToMessage,
+  useRestoreCheckpoint,
 } from "../mutations"
 import { useModels } from "../queries"
 import { ThinkingIndicator } from "./thinking-indicator"
@@ -52,6 +54,7 @@ import {
   ChatActionsProvider,
   type ChatActions,
 } from "../contexts/chat-actions-context"
+import { FileChipGitProvider } from "../file-chip-context"
 import { formatFileCommentContext } from "../lib/file-context"
 import {
   useTurns,
@@ -100,6 +103,7 @@ import {
   isPlanOnlyTurn,
   buildTurnCardsByGroup,
   buildCheckpointByUserBlock,
+  buildCheckpointIdByUserBlock,
   buildCompletedTodosByGroup,
 } from "../lib/message-groups"
 import { useChatScroll } from "../hooks/use-chat-scroll"
@@ -239,16 +243,13 @@ export function ChatView({
     [rootPath]
   )
 
-  const handleToolApprovalRequest = useCallback(
-    (event: PendingApproval) => {
-      setPendingApprovals((prev) =>
-        prev.some((a) => a.toolCallId === event.toolCallId)
-          ? prev
-          : [...prev, event]
-      )
-    },
-    []
-  )
+  const handleToolApprovalRequest = useCallback((event: PendingApproval) => {
+    setPendingApprovals((prev) =>
+      prev.some((a) => a.toolCallId === event.toolCallId)
+        ? prev
+        : [...prev, event]
+    )
+  }, [])
 
   const handleToolApprovalResolved = useCallback(
     (event: { toolCallId: string }) => {
@@ -666,6 +667,15 @@ export function ChatView({
     [visibleMessages, turns]
   )
 
+  // Working-tree checkpoints (see prompt-runner.ts) — a separate, simpler
+  // undo than the turn-based revert above: restoring one only resets files,
+  // it never touches the conversation.
+  const { data: threadCheckpoints = [] } = useThreadCheckpoints(threadId)
+  const checkpointIdByUserBlock = useMemo(
+    () => buildCheckpointIdByUserBlock(visibleMessages, threadCheckpoints),
+    [visibleMessages, threadCheckpoints]
+  )
+
   const completedTodosByGroup = useMemo(
     () =>
       buildCompletedTodosByGroup(
@@ -895,341 +905,405 @@ export function ChatView({
     [revertToMessageMutation]
   )
 
+  const [restoringCheckpointBlockId, setRestoringCheckpointBlockId] = useState<
+    string | null
+  >(null)
+  const restoreCheckpointMutation = useRestoreCheckpoint(threadId)
+  const handleRestoreCheckpoint = useCallback(
+    async (blockId: string) => {
+      const checkpointId = checkpointIdByUserBlock.get(blockId)
+      if (!checkpointId) return
+      setRestoringCheckpointBlockId(blockId)
+      try {
+        const { safetyCheckpoint } =
+          await restoreCheckpointMutation.mutateAsync(checkpointId)
+        // The safety checkpoint never anchors to a user message, so the
+        // transcript's hover actions can't reach it — the toast's Undo is the
+        // only way back. No Undo when the safety capture failed.
+        toast.success("Checkpoint restored", {
+          action: safetyCheckpoint
+            ? {
+                label: "Undo",
+                onClick: () => {
+                  restoreCheckpointMutation
+                    .mutateAsync(safetyCheckpoint.id)
+                    .then(() => toast.success("Restore undone"))
+                    .catch((err: unknown) => {
+                      toast.error("Undo failed", {
+                        description:
+                          err instanceof Error
+                            ? err.message
+                            : "Could not undo the restore",
+                      })
+                    })
+                },
+              }
+            : undefined,
+        })
+      } catch (err) {
+        toast.error("Restore failed", {
+          description:
+            err instanceof Error ? err.message : "Could not restore checkpoint",
+        })
+      } finally {
+        setRestoringCheckpointBlockId(null)
+      }
+    },
+    [checkpointIdByUserBlock, restoreCheckpointMutation]
+  )
+
   return (
     <ChatActionsProvider value={chatActions}>
-      <AlertDialog
-        open={gitError !== null}
-        onOpenChange={(open) => {
-          if (!open) clearGitError()
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Git Error</AlertDialogTitle>
-            <AlertDialogDescription>{gitError}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={clearGitError}>OK</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Feeds file chips (see markdown-components.tsx) the working tree's
+          change status so a chip whose path is modified/added/etc. can show
+          a status dot without threading sessionId through the (per-rootPath
+          cached) markdown component map. */}
+      <FileChipGitProvider sessionId={sessionId} rootPath={rootPath}>
+        <AlertDialog
+          open={gitError !== null}
+          onOpenChange={(open) => {
+            if (!open) clearGitError()
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Git Error</AlertDialogTitle>
+              <AlertDialogDescription>{gitError}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={clearGitError}>OK</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
-        {/* ── Mobile-only floating islands: thread name, branch, working
+        <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
+          {/* ── Mobile-only floating islands: thread name, branch, working
             location. The title bar hides these on narrow screens (no room),
             so they float over the chat view instead. ─────────────────────── */}
-        {isMobile && activeThread && (
-          <MobileThreadIslands
-            activeWorkspace={activeWorkspace}
-            activeThread={activeThread}
-            sessionId={sessionId}
-            threadId={threadId}
-            branch={branch}
-            branches={branches}
-            onBranchSelect={handleBranchSelect}
-            onGitError={handleGitError}
-          />
-        )}
-        {noProvider && (
-          <div className="flex shrink-0 items-center gap-3 border-b border-amber-500/20 bg-amber-500/5 px-4 py-2.5">
-            <PlugZapIcon className="h-4 w-4 shrink-0 text-amber-500" />
-            <p className="min-w-0 flex-1 text-xs text-amber-600 dark:text-amber-400">
-              No model provider configured. Add an API key or sign in to start
-              chatting.
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 shrink-0 border-amber-500/30 text-xs hover:bg-amber-500/10"
-              onClick={() =>
-                navigate({
-                  to: "/settings/$section",
-                  params: { section: "subscriptions" },
-                })
-              }
-            >
-              Configure provider
-            </Button>
-          </div>
-        )}
-        <div
-          ref={scrollContainerRef}
-          onScroll={onScroll}
-          className={cn(
-            "flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-8",
-            // Reserve room for the floating mobile islands (absolutely
-            // positioned above, in the relative parent) so the first message
-            // doesn't render underneath them.
-            isMobile && activeThread ? "pt-16" : "pt-4"
+          {isMobile && activeThread && (
+            <MobileThreadIslands
+              activeWorkspace={activeWorkspace}
+              activeThread={activeThread}
+              sessionId={sessionId}
+              threadId={threadId}
+              branch={branch}
+              branches={branches}
+              onBranchSelect={handleBranchSelect}
+              onGitError={handleGitError}
+            />
           )}
-        >
-          <div ref={messagesContainerRef}>
-            {/* Older history loads automatically as the user scrolls near the
-                top (see useChatScroll); this spinner shows while a page fetches. */}
-            {isFetchingPreviousPage && (
-              <div className="flex justify-center py-3">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-              </div>
+          {noProvider && (
+            <div className="flex shrink-0 items-center gap-3 border-b border-amber-500/20 bg-amber-500/5 px-4 py-2.5">
+              <PlugZapIcon className="h-4 w-4 shrink-0 text-amber-500" />
+              <p className="min-w-0 flex-1 text-xs text-amber-600 dark:text-amber-400">
+                No model provider configured. Add an API key or sign in to start
+                chatting.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 shrink-0 border-amber-500/30 text-xs hover:bg-amber-500/10"
+                onClick={() =>
+                  navigate({
+                    to: "/settings/$section",
+                    params: { section: "subscriptions" },
+                  })
+                }
+              >
+                Configure provider
+              </Button>
+            </div>
+          )}
+          <div
+            ref={scrollContainerRef}
+            onScroll={onScroll}
+            className={cn(
+              "flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-8",
+              // Reserve room for the floating mobile islands (absolutely
+              // positioned above, in the relative parent) so the first message
+              // doesn't render underneath them.
+              isMobile && activeThread ? "pt-16" : "pt-4"
             )}
-            {groupedMessages.map((group, groupIndex) => {
-              const itemKey = groupKeys[groupIndex]
-              const isNewGroup = isNewGroupKey(itemKey)
-              const entryDelayMs = isNewGroup ? getEntryDelayMs(itemKey) : 0
-              let content: React.ReactNode
+          >
+            <div ref={messagesContainerRef}>
+              {/* Older history loads automatically as the user scrolls near the
+                top (see useChatScroll); this spinner shows while a page fetches. */}
+              {isFetchingPreviousPage && (
+                <div className="flex justify-center py-3">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+                </div>
+              )}
+              {groupedMessages.map((group, groupIndex) => {
+                const itemKey = groupKeys[groupIndex]
+                const isNewGroup = isNewGroupKey(itemKey)
+                const entryDelayMs = isNewGroup ? getEntryDelayMs(itemKey) : 0
+                let content: React.ReactNode
 
-              if (group.type === "working") {
-                const isGroupActive =
-                  isLoading && groupIndex === groupedMessages.length - 1
-                content = (
-                  <div className="mx-auto w-full max-w-4xl px-3 pb-3">
-                    <WorkingBlock
-                      messages={group.messages}
-                      isActive={isGroupActive}
-                      showThinking={showThinkingSetting}
-                      isNew={isNewGroup}
-                      entryDelayMs={entryDelayMs}
-                      finalThinking={group.finalThinking}
-                      rootPath={rootPath}
-                    />
-                  </div>
-                )
-              } else {
-                const {
-                  message,
-                  isLastInTurnStatic,
-                  turnMessages,
-                  repeatCount,
-                } = group
-                if (
-                  message.role === "assistant" &&
-                  !message.content.trim() &&
-                  !message.thinking.trim() &&
-                  !message.errorMessage
-                ) {
-                  content = null
-                } else {
-                  // The footer (model · duration · timestamp) isn't final mid-
-                  // turn, so it stays hidden while the active turn streams — but
-                  // it's still mounted (footerPending) to reserve its height, so
-                  // it doesn't add a line and shift the pinned view when the turn
-                  // finishes.
-                  const footerPending =
-                    isLastInTurnStatic &&
-                    isLoading &&
-                    groupIndex === activeTurnFooterGroupIndex
+                if (group.type === "working") {
+                  const isGroupActive =
+                    isLoading && groupIndex === groupedMessages.length - 1
                   content = (
                     <div className="mx-auto w-full max-w-4xl px-3 pb-3">
-                      <MessageRow
-                        message={message}
-                        commandsByName={commandsByName}
-                        agentsById={agentsById}
-                        showThinking={
-                          group.suppressThinking ? false : showThinkingSetting
-                        }
-                        isNewMessage={isNewGroup}
+                      <WorkingBlock
+                        messages={group.messages}
+                        isActive={isGroupActive}
+                        showThinking={showThinkingSetting}
+                        isNew={isNewGroup}
                         entryDelayMs={entryDelayMs}
-                        isLastInTurn={isLastInTurnStatic}
-                        footerPending={footerPending}
-                        turnMessages={turnMessages}
-                        errorRepeatCount={repeatCount}
+                        finalThinking={group.finalThinking}
                         rootPath={rootPath}
-                        threadId={threadId}
-                        onFork={handleFork}
-                        onRevert={!isLoading ? handleRevert : undefined}
-                        isReverting={
-                          message.role === "user" &&
-                          revertingBlockId === message.id
-                        }
-                        checkpoint={
-                          message.role === "user" && message.id
-                            ? checkpointByUserBlock.get(message.id)
-                            : undefined
-                        }
+                        agentsById={agentsById}
                       />
                     </div>
                   )
-                }
-              }
-
-              const turnCards = turnCardsByGroup.get(groupIndex) ?? []
-              const completedTodoLists =
-                completedTodosByGroup.get(groupIndex) ?? []
-
-              // Browser-native windowing: skip layout/paint for groups that are
-              // off-screen so resizing the window no longer reflows the entire
-              // thread at once. The last group is left un-contained since it's
-              // the actively streaming turn (always on-screen, growing rapidly),
-              // and is excluded as a scroll-anchor candidate so its bottom-growth
-              // never gets anchored — the pin logic owns the bottom, native
-              // anchoring owns above-viewport corrections (see useChatScroll).
-              const isLastGroup = groupIndex === groupedMessages.length - 1
-
-              return (
-                <div
-                  key={itemKey}
-                  data-group-key={itemKey}
-                  style={
-                    isLastGroup
-                      ? { overflowAnchor: "none" }
-                      : {
-                          contentVisibility: "auto",
-                          containIntrinsicSize: `auto ${estimateGroupSize(group)}px`,
-                        }
-                  }
-                >
-                  {content}
-                  {completedTodoLists.map((goals) => (
-                    <div
-                      key={`todo-${goals[0]?.id ?? groupIndex}`}
-                      className="mx-auto w-full max-w-4xl px-3 pb-3"
-                    >
-                      <CompletedTodoPanel goals={goals} />
-                    </div>
-                  ))}
-                  {turnCards.map((turn) =>
-                    isPlanOnlyTurn(turn) ? (
-                      <PlanChangesCard
-                        key={`turn-card-${turn.id}`}
-                        rootPath={rootPath}
-                        turn={turn}
-                      />
-                    ) : (
-                      <FileChangesCard
-                        key={`turn-card-${turn.id}`}
-                        sessionId={sessionId}
-                        rootPath={rootPath}
-                        openWithAppId={openWithAppId}
-                        turn={turn}
-                      />
+                } else {
+                  const {
+                    message,
+                    isLastInTurnStatic,
+                    turnMessages,
+                    repeatCount,
+                  } = group
+                  if (
+                    message.role === "assistant" &&
+                    !message.content.trim() &&
+                    !message.thinking.trim() &&
+                    !message.errorMessage
+                  ) {
+                    content = null
+                  } else {
+                    // The footer (model · duration · timestamp) isn't final mid-
+                    // turn, so it stays hidden while the active turn streams — but
+                    // it's still mounted (footerPending) to reserve its height, so
+                    // it doesn't add a line and shift the pinned view when the turn
+                    // finishes.
+                    const footerPending =
+                      isLastInTurnStatic &&
+                      isLoading &&
+                      groupIndex === activeTurnFooterGroupIndex
+                    content = (
+                      <div className="mx-auto w-full max-w-4xl px-3 pb-3">
+                        <MessageRow
+                          message={message}
+                          commandsByName={commandsByName}
+                          agentsById={agentsById}
+                          showThinking={
+                            group.suppressThinking ? false : showThinkingSetting
+                          }
+                          isNewMessage={isNewGroup}
+                          entryDelayMs={entryDelayMs}
+                          isLastInTurn={isLastInTurnStatic}
+                          footerPending={footerPending}
+                          turnMessages={turnMessages}
+                          errorRepeatCount={repeatCount}
+                          rootPath={rootPath}
+                          threadId={threadId}
+                          onFork={handleFork}
+                          onRevert={!isLoading ? handleRevert : undefined}
+                          isReverting={
+                            message.role === "user" &&
+                            revertingBlockId === message.id
+                          }
+                          checkpoint={
+                            message.role === "user" && message.id
+                              ? checkpointByUserBlock.get(message.id)
+                              : undefined
+                          }
+                          onRestoreCheckpoint={handleRestoreCheckpoint}
+                          canRestoreCheckpoint={
+                            message.role === "user" &&
+                            !!message.id &&
+                            checkpointIdByUserBlock.has(message.id)
+                          }
+                          isRestoringCheckpoint={
+                            message.role === "user" &&
+                            restoringCheckpointBlockId === message.id
+                          }
+                        />
+                      </div>
                     )
-                  )}
-                </div>
-              )
-            })}
-            {/* The trailing status row (thinking / compacting / approval) is part
+                  }
+                }
+
+                const turnCards = turnCardsByGroup.get(groupIndex) ?? []
+                const completedTodoLists =
+                  completedTodosByGroup.get(groupIndex) ?? []
+
+                // Browser-native windowing: skip layout/paint for groups that are
+                // off-screen so resizing the window no longer reflows the entire
+                // thread at once. The last group is left un-contained since it's
+                // the actively streaming turn (always on-screen, growing rapidly),
+                // and is excluded as a scroll-anchor candidate so its bottom-growth
+                // never gets anchored — the pin logic owns the bottom, native
+                // anchoring owns above-viewport corrections (see useChatScroll).
+                const isLastGroup = groupIndex === groupedMessages.length - 1
+
+                return (
+                  <div
+                    key={itemKey}
+                    data-group-key={itemKey}
+                    style={
+                      isLastGroup
+                        ? { overflowAnchor: "none" }
+                        : {
+                            contentVisibility: "auto",
+                            containIntrinsicSize: `auto ${estimateGroupSize(group)}px`,
+                          }
+                    }
+                  >
+                    {content}
+                    {completedTodoLists.map((goals) => (
+                      <div
+                        key={`todo-${goals[0]?.id ?? groupIndex}`}
+                        className="mx-auto w-full max-w-4xl px-3 pb-3"
+                      >
+                        <CompletedTodoPanel goals={goals} />
+                      </div>
+                    ))}
+                    {turnCards.map((turn) =>
+                      isPlanOnlyTurn(turn) ? (
+                        <PlanChangesCard
+                          key={`turn-card-${turn.id}`}
+                          rootPath={rootPath}
+                          turn={turn}
+                        />
+                      ) : (
+                        <FileChangesCard
+                          key={`turn-card-${turn.id}`}
+                          sessionId={sessionId}
+                          rootPath={rootPath}
+                          openWithAppId={openWithAppId}
+                          turn={turn}
+                        />
+                      )
+                    )}
+                  </div>
+                )
+              })}
+              {/* The trailing status row (thinking / compacting / approval) is part
                 of the scrollable transcript, so it must live inside
                 messagesContainerRef — the single content wrapper useChatScroll's
                 ResizeObserver watches for growth. Keeping it here (not a sibling)
                 is what lets its appearance grow the observed content and the
                 auto-follow snap the view onto it, so sending a message lands on
                 the thinking indicator rather than just the latest message row. */}
-            <div className="mx-auto w-full max-w-4xl px-3">
-              {isCompacting ? (
-                <CompactingIndicator reason={compactionReason} />
-              ) : pendingApproval ? (
-                <div
-                  aria-live="polite"
-                  className="flex animate-in items-center gap-2 py-0.5 text-xs font-medium text-amber-600 duration-200 fade-in-0 dark:text-amber-400"
-                >
-                  <span className="relative flex size-1.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500/60" />
-                    <span className="relative inline-flex size-1.5 rounded-full bg-amber-500" />
-                  </span>
-                  Waiting for approval
-                </div>
-              ) : (
-                // Always mounted so its row height is reserved whether or not
-                // the agent is working — keeping it from shifting the pinned
-                // transcript on turn boundaries (see ThinkingIndicator).
-                <ThinkingIndicator
-                  className="py-0.5"
-                  active={showThinkingIndicator}
-                />
-              )}
+              <div className="mx-auto w-full max-w-4xl px-3">
+                {isCompacting ? (
+                  <CompactingIndicator reason={compactionReason} />
+                ) : pendingApproval ? (
+                  <div
+                    aria-live="polite"
+                    className="flex animate-in items-center gap-2 py-0.5 text-xs font-medium text-amber-600 duration-200 fade-in-0 dark:text-amber-400"
+                  >
+                    <span className="relative flex size-1.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500/60" />
+                      <span className="relative inline-flex size-1.5 rounded-full bg-amber-500" />
+                    </span>
+                    Waiting for approval
+                  </div>
+                ) : (
+                  // Always mounted so its row height is reserved whether or not
+                  // the agent is working — keeping it from shifting the pinned
+                  // transcript on turn boundaries (see ThinkingIndicator).
+                  <ThinkingIndicator
+                    className="py-0.5"
+                    active={showThinkingIndicator}
+                  />
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {showScrollButton && (
-          <div
-            style={{ bottom: textboxHeight + 16 }}
-            className="pointer-events-none absolute inset-x-0 z-20 flex justify-center"
-          >
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={scrollToBottom}
-              className="pointer-events-auto rounded-full bg-secondary/70 shadow-md backdrop-blur-md"
+          {showScrollButton && (
+            <div
+              style={{ bottom: textboxHeight + 16 }}
+              className="pointer-events-none absolute inset-x-0 z-20 flex justify-center"
             >
-              <ArrowDownIcon className="h-4 w-4" /> Scroll to bottom
-            </Button>
-          </div>
-        )}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={scrollToBottom}
+                className="pointer-events-auto rounded-full bg-secondary/70 shadow-md backdrop-blur-md"
+              >
+                <ArrowDownIcon className="h-4 w-4" /> Scroll to bottom
+              </Button>
+            </div>
+          )}
 
-        {/* Bottom bar — sits directly below the scrolling message list in normal
+          {/* Bottom bar — sits directly below the scrolling message list in normal
             flow, so the chat view ends just above the input instead of scrolling
             behind it. */}
-        <div ref={bottomBarRef} className="relative shrink-0 bg-background">
-          {/* Gradient fade at the bottom of the message list — `bottom-full` pins
+          <div ref={bottomBarRef} className="relative shrink-0 bg-background">
+            {/* Gradient fade at the bottom of the message list — `bottom-full` pins
               it flush to this bar's own top edge via pure CSS, so it always
               tracks the bar's real height (error alert / todo panel / queued
               pill all resize it) with no JS measurement lag that could leave a
               flat gap between the fade and whatever the bar is showing.
               pointer-events-none so it never blocks scrolling/clicks. */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-full z-10 h-8 bg-linear-to-t from-background to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-full z-10 h-8 bg-linear-to-t from-background to-transparent" />
 
-          <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
+            <ChatErrorAlert error={pendingError} onAction={handleErrorAction} />
 
-          <div className="mx-auto w-full max-w-4xl px-3 pb-2 empty:hidden">
-            <TodoPanel messages={visibleMessages} />
-          </div>
-
-          {isLoading && queuedCount > 0 && !activeQuestion && (
-            <div className="mx-auto w-full max-w-4xl px-3 pb-1.5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
-                </span>
-                {queuedCount === 1
-                  ? "1 message queued — the agent will pick it up shortly"
-                  : `${queuedCount} messages queued — the agent will pick them up shortly`}
-              </div>
+            <div className="mx-auto w-full max-w-4xl px-3 pb-2 empty:hidden">
+              <TodoPanel messages={visibleMessages} />
             </div>
-          )}
 
-          <div
-            ref={textboxWrapRef}
-            className="mx-auto w-full max-w-4xl px-3 pb-3"
-          >
-            {pendingApproval ? (
-              <ToolApprovalBlock
-                key={pendingApproval.toolCallId}
-                sessionId={sessionId}
-                approval={pendingApproval}
-              />
-            ) : activeQuestion ? (
-              <QuestionView
-                key={activeQuestion.toolCallId}
-                sessionId={sessionId}
-                question={activeQuestion}
-              />
-            ) : (
-              <ChatComposer
-                ref={chatTextboxRef}
-                onSend={handleSend}
-                onStop={handleStop}
-                initialValue={readThreadDraft(threadId)}
-                initialValueKey={threadId}
-                onValueChange={handleComposerValueChange}
-                isLoading={isLoading}
-                isAborting={abortSessionMutation.isPending}
-                sessionId={sessionId}
-                workspaceId={workspaceId}
-                selectedModelId={selectedModelId}
-                onModelChange={handleModelChange}
-                selectedThinkingLevel={selectedThinkingLevel}
-                onThinkingLevelChange={setSelectedThinkingLevel}
-                mode={selectedMode}
-                onModeChange={handleModeChange}
-                approvalMode={selectedApprovalMode}
-                onApprovalModeChange={handleApprovalModeChange}
-                sessionStats={sessionStats}
-              />
+            {isLoading && queuedCount > 0 && !activeQuestion && (
+              <div className="mx-auto w-full max-w-4xl px-3 pb-1.5">
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
+                  </span>
+                  {queuedCount === 1
+                    ? "1 message queued — the agent will pick it up shortly"
+                    : `${queuedCount} messages queued — the agent will pick them up shortly`}
+                </div>
+              </div>
             )}
+
+            <div
+              ref={textboxWrapRef}
+              className="mx-auto w-full max-w-4xl px-3 pb-3"
+            >
+              {pendingApproval ? (
+                <ToolApprovalBlock
+                  key={pendingApproval.toolCallId}
+                  sessionId={sessionId}
+                  approval={pendingApproval}
+                />
+              ) : activeQuestion ? (
+                <QuestionView
+                  key={activeQuestion.toolCallId}
+                  sessionId={sessionId}
+                  question={activeQuestion}
+                />
+              ) : (
+                <ChatComposer
+                  ref={chatTextboxRef}
+                  onSend={handleSend}
+                  onStop={handleStop}
+                  initialValue={readThreadDraft(threadId)}
+                  initialValueKey={threadId}
+                  onValueChange={handleComposerValueChange}
+                  isLoading={isLoading}
+                  isAborting={abortSessionMutation.isPending}
+                  sessionId={sessionId}
+                  workspaceId={workspaceId}
+                  selectedModelId={selectedModelId}
+                  onModelChange={handleModelChange}
+                  selectedThinkingLevel={selectedThinkingLevel}
+                  onThinkingLevelChange={setSelectedThinkingLevel}
+                  mode={selectedMode}
+                  onModeChange={handleModeChange}
+                  approvalMode={selectedApprovalMode}
+                  onApprovalModeChange={handleApprovalModeChange}
+                  sessionStats={sessionStats}
+                />
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </FileChipGitProvider>
     </ChatActionsProvider>
   )
 }

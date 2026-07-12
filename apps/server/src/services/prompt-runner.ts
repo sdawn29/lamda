@@ -1,6 +1,7 @@
 import type { PromptOptions } from "@lamda/pi-sdk";
-import { insertUserBlock } from "@lamda/db";
+import { insertUserBlock, insertCheckpoint } from "@lamda/db";
 import type { AttachmentMetadata } from "@lamda/db";
+import { createShadowSnapshot, threadCheckpointRefName } from "@lamda/git";
 import { store } from "../store.js";
 import { ensureSessionEventHub } from "./session-service.js";
 import { withInjections } from "./prompt-injection.js";
@@ -39,11 +40,39 @@ export async function sendPrompt(
 
   ensureSessionEventHub(sessionId, entry);
 
+  const promptTime = Date.now();
+
+  // Snapshot the working tree before the agent can touch it, so the
+  // checkpoint reflects state as of this prompt. entry.cwd already resolves
+  // to the thread's worktree path when it runs in one (see
+  // session-service.createSessionForThread), so no separate DB lookup is
+  // needed. Best-effort and silent: capture failures (non-git workspace, git
+  // missing, etc.) must never block sending the prompt.
+  try {
+    const sha = await createShadowSnapshot(
+      entry.cwd,
+      threadCheckpointRefName(entry.threadId),
+    );
+    if (sha) {
+      insertCheckpoint({
+        threadId: entry.threadId,
+        commitSha: sha,
+        label: opts.displayText ?? text,
+        createdAt: promptTime,
+      });
+    }
+  } catch (err) {
+    console.warn(
+      `[checkpoint] capture failed for thread ${entry.threadId}:`,
+      err,
+    );
+  }
+
   insertUserBlock(
     entry.threadId,
     opts.displayText ?? text,
     opts.attachments,
-    undefined,
+    promptTime,
     opts.clientId,
   );
 

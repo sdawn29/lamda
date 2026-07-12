@@ -29,6 +29,7 @@ import { SubagentGroup } from "./subagent-group"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
 import { isSubagentToolName } from "../lib/subagent"
 import type { AssistantMessage, ToolMessage } from "../types"
+import type { AgentDto } from "@/features/workspace/api"
 
 export type WorkingMessage = AssistantMessage | ToolMessage
 
@@ -414,6 +415,8 @@ interface WorkingBlockProps {
   entryDelayMs?: number
   finalThinking?: string
   rootPath?: string
+  /** Resolves a `delegate` call's agent for SubagentCard's model badge. */
+  agentsById?: ReadonlyMap<string, AgentDto>
 }
 
 function computeHistoricalDuration(messages: WorkingMessage[]): number {
@@ -445,6 +448,7 @@ export const WorkingBlock = memo(function WorkingBlock({
   entryDelayMs = 0,
   finalThinking,
   rootPath,
+  agentsById,
 }: WorkingBlockProps) {
   const startTimeRef = useRef<number | null>(null)
   const prevActiveRef = useRef(isActive)
@@ -649,6 +653,7 @@ export const WorkingBlock = memo(function WorkingBlock({
                     isNew={false}
                     rootPath={rootPath}
                     suppressPlanSavedCard
+                    agentsById={agentsById}
                   />
                 )
               }

@@ -14,6 +14,7 @@ import {
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { randomBytes } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -93,6 +94,17 @@ type UpdateStatus =
   | { phase: "ready"; version: string; releaseNotes: string | null }
   | { phase: "error"; message: string };
 
+type AppSettings = {
+  autoUpdateEnabled: boolean;
+};
+
+const DEFAULT_APP_SETTINGS: AppSettings = { autoUpdateEnabled: true };
+
+// How often to re-check for updates in the background after the initial
+// post-launch check. electron-updater tolerates overlapping checkForUpdates()
+// calls poorly, so callers must go through runUpdateCheck() below.
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+
 // Startup can include database migrations, native module loading, and local
 // model/tool discovery. Keep the splash visible rather than failing a healthy
 // launch on slower machines.
@@ -110,6 +122,32 @@ let preloadPathPromise: Promise<string> | null = null;
 let updateStatus: UpdateStatus = { phase: "idle" };
 let pendingUpdateVersion = "";
 let pendingReleaseNotes: string | null = null;
+let appSettings: AppSettings = { ...DEFAULT_APP_SETTINGS };
+let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
+let updateCheckInFlight = false;
+
+function getSettingsFilePath(): string {
+  return path.join(app.getPath("userData"), "settings.json");
+}
+
+function loadAppSettings(): AppSettings {
+  try {
+    const raw = readFileSync(getSettingsFilePath(), "utf-8");
+    const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    return { ...DEFAULT_APP_SETTINGS, ...parsed };
+  } catch {
+    return { ...DEFAULT_APP_SETTINGS };
+  }
+}
+
+function saveAppSettings(settings: AppSettings) {
+  try {
+    mkdirSync(path.dirname(getSettingsFilePath()), { recursive: true });
+    writeFileSync(getSettingsFilePath(), JSON.stringify(settings, null, 2));
+  } catch (err) {
+    console.error("Failed to persist app settings:", err);
+  }
+}
 
 type SelectFolderOptions = {
   canCreateFolder?: boolean;
@@ -301,11 +339,36 @@ function setUpdateStatus(next: UpdateStatus) {
   }
 }
 
+// Applies the current auto-update preference to electron-updater's flags.
+// Safe to call at any time (including from the settings IPC handler) so a
+// runtime toggle takes effect immediately without an app restart.
+function applyAutoUpdatePolicy() {
+  autoUpdater.autoDownload = appSettings.autoUpdateEnabled;
+  autoUpdater.autoInstallOnAppQuit = appSettings.autoUpdateEnabled;
+}
+
+// Runs a single checkForUpdates() pass, guarded against overlap — electron-
+// updater doesn't handle concurrent checks well, so both the periodic timer
+// and the manual "check-for-updates" IPC handler funnel through here.
+async function runUpdateCheck(): Promise<void> {
+  if (updateCheckInFlight) return;
+  updateCheckInFlight = true;
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (err) {
+    setUpdateStatus({
+      phase: "error",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  } finally {
+    updateCheckInFlight = false;
+  }
+}
+
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
 
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
+  applyAutoUpdatePolicy();
 
   autoUpdater.on("checking-for-update", () => {
     setUpdateStatus({ phase: "checking" });
@@ -350,10 +413,12 @@ function setupAutoUpdater() {
   });
 
   setTimeout(() => {
-    autoUpdater.checkForUpdates().catch((err: Error) => {
-      setUpdateStatus({ phase: "error", message: err.message });
-    });
+    void runUpdateCheck();
   }, 10_000);
+
+  updateCheckInterval = setInterval(() => {
+    void runUpdateCheck();
+  }, UPDATE_CHECK_INTERVAL_MS);
 }
 
 /**
@@ -659,6 +724,8 @@ async function createWindow(splash?: BrowserWindow) {
 }
 
 app.whenReady().then(async () => {
+  appSettings = loadAppSettings();
+
   installApplicationMenu();
 
   if (isDev && process.platform === "darwin") {
@@ -783,14 +850,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle("check-for-updates", async () => {
     if (!app.isPackaged) return updateStatus;
-    try {
-      await autoUpdater.checkForUpdates();
-    } catch (err) {
-      setUpdateStatus({
-        phase: "error",
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
+    await runUpdateCheck();
     return updateStatus;
   });
 
@@ -801,6 +861,16 @@ app.whenReady().then(async () => {
 
   ipcMain.handle("install-update", () => {
     autoUpdater.quitAndInstall();
+  });
+
+  ipcMain.handle("get-auto-update-enabled", () => appSettings.autoUpdateEnabled);
+
+  ipcMain.handle("set-auto-update-enabled", (_event, enabled: boolean) => {
+    appSettings = { ...appSettings, autoUpdateEnabled: enabled };
+    saveAppSettings(appSettings);
+    // Reconfigure the live autoUpdater flags immediately; inert (but
+    // harmless) when !app.isPackaged since setupAutoUpdater() never ran.
+    applyAutoUpdatePolicy();
   });
 
   await createWindow(splash);
@@ -824,6 +894,10 @@ app.whenReady().then(async () => {
 app.on("before-quit", () => {
   quitting = true;
   globalShortcut.unregisterAll();
+  if (updateCheckInterval) {
+    clearInterval(updateCheckInterval);
+    updateCheckInterval = null;
+  }
   serverProcess?.kill("SIGTERM");
   serverProcess = null;
 });

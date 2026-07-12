@@ -9,8 +9,11 @@ import { useMainTabsStore } from "@/features/main-tabs"
 import type { AgentDto } from "@/features/workspace/api"
 import { attachmentUrl, type SlashCommand } from "../api"
 import type { UserMessage } from "../types"
+import { useFileChipRootPath } from "../file-chip-context"
+import { FileChip, resolveAbsolutePath } from "./file-chip"
 import { MessageChip } from "./message-chip"
 import { colorStyle, resolveModeIcon } from "./mode-combobox"
+import { AgentModelLine, AgentSourceBadge, AgentToolCountLine } from "./agent-info"
 import {
   FILE_CONTEXT_RE,
   parseFileCommentContext,
@@ -24,28 +27,6 @@ function isFileMention(path: string): boolean {
   // Dotfiles (.npmrc, .env, .gitignore) start with a dot — always a file
   if (basename.startsWith(".")) return true
   return basename.lastIndexOf(".") > 0
-}
-
-function FileChip({ filePath }: { filePath: string }) {
-  const basename = filePath.split("/").pop() ?? filePath
-  return (
-    <MessageChip
-      icon={
-        <Icon
-          icon={`catppuccin:${getIconName(basename)}`}
-          data-icon="inline-start"
-          aria-hidden
-        />
-      }
-      label={basename}
-      detail={
-        <div className="flex flex-col gap-1">
-          <SectionLabel>File</SectionLabel>
-          <span className="font-mono text-xs break-all">{filePath}</span>
-        </div>
-      }
-    />
-  )
 }
 
 function SlashCommandChip({ command }: { command: SlashCommand }) {
@@ -126,9 +107,15 @@ function AgentChip({ agent }: { agent: AgentDto }) {
       className={cn(style.softBg, style.iconAccent)}
       icon={<visual.Icon data-icon="inline-start" aria-hidden />}
       label={<span className="font-mono">{agent.label}</span>}
+      detailClassName="w-64 flex-col items-start gap-1.5"
       detail={
-        <div className="flex flex-col gap-1">
-          <SectionLabel>Subagent</SectionLabel>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <SectionLabel>Subagent</SectionLabel>
+            <AgentSourceBadge source={agent.source} className="ml-auto" />
+          </div>
+          <AgentModelLine model={agent.model} />
+          <AgentToolCountLine tools={agent.tools} />
           {agent.description && (
             <span className="text-xs leading-relaxed">{agent.description}</span>
           )}
@@ -139,6 +126,7 @@ function AgentChip({ agent }: { agent: AgentDto }) {
 }
 
 function FileContextChip({ context }: { context: FileCommentContext }) {
+  const rootPath = useFileChipRootPath()
   const basename = context.path.split("/").pop() ?? context.path
   const rangeLabel =
     context.startColumn && context.endColumn
@@ -146,8 +134,19 @@ function FileContextChip({ context }: { context: FileCommentContext }) {
       : `L${context.line}-L${context.endLine ?? context.line}`
   const hideCommentRow =
     !!context.code && context.code.trim() === context.comment.trim()
+
+  function handleClick() {
+    useMainTabsStore.getState().addFileTab({
+      filePath: resolveAbsolutePath(context.path, rootPath),
+      title: basename,
+      workspacePath: rootPath,
+      scrollToLine: context.line,
+    })
+  }
+
   return (
     <MessageChip
+      onClick={handleClick}
       icon={
         <Icon
           icon={`catppuccin:${getIconName(basename)}`}
@@ -157,26 +156,32 @@ function FileContextChip({ context }: { context: FileCommentContext }) {
       }
       label={basename}
       meta={rangeLabel}
-      detailClassName="w-80 flex-col items-start gap-0 overflow-hidden p-0"
+      detailClassName="w-80 max-w-[calc(100vw-2rem)] flex-col items-stretch gap-0 overflow-hidden p-0"
       detail={
         <>
-          <div className="flex w-full items-center gap-2 border-b border-foreground/10 px-3 py-2.5">
-            <Icon
-              icon={`catppuccin:${getIconName(basename)}`}
-              className="size-4 shrink-0"
-              aria-hidden
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-mono text-2xs font-medium">
+          {/* Header mirrors the file chip hover card (file-chip.tsx). */}
+          <div className="flex w-full items-center gap-2.5 border-b border-foreground/10 px-3 py-2.5">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-foreground/5">
+              <Icon
+                icon={`catppuccin:${getIconName(basename)}`}
+                className="size-4"
+                aria-hidden
+              />
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate text-xs font-medium">{basename}</span>
+              <span className="font-mono text-3xs leading-snug break-all text-muted-foreground">
                 {context.path}
-              </p>
-              <p className="text-3xs text-muted-foreground">
-                Selection {rangeLabel}
-              </p>
+              </span>
             </div>
           </div>
+          <div className="flex w-full items-center gap-1.5 border-b border-foreground/10 px-3 py-1.5 text-3xs text-muted-foreground">
+            <span className="font-medium text-foreground/70">Selection</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="font-mono">{rangeLabel}</span>
+          </div>
           {context.code && (
-            <pre className="max-h-20 w-full overflow-auto bg-muted/40 px-3 py-2 font-mono text-3xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
+            <pre className="max-h-24 w-full overflow-auto bg-muted/30 px-3 py-2 font-mono text-2xs leading-relaxed whitespace-pre-wrap text-foreground/75">
               {context.code}
             </pre>
           )}
@@ -185,6 +190,9 @@ function FileContextChip({ context }: { context: FileCommentContext }) {
               {context.comment}
             </p>
           )}
+          <div className="w-full border-t border-foreground/10 bg-muted/40 px-3 py-1.5 text-3xs text-muted-foreground">
+            Click to open in review panel
+          </div>
         </>
       }
     />
@@ -290,7 +298,7 @@ export function UserMessageContent({
         // Only files get a chip; folder mentions render as plain text.
         parts.push(
           isFileMention(path) ? (
-            <FileChip key={`token-${key++}`} filePath={path} />
+            <FileChip key={`token-${key++}`} path={path} />
           ) : (
             token
           )

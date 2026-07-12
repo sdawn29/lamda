@@ -6,9 +6,10 @@ import {
   steer,
   followUp,
   revertToMessage,
+  restoreCheckpoint,
   type SendPromptParams,
 } from "./api"
-import { messagesQueryKey } from "./queries"
+import { messagesQueryKey, chatKeys } from "./queries"
 import { gitKeys } from "@/features/git/queries"
 
 // ── Send prompt ───────────────────────────────────────────────────────────────
@@ -92,6 +93,23 @@ export function useRevertToMessage(
         queryKey: gitKeys.diffStat(sessionId),
       })
       onSuccess?.(text)
+    },
+  })
+}
+
+// ── Restore checkpoint ───────────────────────────────────────────────────────
+// Restores the working tree only (no conversation change) to a snapshot taken
+// before a past prompt. The git panel refresh is driven server-side by
+// `gitStatusBroadcaster` (see apps/server/src/routes/checkpoints.ts), which the
+// global WS handler already turns into a `gitKeys.all` invalidation — no need
+// to duplicate that here.
+export function useRestoreCheckpoint(threadId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (checkpointId: string) =>
+      restoreCheckpoint(threadId, checkpointId),
+    onSuccess: ({ checkpoints }) => {
+      queryClient.setQueryData(chatKeys.checkpoints(threadId), checkpoints)
     },
   })
 }

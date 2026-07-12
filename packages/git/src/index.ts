@@ -851,6 +851,171 @@ export async function gitListCheckpointRefs(cwd: string): Promise<string[]> {
   }
 }
 
+// ── Shadow checkpoint snapshots ─────────────────────────────────────────────
+// A lighter, more complete alternative to the stash-based turn checkpoints
+// above: captures the ENTIRE working tree (tracked + untracked, honoring
+// .gitignore) as a commit object per top-level user prompt, without touching
+// the user's real index or worktree. Used to power chat-transcript "restore
+// checkpoint" — distinct from the per-turn revert flow, which only tracks
+// files git already knew about.
+
+/** Ref under which one thread's chain of checkpoint commits lives. */
+export function threadCheckpointRefName(threadId: string): string {
+  return `refs/lamda/checkpoints/${threadId}`;
+}
+
+/**
+ * Removes a thread's checkpoint ref, so its whole snapshot chain becomes
+ * eligible for `git gc`. Call when the thread itself is deleted. Best-effort.
+ */
+export async function deleteThreadCheckpointRef(
+  cwd: string,
+  threadId: string,
+): Promise<void> {
+  await execFileAsync(
+    "git",
+    ["update-ref", "-d", threadCheckpointRefName(threadId)],
+    { cwd, timeout: 10000 },
+  ).catch(() => {});
+}
+
+/**
+ * Creates a commit object capturing the entire current working tree (tracked
+ * + untracked, honoring .gitignore) WITHOUT touching the real index or
+ * worktree, then anchors it at `refName`. Technique: point `GIT_INDEX_FILE` at
+ * a throwaway file so `git add -A` builds a tree in complete isolation from
+ * the user's real staging area, then `write-tree` + `commit-tree` turn that
+ * into a commit object. The new commit is parented on HEAD (if the repo has
+ * any commits yet) and on the ref's previous value (if a snapshot already
+ * exists there), so the whole chain of snapshots ever taken stays reachable
+ * from `refName` alone and `git gc` never prunes it.
+ *
+ * Returns the new commit sha, or null on any failure — not a git repo, git
+ * missing, permission errors, etc. Capture is always best-effort and must
+ * never block the caller.
+ */
+export async function createShadowSnapshot(
+  cwd: string,
+  refName: string,
+): Promise<string | null> {
+  assertNotOption(refName, "refName");
+  if (!(await isGitRepo(cwd))) return null;
+
+  const tmpDir = await mkdtemp(join(tmpdir(), "lamda-shadow-"));
+  const indexFile = join(tmpDir, "index");
+  try {
+    const env = { ...process.env, GIT_INDEX_FILE: indexFile };
+
+    await execFileAsync("git", ["add", "-A"], {
+      cwd,
+      timeout: 60000,
+      env,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+
+    const { stdout: treeOut } = await execFileAsync("git", ["write-tree"], {
+      cwd,
+      timeout: 30000,
+      env,
+    });
+    const tree = treeOut.trim();
+    if (!tree) return null;
+
+    const parents: string[] = [];
+    const head = await getRefSha(cwd, "HEAD");
+    if (head) parents.push(head);
+    const previous = await getRefSha(cwd, refName);
+    if (previous && !parents.includes(previous)) parents.push(previous);
+
+    // -c user.name/user.email (rather than relying on the user's global git
+    // config) so this works unattended on machines with no identity set up.
+    const { stdout: commitOut } = await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=lamda",
+        "-c",
+        "user.email=lamda@local",
+        "commit-tree",
+        tree,
+        ...parents.flatMap((p) => ["-p", p]),
+        "-m",
+        "lamda checkpoint",
+      ],
+      { cwd, timeout: 15000, env },
+    );
+    const sha = commitOut.trim();
+    if (!sha) return null;
+
+    await execFileAsync("git", ["update-ref", refName, sha], {
+      cwd,
+      timeout: 10000,
+    });
+
+    return sha;
+  } catch {
+    return null;
+  } finally {
+    await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
+ * Restores the working tree to exactly a shadow snapshot's content: (a) `git
+ * restore --worktree --source=<sha> -- .` overwrites every file the snapshot
+ * knows about — worktree only, so the user's real index/staging state is left
+ * untouched (unlike `git checkout <sha> -- .`, which would also stage every
+ * restored file) — then (b) any file present now but absent from the snapshot
+ * (e.g. created after the checkpoint was taken) is deleted from disk. When the
+ * snapshot tree is empty (checkpoint of an empty workspace), step (a) is
+ * skipped — `-- .` would fail with "pathspec did not match" — and restoring
+ * degenerates to just (b): remove every non-ignored file. Does not clean up
+ * directories left empty by (b). Throws on failure.
+ */
+export async function restoreShadowSnapshot(
+  cwd: string,
+  sha: string,
+): Promise<void> {
+  assertNotOption(sha, "sha");
+  try {
+    const [{ stdout: currentOut }, { stdout: snapshotOut }] = await Promise.all(
+      [
+        execFileAsync(
+          "git",
+          ["ls-files", "-c", "-o", "--exclude-standard", "-z"],
+          { cwd, timeout: 15000, maxBuffer: 64 * 1024 * 1024 },
+        ),
+        execFileAsync("git", ["ls-tree", "-r", "--name-only", "-z", sha], {
+          cwd,
+          timeout: 15000,
+          maxBuffer: 64 * 1024 * 1024,
+        }),
+      ],
+    );
+
+    const snapshotFiles = new Set(snapshotOut.split("\0").filter(Boolean));
+    const currentFiles = currentOut.split("\0").filter(Boolean);
+
+    if (snapshotFiles.size > 0) {
+      await execFileAsync(
+        "git",
+        ["restore", "--worktree", `--source=${sha}`, "--", "."],
+        { cwd, timeout: 60000, maxBuffer: 64 * 1024 * 1024 },
+      );
+    }
+
+    const toDelete = currentFiles.filter((f) => !snapshotFiles.has(f));
+    for (const relPath of toDelete) {
+      await rm(join(cwd, relPath), { force: true }).catch(() => {});
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to restore checkpoint ${sha}: ${message}`, {
+      cause: err,
+    });
+  }
+}
+
 // ── Worktrees ─────────────────────────────────────────────────────────────────
 // Each worktree is an additional working directory linked to the same repo,
 // letting independent threads/agents edit in isolation without colliding. lamda

@@ -52,6 +52,16 @@ export async function fetchInstalledSkills(
   return res.skills
 }
 
+/** Names of installed skills whose registry source has a newer version. */
+export async function fetchSkillUpdates(
+  signal?: AbortSignal
+): Promise<string[]> {
+  const res = await apiFetch<{ updates: string[] }>("/skills/updates", {
+    signal,
+  })
+  return res.updates
+}
+
 export async function fetchSkillInstallJobs(
   signal?: AbortSignal
 ): Promise<SkillInstallJob[]> {

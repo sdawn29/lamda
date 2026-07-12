@@ -142,3 +142,11 @@ export async function downloadUpdate(): Promise<void> {
 export async function installUpdate(): Promise<void> {
   await getElectronAPI()?.installUpdate()
 }
+
+export async function getAutoUpdateEnabled(): Promise<boolean> {
+  return (await getElectronAPI()?.getAutoUpdateEnabled()) ?? true
+}
+
+export async function setAutoUpdateEnabled(enabled: boolean): Promise<void> {
+  await getElectronAPI()?.setAutoUpdateEnabled(enabled)
+}

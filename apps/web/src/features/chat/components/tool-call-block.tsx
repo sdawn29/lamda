@@ -50,6 +50,7 @@ import { SubagentCard } from "./subagent-card"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
 import { isSubagentToolName } from "../lib/subagent"
 import type { ToolMessage } from "../types"
+import type { AgentDto } from "@/features/workspace/api"
 
 const PrismCode = lazy(() => import("./prism-code"))
 
@@ -1300,6 +1301,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   entryDelayMs = 0,
   rootPath,
   suppressPlanSavedCard = false,
+  agentsById,
 }: {
   msg: ToolMessage
   isNew?: boolean
@@ -1308,6 +1310,8 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   rootPath?: string
   /** When true, render write output inline instead of the plan-ready card UI. */
   suppressPlanSavedCard?: boolean
+  /** Resolves a `delegate` call's agent for SubagentCard's model badge. */
+  agentsById?: ReadonlyMap<string, AgentDto>
 }) {
   const normalizedToolName = msg.toolName.toLowerCase()
   const isEdit = normalizedToolName === "edit" && isEditArgs(msg.args)
@@ -1350,6 +1354,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         isNew={isNew}
         entryDelayMs={entryDelayMs}
         rootPath={rootPath}
+        agentsById={agentsById}
       />
     )
   }

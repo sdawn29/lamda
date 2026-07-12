@@ -362,6 +362,41 @@ export function buildCheckpointByUserBlock(
   return result
 }
 
+// Match each user message to the working-tree checkpoint captured for it (see
+// prompt-runner.ts). The server stamps the checkpoint's createdAt with the
+// exact same timestamp as its originating user block, so an exact match is
+// the common case; a small tolerance absorbs any edge-case rounding without
+// risking a cross-message mismatch (prompts are rarely sent within seconds of
+// one another).
+const CHECKPOINT_MATCH_TOLERANCE_MS = 5_000
+
+export function buildCheckpointIdByUserBlock(
+  messages: Message[],
+  checkpoints: { id: string; createdAt: number }[]
+): Map<string, string> {
+  const result = new Map<string, string>()
+  if (checkpoints.length === 0) return result
+
+  for (const message of messages) {
+    if (message.role !== "user" || !message.id || message.createdAt == null)
+      continue
+
+    let bestId: string | null = null
+    let bestDiff = Infinity
+    for (const checkpoint of checkpoints) {
+      const diff = Math.abs(checkpoint.createdAt - message.createdAt)
+      if (diff < bestDiff) {
+        bestDiff = diff
+        bestId = checkpoint.id
+      }
+    }
+    if (bestId && bestDiff <= CHECKPOINT_MATCH_TOLERANCE_MS) {
+      result.set(message.id, bestId)
+    }
+  }
+  return result
+}
+
 // Map each fully-completed todo list to the group that contains the todo tool
 // message where its last goal finished, so the whole list docks inline next to
 // that turn as a single card.

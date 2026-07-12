@@ -56,7 +56,10 @@ import {
   useModes,
 } from "@/features/workspace/queries"
 import type { AgentDto } from "@/features/workspace/api"
-import { useEnvDialog } from "@/features/workspace"
+import { useEnvDialog, useWorkspace } from "@/features/workspace"
+import { useGitStatus, statusLabel } from "@/features/git"
+import { buildChangedFileMap } from "../file-chip-context"
+import { useMainTabsStore } from "@/features/main-tabs"
 import { ModelCombobox } from "./model-combobox"
 import { ModeCombobox, getModeOption, modeOptionFromDto } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
@@ -79,7 +82,7 @@ import {
   type SlashMention,
 } from "./rich-input"
 import { AgentMentionDropdown } from "./agent-mention-dropdown"
-import { FileMentionDropdown } from "./file-mention-dropdown"
+import { FileMentionDropdown, type MentionEntry } from "./file-mention-dropdown"
 import {
   SlashCommandDropdown,
   itemValue,
@@ -208,7 +211,7 @@ export const ChatComposer = memo(
       []
     )
     const fileInputRef = React.useRef<HTMLInputElement>(null)
-    const mentionEntries = React.useRef<WorkspaceEntry[]>([])
+    const mentionEntries = React.useRef<MentionEntry[]>([])
     const slashItemsRef = React.useRef<ChatSlashItem[]>([])
     const isControlled = controlledModelId !== undefined
     const isThinkingControlled = controlledThinkingLevel !== undefined
@@ -426,14 +429,58 @@ export const ChatComposer = memo(
     }, [slashCommandOpen, useWorkspaceCommands, refetchSessionCommands])
     const { data: contextUsage } = useContextUsage(sessionId)
 
-    const mentionEntries2 = React.useMemo(() => {
+    // Section inputs for the @-mention dropdown: currently open file tabs and
+    // the working tree's changed files. Sectioning happens here in the data
+    // layer (not in the dropdown) so the flat index the keyboard navigation
+    // walks matches the visual order of the sections.
+    const { workspaces } = useWorkspace()
+    const workspacePath = workspaces.find((w) => w.id === workspaceId)?.path
+    const { data: gitStatusData } = useGitStatus(sessionId ?? "")
+    const changedFiles = React.useMemo(
+      () => buildChangedFileMap(gitStatusData?.raw ?? ""),
+      [gitStatusData?.raw]
+    )
+    const mainTabs = useMainTabsStore((s) => s.tabs)
+    // Workspace-relative paths of files open as main tabs.
+    const openTabPaths = React.useMemo(() => {
+      const paths = new Set<string>()
+      const root = workspacePath?.replace(/\/$/, "")
+      for (const tab of mainTabs) {
+        if (tab.type !== "file") continue
+        const tabRoot = (tab.workspacePath ?? root)?.replace(/\/$/, "")
+        if (tabRoot && tab.filePath.startsWith(`${tabRoot}/`)) {
+          paths.add(tab.filePath.slice(tabRoot.length + 1))
+        }
+      }
+      return paths
+    }, [mainTabs, workspacePath])
+
+    const mentionEntries2 = React.useMemo((): MentionEntry[] => {
       if (!atMention) return []
       const entries = fileData ?? []
       const f = atMention.filter.toLowerCase()
-      return entries
-        .filter((e) => e.path.toLowerCase().includes(f))
-        .slice(0, 10)
-    }, [fileData, atMention])
+      const matched = entries.filter((e) => e.path.toLowerCase().includes(f))
+
+      // Bucket into Open / Changed / Files, preserving the existing ranking
+      // within each bucket. The concatenated order is exactly what both the
+      // dropdown sections and the arrow-key selectedIndex iterate over.
+      const open: MentionEntry[] = []
+      const changed: MentionEntry[] = []
+      const rest: MentionEntry[] = []
+      for (const e of matched) {
+        const changedFile =
+          e.type === "file" ? changedFiles.get(e.path) : undefined
+        const label = changedFile ? statusLabel(changedFile) : undefined
+        if (e.type === "file" && openTabPaths.has(e.path)) {
+          open.push({ ...e, section: "open", statusLabel: label })
+        } else if (changedFile) {
+          changed.push({ ...e, section: "changed", statusLabel: label })
+        } else {
+          rest.push({ ...e, section: "files" })
+        }
+      }
+      return [...open, ...changed, ...rest].slice(0, 10)
+    }, [fileData, atMention, changedFiles, openTabPaths])
     mentionEntries.current = mentionEntries2
 
     // Built-in action commands. Each runs immediately when selected (no chip
@@ -1131,7 +1178,9 @@ export const ChatComposer = memo(
                   slashMention !== null &&
                   (slashItems.length > 0 || commandsLoading)
                 }
-                agentActive={agentMention !== null && availableAgents.length > 0}
+                agentActive={
+                  agentMention !== null && availableAgents.length > 0
+                }
                 onAtMentionChange={handleAtMentionChange}
                 onSlashMentionChange={handleSlashMentionChange}
                 onAgentMentionChange={handleAgentMentionChange}

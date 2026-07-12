@@ -149,7 +149,6 @@ export type ServerMessage =
   | GitStatusMessage
   | GitProgressMessage
   | GitResultMessage
-  | WorkspaceProgressMessage
   | CommandAckMessage;
 
 export interface ServerErrorMessage {
@@ -178,14 +177,6 @@ export interface GitResultMessage {
   success: boolean;
   error?: string;
   data?: Record<string, unknown>;
-}
-
-export interface WorkspaceProgressMessage {
-  type: "workspace:progress";
-  workspaceId: string;
-  operation: string;
-  current: number;
-  total: number;
 }
 
 export interface CommandAckMessage {

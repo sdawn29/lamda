@@ -2,7 +2,9 @@ import { memo, useEffect, useMemo, useRef, useState } from "react"
 import Markdown from "react-markdown"
 import { cn } from "@/shared/lib/utils"
 import { formatDuration } from "@/shared/lib/formatters"
+import type { AgentDto } from "@/features/workspace/api"
 import { colorStyle, resolveModeIcon } from "./mode-combobox"
+import { AgentModelBadge } from "./agent-info"
 import { getMarkdownComponents } from "./markdown-components"
 import { ThinkingBlock } from "./thinking-block"
 import { ToolCallBlock, toolDisplayName } from "./tool-call-block"
@@ -18,12 +20,21 @@ import {
 } from "./disclosure"
 import {
   describeSubagentActivity,
+  delegateAgentId,
   getSubagentDetails,
   subagentBlocksToMessages,
   subagentStatus,
   delegateDescription,
 } from "../lib/subagent"
 import type { Message, ToolMessage } from "../types"
+
+/** Compact token-count label, e.g. "1.2K", "830". Mirrors context-chart.tsx's
+ * local formatter — kept separate since that file isn't shared UI. */
+function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
 
 /** One renderable row in a subagent card's nested transcript. */
 type SubagentEntry =
@@ -206,15 +217,24 @@ export const SubagentCard = memo(function SubagentCard({
   isNew = true,
   entryDelayMs = 0,
   rootPath,
+  agentsById,
 }: {
   msg: ToolMessage
   isNew?: boolean
   entryDelayMs?: number
   rootPath?: string
+  /** Resolves the agent that ran, for the header's model badge — falls back
+   * to no badge when the map hasn't reached this card. */
+  agentsById?: ReadonlyMap<string, AgentDto>
 }) {
   const details = getSubagentDetails(msg)
   const status = subagentStatus(msg)
   const isLive = status === "running" || status === "queued"
+
+  // The nested run's own agent id is authoritative once the first snapshot
+  // arrives; before that, fall back to the delegate call's args.
+  const agentId = details?.agent || delegateAgentId(msg.args)
+  const agentDto = agentId ? agentsById?.get(agentId) : undefined
 
   // null = follow the default (open while live, collapsed once settled);
   // a click pins the user's choice.
@@ -243,6 +263,7 @@ export const SubagentCard = memo(function SubagentCard({
   // humanized tool part, not the internal name.
   const activity = rawActivity ? toolDisplayName(rawActivity) : null
   const toolCount = details?.stats?.toolCalls ?? 0
+  const totalTokens = details?.stats?.totalTokens ?? 0
 
   // Keep a lone agent's live transcript bounded just like the focus panel used
   // for parallel agents. Follow new output while pinned to the bottom, but
@@ -309,6 +330,7 @@ export const SubagentCard = memo(function SubagentCard({
           )}
         />
         {headerLabel}
+        <AgentModelBadge model={agentDto?.model} />
         {description && (
           <span className={cn("min-w-0 flex-1 truncate", DISCLOSURE_DIM)}>
             {description}
@@ -328,10 +350,14 @@ export const SubagentCard = memo(function SubagentCard({
           <span
             className={cn("shrink-0 text-2xs tabular-nums", DISCLOSURE_DIM)}
           >
-            {toolCount > 0 &&
-              `${toolCount} ${toolCount === 1 ? "tool" : "tools"}`}
-            {toolCount > 0 && settledDuration ? " · " : ""}
-            {settledDuration ? formatDuration(settledDuration) : ""}
+            {[
+              toolCount > 0 &&
+                `${toolCount} ${toolCount === 1 ? "tool" : "tools"}`,
+              totalTokens > 0 && `${formatTokenCount(totalTokens)} tok`,
+              settledDuration ? formatDuration(settledDuration) : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         )}
         <DisclosureChevron expanded={expanded} revealOnHover={!isLive} />

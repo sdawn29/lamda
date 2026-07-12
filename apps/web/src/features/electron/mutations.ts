@@ -8,6 +8,7 @@ import {
   openPath,
   openWorkspaceWithApp,
   selectFolder,
+  setAutoUpdateEnabled,
   type SelectFolderOptions,
 } from "./api"
 import { electronKeys } from "./queries"
@@ -61,5 +62,15 @@ export function useDownloadUpdate() {
 export function useInstallUpdate() {
   return useMutation({
     mutationFn: installUpdate,
+  })
+}
+
+export function useSetAutoUpdateEnabled() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: setAutoUpdateEnabled,
+    onSuccess: (_data, enabled) => {
+      queryClient.setQueryData(electronKeys.autoUpdateEnabled, enabled)
+    },
   })
 }

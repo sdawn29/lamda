@@ -618,6 +618,47 @@ export function revertToMessage(
   )
 }
 
+// ── Checkpoints (working-tree snapshots taken before each prompt) ─────────────
+// Distinct from the turn-based revert-to-message flow above: a checkpoint is a
+// full working-tree snapshot (tracked + untracked files) taken right before a
+// prompt is sent, restorable independently of the conversation history.
+
+export interface ThreadCheckpoint {
+  id: string
+  threadId: string
+  commitSha: string
+  label: string
+  createdAt: number
+}
+
+export async function listCheckpoints(
+  threadId: string
+): Promise<ThreadCheckpoint[]> {
+  const data = await apiFetch<{ checkpoints: ThreadCheckpoint[] }>(
+    `/thread/${threadId}/checkpoints`
+  )
+  return data.checkpoints
+}
+
+export interface RestoreCheckpointResponse {
+  checkpoints: ThreadCheckpoint[]
+  /**
+   * Snapshot of the state right before this restore ran, so the restore can
+   * be undone by restoring it in turn. Null when the safety capture failed.
+   */
+  safetyCheckpoint: ThreadCheckpoint | null
+}
+
+export function restoreCheckpoint(
+  threadId: string,
+  checkpointId: string
+): Promise<RestoreCheckpointResponse> {
+  return apiFetch<RestoreCheckpointResponse>(
+    `/thread/${threadId}/checkpoints/${checkpointId}/restore`,
+    { method: "POST" }
+  )
+}
+
 // ── Workspace files ────────────────────────────────────────────────────────
 
 export type WorkspaceEntry = { path: string; type: "file" | "dir" }

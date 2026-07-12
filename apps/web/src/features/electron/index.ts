@@ -6,11 +6,13 @@ export type {
 } from "./api"
 export { restartServer } from "./api"
 export {
+  electronAutoUpdateEnabledQueryOptions,
   electronKeys,
   electronPlatformQueryOptions,
   electronServerPortQueryOptions,
   electronServerStatusQueryOptions,
   electronUpdateStatusQueryOptions,
+  useAutoUpdateEnabled,
   useElectronFullscreen,
   useElectronPlatform,
   useElectronServerPort,
@@ -27,6 +29,7 @@ export {
   useOpenPath,
   useOpenWorkspaceWithApp,
   useSelectFolder,
+  useSetAutoUpdateEnabled,
 } from "./mutations"
 export { ServerUnavailable } from "./server-unavailable"
 export { useAutoUpdateCheck } from "./use-auto-update-check"

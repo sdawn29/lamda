@@ -68,6 +68,34 @@ export function statusTextClass(label: string): string {
   return (STATUS_META[label] ?? { text: "text-muted-foreground" }).text
 }
 
+// Solid-fill dot classes per status label. Same color families as STATUS_META
+// above — kept as literal strings (not derived via string replace) so
+// Tailwind's scanner sees them.
+const STATUS_DOT_CLASSES: Record<string, string> = {
+  M: "bg-yellow-600 dark:bg-yellow-400",
+  "M*": "bg-yellow-600 dark:bg-yellow-400",
+  A: "bg-green-600 dark:bg-green-400",
+  D: "bg-red-600 dark:bg-red-400",
+  U: "bg-blue-600 dark:bg-blue-400",
+  R: "bg-purple-600 dark:bg-purple-400",
+}
+
+/** Solid-fill dot class for a status label — used where a letter would be too
+ *  loud (e.g. the composer's file-mention dropdown). */
+export function statusDotClass(label: string): string {
+  return STATUS_DOT_CLASSES[label] ?? "bg-muted-foreground"
+}
+
+/** Combined bg+text classes for a status label — used by pill badges outside
+ *  this component (e.g. the file chip hover card in chat). */
+export function statusBadgeClasses(label: string): string {
+  const meta = STATUS_META[label] ?? {
+    bg: "bg-muted",
+    text: "text-muted-foreground",
+  }
+  return `${meta.bg} ${meta.text}`
+}
+
 export const StatusBadge = memo(function StatusBadge({
   file,
 }: {

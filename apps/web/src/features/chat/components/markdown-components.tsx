@@ -2,16 +2,12 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { PluggableList } from "unified"
-import { Icon } from "@iconify/react"
 import { useSyntaxTheme } from "@/features/themes"
-import { useMainTabsStore } from "@/features/main-tabs"
 import { Check, Copy } from "lucide-react"
 
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
-import { getIconName } from "@/shared/ui/file-icon"
-import { SectionLabel } from "@/shared/ui/section-label"
-import { MessageChip } from "./message-chip"
+import { FileChip } from "./file-chip"
 
 const PrismCode = lazy(() => import("./prism-code"))
 
@@ -195,9 +191,10 @@ const FILE_EXT_RE =
   /\.(tsx?|jsx?|mjs|cjs|json|md|mdx|css|scss|less|html?|py|go|rs|rb|java|kt|swift|c|h|cpp|hpp|cs|php|sh|bash|zsh|sql|ya?ml|toml|ini|env|lock|txt|svg|vue|astro)$/i
 
 // Trailing location suffix: `:line`, `:line:col`, or a range like `:8-9` /
-// `:8:1-9:5`. The first capture group is the start line (used to scroll), while
-// the whole match preserves the original text (range included) for display.
-const LINE_SUFFIX_RE = /:(\d+)(?::\d+)?(?:-\d+(?::\d+)?)?$/
+// `:8:1-9:5`. Capture 1 is the start line (used to scroll and center the
+// peek), capture 2 the end line of a range (used to highlight it), while the
+// whole match preserves the original text (range included) for display.
+const LINE_SUFFIX_RE = /:(\d+)(?::\d+)?(?:-(\d+)(?::\d+)?)?$/
 
 // API/web routes masquerade as folder paths: they have slashes and no file
 // extension, so the directory heuristic happily turns `/api/users` into a
@@ -229,6 +226,8 @@ interface FileReference {
   path: string
   /** Start line, used to scroll the opened file into view. */
   line?: number
+  /** End line when the reference is a range (`:8-14`). */
+  endLine?: number
   /** Full location suffix without the leading colon (e.g. `8`, `8:3`, `8-9`). */
   location?: string
 }
@@ -259,6 +258,7 @@ function parseFileReference(text: string): FileReference | null {
 
   const lineMatch = trimmed.match(LINE_SUFFIX_RE)
   const line = lineMatch ? Number(lineMatch[1]) : undefined
+  const endLine = lineMatch?.[2] ? Number(lineMatch[2]) : undefined
   const location = lineMatch ? lineMatch[0].slice(1) : undefined
   const path = lineMatch ? trimmed.slice(0, lineMatch.index) : trimmed
   if (!path) return null
@@ -275,57 +275,7 @@ function parseFileReference(text: string): FileReference | null {
   // Folders aren't openable, so they stay as plain inline code (no chip).
   if (looksLikeDirectory(path)) return null
 
-  return { path, line, location }
-}
-
-function resolveAbsolutePath(path: string, rootPath?: string): string {
-  if (path.startsWith("/")) return path
-  if (rootPath) return `${rootPath.replace(/\/$/, "")}/${path}`
-  return path
-}
-
-function FileReferenceLink({
-  reference,
-  rootPath,
-}: {
-  reference: FileReference
-  rootPath?: string
-}) {
-  const normalizedPath = reference.path.replace(/\/+$/, "")
-  const basename = normalizedPath.split("/").pop() || normalizedPath
-
-  function handleClick() {
-    useMainTabsStore.getState().addFileTab({
-      filePath: resolveAbsolutePath(reference.path, rootPath),
-      title: basename,
-      workspacePath: rootPath,
-      scrollToLine: reference.line,
-    })
-  }
-
-  return (
-    <MessageChip
-      onClick={handleClick}
-      icon={
-        <Icon
-          icon={`catppuccin:${getIconName(basename)}`}
-          data-icon="inline-start"
-          aria-hidden
-        />
-      }
-      label={basename}
-      meta={reference.location != null ? `:${reference.location}` : undefined}
-      detail={
-        <div className="flex flex-col gap-1">
-          <SectionLabel>Open in review panel</SectionLabel>
-          <span className="font-mono text-xs break-all">
-            {reference.path}
-            {reference.location != null ? `:${reference.location}` : ""}
-          </span>
-        </div>
-      }
-    />
-  )
+  return { path, line, endLine, location }
 }
 
 /**
@@ -356,7 +306,15 @@ function createMarkdownComponents(rootPath?: string, rich = false): Components {
       }
       const reference = parseFileReference(String(children))
       if (reference) {
-        return <FileReferenceLink reference={reference} rootPath={rootPath} />
+        return (
+          <FileChip
+            path={reference.path}
+            line={reference.line}
+            endLine={reference.endLine}
+            location={reference.location}
+            rootPath={rootPath}
+          />
+        )
       }
       return <code className={INLINE_CODE_CLASS}>{children}</code>
     },
