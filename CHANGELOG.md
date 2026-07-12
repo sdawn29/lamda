@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.50.0](../../releases/tag/v0.50.0) — 2026-07-12
+
+### Features
+
+* enhance update handling with structured release notes and new composer settings menu
+* **electron:** add auto-update functionality
+* **chat:** enhance subagent transcript scrolling and add agent mention dropdown
+
 ## [0.49.0](../../releases/tag/v0.49.0) — 2026-07-10
 
 ### Features
