@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.52.0](../../releases/tag/v0.52.0) — 2026-07-14
+
+### Features
+
+* update web fetch tool to return Markdown and enhance related tests
+
 ## [0.51.0](../../releases/tag/v0.51.0) — 2026-07-14
 
 ### Features
