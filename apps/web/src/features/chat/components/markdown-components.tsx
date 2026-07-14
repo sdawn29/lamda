@@ -21,7 +21,7 @@ export const remarkPlugins: PluggableList = [remarkGfm]
  */
 const CHAT_PROSE_BASE =
   "prose prose-sm max-w-none dark:prose-invert font-chat " +
-  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-colors [&_a:hover]:text-primary/70"
+  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:transition-[filter] [&_a:hover]:brightness-125"
 
 /**
  * Single source of truth for chat-surface markdown typography, shared by the
@@ -382,7 +382,7 @@ const baseMarkdownComponents: Components = {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="text-primary underline underline-offset-4 transition-colors hover:text-primary/70"
+      className="text-primary underline underline-offset-4 transition-[filter] hover:brightness-125"
     >
       {children}
     </a>

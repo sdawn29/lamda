@@ -126,7 +126,7 @@ const HOST_GROUP: CatalogGroupDto = {
     {
       name: "web_fetch",
       label: "web_fetch",
-      description: "Fetch a URL and read it as text.",
+      description: "Fetch a URL and read it as Markdown.",
       subagent: true,
     },
     {

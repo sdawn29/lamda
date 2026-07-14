@@ -22,24 +22,19 @@ export function webFetchHost(input: Record<string, unknown>): string | null {
   }
 }
 
-function ok(data: unknown) {
+function markdown(text: string) {
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(data) }],
+    content: [{ type: "text" as const, text }],
     details: {},
   };
 }
 
 function fail(message: string) {
-  return {
-    content: [
-      { type: "text" as const, text: JSON.stringify({ error: message }) },
-    ],
-    details: {},
-  };
+  return markdown(`## Web fetch failed\n\n${message}`);
 }
 
 // ── HTML → text ─────────────────────────────────────────────────────────────
-// Dependency-free reduction of an HTML document to markdown-ish plain text:
+// Dependency-free reduction of an HTML document to Markdown:
 // enough structure (headings, lists, links) for the model to navigate, without
 // pulling a parser into the server bundle.
 
@@ -74,7 +69,10 @@ function decodeEntities(text: string): string {
     );
 }
 
-export function htmlToText(html: string): { title: string | null; text: string } {
+export function htmlToMarkdown(html: string): {
+  title: string | null;
+  markdown: string;
+} {
   const title =
     /<title[^>]*>([\s\S]*?)<\/title>/i
       .exec(html)?.[1]
@@ -92,7 +90,10 @@ export function htmlToText(html: string): { title: string | null; text: string }
     .replace(
       /<a\b[^>]*href=["']?([^"'\s>]+)["']?[^>]*>([\s\S]*?)<\/a\s*>/gi,
       (_, href: string, inner: string) => {
-        const text = inner.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+        const text = inner
+          .replace(/<[^>]+>/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
         if (!text) return "";
         return href.startsWith("#") ? text : `[${text}](${href})`;
       },
@@ -105,7 +106,10 @@ export function htmlToText(html: string): { title: string | null; text: string }
     .replace(/<\/h[1-6]\s*>/gi, "\n\n")
     .replace(/<li[^>]*>/gi, "\n- ")
     .replace(/<(br|hr)\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|section|article|tr|ul|ol|table|blockquote)\s*>/gi, "\n\n")
+    .replace(
+      /<\/(p|div|section|article|tr|ul|ol|table|blockquote)\s*>/gi,
+      "\n\n",
+    )
     .replace(/<td[^>]*>|<th[^>]*>/gi, " | ")
     .replace(/<[^>]+>/g, "");
 
@@ -116,7 +120,58 @@ export function htmlToText(html: string): { title: string | null; text: string }
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  return { title, text: s };
+  return { title: title ? decodeEntities(title) : null, markdown: s };
+}
+
+/** @deprecated Use {@link htmlToMarkdown}. */
+export function htmlToText(html: string): {
+  title: string | null;
+  text: string;
+} {
+  const { title, markdown: text } = htmlToMarkdown(html);
+  return { title, text };
+}
+
+interface WebFetchMarkdownResult {
+  url: string;
+  finalUrl?: string;
+  status: number;
+  contentType: string;
+  title: string | null;
+  content: string;
+  totalLength: number;
+  offset: number;
+  truncated: boolean;
+  capped: boolean;
+}
+
+export function formatWebFetchMarkdown(result: WebFetchMarkdownResult): string {
+  const sourceUrl = result.finalUrl ?? result.url;
+  const heading =
+    result.title?.replace(/\s+/g, " ").trim() || "Fetched content";
+  const lines = [
+    `# ${heading}`,
+    "",
+    `- Source: <${sourceUrl}>`,
+    `- Status: \`${result.status}\``,
+    `- Content type: \`${result.contentType || "unknown"}\``,
+  ];
+
+  if (result.finalUrl && result.finalUrl !== result.url) {
+    lines.push(`- Requested URL: <${result.url}>`);
+  }
+
+  lines.push("", "---", "", result.content);
+
+  if (result.truncated) {
+    const nextOffset = result.offset + result.content.length;
+    lines.push(
+      "",
+      `> Content truncated; showing characters ${result.offset}–${nextOffset} of ${result.totalLength}${result.capped ? " (response capped at 2 MB)" : ""}. Call again with \`offset=${nextOffset}\` to continue.`,
+    );
+  }
+
+  return lines.join("\n");
 }
 
 /** Read up to `MAX_RESPONSE_BYTES` of a response body, then stop pulling. */
@@ -149,16 +204,16 @@ async function readBodyCapped(
 }
 
 /**
- * Tool that fetches a URL and returns its content as text — HTML is reduced to
- * markdown-ish plain text, everything else (JSON, plain text, …) is returned
- * as-is. Output is truncated to a fixed budget; `offset` pages through longer
+ * Tool that fetches a URL and returns a Markdown document — HTML is reduced to
+ * Markdown, while other text formats are embedded as-is. Output is truncated to
+ * a fixed budget; `offset` pages through longer
  * documents. Gated per-host by the tool-approval bridge.
  */
 export function createWebFetchTool(): ToolDefinition {
   return {
     name: WEB_FETCH_TOOL_NAME,
     label: "fetch web page",
-    description: `Fetch a URL over HTTP(S) and return its content as text. HTML pages are converted to readable plain text with markdown headings, lists, and links; JSON and plain-text responses are returned verbatim.
+    description: `Fetch a URL over HTTP(S) and return a Markdown document. HTML pages are converted to readable Markdown with headings, lists, and links; other text responses are included verbatim in the Markdown body.
 
 Use this to read documentation, articles, API responses, or any other web resource the user points you at.
 
@@ -196,7 +251,9 @@ Notes:
       }
 
       const offset =
-        typeof p.offset === "number" && Number.isFinite(p.offset) && p.offset > 0
+        typeof p.offset === "number" &&
+        Number.isFinite(p.offset) &&
+        p.offset > 0
           ? Math.floor(p.offset)
           : 0;
 
@@ -248,28 +305,28 @@ Notes:
       let title: string | null = null;
       let text = body;
       if (mime === "text/html" || mime === "application/xhtml+xml") {
-        ({ title, text } = htmlToText(body));
+        const converted = htmlToMarkdown(body);
+        title = converted.title;
+        text = converted.markdown;
       }
 
       const slice = text.slice(offset, offset + MAX_CONTENT_CHARS);
       const truncated = capped || offset + slice.length < text.length;
 
-      return ok({
-        url: url.href,
-        ...(res.url && res.url !== url.href ? { finalUrl: res.url } : {}),
-        status: res.status,
-        contentType: mime,
-        ...(title ? { title } : {}),
-        content: slice,
-        totalLength: text.length,
-        ...(offset > 0 ? { offset } : {}),
-        truncated,
-        ...(truncated
-          ? {
-              note: `Content truncated; showing characters ${offset}–${offset + slice.length} of ${text.length}${capped ? " (response capped at 2 MB)" : ""}. Call again with offset=${offset + slice.length} to continue.`,
-            }
-          : {}),
-      });
+      return markdown(
+        formatWebFetchMarkdown({
+          url: url.href,
+          ...(res.url && res.url !== url.href ? { finalUrl: res.url } : {}),
+          status: res.status,
+          contentType: mime,
+          title,
+          content: slice,
+          totalLength: text.length,
+          offset,
+          truncated,
+          capped,
+        }),
+      );
     },
   };
 }

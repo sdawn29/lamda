@@ -246,7 +246,7 @@ export function ToolRunGroup({
   const diffCounts = groupId === "editing" ? runDiffCounts(tools) : null
 
   return (
-    <div className="w-full text-xs">
+    <div className="w-full py-1 text-xs">
       <button
         type="button"
         className={DISCLOSURE_ROW_CLASS}
@@ -557,7 +557,7 @@ export const WorkingBlock = memo(function WorkingBlock({
 
   return (
     <div
-      className={cn("w-full text-xs", isNew && "animate-chat-message-in")}
+      className={cn("w-full py-1 text-xs", isNew && "animate-chat-message-in")}
       style={
         isNew && entryDelayMs > 0
           ? { animationDelay: `${entryDelayMs}ms` }
