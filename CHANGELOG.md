@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.51.0](../../releases/tag/v0.51.0) — 2026-07-14
+
+### Features
+
+* enhance tool activity descriptions and add tests for activity labeling
+
+### Code Refactoring
+
+* optimize state management and effects in various components
+
 ## [0.50.0](../../releases/tag/v0.50.0) — 2026-07-12
 
 ### Features
