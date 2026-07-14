@@ -714,7 +714,7 @@ export const RichInput = React.forwardRef<
       onInput={handleInput}
       onPaste={handlePaste}
       className={cn(
-        "rich-input max-h-48 min-h-7 w-full cursor-text overflow-y-auto bg-transparent px-1.5 text-sm leading-relaxed wrap-break-word outline-none",
+        "rich-input max-h-48 min-h-7 w-full cursor-text overflow-y-auto bg-transparent p-1.5 text-sm leading-relaxed wrap-break-word outline-none",
         minHeightClassName
       )}
     />

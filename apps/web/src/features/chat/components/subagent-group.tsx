@@ -12,7 +12,11 @@ import {
   NESTED_BODY_CLASS,
   SHIMMER_TEXT_CLASS,
 } from "./disclosure"
-import { SubagentTranscript, useElapsed } from "./subagent-card"
+import {
+  SubagentEnvironmentCard,
+  SubagentTranscript,
+  useElapsed,
+} from "./subagent-card"
 import { toolDisplayName } from "./tool-call-block"
 import { RollingTimerText } from "./working-block"
 import {
@@ -158,20 +162,17 @@ function SubagentFocusPanel({
   }, [live, details])
 
   return (
-    <div
-      ref={scrollRef}
+    <SubagentEnvironmentCard
+      scrollRef={scrollRef}
       onScroll={() => {
         const el = scrollRef.current
         if (!el) return
         pinnedRef.current =
           el.scrollHeight - el.scrollTop - el.clientHeight < 24
       }}
-      className="max-h-80 overflow-y-auto rounded-md border border-border/40 bg-muted/15 px-3 py-2.5"
     >
-      <div className="flex flex-col gap-1">
-        <SubagentTranscript msg={msg} rootPath={rootPath} />
-      </div>
-    </div>
+      <SubagentTranscript msg={msg} rootPath={rootPath} />
+    </SubagentEnvironmentCard>
   )
 }
 

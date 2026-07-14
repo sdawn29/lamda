@@ -4,7 +4,6 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
   CheckIcon,
-  ChevronDownIcon,
   FolderGit2Icon,
   FolderIcon,
   FolderPlusIcon,
@@ -488,16 +487,12 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
             variant="ghost"
             size="sm"
             aria-expanded={wsPickerOpen}
-            className="h-7 gap-1.5 px-2 text-xs"
+            className="h-7 gap-1.5 bg-muted/40 px-2 text-xs"
           >
             <FolderIcon data-icon="inline-start" />
             <span className="max-w-[12rem] truncate">
               {selectedWorkspace?.name ?? "Select workspace"}
             </span>
-            <ChevronDownIcon
-              data-icon="inline-end"
-              className={`opacity-50 transition-transform duration-200 ${wsPickerOpen ? "rotate-180" : ""}`}
-            />
           </Button>
         }
       />
@@ -572,6 +567,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
         <Button
           variant="ghost"
           size="sm"
+          className="bg-muted/40"
           onClick={() => {
             setWorktreeBranchDraft(worktreeBranchName)
             setWorktreeDialogOpen(true)
@@ -589,6 +585,8 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           branches={branches}
           onBranchSelect={setSelectedBranch}
           workspaceId={workspaceId ?? undefined}
+          showChevron={false}
+          triggerClassName="bg-muted/40"
         />
       )}
       <Popover open={locationPickerOpen} onOpenChange={setLocationPickerOpen}>
@@ -599,6 +597,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
               size="sm"
               aria-expanded={locationPickerOpen}
               title="Choose where the new thread runs"
+              className="bg-muted/40"
             >
               {createInWorktree ? (
                 <FolderGit2Icon data-icon="inline-start" />
@@ -606,10 +605,6 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
                 <MonitorIcon data-icon="inline-start" />
               )}
               <span>{createInWorktree ? "Worktree" : "Local"}</span>
-              <ChevronDownIcon
-                data-icon="inline-end"
-                className={`opacity-50 transition-transform duration-200 ${locationPickerOpen ? "rotate-180" : ""}`}
-              />
             </Button>
           }
         />
@@ -750,7 +745,7 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
 
           <div className="shrink-0 bg-background">
             <div className="mx-auto w-full max-w-4xl px-3 pb-3">
-              <div className="mb-1 flex min-w-0 items-center gap-1 px-1">
+              <div className="mb-1 flex min-w-0 items-center gap-1">
                 {workspaceSelector}
                 {contextLeading}
               </div>

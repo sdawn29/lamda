@@ -858,9 +858,25 @@ function createDb() {
   // and not trigger-syncable — the indexer deletes/upserts vectors explicitly.
   if (vecAvailable) {
     try {
+      // Older builds created this table without a workspace partition key and
+      // performed a global KNN search before filtering results by workspace.
+      // In a database with several indexed workspaces, another workspace could
+      // consume the entire candidate limit and make search return no results.
+      // Recreate the derived vector index once; the semantic indexer will
+      // backfill it from code_chunks in the background.
+      const codeVecColumns = sqlite
+        .prepare("PRAGMA table_info(code_chunks_vec)")
+        .all() as { name: string }[];
+      if (
+        codeVecColumns.length > 0 &&
+        !codeVecColumns.some((column) => column.name === "workspace_id")
+      ) {
+        sqlite.exec("DROP TABLE code_chunks_vec");
+      }
       sqlite.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS code_chunks_vec USING vec0(
           id TEXT PRIMARY KEY,
+          workspace_id TEXT PARTITION KEY,
           embedding float[${MEMORY_EMBEDDING_DIM}]
         );
       `);

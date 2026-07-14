@@ -379,7 +379,7 @@ class SemanticIndexer {
       batch.forEach((c, i) => {
         const v = vectors[i];
         if (v) {
-          upsertChunkVector(c.id, v);
+          upsertChunkVector(workspaceId, c.id, v);
           embedded++;
         }
       });

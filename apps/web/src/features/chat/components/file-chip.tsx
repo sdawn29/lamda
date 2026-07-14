@@ -16,7 +16,7 @@ import { MessageChip } from "./message-chip"
 /**
  * The one file chip used everywhere in a transcript — assistant markdown
  * references (`path:line`) and user @-mentions. Inline it stays compact
- * (icon · basename · location · git-status letter); hovering opens a card
+ * (icon · basename · full path/location · git-status letter); hovering opens a card
  * with the full path, git state, file stats, and a line-numbered peek
  * centered on the referenced line. Clicking opens the file in the review
  * panel and scrolls to that line.
@@ -270,7 +270,7 @@ export function FileChip({
           {basename}
         </span>
       }
-      meta={location != null ? locationSuffix : undefined}
+      meta={`${relPath}${locationSuffix}`}
       statusDot={
         label ? (
           <span

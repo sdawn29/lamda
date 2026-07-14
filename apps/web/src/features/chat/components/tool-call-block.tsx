@@ -49,6 +49,7 @@ import { PlanSavedCard } from "./plan-saved-card"
 import { SubagentCard } from "./subagent-card"
 import { QUESTION_TOOL_NAME } from "../lib/active-question"
 import { isSubagentToolName } from "../lib/subagent"
+import { describeToolActivity } from "../lib/tool-activity"
 import type { ToolMessage } from "../types"
 import type { AgentDto } from "@/features/workspace/api"
 
@@ -1522,9 +1523,11 @@ export const ToolCallBlock = memo(function ToolCallBlock({
   const resultText = getResultText(msg)
   const resultImages = getResultImages(msg)
   const mcp = parseMcpToolName(msg.toolName)
-  const summary = mcp
+  const activity = mcp ? null : describeToolActivity(msg)
+  const fallbackSummary = mcp
     ? mcpArgsSummary(msg.args) || argsSummary(msg.args, rootPath)
     : argsSummary(msg.args, rootPath)
+  const summary = activity?.summary ?? fallbackSummary
   const lsp = isLsp ? describeLsp(msg, resultText) : null
 
   // Skill loads parse the SKILL.md frontmatter so the row can show the skill's
@@ -1579,10 +1582,10 @@ export const ToolCallBlock = memo(function ToolCallBlock({
     showLspContent ||
     showOtherContent
 
-  // Bash reads as an action, not a tool name: "Running" while the command is in
-  // flight, "Ran" once it has finished (or errored — it still ran). Skills read
-  // the same way: "Loading" while in flight, "Loaded" once done, with the skill
-  // name shown alongside.
+  // Specialized tools provide richer domain-specific copy. Every other
+  // non-MCP tool comes through the shared activity catalog, which prevents raw
+  // implementation names such as `grep` or `semantic_search` leaking into the
+  // transcript as the only explanation of what happened.
   const toolLabel = memory
     ? memory.label
     : lsp
@@ -1591,11 +1594,7 @@ export const ToolCallBlock = memo(function ToolCallBlock({
         ? msg.status === "running"
           ? "Loading"
           : "Loaded"
-        : normalizedToolName === "bash"
-          ? msg.status === "running"
-            ? "Running"
-            : "Ran"
-          : toolDisplayName(msg.toolName)
+        : (activity?.label ?? toolDisplayName(msg.toolName))
 
   return (
     <div

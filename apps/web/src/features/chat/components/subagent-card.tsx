@@ -1,11 +1,25 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react"
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+  type UIEventHandler,
+} from "react"
 import Markdown from "react-markdown"
 import { cn } from "@/shared/lib/utils"
 import { formatDuration } from "@/shared/lib/formatters"
+import { Card, CardContent } from "@/shared/ui/card"
 import type { AgentDto } from "@/features/workspace/api"
 import { colorStyle, resolveModeIcon } from "./mode-combobox"
 import { AgentModelBadge } from "./agent-info"
-import { getMarkdownComponents } from "./markdown-components"
+import {
+  chatProseClassRich,
+  getMarkdownComponents,
+  remarkPlugins,
+} from "./markdown-components"
 import { ThinkingBlock } from "./thinking-block"
 import { ToolCallBlock, toolDisplayName } from "./tool-call-block"
 import { RollingTimerText, ToolRunGroup, toolGroupId } from "./working-block"
@@ -15,7 +29,6 @@ import {
   DISCLOSURE_LABEL_DONE,
   DISCLOSURE_ROW_CLASS,
   DisclosureChevron,
-  NESTED_BODY_CLASS,
   SHIMMER_TEXT_CLASS,
 } from "./disclosure"
 import {
@@ -53,6 +66,35 @@ type SubagentEntry =
   | { kind: "assistant"; key: string; content: string; thinking: string }
   | { kind: "tool"; key: string; msg: ToolMessage }
   | { kind: "run"; key: string; tools: ToolMessage[] }
+
+/**
+ * The visual boundary around a subagent's nested transcript. The outline shows
+ * the isolated run without visually separating it from the chat background.
+ */
+export function SubagentEnvironmentCard({
+  children,
+  scrollRef,
+  onScroll,
+}: {
+  children: ReactNode
+  scrollRef: RefObject<HTMLDivElement | null>
+  onScroll: UIEventHandler<HTMLDivElement>
+}) {
+  return (
+    <Card
+      size="sm"
+      className="gap-0 border border-border bg-background py-0 ring-0"
+    >
+      <CardContent
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="max-h-80 overflow-y-auto py-3"
+      >
+        <div className="flex flex-col gap-1">{children}</div>
+      </CardContent>
+    </Card>
+  )
+}
 
 /**
  * Flatten a subagent's transcript into visible rows, collapsing consecutive
@@ -165,7 +207,7 @@ export const SubagentTranscript = memo(function SubagentTranscript({
   const entries = useMemo(() => buildSubagentEntries(children), [children])
 
   const markdownComponents = useMemo(
-    () => getMarkdownComponents(rootPath),
+    () => getMarkdownComponents(rootPath, true),
     [rootPath]
   )
 
@@ -204,8 +246,11 @@ export const SubagentTranscript = memo(function SubagentTranscript({
               <ThinkingBlock thinking={entry.thinking} isNew={false} />
             )}
             {entry.content.trim() && (
-              <div className="prose prose-sm max-w-none text-xs leading-relaxed text-foreground/80 dark:prose-invert">
-                <Markdown components={markdownComponents}>
+              <div className={chatProseClassRich}>
+                <Markdown
+                  remarkPlugins={remarkPlugins}
+                  components={markdownComponents}
+                >
                   {entry.content}
                 </Markdown>
               </div>
@@ -386,18 +431,21 @@ export const SubagentCard = memo(function SubagentCard({
       </button>
 
       <CollapsibleBody open={expanded}>
-        <div
-          ref={transcriptScrollRef}
-          onScroll={() => {
-            const element = transcriptScrollRef.current
-            if (!element) return
-            transcriptPinnedRef.current =
-              element.scrollHeight - element.scrollTop - element.clientHeight <
-              24
-          }}
-          className={cn(NESTED_BODY_CLASS, "max-h-80 overflow-y-auto pr-2")}
-        >
-          <SubagentTranscript msg={msg} rootPath={rootPath} />
+        <div className="mt-1.5">
+          <SubagentEnvironmentCard
+            scrollRef={transcriptScrollRef}
+            onScroll={() => {
+              const element = transcriptScrollRef.current
+              if (!element) return
+              transcriptPinnedRef.current =
+                element.scrollHeight -
+                  element.scrollTop -
+                  element.clientHeight <
+                24
+            }}
+          >
+            <SubagentTranscript msg={msg} rootPath={rootPath} />
+          </SubagentEnvironmentCard>
         </div>
       </CollapsibleBody>
     </div>

@@ -1168,9 +1168,9 @@ export const ChatComposer = memo(
             onSelect={handleSelectFile}
           />
 
-          <div className="mx-1 my-1 flex flex-col">
+          <div className="flex flex-col gap-1.5 p-1.5">
             {historyNav && (
-              <div className="flex items-center justify-between gap-2 px-3 pt-2 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/70 px-2 py-0.5 font-medium">
                   <HistoryIcon className="size-3" />
                   History
@@ -1187,7 +1187,7 @@ export const ChatComposer = memo(
                 </span>
               </div>
             )}
-            <div className="flex items-end gap-1.5 px-2 py-1.5">
+            <div className="flex items-center gap-1.5">
               {/* Centers the single-line input (and its placeholder) against
                   the 28px send button; the input itself is one line-height
                   tall and grows naturally when the text wraps. */}
@@ -1386,7 +1386,7 @@ export const ChatComposer = memo(
             </div>
 
             {attachments.length > 0 && (
-              <div className="flex flex-wrap gap-2 px-2 pb-1.5">
+              <div className="flex flex-wrap gap-2">
                 {attachments.map((attachment) => (
                   <AttachmentPreview
                     key={attachment.id}
@@ -1416,7 +1416,7 @@ export const ChatComposer = memo(
             composer, grouped left (behavior: mode / permissions / attach) and
             right (generation: model / thinking / context), each control with
             its own dropdown. */}
-        <div className="mt-1.5 flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1 px-0.5">
+        <div className="mt-1.5 flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <div className="flex min-w-0 items-center gap-0.5">
             {onModeChange && (
               <ModeCombobox
@@ -1469,7 +1469,6 @@ export const ChatComposer = memo(
                 availableLevels={availableLevels}
               />
             )}
-            <div aria-hidden className="h-4 w-px shrink-0 bg-border/60" />
             <ContextChart
               contextUsage={contextUsage}
               sessionId={sessionId}

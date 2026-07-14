@@ -45,6 +45,10 @@ interface BranchSelectorProps {
   disabled?: boolean
   /** Tooltip shown on the trigger when `disabled`. */
   disabledReason?: string
+  /** Whether to show the dropdown chevron in the trigger. */
+  showChevron?: boolean
+  /** Additional classes for the dropdown trigger. */
+  triggerClassName?: string
 }
 
 export function BranchSelector({
@@ -56,6 +60,8 @@ export function BranchSelector({
   workspaceId,
   disabled,
   disabledReason,
+  showChevron = true,
+  triggerClassName,
 }: BranchSelectorProps) {
   const [open, setOpen] = React.useState(false)
   const [dialogOpen, setDialogOpen] = React.useState(false)
@@ -131,6 +137,7 @@ export function BranchSelector({
               aria-expanded={open}
               disabled={disabled}
               title={disabled ? disabledReason : undefined}
+              className={triggerClassName}
             >
               <GitBranchIcon data-icon="inline-start" />
               <span>
@@ -146,10 +153,12 @@ export function BranchSelector({
                   ↓{aheadBehind.behind}
                 </span>
               )}
-              <ChevronDownIcon
-                data-icon="inline-end"
-                className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-              />
+              {showChevron && (
+                <ChevronDownIcon
+                  data-icon="inline-end"
+                  className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+                />
+              )}
             </Button>
           }
         />

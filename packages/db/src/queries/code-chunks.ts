@@ -244,13 +244,18 @@ export function getCodeFileManifest(
  * Store/replace the embedding for a chunk in the vec0 table. No-op when
  * sqlite-vec is unavailable.
  */
-export function upsertChunkVector(id: string, embedding: number[]): void {
+export function upsertChunkVector(
+  workspaceId: string,
+  id: string,
+  embedding: number[],
+): void {
   if (!isVecAvailable() || embedding.length === 0) return;
   const json = JSON.stringify(embedding);
   try {
     db.run(sql`DELETE FROM code_chunks_vec WHERE id = ${id}`);
     db.run(
-      sql`INSERT INTO code_chunks_vec(id, embedding) VALUES (${id}, ${json})`,
+      sql`INSERT INTO code_chunks_vec(id, workspace_id, embedding)
+          VALUES (${id}, ${workspaceId}, ${json})`,
     );
   } catch {
     // Dimension mismatch or vec unavailable — skip silently.
@@ -292,8 +297,9 @@ export function listChunksNeedingEmbedding(
   }
 }
 
-/** KNN ids+distances for a query vector, nearest first. Unscoped — over-fetch and filter. */
+/** Workspace-scoped KNN ids+distances for a query vector, nearest first. */
 function vecSearchIds(
+  workspaceId: string,
   embedding: number[],
   limit: number,
 ): { id: string; distance: number }[] {
@@ -301,7 +307,8 @@ function vecSearchIds(
   try {
     return db.all<{ id: string; distance: number }>(sql`
       SELECT id, distance FROM code_chunks_vec
-      WHERE embedding MATCH ${JSON.stringify(embedding)}
+      WHERE workspace_id = ${workspaceId}
+        AND embedding MATCH ${JSON.stringify(embedding)}
       ORDER BY distance
       LIMIT ${limit}
     `);
@@ -322,14 +329,27 @@ function toFtsQuery(text: string): string | null {
   return unique.map((t) => `"${t}"`).join(" OR ");
 }
 
-/** FTS5 BM25-ranked candidate ids, or null when FTS5 is unavailable/errors. */
-function ftsRankedIds(queryText: string, limit: number): string[] | null {
+/** Workspace/path-scoped FTS5 candidates, or null when FTS5 is unavailable. */
+function ftsRankedIds(
+  workspaceId: string,
+  queryText: string,
+  limit: number,
+  pathPrefix?: string,
+): string[] | null {
   const match = toFtsQuery(queryText);
   if (!match) return [];
   try {
+    const normalizedPath = normalizePathPrefix(pathPrefix);
+    const pathCondition = normalizedPath
+      ? sql`AND c.file_path LIKE ${`${normalizedPath}%`}`
+      : sql``;
     const ranked = db.all<{ id: string }>(sql`
-      SELECT id FROM code_chunks_fts
+      SELECT f.id
+      FROM code_chunks_fts AS f
+      INNER JOIN code_chunks AS c ON c.id = f.id
       WHERE code_chunks_fts MATCH ${match}
+        AND c.workspace_id = ${workspaceId}
+        ${pathCondition}
       ORDER BY bm25(code_chunks_fts)
       LIMIT ${limit}
     `);
@@ -433,9 +453,9 @@ const RRF_K = 60;
  * Search code chunks for a workspace, fusing FTS5 BM25 keyword ranking with
  * semantic vector KNN (when `queryVector` is supplied and sqlite-vec is
  * available) via reciprocal rank fusion — same shape as
- * `retrieveRelevantMemories`. Both indexes are unscoped, so candidates are
- * over-fetched, then scope-filtered (+ optional path-prefix filter) and
- * hydrated through the ORM, preserving fused order. Falls back to a substring
+ * `retrieveRelevantMemories`. Candidates are workspace-scoped before ranking
+ * so other indexed workspaces cannot crowd out the active workspace. Results
+ * are then hydrated through the ORM, preserving fused order. Falls back to a substring
  * search when FTS5 is unavailable and there's no vector, and reports which
  * mode actually served the results so callers can surface index state.
  */
@@ -447,8 +467,10 @@ export function searchCodeChunks(
   pathPrefix?: string,
 ): CodeSearchResult {
   const normalizedPath = normalizePathPrefix(pathPrefix);
-  const fts = ftsRankedIds(queryText, limit * 12);
-  const vec = queryVector ? vecSearchIds(queryVector, limit * 12) : [];
+  const fts = ftsRankedIds(workspaceId, queryText, limit * 12, normalizedPath);
+  const vec = queryVector
+    ? vecSearchIds(workspaceId, queryVector, limit * 12)
+    : [];
 
   if (fts === null && vec.length === 0) {
     if (!queryText) return { hits: [], mode: "none" };
