@@ -26,7 +26,6 @@ import type {
   ManagedSessionHandle,
   ManagedSessionStats,
   SdkConfig,
-  SessionTokenStats,
 } from "./types.js";
 
 // Duck-typed shapes for SDK message content — avoids a direct @earendil-works/pi-ai dependency
@@ -99,7 +98,7 @@ function buildRuntimeHandle(
   runtime: AgentSessionRuntime,
 ): ManagedSessionHandle {
   return {
-    prompt: (text, options) => runtime.session.prompt(text, options as any),
+    prompt: (text, options) => runtime.session.prompt(text, options),
     steer: (text) => runtime.session.steer(text),
     followUp: (text) => runtime.session.followUp(text),
     abort: () => runtime.session.abort(),
@@ -124,7 +123,7 @@ function buildRuntimeHandle(
       }
       await runtime.session.setModel(model);
     },
-    setThinkingLevel: (level) => runtime.session.setThinkingLevel(level as any),
+    setThinkingLevel: (level) => runtime.session.setThinkingLevel(level),
     setMode: (mode: Mode) => {
       const session = runtime.session as unknown as {
         setActiveToolsByName(toolNames: string[]): void;
@@ -169,10 +168,12 @@ function buildRuntimeHandle(
     setName: (name) => runtime.session.setSessionName(name),
     getName: () => runtime.session.sessionName,
     getContextUsage() {
-      const session = runtime.session as any;
-      const usage = session.getContextUsage();
+      const usage = runtime.session.getContextUsage();
       if (!usage) return undefined;
-      const breakdown = computeContextBreakdown(session.messages, usage.tokens);
+      const breakdown = computeContextBreakdown(
+        runtime.session.messages as unknown as _UsageMsg[],
+        usage.tokens,
+      );
       return {
         tokens: usage.tokens,
         contextWindow: usage.contextWindow,
@@ -181,10 +182,9 @@ function buildRuntimeHandle(
       };
     },
     async compact() {
-      await (runtime.session as any).compact();
+      await runtime.session.compact();
     },
-    getAvailableThinkingLevels: () =>
-      (runtime.session as any).getAvailableThinkingLevels() as string[],
+    getAvailableThinkingLevels: () => runtime.session.getAvailableThinkingLevels(),
     getCommands() {
       return mapResourceCommands(runtime.session.resourceLoader);
     },
@@ -199,7 +199,7 @@ function buildRuntimeHandle(
       await runtime.session.resourceLoader.reload();
     },
     getSessionStats(): ManagedSessionStats {
-      const stats = (runtime.session as any).getSessionStats();
+      const stats = runtime.session.getSessionStats();
       return {
         sessionFile: stats.sessionFile ?? null,
         sessionId: stats.sessionId,
@@ -208,13 +208,19 @@ function buildRuntimeHandle(
         toolCalls: stats.toolCalls,
         toolResults: stats.toolResults,
         totalMessages: stats.totalMessages,
-        tokens: stats.tokens as SessionTokenStats,
+        tokens: stats.tokens,
         cost: stats.cost,
         contextUsage: stats.contextUsage,
       };
     },
     setCustomTools: (tools) => {
-      const s = runtime.session as any;
+      // _customTools/_refreshToolRegistry are private on AgentSession; this
+      // mirrors the same private-field poke used by setMode/setActiveTools
+      // above to swap the registered custom tools without a full reload.
+      const s = runtime.session as unknown as {
+        _customTools?: unknown[];
+        _refreshToolRegistry(): void;
+      };
       s._customTools = tools;
       s._refreshToolRegistry();
     },
@@ -290,7 +296,7 @@ function buildRuntimeFactory(
         sessionManager,
         sessionStartEvent,
         model,
-        thinkingLevel: config.thinkingLevel as any,
+        thinkingLevel: config.thinkingLevel,
         customTools: config.customTools,
       })),
       services,

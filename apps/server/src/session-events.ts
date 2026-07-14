@@ -842,7 +842,7 @@ class SessionEventHub {
                   toolCallId,
                   toolName,
                   args,
-                } as any,
+                },
                 data: "",
               },
             ];
@@ -859,7 +859,7 @@ class SessionEventHub {
                     toolName,
                     args,
                     partialResult: JSON.parse(block.toolResult),
-                  } as any,
+                  },
                   data: "",
                 });
               } catch {

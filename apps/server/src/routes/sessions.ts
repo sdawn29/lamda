@@ -912,7 +912,7 @@ sessions.get("/attachment/:threadId/:attachmentId", async (c) => {
   let fileStat;
   try {
     fileStat = await stat(foundPath);
-  } catch (err: any) {
+  } catch (err) {
     return c.json(
       { error: err instanceof Error ? err.message : String(err) },
       500,

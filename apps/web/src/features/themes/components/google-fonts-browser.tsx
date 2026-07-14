@@ -24,17 +24,27 @@ import { resolveFontLabel, type FontOption } from "../font-options"
 
 const fontLoadedSet = new Set<string>()
 
+function computeLoaded(family: string | null) {
+  return family ? fontLoadedSet.has(family) : true
+}
+
 function useLazyFont<T extends HTMLElement>(family: string | null) {
   const ref = React.useRef<T | null>(null)
-  const [loaded, setLoaded] = React.useState(() =>
-    family ? fontLoadedSet.has(family) : true
-  )
+  const [state, setState] = React.useState(() => ({
+    family,
+    loaded: computeLoaded(family),
+  }))
+
+  // Adjust state during render when the `family` prop changes, instead of
+  // syncing it from an effect — keeps the initial-mount value and any later
+  // prop change on the same code path.
+  if (state.family !== family) {
+    setState({ family, loaded: computeLoaded(family) })
+  }
+  const loaded = state.family === family ? state.loaded : computeLoaded(family)
 
   React.useEffect(() => {
-    if (!family || fontLoadedSet.has(family)) {
-      setLoaded(true)
-      return
-    }
+    if (!family || fontLoadedSet.has(family)) return
 
     const el = ref.current
     if (!el) return
@@ -44,7 +54,7 @@ function useLazyFont<T extends HTMLElement>(family: string | null) {
         if (entry?.isIntersecting) {
           loadGoogleFont(family)
           fontLoadedSet.add(family)
-          setLoaded(true)
+          setState({ family, loaded: true })
           observer.disconnect()
         }
       },

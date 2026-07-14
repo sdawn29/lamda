@@ -1,5 +1,5 @@
 import * as React from "react"
-import { BrainIcon, ChevronDownIcon } from "lucide-react"
+import { BrainIcon } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
 import {
@@ -74,13 +74,10 @@ export function ThinkingCombobox({
             size="sm"
             aria-expanded={open}
             title={selectedLevel?.label ?? selected}
+            className="text-2xs"
           >
             <span data-icon="inline-start">{selectedLevel?.icon}</span>
             <span>{selectedLevel?.label ?? selected}</span>
-            <ChevronDownIcon
-              data-icon="inline-end"
-              className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-            />
           </Button>
         }
       />

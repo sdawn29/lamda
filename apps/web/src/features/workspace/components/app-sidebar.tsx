@@ -115,16 +115,25 @@ function useNow() {
 // (load/CORS failure) — treated as "leave the icon as-is".
 const iconLuminanceCache = new Map<string, number | null>()
 
+function computeCachedLuminance(src: string | null): number | null {
+  return src ? (iconLuminanceCache.get(src) ?? null) : null
+}
+
 function useIconLuminance(src: string | null): number | null {
-  const [luminance, setLuminance] = useState<number | null>(() =>
-    src ? (iconLuminanceCache.get(src) ?? null) : null
-  )
+  const [state, setState] = useState<{
+    src: string | null
+    luminance: number | null
+  }>(() => ({ src, luminance: computeCachedLuminance(src) }))
+
+  // Adjust state during render when `src` changes, instead of syncing a
+  // cache hit from an effect — the effect below only handles the genuinely
+  // async case (sampling an image that isn't cached yet).
+  if (state.src !== src) {
+    setState({ src, luminance: computeCachedLuminance(src) })
+  }
+
   useEffect(() => {
-    if (!src) return
-    if (iconLuminanceCache.has(src)) {
-      setLuminance(iconLuminanceCache.get(src) ?? null)
-      return
-    }
+    if (!src || iconLuminanceCache.has(src)) return
     let cancelled = false
     const img = new Image()
     img.crossOrigin = "anonymous"
@@ -154,7 +163,7 @@ function useIconLuminance(src: string | null): number | null {
         // Tainted canvas (icon served without CORS) — luminance stays unknown.
       }
       iconLuminanceCache.set(src, result)
-      setLuminance(result)
+      setState({ src, luminance: result })
     }
     img.onerror = () => {
       if (!cancelled) iconLuminanceCache.set(src, null)
@@ -164,7 +173,7 @@ function useIconLuminance(src: string | null): number | null {
       cancelled = true
     }
   }, [src])
-  return luminance
+  return state.src === src ? state.luminance : computeCachedLuminance(src)
 }
 
 function WorkspaceIcon({

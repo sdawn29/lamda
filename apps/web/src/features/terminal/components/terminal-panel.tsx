@@ -58,6 +58,14 @@ const TerminalInstance = memo(function TerminalInstance({
     terminalThemeRef.current = terminalTheme
   }, [terminalTheme])
 
+  // Latest onTitleChange for the mount effect below — the parent passes a new
+  // closure on every render, but the effect must not depend on it directly
+  // (that would re-run the mount effect and tear down the live session).
+  const onTitleChangeRef = useRef(onTitleChange)
+  useEffect(() => {
+    onTitleChangeRef.current = onTitleChange
+  }, [onTitleChange])
+
   // Mount xterm + WebSocket once — cwd is fixed at tab creation time and never changes
   useEffect(() => {
     const container = containerRef.current
@@ -93,7 +101,7 @@ const TerminalInstance = memo(function TerminalInstance({
     fitAddonRef.current = fitAddon
 
     term.onTitleChange((title) => {
-      if (title) onTitleChange(id, title)
+      if (title) onTitleChangeRef.current(id, title)
     })
 
     let cancelled = false
@@ -234,9 +242,12 @@ const TerminalInstance = memo(function TerminalInstance({
       fitAddonRef.current = null
       wsRef.current = null
     }
-    // cwd is intentionally excluded — it's fixed at tab creation time and must not trigger re-mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    // id/cwd/workspaceId/initialCommand are fixed for this instance's whole
+    // lifetime (the parent list keys each TerminalInstance by tab id), so
+    // listing them here doesn't cause a re-mount — it just satisfies the lint
+    // honestly instead of suppressing it. onTitleChange is intentionally read
+    // via a ref above instead of being a dependency.
+  }, [id, cwd, workspaceId, initialCommand])
 
   // Refit when this instance becomes active (was hidden)
   useEffect(() => {

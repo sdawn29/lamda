@@ -32,6 +32,7 @@ export function useAutoUpdateCheck() {
       .catch(() => {
         // Silently ignore network/API errors for the background check.
       })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // intentionally runs only once per mount
+    // queryClient is stable for the app's lifetime, so this still only fires
+    // the check once per mount despite being listed as a dependency.
+  }, [queryClient])
 }

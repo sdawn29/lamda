@@ -62,7 +62,7 @@ import {
   useModes,
 } from "@/features/workspace/queries"
 import type { ApprovalMode, Mode, WorkspaceDto } from "@/features/workspace/api"
-import { useAppSettings } from "@/features/settings/queries"
+import { useAppSettings, useMemories } from "@/features/settings/queries"
 import { useUpdateAppSetting } from "@/features/settings/mutations"
 import {
   BranchSelector,
@@ -85,6 +85,7 @@ import {
   type PendingAttachment,
 } from "./chat-composer"
 import { pendingToUploads, pendingToDisplay } from "../lib/attachments"
+import { NewThreadDashboard } from "./new-thread-dashboard"
 import { setPendingThreadPreferences } from "./pending-thread-preferences"
 import { getNextMode } from "./mode-combobox"
 import { ThinkingIndicator } from "./thinking-indicator"
@@ -109,13 +110,27 @@ function deriveTitleFromMessage(text: string): string {
   return firstLine.length > 80 ? firstLine.slice(0, 80).trimEnd() : firstLine
 }
 
+function getProfileName(content: string): string | null {
+  const match = content.match(
+    /\buser(?:'s|’s) name is (.+?)(?:\.\s+They\b|\.?$)/i
+  )
+  return match?.[1]?.trim() || null
+}
+
 export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { workspaces, createThread } = useWorkspace()
   const { data: appSettings, isFetched: settingsFetched } = useAppSettings()
+  const { data: memories = [] } = useMemories()
   const updateAppSetting = useUpdateAppSetting()
   const { handleCreateLocal, handleCreateRemote } = useCreateWorkspaceAction()
+  const profileMemory = memories.find(
+    (memory) => memory.scope === "user" && memory.category === "profile"
+  )
+  const userName =
+    appSettings?.[APP_SETTINGS_KEYS.USER_NAME]?.trim() ||
+    (profileMemory ? getProfileName(profileMemory.content) : null)
 
   // The user's explicit pick; until they pick, the workspace is derived below
   // from the ?ws= param, then the last-used workspace, then the first one.
@@ -701,57 +716,67 @@ export function NewThreadView({ initialWorkspaceId }: NewThreadViewProps) {
           </div>
         </>
       ) : (
-        <div className="flex flex-1 items-center justify-center overflow-y-auto px-6">
-          <div className="-mt-12 flex w-full max-w-4xl flex-col items-stretch">
-            <div className="mb-7 flex flex-col items-center gap-3 text-center select-none">
-              <LambdaMark />
-              <div className="space-y-1.5">
-                <h1 className="text-xl font-semibold tracking-tight">
-                  What should we build?
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {noWorkspaces
-                    ? "Add a workspace to begin your first conversation."
-                    : "Type / for skills and commands, @ to reference files."}
-                </p>
+        <>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-3 pt-8 pb-6">
+              <div className="flex items-center gap-3 select-none">
+                <LambdaMark size="sm" />
+                <div className="space-y-0.5">
+                  <h1 className="text-lg font-semibold tracking-tight">
+                    {userName
+                      ? `Welcome ${userName}, what should we build?`
+                      : "What should we build?"}
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    {noWorkspaces
+                      ? "Add a workspace to begin your first conversation."
+                      : "Type / for skills and commands, @ to reference files."}
+                  </p>
+                </div>
               </div>
+
+              <NewThreadDashboard />
+
+              {!noWorkspaces && (
+                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-2xs text-muted-foreground/70 select-none">
+                  <HintItem keys="/" label="Commands & skills" />
+                  <HintItem keys="@" label="Reference files" />
+                  <HintItem keys={["⇧", "Tab"]} label="Cycle mode" />
+                  <HintItem keys="⏎" label="Send" />
+                </div>
+              )}
             </div>
-
-            <div className="mb-1 flex min-w-0 items-center gap-1 px-1">
-              {workspaceSelector}
-              {contextLeading}
-            </div>
-
-            <ChatComposer
-              ref={chatTextboxRef}
-              onSend={handleSend}
-              isLoading={isSending}
-              workspaceId={workspaceId ?? undefined}
-              selectedModelId={selectedModelId}
-              onModelChange={setSelectedModelId}
-              selectedThinkingLevel={selectedThinkingLevel}
-              onThinkingLevelChange={setSelectedThinkingLevel}
-              mode={selectedMode}
-              onModeChange={setSelectedMode}
-              approvalMode={selectedApprovalMode}
-              onApprovalModeChange={setSelectedApprovalMode}
-              placeholder={
-                noWorkspaces
-                  ? "Add a workspace to start a thread"
-                  : "Ask anything / for commands, @ for files"
-              }
-            />
-
-            {!noWorkspaces && (
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-2xs text-muted-foreground/70 select-none">
-                <HintItem keys="/" label="Commands & skills" />
-                <HintItem keys="@" label="Reference files" />
-                <HintItem keys={["⇧", "Tab"]} label="Cycle mode" />
-                <HintItem keys="⏎" label="Send" />
-              </div>
-            )}
           </div>
-        </div>
+
+          <div className="shrink-0 bg-background">
+            <div className="mx-auto w-full max-w-4xl px-3 pb-3">
+              <div className="mb-1 flex min-w-0 items-center gap-1 px-1">
+                {workspaceSelector}
+                {contextLeading}
+              </div>
+
+              <ChatComposer
+                ref={chatTextboxRef}
+                onSend={handleSend}
+                isLoading={isSending}
+                workspaceId={workspaceId ?? undefined}
+                selectedModelId={selectedModelId}
+                onModelChange={setSelectedModelId}
+                selectedThinkingLevel={selectedThinkingLevel}
+                onThinkingLevelChange={setSelectedThinkingLevel}
+                mode={selectedMode}
+                onModeChange={setSelectedMode}
+                approvalMode={selectedApprovalMode}
+                onApprovalModeChange={setSelectedApprovalMode}
+                placeholder={
+                  noWorkspaces
+                    ? "Add a workspace to start a thread"
+                    : "Ask anything / for commands, @ for files"
+                }
+              />
+            </div>
+          </div>
+        </>
       )}
 
       <CreateWorkspaceDialog

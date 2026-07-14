@@ -214,12 +214,21 @@ export function ChatView({
   // restore below from resurrecting an approval that a live `resolved` event
   // already cleared (the REST snapshot can arrive after that event).
   const resolvedApprovalsRef = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    announcedPlansRef.current = new Set()
-    resolvedApprovalsRef.current = new Set()
+
+  // The approval queue is reset during render (instead of inside the effect
+  // below) so the switch lands on the same render as the thread change,
+  // before anything reads the stale queue.
+  const [lastThreadId, setLastThreadId] = useState(threadId)
+  if (threadId !== lastThreadId) {
+    setLastThreadId(threadId)
     // Approvals belong to the previous thread's session; the status-snapshot
     // effect below restores any still pending for the new one.
     setPendingApprovals([])
+  }
+
+  useEffect(() => {
+    announcedPlansRef.current = new Set()
+    resolvedApprovalsRef.current = new Set()
   }, [threadId])
 
   const handlePlanSaved = useCallback(
@@ -993,32 +1002,34 @@ export function ChatView({
             />
           )}
           {noProvider && (
-            <div className="flex shrink-0 items-center gap-3 border-b border-amber-500/20 bg-amber-500/5 px-4 py-2.5">
-              <PlugZapIcon className="h-4 w-4 shrink-0 text-amber-500" />
-              <p className="min-w-0 flex-1 text-xs text-amber-600 dark:text-amber-400">
-                No model provider configured. Add an API key or sign in to start
-                chatting.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 shrink-0 border-amber-500/30 text-xs hover:bg-amber-500/10"
-                onClick={() =>
-                  navigate({
-                    to: "/settings/$section",
-                    params: { section: "subscriptions" },
-                  })
-                }
-              >
-                Configure provider
-              </Button>
+            <div className="shrink-0 border-b border-amber-500/20 bg-amber-500/5">
+              <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-3 py-2.5">
+                <PlugZapIcon className="h-4 w-4 shrink-0 text-amber-500" />
+                <p className="min-w-0 flex-1 text-xs text-amber-600 dark:text-amber-400">
+                  No model provider configured. Add an API key or sign in to
+                  start chatting.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 shrink-0 border-amber-500/30 text-xs hover:bg-amber-500/10"
+                  onClick={() =>
+                    navigate({
+                      to: "/settings/$section",
+                      params: { section: "subscriptions" },
+                    })
+                  }
+                >
+                  Configure provider
+                </Button>
+              </div>
             </div>
           )}
           <div
             ref={scrollContainerRef}
             onScroll={onScroll}
             className={cn(
-              "flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-8",
+              "flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-8 [scrollbar-gutter:stable_both-edges]",
               // Reserve room for the floating mobile islands (absolutely
               // positioned above, in the relative parent) so the first message
               // doesn't render underneath them.

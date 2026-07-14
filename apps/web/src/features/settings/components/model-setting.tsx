@@ -20,7 +20,7 @@ export function ModelSetting({ settingKey }: { settingKey: string }) {
   const { data: settings } = useAppSettings()
   const updateSetting = useUpdateAppSetting()
   const { data: modelsData } = useModels()
-  const models = modelsData?.models ?? []
+  const models = React.useMemo(() => modelsData?.models ?? [], [modelsData])
 
   const grouped = React.useMemo<ModelGroup>(
     () =>

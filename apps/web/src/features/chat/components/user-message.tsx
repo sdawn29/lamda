@@ -278,14 +278,18 @@ export function UserMessageContent({
   let match: RegExpExecArray | null
   let key = 0
 
-  FILE_CONTEXT_RE.lastIndex = 0
-  TOKEN_RE.lastIndex = 0
+  // Local copies — FILE_CONTEXT_RE/TOKEN_RE are module-scoped `g` regexes, and
+  // mutating their shared `.lastIndex` from render would step on any other
+  // concurrent match (e.g. another instance of this component rendering, or
+  // rich-input.tsx's own use of FILE_CONTEXT_RE).
+  const fileContextRe = new RegExp(FILE_CONTEXT_RE)
+  const tokenRe = new RegExp(TOKEN_RE)
 
   const pushInlineTokens = (text: string) => {
     let tokenLastIndex = 0
     let tokenMatch: RegExpExecArray | null
-    TOKEN_RE.lastIndex = 0
-    while ((tokenMatch = TOKEN_RE.exec(text)) !== null) {
+    tokenRe.lastIndex = 0
+    while ((tokenMatch = tokenRe.exec(text)) !== null) {
       const token = tokenMatch[0]
       const start = tokenMatch.index
 
@@ -336,7 +340,7 @@ export function UserMessageContent({
     }
   }
 
-  while ((match = FILE_CONTEXT_RE.exec(content)) !== null) {
+  while ((match = fileContextRe.exec(content)) !== null) {
     if (match.index > lastIndex) {
       pushInlineTokens(content.slice(lastIndex, match.index))
     }

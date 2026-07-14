@@ -121,7 +121,7 @@ file.get("/file", async (c) => {
   let fileStat;
   try {
     fileStat = await stat(path);
-  } catch (err: any) {
+  } catch (err) {
     return c.json(
       { error: err instanceof Error ? err.message : String(err) },
       500,

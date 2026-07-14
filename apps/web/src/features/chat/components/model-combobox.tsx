@@ -28,6 +28,7 @@ export function ModelCombobox({
   triggerClassName,
   contentClassName,
   side = "top",
+  hideChevron = false,
 }: {
   groups: ModelGroup
   selected: { id: string; name: string; provider: string } | null
@@ -40,6 +41,8 @@ export function ModelCombobox({
   contentClassName?: string
   /** Side the popover opens toward. */
   side?: "top" | "bottom" | "left" | "right"
+  /** Hides the chevron for compact triggers (e.g. the composer's controls bar). */
+  hideChevron?: boolean
 }) {
   const [open, setOpen] = React.useState(false)
 
@@ -85,10 +88,12 @@ export function ModelCombobox({
             >
               {selected?.name ?? placeholder}
             </span>
-            <ChevronDownIcon
-              data-icon="inline-end"
-              className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-            />
+            {!hideChevron && (
+              <ChevronDownIcon
+                data-icon="inline-end"
+                className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+              />
+            )}
           </Button>
         }
       />

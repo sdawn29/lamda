@@ -107,6 +107,10 @@ export function OnboardingWizard() {
     })
 
     if (!trimmedName) return
+    updateSetting.mutate({
+      key: APP_SETTINGS_KEYS.USER_NAME,
+      value: trimmedName,
+    })
     const job = occupation.trim()
     const content = job
       ? `The user's name is ${trimmedName}. They work as a ${job}.`

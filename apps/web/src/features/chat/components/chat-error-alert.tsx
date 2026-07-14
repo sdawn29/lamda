@@ -40,22 +40,26 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Collapse + reset copy state whenever a new error takes the slot.
-  useEffect(() => {
+  // Collapse + reset copy state whenever a new error takes the slot. Adjusted
+  // during render (instead of an effect) by comparing against the last error
+  // id we rendered for.
+  const [resetForId, setResetForId] = useState(error?.id)
+  if (resetForId !== error?.id) {
+    setResetForId(error?.id)
     setExpanded(false)
     setCopied(false)
-  }, [error?.id])
+  }
 
+  const errorId = error?.id
   useEffect(() => {
-    if (!shouldAutoDismiss || !error) return
-    const id = error.id
+    if (!shouldAutoDismiss || errorId == null) return
     timerRef.current = setTimeout(() => {
-      onActionRef.current({ type: "dismiss" }, id)
+      onActionRef.current({ type: "dismiss" }, errorId)
     }, 4000)
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [error?.id, shouldAutoDismiss])
+  }, [errorId, shouldAutoDismiss])
 
   useEffect(() => {
     return () => {

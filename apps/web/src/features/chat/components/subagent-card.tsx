@@ -36,6 +36,18 @@ function formatTokenCount(n: number): string {
   return String(n)
 }
 
+// Per-subagent-tool-call cache of stabilized child identities, used by
+// SubagentTranscript below. Kept at module scope (rather than a ref) since
+// React Compiler forbids mutating anything sourced from a hook (useRef's
+// `.current`, or a useMemo/useState result) during render — this Map isn't
+// hook-derived, so it can be read and written synchronously as part of the
+// `children` memo. Entries are removed when their SubagentTranscript unmounts
+// (see the cleanup effect there) so this doesn't grow unbounded.
+const transcriptChildCaches = new Map<
+  string,
+  Map<string, { sig: string; msg: Message }>
+>()
+
 /** One renderable row in a subagent card's nested transcript. */
 type SubagentEntry =
   | { kind: "assistant"; key: string; content: string; thinking: string }
@@ -127,18 +139,28 @@ export const SubagentTranscript = memo(function SubagentTranscript({
   // Stabilize settled children's identities across streaming snapshots (each
   // snapshot deserializes to fresh objects) so the memoized ToolCallBlock rows
   // inside a run group don't re-render on every text delta of a later block.
-  const childCacheRef = useRef(new Map<string, { sig: string; msg: Message }>())
+  useEffect(() => {
+    return () => {
+      transcriptChildCaches.delete(msg.toolCallId)
+    }
+  }, [msg.toolCallId])
+
   const children = useMemo(() => {
     if (!details) return []
+    let cache = transcriptChildCaches.get(msg.toolCallId)
+    if (!cache) {
+      cache = new Map()
+      transcriptChildCaches.set(msg.toolCallId, cache)
+    }
     return subagentBlocksToMessages(details.blocks).map((child) => {
       if (child.role !== "tool" || child.status === "running") return child
       const sig = `${child.status}:${child.duration ?? ""}`
-      const cached = childCacheRef.current.get(child.toolCallId)
+      const cached = cache.get(child.toolCallId)
       if (cached && cached.sig === sig) return cached.msg
-      childCacheRef.current.set(child.toolCallId, { sig, msg: child })
+      cache.set(child.toolCallId, { sig, msg: child })
       return child
     })
-  }, [details])
+  }, [details, msg.toolCallId])
 
   const entries = useMemo(() => buildSubagentEntries(children), [children])
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { cn } from "@/shared/lib/utils"
 import type { DiffMode } from "./types"
 import { detectLanguage } from "./highlight"
@@ -31,9 +31,14 @@ export function DiffView({
 }: DiffViewProps) {
   // When the toolbar is shown the view mode becomes locally controllable;
   // it stays seeded by (and in sync with) the `mode` prop for callers that
-  // drive it externally.
+  // drive it externally. Adjusted during render instead of an effect so it
+  // takes effect on the same render as the prop change.
   const [mode, setMode] = useState<DiffMode>(modeProp)
-  useEffect(() => setMode(modeProp), [modeProp])
+  const [lastModeProp, setLastModeProp] = useState(modeProp)
+  if (modeProp !== lastModeProp) {
+    setLastModeProp(modeProp)
+    setMode(modeProp)
+  }
 
   const lines = useMemo(() => parseDiff(diff), [diff])
   const diffBuffers = useMemo(() => {

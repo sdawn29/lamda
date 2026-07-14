@@ -114,7 +114,10 @@ export function WorktreeSelector({
   // Set when a merge reports uncommitted changes, to confirm a forced merge.
   const [mergeConfirmOpen, setMergeConfirmOpen] = React.useState(false)
   const [conflictDialogOpen, setConflictDialogOpen] = React.useState(false)
-  const conflictFiles = React.useRef<string[]>([])
+  // Full list of conflicting files from the merge attempt. Read throughout
+  // the conflict dialog's render (counts, progress bar, file list) so this is
+  // real state rather than a ref.
+  const [conflictFiles, setConflictFiles] = React.useState<string[]>([])
   const [remainingConflicts, setRemainingConflicts] = React.useState<string[]>(
     []
   )
@@ -141,7 +144,7 @@ export function WorktreeSelector({
 
   function resetConflictState() {
     setConflictDialogOpen(false)
-    conflictFiles.current = []
+    setConflictFiles([])
     setRemainingConflicts([])
     setResolutions({})
     setMergeReadyToContinue(false)
@@ -225,7 +228,7 @@ export function WorktreeSelector({
             // Needs confirmation to discard uncommitted changes.
             setMergeConfirmOpen(true)
           } else if ("conflicts" in result) {
-            conflictFiles.current = result.conflicts
+            setConflictFiles(result.conflicts)
             setRemainingConflicts(result.conflicts)
             setResolutions({})
             setMergeReadyToContinue(result.readyToContinue)
@@ -305,7 +308,7 @@ export function WorktreeSelector({
   // Show just "Worktree" / "Local" here; the branch name is the branch selector's job.
   const label = inWorktree ? "Worktree" : "Local"
 
-  const resolvedCount = conflictFiles.current.length - remainingConflicts.length
+  const resolvedCount = conflictFiles.length - remainingConflicts.length
 
   return (
     <>
@@ -569,11 +572,11 @@ export function WorktreeSelector({
                 </DialogDescription>
               </DialogHeader>
 
-              {conflictFiles.current.length > 0 && (
+              {conflictFiles.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-sm font-medium">
-                      {resolvedCount} of {conflictFiles.current.length} resolved
+                      {resolvedCount} of {conflictFiles.length} resolved
                     </span>
                     <span className="truncate text-2xs text-muted-foreground">
                       Local = workspace · Worktree ={" "}
@@ -584,12 +587,12 @@ export function WorktreeSelector({
                     className="h-1.5 overflow-hidden rounded-full bg-muted"
                     role="progressbar"
                     aria-valuenow={resolvedCount}
-                    aria-valuemax={conflictFiles.current.length}
+                    aria-valuemax={conflictFiles.length}
                   >
                     <div
                       className="h-full rounded-full bg-emerald-500 transition-[width] duration-300 dark:bg-emerald-400"
                       style={{
-                        width: `${(resolvedCount / conflictFiles.current.length) * 100}%`,
+                        width: `${(resolvedCount / conflictFiles.length) * 100}%`,
                       }}
                     />
                   </div>
@@ -597,7 +600,7 @@ export function WorktreeSelector({
               )}
 
               <div className="-mx-1 flex max-h-[50vh] flex-col gap-1.5 overflow-y-auto px-1">
-                {conflictFiles.current.length === 0 && (
+                {conflictFiles.length === 0 && (
                   <Alert
                     variant={mergeReadyToContinue ? "default" : "destructive"}
                   >
@@ -608,7 +611,7 @@ export function WorktreeSelector({
                     </AlertDescription>
                   </Alert>
                 )}
-                {conflictFiles.current.map((filePath) => {
+                {conflictFiles.map((filePath) => {
                   const resolution = resolutions[filePath]
                   const isRemaining = remainingConflicts.includes(filePath)
                   const slash = filePath.lastIndexOf("/")

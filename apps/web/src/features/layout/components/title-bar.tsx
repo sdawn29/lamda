@@ -345,17 +345,28 @@ export function TitleBar() {
     })
   }
 
+  // Tracks how many BACK navigations we're currently "ahead" of, so
+  // canGoForward can be derived without the router exposing it directly.
+  // Held in a ref (mutated only from the history-subscription callback, an
+  // event handler, not render) rather than a variable closed over by the
+  // memo — a plain variable there would be a render-scoped value mutated
+  // after render completes.
+  const backForwardCountRef = useRef(0)
   const { subscribe, getSnapshot } = useMemo(() => {
-    let count = 0
     return {
       subscribe: (notify: () => void) =>
         router.history.subscribe(({ action }) => {
-          if (action.type === "PUSH" || action.type === "REPLACE") count = 0
-          else if (action.type === "BACK") count++
-          else if (action.type === "FORWARD") count = Math.max(0, count - 1)
+          if (action.type === "PUSH" || action.type === "REPLACE")
+            backForwardCountRef.current = 0
+          else if (action.type === "BACK") backForwardCountRef.current++
+          else if (action.type === "FORWARD")
+            backForwardCountRef.current = Math.max(
+              0,
+              backForwardCountRef.current - 1
+            )
           notify()
         }),
-      getSnapshot: () => count > 0,
+      getSnapshot: () => backForwardCountRef.current > 0,
     }
   }, [router.history])
 

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { BotIcon, Loader2Icon, SparklesIcon } from "lucide-react"
@@ -57,13 +57,20 @@ export function ContextChart({
 }: ContextChartProps) {
   const queryClient = useQueryClient()
   const [isCompacting, setIsCompacting] = useState(false)
-  const lastValidRef = useRef<ContextUsage | null>(null)
+  // Keeps showing the last known-good usage while a fresh snapshot is
+  // unavailable (e.g. `tokens` briefly null right after compaction). Adjusted
+  // during render instead of a ref, since render reads this value directly.
+  const [lastValid, setLastValid] = useState<ContextUsage | null>(null)
 
-  if (contextUsage && contextUsage.tokens != null) {
-    lastValidRef.current = contextUsage
+  if (
+    contextUsage &&
+    contextUsage.tokens != null &&
+    contextUsage !== lastValid
+  ) {
+    setLastValid(contextUsage)
   }
 
-  const display = lastValidRef.current ?? contextUsage
+  const display = lastValid ?? contextUsage
   if (!display) return null
 
   const pct =

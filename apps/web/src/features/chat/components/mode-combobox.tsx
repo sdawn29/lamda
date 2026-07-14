@@ -3,11 +3,11 @@ import {
   BotIcon,
   BookOpenIcon,
   BugIcon,
-  ChevronDownIcon,
   CodeIcon,
   CompassIcon,
   EyeIcon,
   HammerIcon,
+  ListChecksIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
   PencilIcon,
@@ -30,6 +30,7 @@ import {
   CommandGroup,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/shared/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover"
 import { cn } from "@/shared/lib/utils"
@@ -297,10 +298,13 @@ export function ModeCombobox({
   selected,
   onSelect,
   modes,
+  onCustomizeTools,
 }: {
   selected: Mode
   onSelect: (mode: Mode) => void
   modes: ModeDto[]
+  /** When set, a "Customize allowed tools…" footer item renders in the menu. */
+  onCustomizeTools?: () => void
 }) {
   const [open, setOpen] = React.useState(false)
   const selectedOption = getModeOption(selected, modes)
@@ -315,7 +319,7 @@ export function ModeCombobox({
             size="sm"
             aria-expanded={open}
             title={selectedOption.label}
-            className="gap-1.5 text-foreground/80 transition-colors hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
+            className="gap-1.5 text-2xs text-foreground/80 transition-colors hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
           >
             <span
               data-icon="inline-start"
@@ -323,13 +327,7 @@ export function ModeCombobox({
             >
               <selectedOption.Icon className="size-3.5 shrink-0" />
             </span>
-            <span className="font-medium">
-              {selectedOption.label}
-            </span>
-            <ChevronDownIcon
-              data-icon="inline-end"
-              className={`opacity-50 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-            />
+            <span className="font-medium">{selectedOption.label}</span>
           </Button>
         }
       />
@@ -378,6 +376,28 @@ export function ModeCombobox({
                 )
               })}
             </CommandGroup>
+            {onCustomizeTools && (
+              <>
+                <CommandSeparator />
+                <CommandGroup className="p-1">
+                  <CommandItem
+                    value="customize-tools"
+                    className="items-center gap-2.5 rounded-lg px-2 py-1.5 text-muted-foreground"
+                    onSelect={() => {
+                      setOpen(false)
+                      onCustomizeTools()
+                    }}
+                  >
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/70">
+                      <ListChecksIcon className="size-3.5 shrink-0" />
+                    </span>
+                    <span className="text-xs font-medium">
+                      Customize allowed tools…
+                    </span>
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

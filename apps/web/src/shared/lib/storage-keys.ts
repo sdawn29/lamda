@@ -8,6 +8,7 @@ export const APP_SETTINGS_KEYS = {
   SHOW_THINKING: "show_thinking",
   RICH_CHAT_RENDERING: "rich_chat_rendering",
   ONBOARDING_COMPLETED: "onboarding_completed",
+  USER_NAME: "user_name",
   THEME: "theme",
   COLOR_THEME: "color_theme",
   CUSTOM_THEME: "custom_theme",

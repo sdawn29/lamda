@@ -194,8 +194,17 @@ export function useChatStream({
     return () => clearTimeout(timer)
   }, [sessionId])
 
-  useEffect(() => {
-    if (!sessionStatus) return
+  // Mirror the server status snapshot into local state as soon as a new
+  // snapshot reference shows up — adjusted during render (instead of an
+  // effect) since react-query hands us a stable reference until the next
+  // fetch resolves, so this fires exactly once per snapshot, same as the
+  // effect's dependency array used to. Only this hook's own setStates run
+  // here; the thread-status store write happens in the effect below (writing
+  // an external store during render would notify other subscribed components
+  // mid-render).
+  const [lastSyncedStatus, setLastSyncedStatus] = useState(sessionStatus)
+  if (sessionStatus && sessionStatus !== lastSyncedStatus) {
+    setLastSyncedStatus(sessionStatus)
     setIsLoading(sessionStatus.isRunning)
     setIsCompacting(sessionStatus.isCompacting)
     setCompactionReason(sessionStatus.compactionReason)
@@ -209,8 +218,20 @@ export function useChatStream({
           action: { type: "dismiss" },
         })
       )
-      setThreadStatus(threadId, "error")
     }
+  }
+
+  // Mark the thread errored whenever a snapshot carries a pending error —
+  // kept out of the render adjustment above since it writes the zustand
+  // thread-status store (an external system), which belongs in an effect.
+  // Keyed on the snapshot reference so it fires once per snapshot, exactly
+  // when the mirror above consumed it.
+  useEffect(() => {
+    if (sessionStatus?.pendingError) setThreadStatus(threadId, "error")
+  }, [sessionStatus, threadId, setThreadStatus])
+
+  useEffect(() => {
+    if (!sessionStatus) return
 
     // On the first status snapshot after a (re)mount, resync the messages cache
     // if the session is idle. Returning from a route that unmounts the chat view
@@ -243,10 +264,7 @@ export function useChatStream({
     }
   }, [
     sessionStatus,
-    setThreadStatus,
     threadId,
-    queryClient,
-    sessionId,
     resyncMessages,
   ])
 

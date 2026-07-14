@@ -35,14 +35,16 @@ function useAnimatedCount(target: number): number {
   useEffect(() => {
     const from = displayRef.current
     if (from === target) return
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      displayRef.current = target
-      setDisplay(target)
-      return
-    }
+    // Reduced-motion: snap to target on the next frame instead of tweening.
+    // Handled via the same rAF tick (duration 0, t=1 immediately) rather than
+    // calling setDisplay synchronously in the effect body.
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches
+    const duration = reduced ? 0 : COUNT_ANIMATION_MS
     const start = performance.now()
     const tick = (now: number) => {
-      const t = Math.min((now - start) / COUNT_ANIMATION_MS, 1)
+      const t = duration === 0 ? 1 : Math.min((now - start) / duration, 1)
       const value = Math.round(from + (target - from) * easeOutCubic(t))
       displayRef.current = value
       setDisplay(value)

@@ -601,9 +601,16 @@ export const FileContentView = memo(function FileContentView({
   const [scrollToLine, setScrollToLine] = useState<number | null>(null)
   const chatActions = useChatActions()
 
-  useEffect(() => {
+  // Sync scrollToLine from the prop whenever it changes — this component is
+  // reused (not remounted) across file/line switches in the review panel, so
+  // this is adjusted during render instead of inside an effect.
+  const [lastInitialScrollToLine, setLastInitialScrollToLine] = useState(
+    initialScrollToLine
+  )
+  if (initialScrollToLine !== lastInitialScrollToLine) {
+    setLastInitialScrollToLine(initialScrollToLine)
     if (initialScrollToLine) setScrollToLine(initialScrollToLine)
-  }, [initialScrollToLine])
+  }
 
   const workspaceId = useResolveWorkspaceId(workspacePath)
   const lsp = useLspConnection(workspaceId)
@@ -775,10 +782,16 @@ export const FileContentView = memo(function FileContentView({
     [filePath, serverUrl, onOpenFile]
   )
 
-  useEffect(() => {
+  // Reset the preview toggles to match the new file whenever `filePath`
+  // changes (isMarkdown/isHtml are pure functions of it) — adjusted during
+  // render since this component is reused (not remounted) across file
+  // switches, and the user can still flip the toggle afterward.
+  const [lastPreviewFilePath, setLastPreviewFilePath] = useState(filePath)
+  if (filePath !== lastPreviewFilePath) {
+    setLastPreviewFilePath(filePath)
     setMarkdownPreview(isMarkdown)
     setHtmlPreview(isHtml)
-  }, [filePath, isMarkdown, isHtml])
+  }
 
   const language = LANGUAGE_MAP[fileExtension] ?? fileExtension
 

@@ -1,10 +1,5 @@
 import * as React from "react"
-import {
-  ChevronDownIcon,
-  FilePenIcon,
-  ShieldCheckIcon,
-  ShieldOffIcon,
-} from "lucide-react"
+import { FilePenIcon, ShieldCheckIcon, ShieldOffIcon } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
 import {
@@ -98,7 +93,7 @@ export function ApprovalModeCombobox({
             size="sm"
             aria-expanded={open}
             title={selectedOption.label}
-            className={cn(selectedOption.triggerBg)}
+            className={cn("text-2xs", selectedOption.triggerBg)}
           >
             <span
               data-icon="inline-start"
@@ -111,10 +106,6 @@ export function ApprovalModeCombobox({
             >
               {selectedOption.label}
             </span>
-            <ChevronDownIcon
-              data-icon="inline-end"
-              className={`opacity-60 transition-transform duration-200 ${open ? "rotate-180" : ""} ${selectedOption.iconAccent}`}
-            />
           </Button>
         }
       />

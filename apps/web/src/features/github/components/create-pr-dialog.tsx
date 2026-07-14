@@ -38,17 +38,27 @@ export function CreatePrDialog({
   const [draft, setDraft] = useState(false)
   const [createdUrl, setCreatedUrl] = useState<string | null>(null)
 
-  // Reset the form whenever the dialog opens.
-  useEffect(() => {
+  // Reset the form whenever the dialog opens. Adjusted during render (instead
+  // of an effect) by comparing against the open value we last rendered for —
+  // this only runs on the render where `open` actually flips to true.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
     if (open) {
       setTitle("")
       setBody("")
       setDraft(false)
       setCreatedUrl(null)
-      createPr.reset()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }
+
+  // The mutation reset writes react-query's mutation cache (an external
+  // store), so it stays in an effect rather than the render adjustment above.
+  // mutation.reset is referentially stable in react-query v5.
+  const { reset: resetCreatePr } = createPr
+  useEffect(() => {
+    if (open) resetCreatePr()
+  }, [open, resetCreatePr])
 
   const base = repo?.defaultBranch ?? null
 

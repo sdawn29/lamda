@@ -60,9 +60,11 @@ import { useEnvDialog, useWorkspace } from "@/features/workspace"
 import { useGitStatus, statusLabel } from "@/features/git"
 import { buildChangedFileMap } from "../file-chip-context"
 import { useMainTabsStore } from "@/features/main-tabs"
-import { getModeOption, modeOptionFromDto } from "./mode-combobox"
+import { getModeOption, modeOptionFromDto, ModeCombobox } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
-import { ComposerSettingsMenu } from "./composer-settings-menu"
+import { ModelCombobox } from "./model-combobox"
+import { ThinkingCombobox } from "./thinking-combobox"
+import { ModeToolsDialog } from "./mode-tools-dialog"
 import type { ThinkingLevel } from "./thinking-combobox"
 export type { ThinkingLevel } from "./thinking-combobox"
 import {
@@ -209,6 +211,8 @@ export const ChatComposer = memo(
     const [attachments, setAttachments] = React.useState<PendingAttachment[]>(
       []
     )
+    // Mode-tools dialog, opened from the mode dropdown's footer item.
+    const [toolsOpen, setToolsOpen] = React.useState(false)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
     const mentionEntries = React.useRef<MentionEntry[]>([])
     const slashItemsRef = React.useRef<ChatSlashItem[]>([])
@@ -276,6 +280,22 @@ export const ChatComposer = memo(
       setHistoryNav({ position: total - cursor, total })
     }, [])
 
+    // "Clear" is a slash-command action embedded in the memoized `actions`
+    // list below, which the compiler can't prove never runs during render —
+    // so it must not itself read `richInputRef`. Bumping this counter and
+    // clearing the actual input in a plain effect keeps the ref access out of
+    // that memoized closure entirely.
+    const [clearInputTick, setClearInputTick] = React.useState(0)
+    const handleClearInput = React.useCallback(() => {
+      setClearInputTick((n) => n + 1)
+      setIsEmpty(true)
+      onValueChange?.("")
+    }, [onValueChange])
+    React.useEffect(() => {
+      if (clearInputTick === 0) return
+      richInputRef.current?.clear()
+    }, [clearInputTick])
+
     useImperativeHandle(ref, () => ({
       getValue() {
         return richInputRef.current?.getValue() ?? ""
@@ -331,12 +351,12 @@ export const ChatComposer = memo(
       // When thinking is available, default to "medium" if not set or not in available levels
       if (!availableLevels.includes(selectedThinkingLevel)) {
         const mediumIndex = availableLevels.indexOf("medium")
-        if (mediumIndex !== -1) {
-          setThinkingLevel("medium")
-        } else {
-          // Fall back to first available level
-          setThinkingLevel(availableLevels[0] as ThinkingLevel)
-        }
+        const next =
+          mediumIndex !== -1 ? "medium" : (availableLevels[0] as ThinkingLevel)
+        // setThinkingLevel also notifies the parent (controlled mode) and
+        // writes to the prefs store, so it can't run during render — deferred
+        // to a microtask instead of calling it synchronously in the effect.
+        queueMicrotask(() => setThinkingLevel(next))
       }
     }, [availableLevels, selectedThinkingLevel, setThinkingLevel])
 
@@ -381,8 +401,8 @@ export const ChatComposer = memo(
           agent.description.toLowerCase().includes(query)
       )
     }, [agentData, agentMention, mode, modeList])
-    const activeModeLabel =
-      modeList.find((entry) => entry.id === mode)?.label ?? mode
+    const activeModeDto = modeList.find((entry) => entry.id === mode)
+    const activeModeLabel = activeModeDto?.label ?? mode
     const fileData = React.useMemo((): WorkspaceEntry[] => {
       if (!indexedFiles) return []
       return indexedFiles.map((f) => ({
@@ -480,7 +500,11 @@ export const ChatComposer = memo(
       }
       return [...open, ...changed, ...rest].slice(0, 10)
     }, [fileData, atMention, changedFiles, openTabPaths])
-    mentionEntries.current = mentionEntries2
+    // Mirrored into a ref (rather than read directly) since it's only
+    // consulted from the arrow-key handlers below, not during render.
+    React.useEffect(() => {
+      mentionEntries.current = mentionEntries2
+    }, [mentionEntries2])
 
     // Built-in action commands. Each runs immediately when selected (no chip
     // is inserted). Items are conditionally included based on context.
@@ -566,11 +590,7 @@ export const ChatComposer = memo(
           name: "clear",
           description: "Clear the input",
           icon: EraserIcon,
-          onSelect: () => {
-            richInputRef.current?.clear()
-            setIsEmpty(true)
-            onValueChange?.("")
-          },
+          onSelect: handleClearInput,
         })
       }
 
@@ -668,7 +688,7 @@ export const ChatComposer = memo(
       isLoading,
       isEmpty,
       onStop,
-      onValueChange,
+      handleClearInput,
       mode,
       modeList,
       onModeChange,
@@ -737,7 +757,11 @@ export const ChatComposer = memo(
       () => slashGroups.flatMap((g) => g.items),
       [slashGroups]
     )
-    slashItemsRef.current = slashItems
+    // Mirrored into a ref (rather than read directly) since it's only
+    // consulted from onSlashEnter/arrow-key handlers below, not during render.
+    React.useEffect(() => {
+      slashItemsRef.current = slashItems
+    }, [slashItems])
 
     // Server returned no skills/prompts at all (not just filtered to zero).
     const noSkillsAvailable =
@@ -1099,7 +1123,7 @@ export const ChatComposer = memo(
       <div className={cn("w-full", className)}>
         <div
           className={cn(
-            "relative flex w-full flex-col rounded-2xl border border-border/50 bg-muted/40",
+            "relative flex w-full flex-col rounded-lg border border-border/50 bg-muted/40",
             "transition-colors duration-150 focus-within:border-primary/40"
           )}
         >
@@ -1163,123 +1187,202 @@ export const ChatComposer = memo(
                 </span>
               </div>
             )}
-            <div className="px-2 py-1.5">
-              <RichInput
-                ref={richInputRef}
-                placeholder={
-                  isLoading
-                    ? "Steer the agent — your message joins this run"
-                    : placeholder
-                }
-                minHeightClassName={inputMinHeightClassName}
-                mentionActive={atMention !== null && mentionEntries2.length > 0}
-                slashActive={
-                  slashMention !== null &&
-                  (slashItems.length > 0 || commandsLoading)
-                }
-                agentActive={
-                  agentMention !== null && availableAgents.length > 0
-                }
-                onAtMentionChange={handleAtMentionChange}
-                onSlashMentionChange={handleSlashMentionChange}
-                onAgentMentionChange={handleAgentMentionChange}
-                onSend={handleSend}
-                onInput={handleInput}
-                onPasteFiles={(files) => void handleAddFiles(files)}
-                onMentionEnter={() => {
-                  const idx = atMention?.selectedIndex ?? 0
-                  const entry = mentionEntries2[idx]
-                  if (entry) handleSelectFile(entry)
-                }}
-                onSlashEnter={() => {
-                  const idx = slashMention?.selectedIndex ?? 0
-                  const item = slashItemsRef.current[idx]
-                  if (item) handleSelectItem(item)
-                }}
-                onAgentEnter={() => {
-                  const idx = agentMention?.selectedIndex ?? 0
-                  const agent = availableAgents[idx]
-                  if (agent) handleSelectAgent(agent)
-                }}
-                onArrowUp={() => {
-                  if (slashMention !== null) {
-                    setSlashMention((prev) => {
-                      if (!prev) return prev
-                      const n = slashItemsRef.current.length
-                      if (n === 0) return prev
-                      return {
-                        ...prev,
-                        selectedIndex: (prev.selectedIndex - 1 + n) % n,
-                      }
-                    })
-                  } else if (agentMention !== null) {
-                    setAgentMention((prev) => {
-                      if (!prev) return prev
-                      const n = availableAgents.length
-                      if (n === 0) return prev
-                      return {
-                        ...prev,
-                        selectedIndex: (prev.selectedIndex - 1 + n) % n,
-                      }
-                    })
-                  } else {
-                    setAtMention((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            selectedIndex:
-                              (prev.selectedIndex -
-                                1 +
-                                mentionEntries.current.length) %
-                              mentionEntries.current.length,
-                          }
-                        : prev
-                    )
+            <div className="flex items-end gap-1.5 px-2 py-1.5">
+              {/* Centers the single-line input (and its placeholder) against
+                  the 28px send button; the input itself is one line-height
+                  tall and grows naturally when the text wraps. */}
+              <div className="flex min-h-7 min-w-0 flex-1 items-center">
+                <RichInput
+                  ref={richInputRef}
+                  placeholder={
+                    isLoading
+                      ? "Steer the agent — your message joins this run"
+                      : placeholder
                   }
-                }}
-                onArrowDown={() => {
-                  if (slashMention !== null) {
-                    setSlashMention((prev) => {
-                      if (!prev) return prev
-                      const n = slashItemsRef.current.length
-                      if (n === 0) return prev
-                      return {
-                        ...prev,
-                        selectedIndex: (prev.selectedIndex + 1) % n,
-                      }
-                    })
-                  } else if (agentMention !== null) {
-                    setAgentMention((prev) => {
-                      if (!prev) return prev
-                      const n = availableAgents.length
-                      if (n === 0) return prev
-                      return {
-                        ...prev,
-                        selectedIndex: (prev.selectedIndex + 1) % n,
-                      }
-                    })
-                  } else {
-                    setAtMention((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            selectedIndex:
-                              (prev.selectedIndex + 1) %
-                              mentionEntries.current.length,
-                          }
-                        : prev
-                    )
+                  minHeightClassName={inputMinHeightClassName ?? "min-h-[1lh]"}
+                  mentionActive={
+                    atMention !== null && mentionEntries2.length > 0
                   }
-                }}
-                onEscape={() => {
-                  exitHistory()
-                  setAtMention(null)
-                  setSlashMention(null)
-                  setAgentMention(null)
-                }}
-                onHistoryPrev={(atStart) => navigateHistory("prev", atStart)}
-                onHistoryNext={() => navigateHistory("next", false)}
-              />
+                  slashActive={
+                    slashMention !== null &&
+                    (slashItems.length > 0 || commandsLoading)
+                  }
+                  agentActive={
+                    agentMention !== null && availableAgents.length > 0
+                  }
+                  onAtMentionChange={handleAtMentionChange}
+                  onSlashMentionChange={handleSlashMentionChange}
+                  onAgentMentionChange={handleAgentMentionChange}
+                  onSend={handleSend}
+                  onInput={handleInput}
+                  onPasteFiles={(files) => void handleAddFiles(files)}
+                  onMentionEnter={() => {
+                    const idx = atMention?.selectedIndex ?? 0
+                    const entry = mentionEntries2[idx]
+                    if (entry) handleSelectFile(entry)
+                  }}
+                  onSlashEnter={() => {
+                    const idx = slashMention?.selectedIndex ?? 0
+                    const item = slashItemsRef.current[idx]
+                    if (item) handleSelectItem(item)
+                  }}
+                  onAgentEnter={() => {
+                    const idx = agentMention?.selectedIndex ?? 0
+                    const agent = availableAgents[idx]
+                    if (agent) handleSelectAgent(agent)
+                  }}
+                  onArrowUp={() => {
+                    if (slashMention !== null) {
+                      setSlashMention((prev) => {
+                        if (!prev) return prev
+                        const n = slashItemsRef.current.length
+                        if (n === 0) return prev
+                        return {
+                          ...prev,
+                          selectedIndex: (prev.selectedIndex - 1 + n) % n,
+                        }
+                      })
+                    } else if (agentMention !== null) {
+                      setAgentMention((prev) => {
+                        if (!prev) return prev
+                        const n = availableAgents.length
+                        if (n === 0) return prev
+                        return {
+                          ...prev,
+                          selectedIndex: (prev.selectedIndex - 1 + n) % n,
+                        }
+                      })
+                    } else {
+                      setAtMention((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              selectedIndex:
+                                (prev.selectedIndex -
+                                  1 +
+                                  mentionEntries.current.length) %
+                                mentionEntries.current.length,
+                            }
+                          : prev
+                      )
+                    }
+                  }}
+                  onArrowDown={() => {
+                    if (slashMention !== null) {
+                      setSlashMention((prev) => {
+                        if (!prev) return prev
+                        const n = slashItemsRef.current.length
+                        if (n === 0) return prev
+                        return {
+                          ...prev,
+                          selectedIndex: (prev.selectedIndex + 1) % n,
+                        }
+                      })
+                    } else if (agentMention !== null) {
+                      setAgentMention((prev) => {
+                        if (!prev) return prev
+                        const n = availableAgents.length
+                        if (n === 0) return prev
+                        return {
+                          ...prev,
+                          selectedIndex: (prev.selectedIndex + 1) % n,
+                        }
+                      })
+                    } else {
+                      setAtMention((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              selectedIndex:
+                                (prev.selectedIndex + 1) %
+                                mentionEntries.current.length,
+                            }
+                          : prev
+                      )
+                    }
+                  }}
+                  onEscape={() => {
+                    exitHistory()
+                    setAtMention(null)
+                    setSlashMention(null)
+                    setAgentMention(null)
+                  }}
+                  onHistoryPrev={(atStart) => navigateHistory("prev", atStart)}
+                  onHistoryNext={() => navigateHistory("next", false)}
+                />
+              </div>
+
+              {isLoading && !isEmpty ? (
+                // While the agent runs, a non-empty submit steers the live turn.
+                // The steer button replaces Stop so there's a single primary
+                // action — Stop returns the moment the input is cleared.
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        size="icon"
+                        onClick={handleSend}
+                        aria-label="Send to running agent"
+                        className={cn(
+                          "aspect-square shrink-0 animate-in rounded-lg transition-colors duration-150 fade-in-0 zoom-in-90",
+                          modeSendButton
+                        )}
+                      >
+                        <ArrowUpIcon />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>
+                    Send — steers the running agent
+                    <ShortcutKbd binding="enter" className="ml-1" />
+                  </TooltipContent>
+                </Tooltip>
+              ) : isLoading ? (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        size="icon"
+                        onClick={onStop}
+                        disabled={isAborting}
+                        aria-label="Stop generation"
+                        className="aspect-square shrink-0 animate-in rounded-lg bg-destructive duration-150 fade-in-0 zoom-in-90 hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <div className="h-3 w-3 rounded-sm bg-white" />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>
+                    {isAborting ? "Stopping" : "Stop"}
+                    {!isAborting && (
+                      <ShortcutKbd binding={stopBinding} className="ml-1" />
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        size="icon"
+                        onClick={handleSend}
+                        disabled={!canSend}
+                        aria-label="Send message"
+                        className={cn(
+                          "aspect-square shrink-0 animate-in rounded-lg transition-colors duration-150 fade-in-0 zoom-in-90",
+                          modeSendButton
+                        )}
+                      >
+                        <ArrowUpIcon />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>
+                    Send
+                    <ShortcutKbd binding="enter" className="ml-1" />
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
 
             {attachments.length > 0 && (
@@ -1306,132 +1409,82 @@ export const ChatComposer = memo(
                 e.target.value = ""
               }}
             />
-
-            <div className="@container/composer-controls flex items-center justify-between gap-2 px-1.5 pb-1.5">
-              <div className="flex min-w-0 items-center gap-0.5">
-                <ComposerSettingsMenu
-                  groups={grouped}
-                  selectedModel={selectedModel}
-                  onSelectModel={(compositeKey) => {
-                    if (!isControlled) setInternalModelId(compositeKey)
-                    onModelChange?.(compositeKey)
-                  }}
-                  thinkingLevel={selectedThinkingLevel}
-                  onThinkingLevelChange={setThinkingLevel}
-                  availableLevels={availableLevels}
-                  mode={mode}
-                  modes={modeList}
-                  onModeChange={onModeChange}
-                  workspaceId={workspaceId}
-                />
-              </div>
-
-              <div className="flex min-w-0 items-center justify-end gap-2">
-                <ContextChart
-                  contextUsage={contextUsage}
-                  sessionId={sessionId}
-                  sessionStats={sessionStats}
-                />
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        type="button"
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label="Attach files"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <PaperclipIcon className="size-3.5" />
-                      </Button>
-                    }
-                  />
-                  <TooltipContent>Attach files</TooltipContent>
-                </Tooltip>
-                {isLoading && !isEmpty ? (
-                  // While the agent runs, a non-empty submit steers the live turn.
-                  // The steer button replaces Stop so there's a single primary
-                  // action — Stop returns the moment the input is cleared.
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          size="icon"
-                          onClick={handleSend}
-                          aria-label="Send to running agent"
-                          className={cn(
-                            "aspect-square animate-in rounded-lg transition-colors duration-150 fade-in-0 zoom-in-90",
-                            modeSendButton
-                          )}
-                        >
-                          <ArrowUpIcon />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>
-                      Send — steers the running agent
-                      <ShortcutKbd binding="enter" className="ml-1" />
-                    </TooltipContent>
-                  </Tooltip>
-                ) : isLoading ? (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          size="icon"
-                          onClick={onStop}
-                          disabled={isAborting}
-                          aria-label="Stop generation"
-                          className="aspect-square animate-in rounded-lg bg-destructive duration-150 fade-in-0 zoom-in-90 hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <div className="h-3 w-3 rounded-sm bg-white" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>
-                      {isAborting ? "Stopping" : "Stop"}
-                      {!isAborting && (
-                        <ShortcutKbd binding={stopBinding} className="ml-1" />
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          size="icon"
-                          onClick={handleSend}
-                          disabled={!canSend}
-                          aria-label="Send message"
-                          className={cn(
-                            "aspect-square animate-in rounded-lg transition-colors duration-150 fade-in-0 zoom-in-90",
-                            modeSendButton
-                          )}
-                        >
-                          <ArrowUpIcon />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>
-                      Send
-                      <ShortcutKbd binding="enter" className="ml-1" />
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-            </div>
           </div>
         </div>
 
-        {showApproval && (
-          <div className="mt-1.5 flex w-full justify-end">
-            <ApprovalModeCombobox
-              selected={approvalMode}
-              onSelect={onApprovalModeChange!}
+        {/* Controls bar — everything but the send button lives below the
+            composer, grouped left (behavior: mode / permissions / attach) and
+            right (generation: model / thinking / context), each control with
+            its own dropdown. */}
+        <div className="mt-1.5 flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1 px-0.5">
+          <div className="flex min-w-0 items-center gap-0.5">
+            {onModeChange && (
+              <ModeCombobox
+                selected={mode}
+                onSelect={onModeChange}
+                modes={modeList}
+                onCustomizeTools={() => setToolsOpen(true)}
+              />
+            )}
+            {showApproval && (
+              <ApprovalModeCombobox
+                selected={approvalMode}
+                onSelect={onApprovalModeChange!}
+              />
+            )}
+            <div aria-hidden className="h-4 w-px shrink-0 bg-border/60" />
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Attach files"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <PaperclipIcon className="size-3.5" />
+                  </Button>
+                }
+              />
+              <TooltipContent>Attach files</TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-0.5">
+            <ModelCombobox
+              groups={grouped}
+              selected={selectedModel}
+              onSelect={(compositeKey) => {
+                if (!isControlled) setInternalModelId(compositeKey)
+                onModelChange?.(compositeKey)
+              }}
+              triggerClassName="text-2xs [&_[data-icon=inline-end]]:hidden"
+            />
+            {selectedModel?.reasoning && (
+              <ThinkingCombobox
+                selected={selectedThinkingLevel}
+                onSelect={setThinkingLevel}
+                availableLevels={availableLevels}
+              />
+            )}
+            <div aria-hidden className="h-4 w-px shrink-0 bg-border/60" />
+            <ContextChart
+              contextUsage={contextUsage}
+              sessionId={sessionId}
+              sessionStats={sessionStats}
             />
           </div>
+        </div>
+
+        {onModeChange && (
+          <ModeToolsDialog
+            mode={activeModeDto}
+            workspaceId={workspaceId}
+            open={toolsOpen}
+            onOpenChange={setToolsOpen}
+          />
         )}
       </div>
     )
