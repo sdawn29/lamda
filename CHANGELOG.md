@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.53.0](../../releases/tag/v0.53.0) — 2026-07-15
+
+### Features
+
+* implement GitHub and GitLab merge request details and comments
+* **chat:** implement subagent panel and improve subagent card UI
+* **dock:** implement dock store with tab management and persistence
+
 ## [0.52.0](../../releases/tag/v0.52.0) — 2026-07-14
 
 ### Features
