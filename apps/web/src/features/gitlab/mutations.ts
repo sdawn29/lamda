@@ -3,12 +3,15 @@ import {
   checkoutMergeRequest,
   commentMergeRequest,
   createMergeRequest,
+  createMergeRequestReviewComment,
   mergeMergeRequest,
   publishGitlabRepository,
+  replyToMergeRequestReviewComment,
 } from "./api"
 import { gitlabKeys } from "./queries"
 import type {
   CreateMergeRequestInput,
+  CreateReviewCommentInput,
   PublishRepositoryInput,
   RepoContext,
 } from "./types"
@@ -59,6 +62,39 @@ export function useMergeMergeRequest(ctx: RepoContext) {
     onSuccess: (_data, { number }) => {
       qc.invalidateQueries({ queryKey: [...gitlabKeys.all, "mrs"] })
       qc.invalidateQueries({ queryKey: gitlabKeys.mr(ctx, number) })
+    },
+  })
+}
+
+export function useCreateMergeRequestReviewComment(
+  ctx: RepoContext,
+  number: number
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateReviewCommentInput) =>
+      createMergeRequestReviewComment(ctx, number, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: gitlabKeys.review(ctx, number) })
+    },
+  })
+}
+
+export function useReplyToMergeRequestReviewComment(
+  ctx: RepoContext,
+  number: number
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      discussionId,
+      body,
+    }: {
+      discussionId: string
+      body: string
+    }) => replyToMergeRequestReviewComment(ctx, number, discussionId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: gitlabKeys.review(ctx, number) })
     },
   })
 }

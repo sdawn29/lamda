@@ -8,9 +8,13 @@ import type {
   IssueSummary,
   MergeRequestState,
   MergeRequestDetail,
+  MergeRequestReview,
+  MergeRequestReviewComment,
   MergeRequestSummary,
+  PipelineDetail,
   PublishRepositoryInput,
   RepoContext,
+  CreateReviewCommentInput,
 } from "./types"
 
 function ctxQuery(ctx: RepoContext): string {
@@ -80,6 +84,20 @@ export async function fetchMergeRequests(
   return res.mrs
 }
 
+export async function fetchGitlabPipeline(
+  ctx: RepoContext,
+  ref?: string,
+  signal?: AbortSignal
+): Promise<PipelineDetail | null> {
+  const params = new URLSearchParams(ctxQuery(ctx))
+  if (ref) params.set("ref", ref)
+  const res = await apiFetch<{ pipeline: PipelineDetail | null }>(
+    `/gitlab/pipeline?${params.toString()}`,
+    { signal }
+  )
+  return res.pipeline
+}
+
 export async function createMergeRequest(
   input: CreateMergeRequestInput
 ): Promise<{ url: string }> {
@@ -96,6 +114,43 @@ export async function fetchMergeRequest(
     { signal }
   )
   return res.mr
+}
+
+export async function fetchMergeRequestReview(
+  ctx: RepoContext,
+  number: number,
+  signal?: AbortSignal
+): Promise<MergeRequestReview> {
+  const res = await apiFetch<{ review: MergeRequestReview }>(
+    `/gitlab/mrs/${number}/review?${ctxQuery(ctx)}`,
+    { signal }
+  )
+  return res.review
+}
+
+export async function createMergeRequestReviewComment(
+  ctx: RepoContext,
+  number: number,
+  input: CreateReviewCommentInput
+): Promise<MergeRequestReviewComment> {
+  const res = await apiFetch<{ comment: MergeRequestReviewComment }>(
+    `/gitlab/mrs/${number}/review-comments`,
+    jsonInit({ ...ctx, ...input })
+  )
+  return res.comment
+}
+
+export async function replyToMergeRequestReviewComment(
+  ctx: RepoContext,
+  number: number,
+  discussionId: string,
+  body: string
+): Promise<MergeRequestReviewComment> {
+  const res = await apiFetch<{ comment: MergeRequestReviewComment }>(
+    `/gitlab/mrs/${number}/discussions/${encodeURIComponent(discussionId)}/replies`,
+    jsonInit({ ...ctx, body })
+  )
+  return res.comment
 }
 
 export async function commentMergeRequest(

@@ -330,6 +330,7 @@ export async function listMergeRequests(
 }
 
 export interface NoteSummary {
+  id: number;
   author: string | null;
   body: string;
   createdAt: string;
@@ -349,10 +350,11 @@ async function listNotes(
     cwd,
   );
   return raws
-    .filter((raw) => raw.system !== true)
+    .filter((raw) => raw.system !== true && raw.type == null)
     .map((raw) => {
       const author = raw.author as { username?: string; name?: string } | null;
       return {
+        id: Number(raw.id ?? 0),
         author: author?.username ?? author?.name ?? null,
         body: String(raw.body ?? ""),
         createdAt: String(raw.created_at ?? raw.createdAt ?? ""),
@@ -365,9 +367,51 @@ export interface MergeRequestDetail extends MergeRequestSummary {
   mergeStatus: string | null;
   /** GitLab reports this as a string, e.g. "5" or "1000+". */
   changesCount: string | null;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
   files: { path: string; additions: number; deletions: number }[];
+  commits: MergeRequestCommit[];
   comments: NoteSummary[];
   pipeline: PipelineDetail | null;
+}
+
+export interface MergeRequestCommit {
+  oid: string;
+  messageHeadline: string;
+  messageBody: string;
+  authoredDate: string;
+  committedDate: string;
+  authors: {
+    login: string | null;
+    name: string | null;
+    email: string | null;
+  }[];
+}
+
+function mapMergeRequestCommit(
+  raw: Record<string, unknown>,
+): MergeRequestCommit {
+  const title = String(raw.title ?? raw.message ?? "");
+  const message = String(raw.message ?? "");
+  const authorName = stringField(raw.author_name);
+  const authorEmail = stringField(raw.author_email);
+  return {
+    oid: String(raw.id ?? raw.sha ?? ""),
+    messageHeadline: title.split("\n", 1)[0] ?? "",
+    messageBody: message.startsWith(title)
+      ? message.slice(title.length).trim()
+      : message.trim(),
+    authoredDate: String(raw.authored_date ?? raw.created_at ?? ""),
+    committedDate: String(raw.committed_date ?? raw.created_at ?? ""),
+    authors: [
+      {
+        login: null,
+        name: authorName || null,
+        email: authorEmail || null,
+      },
+    ],
+  };
 }
 
 function diffStats(diff: string): { additions: number; deletions: number } {
@@ -389,30 +433,319 @@ export async function getMergeRequest(
     ["mr", "view", String(number), "--output", "json"],
     cwd,
   );
-  const [comments, pipeline, changesResponse] = await Promise.all([
+  const [comments, pipeline, changesResponse, commitRaws] = await Promise.all([
     listNotes(cwd, "merge_requests", number).catch(() => []),
     getPipeline(cwd, { mr: number }).catch(() => null),
     runGlabJson<Record<string, unknown>>(
       ["api", `projects/:id/merge_requests/${number}/changes`],
       cwd,
     ).catch(() => null),
+    runGlabJson<Record<string, unknown>[]>(
+      ["api", `projects/:id/merge_requests/${number}/commits?per_page=100`],
+      cwd,
+    ).catch(() => []),
   ]);
   const changes = Array.isArray(changesResponse?.changes)
     ? (changesResponse.changes as Record<string, unknown>[])
     : [];
+  const files = changes.map((change) => ({
+    path: String(change.new_path ?? change.old_path ?? ""),
+    ...diffStats(String(change.diff ?? "")),
+  }));
+  const totals = files.reduce(
+    (result, file) => ({
+      additions: result.additions + file.additions,
+      deletions: result.deletions + file.deletions,
+    }),
+    { additions: 0, deletions: 0 },
+  );
   return {
     ...mapMergeRequest(raw),
     description: String(raw.description ?? ""),
     mergeStatus:
       stringField(raw.detailed_merge_status ?? raw.merge_status) || null,
     changesCount: stringField(raw.changes_count) || null,
-    files: changes.map((change) => ({
-      path: String(change.new_path ?? change.old_path ?? ""),
-      ...diffStats(String(change.diff ?? "")),
-    })),
+    additions: totals.additions,
+    deletions: totals.deletions,
+    changedFiles: files.length,
+    files,
+    commits: commitRaws.map(mapMergeRequestCommit),
     comments,
     pipeline,
   };
+}
+
+export type ReviewSide = "LEFT" | "RIGHT";
+
+export interface MergeRequestReviewFile {
+  path: string;
+  previousPath: string | null;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch: string | null;
+}
+
+export interface MergeRequestReviewComment {
+  id: number;
+  discussionId: string;
+  path: string;
+  body: string;
+  author: string | null;
+  createdAt: string;
+  updatedAt: string;
+  line: number | null;
+  originalLine: number | null;
+  side: ReviewSide | null;
+  startLine: number | null;
+  startSide: ReviewSide | null;
+  inReplyToId: number | null;
+  commitId: string;
+  originalCommitId: string;
+  url: string;
+}
+
+export interface MergeRequestReview {
+  baseCommitOid: string;
+  startCommitOid: string;
+  headCommitOid: string;
+  files: MergeRequestReviewFile[];
+  comments: MergeRequestReviewComment[];
+}
+
+function reviewFileStatus(change: Record<string, unknown>): string {
+  if (change.new_file === true) return "added";
+  if (change.deleted_file === true) return "removed";
+  if (change.renamed_file === true) return "renamed";
+  return "modified";
+}
+
+function mapReviewNote(
+  raw: Record<string, unknown>,
+  discussionId: string,
+  rootNoteId: number | null,
+  mrUrl: string,
+  fallback?: MergeRequestReviewComment,
+): MergeRequestReviewComment | null {
+  if (raw.system === true) return null;
+  const author = raw.author as { username?: string; name?: string } | null;
+  const position =
+    typeof raw.position === "object" && raw.position !== null
+      ? (raw.position as Record<string, unknown>)
+      : null;
+  const newLine = position ? Number(position.new_line ?? 0) || null : null;
+  const oldLine = position ? Number(position.old_line ?? 0) || null : null;
+  const path = position
+    ? String(position.new_path ?? position.old_path ?? "")
+    : (fallback?.path ?? "");
+  const id = Number(raw.id ?? 0);
+  return {
+    id,
+    discussionId,
+    path,
+    body: String(raw.body ?? ""),
+    author: author?.username ?? author?.name ?? null,
+    createdAt: String(raw.created_at ?? ""),
+    updatedAt: String(raw.updated_at ?? raw.created_at ?? ""),
+    line: newLine ?? fallback?.line ?? null,
+    originalLine: oldLine ?? fallback?.originalLine ?? null,
+    side: newLine ? "RIGHT" : oldLine ? "LEFT" : (fallback?.side ?? null),
+    startLine: null,
+    startSide: null,
+    inReplyToId: rootNoteId && rootNoteId !== id ? rootNoteId : null,
+    commitId: position
+      ? String(position.head_sha ?? "")
+      : (fallback?.commitId ?? ""),
+    originalCommitId: position
+      ? String(position.base_sha ?? "")
+      : (fallback?.originalCommitId ?? ""),
+    url: mrUrl ? `${mrUrl}#note_${id}` : "",
+  };
+}
+
+export async function getMergeRequestReview(
+  cwd: string,
+  number: number,
+): Promise<MergeRequestReview> {
+  assertPositiveInt(number, "merge request number");
+  const [changesResponse, discussionRaws, mr] = await Promise.all([
+    runGlabJson<Record<string, unknown>>(
+      ["api", `projects/:id/merge_requests/${number}/changes`],
+      cwd,
+      30000,
+    ),
+    runGlabJson<Record<string, unknown>[]>(
+      ["api", `projects/:id/merge_requests/${number}/discussions?per_page=100`],
+      cwd,
+      30000,
+    ),
+    runGlabJson<Record<string, unknown>>(
+      ["api", `projects/:id/merge_requests/${number}`],
+      cwd,
+    ),
+  ]);
+  const diffRefs =
+    typeof changesResponse.diff_refs === "object" &&
+    changesResponse.diff_refs !== null
+      ? (changesResponse.diff_refs as Record<string, unknown>)
+      : {};
+  const changes = Array.isArray(changesResponse.changes)
+    ? (changesResponse.changes as Record<string, unknown>[])
+    : [];
+  const comments: MergeRequestReviewComment[] = [];
+  for (const discussion of discussionRaws) {
+    const discussionId = String(discussion.id ?? "");
+    const notes = Array.isArray(discussion.notes)
+      ? (discussion.notes as Record<string, unknown>[])
+      : [];
+    const rootRaw = notes[0];
+    if (
+      !rootRaw ||
+      (String(rootRaw.type ?? "") !== "DiffNote" && !rootRaw.position)
+    ) {
+      continue;
+    }
+    const rootNoteId = notes.length > 0 ? Number(notes[0].id ?? 0) : null;
+    const root = mapReviewNote(
+      rootRaw,
+      discussionId,
+      rootNoteId,
+      String(mr.web_url ?? ""),
+    );
+    if (!root) continue;
+    comments.push(root);
+    for (const note of notes.slice(1)) {
+      const mapped = mapReviewNote(
+        note,
+        discussionId,
+        rootNoteId,
+        String(mr.web_url ?? ""),
+        root,
+      );
+      if (mapped) comments.push(mapped);
+    }
+  }
+
+  return {
+    baseCommitOid: String(diffRefs.base_sha ?? ""),
+    startCommitOid: String(diffRefs.start_sha ?? ""),
+    headCommitOid: String(diffRefs.head_sha ?? ""),
+    files: changes.map((change) => {
+      const patch = String(change.diff ?? "");
+      return {
+        path: String(change.new_path ?? change.old_path ?? ""),
+        previousPath:
+          String(change.old_path ?? "") !== String(change.new_path ?? "")
+            ? String(change.old_path ?? "") || null
+            : null,
+        status: reviewFileStatus(change),
+        ...diffStats(patch),
+        patch: patch || null,
+      };
+    }),
+    comments,
+  };
+}
+
+export async function createMergeRequestReviewComment(
+  cwd: string,
+  number: number,
+  input: {
+    body: string;
+    baseSha: string;
+    startSha: string;
+    headSha: string;
+    path: string;
+    previousPath?: string;
+    side: ReviewSide;
+    line: number;
+    oldLine?: number;
+    newLine?: number;
+  },
+): Promise<MergeRequestReviewComment> {
+  assertPositiveInt(number, "merge request number");
+  assertPositiveInt(input.line, "line");
+  if (!input.body.trim()) throw new GlabError("Comment body is required", "");
+  const fields = [
+    "api",
+    `projects/:id/merge_requests/${number}/discussions`,
+    "--method",
+    "POST",
+    "--raw-field",
+    `body=${input.body}`,
+    "--raw-field",
+    "position[position_type]=text",
+    "--raw-field",
+    `position[base_sha]=${input.baseSha}`,
+    "--raw-field",
+    `position[start_sha]=${input.startSha}`,
+    "--raw-field",
+    `position[head_sha]=${input.headSha}`,
+    "--raw-field",
+    `position[old_path]=${input.previousPath ?? input.path}`,
+    "--raw-field",
+    `position[new_path]=${input.path}`,
+  ];
+  const oldLine = input.oldLine ?? (input.side === "LEFT" ? input.line : null);
+  const newLine = input.newLine ?? (input.side === "RIGHT" ? input.line : null);
+  if (oldLine) fields.push("--field", `position[old_line]=${oldLine}`);
+  if (newLine) fields.push("--field", `position[new_line]=${newLine}`);
+  const raw = await runGlabJson<Record<string, unknown>>(fields, cwd);
+  const notes = Array.isArray(raw.notes)
+    ? (raw.notes as Record<string, unknown>[])
+    : [];
+  const note = notes[0];
+  const mapped = note
+    ? mapReviewNote(note, String(raw.id ?? ""), null, "")
+    : null;
+  if (!mapped) throw new GlabError("GitLab did not return the comment", "");
+  return mapped;
+}
+
+export async function replyToMergeRequestReviewComment(
+  cwd: string,
+  number: number,
+  discussionId: string,
+  body: string,
+): Promise<MergeRequestReviewComment> {
+  assertPositiveInt(number, "merge request number");
+  if (!discussionId.trim())
+    throw new GlabError("Discussion id is required", "");
+  if (!body.trim()) throw new GlabError("Reply body is required", "");
+  const raw = await runGlabJson<Record<string, unknown>>(
+    [
+      "api",
+      `projects/:id/merge_requests/${number}/discussions/${discussionId}/notes`,
+      "--method",
+      "POST",
+      "--raw-field",
+      `body=${body}`,
+    ],
+    cwd,
+  );
+  const mapped = mapReviewNote(raw, discussionId, null, "");
+  if (!mapped) {
+    const author = raw.author as { username?: string; name?: string } | null;
+    return {
+      id: Number(raw.id ?? 0),
+      discussionId,
+      path: "",
+      body: String(raw.body ?? body),
+      author: author?.username ?? author?.name ?? null,
+      createdAt: String(raw.created_at ?? ""),
+      updatedAt: String(raw.updated_at ?? raw.created_at ?? ""),
+      line: null,
+      originalLine: null,
+      side: null,
+      startLine: null,
+      startSide: null,
+      inReplyToId: null,
+      commitId: "",
+      originalCommitId: "",
+      url: "",
+    };
+  }
+  return mapped;
 }
 
 export interface CreateMergeRequestInput {

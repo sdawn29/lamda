@@ -47,9 +47,11 @@ import { SectionLabel } from "@/shared/ui/section-label"
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 import { openExternal } from "@/features/electron/api"
 import { parseApiError } from "@/features/git"
+import { CiChecksBadge } from "@/features/github/components/ci-checks-badge"
 import {
   useGitlabIssues,
   useGitlabRepoInfo,
+  useGitlabPipeline,
   useGlabStatus,
   useMergeRequest,
   useMergeRequests,
@@ -62,6 +64,7 @@ import {
 } from "../mutations"
 import type { GitlabRepositoryVisibility, RepoContext } from "../types"
 import { CreateMrDialog } from "./create-mr-dialog"
+import { GitlabMergeRequestDetail } from "./gitlab-merge-request-detail"
 import { GitlabLogo } from "./gitlab-logo"
 
 export function GitlabReviewView({
@@ -81,6 +84,11 @@ export function GitlabReviewView({
   const [createOpen, setCreateOpen] = useState(false)
   const [publishOpen, setPublishOpen] = useState(false)
   const [selectedMr, setSelectedMr] = useState<number | null>(null)
+  const { data: pipeline } = useGitlabPipeline(
+    ctx,
+    branch ?? undefined,
+    connected && Boolean(repo)
+  )
 
   if (statusLoading) {
     return <PanelMessage loading message="Checking GitLab" />
@@ -141,27 +149,47 @@ export function GitlabReviewView({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3 py-2">
-        <button
-          type="button"
-          className="flex min-w-0 items-center gap-1.5 text-xs font-medium hover:underline"
-          onClick={() => void openExternal(repo.url)}
-          title={repo.nameWithOwner}
-        >
-          <GitlabLogo className="size-3.5" />
-          <span className="truncate">{repo.nameWithOwner}</span>
-        </button>
-        <Button
-          size="sm"
-          className="h-6 shrink-0 gap-1.5 px-2 text-xs"
-          onClick={() => setCreateOpen(true)}
-        >
-          <GitMerge className="size-3.5" />
-          Create MR
-        </Button>
+    <div className="@container/gitlab flex h-full min-h-0 flex-col bg-muted/[0.08]">
+      <div className="shrink-0 p-2 pb-0">
+        <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-background/90 p-2.5 shadow-sm shadow-black/[0.03] backdrop-blur @sm/gitlab:flex-row @sm/gitlab:items-center @sm/gitlab:justify-between">
+          <button
+            type="button"
+            className="flex min-w-0 items-center gap-2 text-left text-xs font-medium hover:underline"
+            onClick={() => void openExternal(repo.url)}
+            title={repo.nameWithOwner}
+          >
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
+              <GitlabLogo className="size-4" />
+            </div>
+            <span className="min-w-0">
+              <span className="block truncate">{repo.nameWithOwner}</span>
+              <span className="block text-3xs font-normal text-muted-foreground/60">
+                GitLab repository
+              </span>
+            </span>
+          </button>
+          <div className="flex items-center justify-between gap-2 @sm/gitlab:justify-end">
+            <CiChecksBadge
+              checks={(pipeline?.jobs ?? []).map((job) => ({
+                name: job.name,
+                bucket: job.bucket,
+                state: job.state,
+                link: job.link,
+                workflow: job.stage,
+              }))}
+            />
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              onClick={() => setCreateOpen(true)}
+            >
+              <GitMerge data-icon="inline-start" />
+              Create MR
+            </Button>
+          </div>
+        </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-2 @sm/gitlab:p-3">
         <MergeRequestsSection ctx={ctx} onSelect={setSelectedMr} />
         <IssuesSection ctx={ctx} />
       </div>
@@ -322,14 +350,6 @@ function PublishGitlabRepositoryDialog({
   )
 }
 
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="sticky top-0 z-10 flex items-center gap-1.5 bg-background/95 px-3 pt-3 pb-1.5 backdrop-blur">
-      <SectionLabel>{children}</SectionLabel>
-    </div>
-  )
-}
-
 function Row({
   onClick,
   icon,
@@ -347,7 +367,7 @@ function Row({
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-accent"
+      className="group flex min-h-12 w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/35"
     >
       <span className="mt-0.5 shrink-0 text-muted-foreground">{icon}</span>
       <span className="min-w-0 flex-1">
@@ -400,8 +420,8 @@ function MergeRequestsSection({
   const [state, setState] = useState<"opened" | "closed" | "all">("opened")
   const { data: mrs = [], isLoading } = useMergeRequests(ctx, state)
   return (
-    <section className="pb-1">
-      <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-1.5">
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
         <SectionLabel>Merge requests</SectionLabel>
         <ToggleGroup
           size="sm"
@@ -419,32 +439,36 @@ function MergeRequestsSection({
           <ToggleGroupItem value="all">All</ToggleGroupItem>
         </ToggleGroup>
       </div>
-      <ListState
-        loading={isLoading}
-        empty={mrs.length === 0}
-        message="No open merge requests"
-      />
-      {mrs.map((mr) => (
-        <Row
-          key={mr.number}
-          onClick={() => onSelect(mr.number)}
-          external={false}
-          icon={
-            <GitlabLogo
-              className={
-                mr.isDraft ? "size-3.5 text-muted-foreground" : "size-3.5"
-              }
-            />
-          }
-          title={`!${mr.number} ${mr.title}`}
-          meta={`${mr.headRefName || "branch"} -> ${mr.baseRefName || "target"}`}
+      <div className="divide-y divide-border/40 overflow-hidden rounded-xl border border-border/60 bg-card/65 shadow-sm shadow-black/[0.025]">
+        <ListState
+          loading={isLoading}
+          empty={mrs.length === 0}
+          message="No open merge requests"
         />
-      ))}
+        {mrs.map((mr) => (
+          <Row
+            key={mr.number}
+            onClick={() => onSelect(mr.number)}
+            external={false}
+            icon={
+              <GitlabLogo
+                className={
+                  mr.isDraft ? "size-3.5 text-muted-foreground" : "size-3.5"
+                }
+              />
+            }
+            title={mr.title}
+            meta={`!${mr.number} · ${mr.headRefName || "branch"}${
+              mr.author ? ` · ${mr.author}` : ""
+            }`}
+          />
+        ))}
+      </div>
     </section>
   )
 }
 
-function GitlabMergeRequestDetail({
+export function LegacyGitlabMergeRequestDetail({
   ctx,
   number,
   onBack,
@@ -734,22 +758,28 @@ function GitlabMergeRequestDetail({
 function IssuesSection({ ctx }: { ctx: RepoContext }) {
   const { data: issues = [], isLoading } = useGitlabIssues(ctx, "opened")
   return (
-    <section className="pb-2">
-      <SectionHeader>Issues</SectionHeader>
-      <ListState
-        loading={isLoading}
-        empty={issues.length === 0}
-        message="No open issues"
-      />
-      {issues.map((issue) => (
-        <Row
-          key={issue.number}
-          onClick={() => void openExternal(issue.url)}
-          icon={<CircleDot className="size-3.5" />}
-          title={`#${issue.number} ${issue.title}`}
-          meta={issue.labels.length ? issue.labels.join(", ") : issue.state}
+    <section>
+      <div className="mb-2 flex items-center px-0.5">
+        <SectionLabel>Issues</SectionLabel>
+      </div>
+      <div className="divide-y divide-border/40 overflow-hidden rounded-xl border border-border/60 bg-card/65 shadow-sm shadow-black/[0.025]">
+        <ListState
+          loading={isLoading}
+          empty={issues.length === 0}
+          message="No open issues"
         />
-      ))}
+        {issues.map((issue) => (
+          <Row
+            key={issue.number}
+            onClick={() => void openExternal(issue.url)}
+            icon={<CircleDot className="size-3.5" />}
+            title={issue.title}
+            meta={`#${issue.number} · ${
+              issue.labels.length ? issue.labels.join(", ") : issue.state
+            }`}
+          />
+        ))}
+      </div>
     </section>
   )
 }

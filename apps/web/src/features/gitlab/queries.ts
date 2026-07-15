@@ -4,7 +4,9 @@ import {
   fetchGitlabRepositories,
   fetchGlabStatus,
   fetchIssues,
+  fetchGitlabPipeline,
   fetchMergeRequest,
+  fetchMergeRequestReview,
   fetchMergeRequests,
 } from "./api"
 import type { IssueState, MergeRequestState, RepoContext } from "./types"
@@ -29,6 +31,10 @@ export const gitlabKeys = {
     [...root, "mrs", ctxKey(ctx), state] as const,
   mr: (ctx: RepoContext, number: number) =>
     [...root, "mr", ctxKey(ctx), number] as const,
+  review: (ctx: RepoContext, number: number) =>
+    [...root, "review", ctxKey(ctx), number] as const,
+  pipeline: (ctx: RepoContext, ref?: string) =>
+    [...root, "pipeline", ctxKey(ctx), ref ?? "current"] as const,
   issues: (ctx: RepoContext, state: IssueState) =>
     [...root, "issues", ctxKey(ctx), state] as const,
 }
@@ -77,11 +83,37 @@ export function useMergeRequests(
   })
 }
 
+export function useGitlabPipeline(
+  ctx: RepoContext,
+  ref?: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: gitlabKeys.pipeline(ctx, ref),
+    queryFn: ({ signal }) => fetchGitlabPipeline(ctx, ref, signal),
+    enabled: enabled && Boolean(ctxKey(ctx)),
+    staleTime: 30 * 1000,
+  })
+}
+
 export function useMergeRequest(ctx: RepoContext, number: number | null) {
   return useQuery({
     queryKey: gitlabKeys.mr(ctx, number ?? 0),
     queryFn: ({ signal }) => fetchMergeRequest(ctx, number as number, signal),
     enabled: Boolean(ctxKey(ctx)) && number != null,
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useMergeRequestReview(
+  ctx: RepoContext,
+  number: number,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: gitlabKeys.review(ctx, number),
+    queryFn: ({ signal }) => fetchMergeRequestReview(ctx, number, signal),
+    enabled: enabled && Boolean(ctxKey(ctx)),
     staleTime: 30 * 1000,
   })
 }

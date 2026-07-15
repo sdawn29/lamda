@@ -28,29 +28,82 @@ import { Textarea } from "@/shared/ui/textarea"
 import { useCreateReviewComment } from "../mutations"
 import { usePullRequestReview } from "../queries"
 import { PullRequestCommentCard } from "./pull-request-comment-card"
-import type {
-  PullRequestFile,
-  PullRequestReviewComment,
-  RepoContext,
-  ReviewSide,
-} from "../types"
+import type { RepoContext } from "../types"
+
+export type ReviewSide = "LEFT" | "RIGHT"
+
+export interface CodeReviewFile {
+  path: string
+  previousPath: string | null
+  status: string
+  additions: number
+  deletions: number
+  patch: string | null
+}
+
+export interface CodeReviewComment {
+  id: number
+  path: string
+  body: string
+  author: string | null
+  createdAt: string
+  updatedAt: string
+  line: number | null
+  originalLine: number | null
+  side: ReviewSide | null
+  startLine: number | null
+  startSide: ReviewSide | null
+  inReplyToId: number | null
+  commitId: string
+  originalCommitId: string
+  url: string
+}
+
+export interface CodeReviewPayload {
+  baseCommitOid?: string
+  startCommitOid?: string
+  headCommitOid: string
+  files: CodeReviewFile[]
+  comments: CodeReviewComment[]
+}
+
+export interface CodeReviewCommentInput {
+  body: string
+  path: string
+  previousPath?: string
+  side: ReviewSide
+  line: number
+  oldLine?: number
+  newLine?: number
+  commitId: string
+  baseSha?: string
+  startSha?: string
+  headSha: string
+}
 
 interface LineAnchor {
   side: ReviewSide
   line: number
+  oldLine?: number
+  newLine?: number
 }
 
 function anchorKey(side: ReviewSide, line: number): string {
   return `${side}:${line}`
 }
 
-function commentAnchor(comment: PullRequestReviewComment): LineAnchor | null {
+function commentAnchor(comment: CodeReviewComment): LineAnchor | null {
   const line = comment.line ?? comment.originalLine
   if (!line) return null
-  return { side: comment.side ?? "RIGHT", line }
+  return {
+    side: comment.side ?? "RIGHT",
+    line,
+    oldLine: comment.originalLine ?? undefined,
+    newLine: comment.line ?? undefined,
+  }
 }
 
-function reviewStatus(file: PullRequestFile): string {
+function reviewStatus(file: CodeReviewFile): string {
   if (file.status === "added") return "A"
   if (file.status === "removed") return "D"
   if (file.status === "renamed") return "R"
@@ -63,7 +116,7 @@ function monospaceColumnWidth(value: string): number {
   return width
 }
 
-function asChangedFile(file: PullRequestFile): ChangedFile {
+function asChangedFile(file: CodeReviewFile): ChangedFile {
   const status = reviewStatus(file)
   return {
     raw: status.padEnd(2, " "),
@@ -87,12 +140,46 @@ export function PullRequestFiles({
     isLoading,
     error,
   } = usePullRequestReview(ctx, number, enabled)
+  const createComment = useCreateReviewComment(ctx, number)
+
+  return (
+    <CodeReviewFiles
+      review={review}
+      isLoading={isLoading}
+      error={error}
+      createCommentPending={createComment.isPending}
+      onCreateComment={(input) =>
+        createComment.mutateAsync({
+          body: input.body,
+          commitId: input.commitId,
+          path: input.path,
+          side: input.side,
+          line: input.line,
+        })
+      }
+    />
+  )
+}
+
+export function CodeReviewFiles({
+  review,
+  isLoading,
+  error,
+  createCommentPending,
+  onCreateComment,
+}: {
+  review: CodeReviewPayload | undefined
+  isLoading: boolean
+  error: unknown
+  createCommentPending: boolean
+  onCreateComment: (input: CodeReviewCommentInput) => Promise<unknown>
+}) {
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
     () => new Set()
   )
   const [mode, setMode] = useState<DiffMode>("inline")
   const commentsByPath = useMemo(() => {
-    const grouped = new Map<string, PullRequestReviewComment[]>()
+    const grouped = new Map<string, CodeReviewComment[]>()
     for (const comment of review?.comments ?? []) {
       const existing = grouped.get(comment.path)
       if (existing) existing.push(comment)
@@ -126,7 +213,7 @@ export function PullRequestFiles({
   if (review.files.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-        This pull request has no changed files.
+        This review has no changed files.
       </div>
     )
   }
@@ -185,12 +272,12 @@ export function PullRequestFiles({
                   }
                   expandedContent={
                     <ReviewFileDiff
-                      ctx={ctx}
-                      number={number}
                       file={file}
-                      headCommitOid={review.headCommitOid}
+                      review={review}
                       comments={comments}
                       mode={mode}
+                      createCommentPending={createCommentPending}
+                      onCreateComment={onCreateComment}
                     />
                   }
                 />
@@ -204,27 +291,26 @@ export function PullRequestFiles({
 }
 
 function ReviewFileDiff({
-  ctx,
-  number,
   file,
-  headCommitOid,
+  review,
   comments,
   mode,
+  createCommentPending,
+  onCreateComment,
 }: {
-  ctx: RepoContext
-  number: number
-  file: PullRequestFile
-  headCommitOid: string
-  comments: PullRequestReviewComment[]
+  file: CodeReviewFile
+  review: CodeReviewPayload
+  comments: CodeReviewComment[]
   mode: DiffMode
+  createCommentPending: boolean
+  onCreateComment: (input: CodeReviewCommentInput) => Promise<unknown>
 }) {
-  const createComment = useCreateReviewComment(ctx, number)
   const [activeAnchor, setActiveAnchor] = useState<LineAnchor | null>(null)
   const [commentBody, setCommentBody] = useState("")
   const lines = useMemo(() => parseDiff(file.patch ?? ""), [file.patch])
   const sideBySideRows = useMemo(() => buildSideBySideRows(lines), [lines])
   const commentsByAnchor = useMemo(() => {
-    const grouped = new Map<string, PullRequestReviewComment[]>()
+    const grouped = new Map<string, CodeReviewComment[]>()
     for (const comment of comments) {
       const anchor = commentAnchor(comment)
       if (!anchor) continue
@@ -239,28 +325,30 @@ function ReviewFileDiff({
     () => comments.filter((comment) => !commentAnchor(comment)),
     [comments]
   )
-  function submitComment() {
+  async function submitComment() {
     if (!activeAnchor || !commentBody.trim()) return
-    createComment.mutate(
-      {
+    try {
+      await onCreateComment({
         body: commentBody.trim(),
-        commitId: headCommitOid,
+        commitId: review.headCommitOid,
+        baseSha: review.baseCommitOid,
+        startSha: review.startCommitOid,
+        headSha: review.headCommitOid,
         path: file.path,
+        previousPath: file.previousPath ?? undefined,
         side: activeAnchor.side,
         line: activeAnchor.line,
-      },
-      {
-        onSuccess: () => {
-          setCommentBody("")
-          setActiveAnchor(null)
-          toast.success("Review comment added")
-        },
-        onError: (commentError) =>
-          toast.error("Couldn't add review comment", {
-            description: parseApiError(commentError),
-          }),
-      }
-    )
+        oldLine: activeAnchor.oldLine,
+        newLine: activeAnchor.newLine,
+      })
+      setCommentBody("")
+      setActiveAnchor(null)
+      toast.success("Review comment added")
+    } catch (commentError) {
+      toast.error("Couldn't add review comment", {
+        description: parseApiError(commentError),
+      })
+    }
   }
 
   return (
@@ -285,9 +373,20 @@ function ReviewFileDiff({
               {lines.map((line, index) => {
                 const anchor: LineAnchor | null =
                   line.kind === "removed" && line.oldLineNum
-                    ? { side: "LEFT", line: Number(line.oldLineNum) }
+                    ? {
+                        side: "LEFT",
+                        line: Number(line.oldLineNum),
+                        oldLine: Number(line.oldLineNum),
+                      }
                     : line.newLineNum
-                      ? { side: "RIGHT", line: Number(line.newLineNum) }
+                      ? {
+                          side: "RIGHT",
+                          line: Number(line.newLineNum),
+                          oldLine: line.oldLineNum
+                            ? Number(line.oldLineNum)
+                            : undefined,
+                          newLine: Number(line.newLineNum),
+                        }
                       : null
                 const key = anchor ? anchorKey(anchor.side, anchor.line) : null
                 const lineComments = key
@@ -365,7 +464,7 @@ function ReviewFileDiff({
                         filePath={file.path}
                         anchor={anchor}
                         body={commentBody}
-                        pending={createComment.isPending}
+                        pending={createCommentPending}
                         onBodyChange={setCommentBody}
                         onCancel={() => setActiveAnchor(null)}
                         onSubmit={submitComment}
@@ -382,7 +481,7 @@ function ReviewFileDiff({
               commentsByAnchor={commentsByAnchor}
               activeAnchor={activeAnchor}
               commentBody={commentBody}
-              pending={createComment.isPending}
+              pending={createCommentPending}
               onOpenComment={(anchor) => {
                 setActiveAnchor(anchor)
                 setCommentBody("")
@@ -419,7 +518,7 @@ function ReviewSideBySideDiff({
 }: {
   rows: ReturnType<typeof buildSideBySideRows>
   filePath: string
-  commentsByAnchor: Map<string, PullRequestReviewComment[]>
+  commentsByAnchor: Map<string, CodeReviewComment[]>
   activeAnchor: LineAnchor | null
   commentBody: string
   pending: boolean
@@ -448,7 +547,7 @@ function ReviewSideBySideDiff({
   const threads: Array<{
     key: string
     label: string
-    comments: PullRequestReviewComment[]
+    comments: CodeReviewComment[]
   }> = []
   const seenAnchors = new Set<string>()
   let widestLine = 0
@@ -631,7 +730,14 @@ function sideAnchor(
 ): LineAnchor | null {
   if (!line) return null
   const value = side === "LEFT" ? line.oldLineNum : line.newLineNum
-  return value ? { side, line: Number(value) } : null
+  return value
+    ? {
+        side,
+        line: Number(value),
+        oldLine: line.oldLineNum ? Number(line.oldLineNum) : undefined,
+        newLine: line.newLineNum ? Number(line.newLineNum) : undefined,
+      }
+    : null
 }
 
 function ReviewSideCell({
@@ -800,7 +906,7 @@ function ReviewComments({
   comments,
   label,
 }: {
-  comments: PullRequestReviewComment[]
+  comments: CodeReviewComment[]
   label: string
 }) {
   return (

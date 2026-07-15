@@ -57,9 +57,82 @@ export interface MergeRequestDetail extends MergeRequestSummary {
   description: string
   mergeStatus: string | null
   changesCount: string | null
+  additions: number
+  deletions: number
+  changedFiles: number
   files: { path: string; additions: number; deletions: number }[]
-  comments: { author: string | null; body: string; createdAt: string }[]
+  commits: MergeRequestCommit[]
+  comments: {
+    id: number
+    author: string | null
+    body: string
+    createdAt: string
+  }[]
   pipeline: PipelineDetail | null
+}
+
+export interface MergeRequestCommit {
+  oid: string
+  messageHeadline: string
+  messageBody: string
+  authoredDate: string
+  committedDate: string
+  authors: {
+    login: string | null
+    name: string | null
+    email: string | null
+  }[]
+}
+
+export type ReviewSide = "LEFT" | "RIGHT"
+
+export interface MergeRequestReviewFile {
+  path: string
+  previousPath: string | null
+  status: string
+  additions: number
+  deletions: number
+  patch: string | null
+}
+
+export interface MergeRequestReviewComment {
+  id: number
+  discussionId: string
+  path: string
+  body: string
+  author: string | null
+  createdAt: string
+  updatedAt: string
+  line: number | null
+  originalLine: number | null
+  side: ReviewSide | null
+  startLine: number | null
+  startSide: ReviewSide | null
+  inReplyToId: number | null
+  commitId: string
+  originalCommitId: string
+  url: string
+}
+
+export interface MergeRequestReview {
+  baseCommitOid: string
+  startCommitOid: string
+  headCommitOid: string
+  files: MergeRequestReviewFile[]
+  comments: MergeRequestReviewComment[]
+}
+
+export interface CreateReviewCommentInput {
+  body: string
+  baseSha: string
+  startSha: string
+  headSha: string
+  path: string
+  previousPath?: string
+  side: ReviewSide
+  line: number
+  oldLine?: number
+  newLine?: number
 }
 
 export interface IssueSummary {

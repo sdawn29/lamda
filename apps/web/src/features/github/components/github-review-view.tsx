@@ -547,12 +547,14 @@ function PullRequestActivityList({
   )
 }
 
-function PullRequestCommits({
+export function PullRequestCommits({
   commits,
   repositoryUrl,
+  commitUrl,
 }: {
   commits: PullRequestCommit[]
   repositoryUrl: string
+  commitUrl?: (oid: string) => string
 }) {
   if (commits.length === 0) {
     return (
@@ -578,7 +580,10 @@ function PullRequestCommits({
               type="button"
               className="group flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/30"
               onClick={() =>
-                void openExternal(`${repositoryUrl}/commit/${commit.oid}`)
+                void openExternal(
+                  commitUrl?.(commit.oid) ??
+                    `${repositoryUrl}/commit/${commit.oid}`
+                )
               }
             >
               <GitCommitHorizontal className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/60" />
