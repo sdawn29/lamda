@@ -8,6 +8,7 @@ export {
   useRepoInfo,
   usePullRequests,
   usePullRequest,
+  usePullRequestReview,
   useIssues,
   useIssue,
   useChecks,
@@ -21,6 +22,7 @@ export {
   useCreateIssue,
   useCommentIssue,
   useCommentPullRequest,
+  useCreateReviewComment,
 } from "./mutations"
 export type {
   GhStatus,
@@ -28,6 +30,12 @@ export type {
   GhRepositorySummary,
   PullRequestSummary,
   PullRequestDetail,
+  PullRequestCommit,
+  PullRequestReview,
+  PullRequestFile,
+  PullRequestReviewComment,
+  ReviewSide,
+  CreateReviewCommentInput,
   IssueSummary,
   IssueDetail,
   CheckRun,

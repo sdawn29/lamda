@@ -296,8 +296,223 @@ export interface PullRequestDetail extends PullRequestSummary {
   reviewDecision: string | null;
   mergeable: string | null;
   files: { path: string; additions: number; deletions: number }[];
+  commits: PullRequestCommit[];
   comments: { author: string | null; body: string; createdAt: string }[];
   checks: CheckRun[];
+}
+
+export interface PullRequestCommit {
+  oid: string;
+  messageHeadline: string;
+  messageBody: string;
+  authoredDate: string;
+  committedDate: string;
+  authors: {
+    login: string | null;
+    name: string | null;
+    email: string | null;
+  }[];
+}
+
+export type ReviewSide = "LEFT" | "RIGHT";
+
+export interface PullRequestFile {
+  path: string;
+  previousPath: string | null;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch: string | null;
+}
+
+export interface PullRequestReviewComment {
+  id: number;
+  path: string;
+  body: string;
+  author: string | null;
+  createdAt: string;
+  updatedAt: string;
+  line: number | null;
+  originalLine: number | null;
+  side: ReviewSide | null;
+  startLine: number | null;
+  startSide: ReviewSide | null;
+  inReplyToId: number | null;
+  commitId: string;
+  originalCommitId: string;
+  url: string;
+}
+
+export interface PullRequestReview {
+  headCommitOid: string;
+  files: PullRequestFile[];
+  comments: PullRequestReviewComment[];
+}
+
+interface RawPullRequestFile {
+  filename: string;
+  previous_filename?: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch?: string;
+}
+
+interface RawReviewComment {
+  id: number;
+  path: string;
+  body: string;
+  user: { login?: string } | null;
+  created_at: string;
+  updated_at: string;
+  line: number | null;
+  original_line: number | null;
+  side: ReviewSide | null;
+  start_line: number | null;
+  start_side: ReviewSide | null;
+  in_reply_to_id?: number;
+  commit_id: string;
+  original_commit_id: string;
+  html_url: string;
+}
+
+function flattenPages<T>(pages: T[][]): T[] {
+  return pages.flat();
+}
+
+function mapReviewComment(raw: RawReviewComment): PullRequestReviewComment {
+  return {
+    id: raw.id,
+    path: raw.path,
+    body: raw.body,
+    author: raw.user?.login ?? null,
+    createdAt: raw.created_at,
+    updatedAt: raw.updated_at,
+    line: raw.line,
+    originalLine: raw.original_line,
+    side: raw.side,
+    startLine: raw.start_line,
+    startSide: raw.start_side,
+    inReplyToId: raw.in_reply_to_id ?? null,
+    commitId: raw.commit_id,
+    originalCommitId: raw.original_commit_id,
+    url: raw.html_url,
+  };
+}
+
+/**
+ * Loads the heavyweight code-review payload separately from PR metadata so the
+ * overview remains quick. GitHub's REST API supplies both patches and the
+ * original/current line anchors needed to place comments in a diff.
+ */
+export async function getPullRequestReview(
+  cwd: string,
+  number: number,
+): Promise<PullRequestReview> {
+  assertPositiveInt(number, "pull request number");
+  const repo = await getRepoInfo(cwd);
+  if (!repo) throw new Error("GitHub repository not found");
+  const endpoint = `repos/${repo.nameWithOwner}/pulls/${number}`;
+
+  const headPromise = runGhJson<{ headRefOid: string }>(
+    ["pr", "view", String(number), "--json", "headRefOid"],
+    cwd,
+  );
+  const filesPromise = runGhJson<RawPullRequestFile[][]>(
+    ["api", `${endpoint}/files?per_page=100`, "--paginate", "--slurp"],
+    cwd,
+    30000,
+  );
+  const commentsPromise = runGhJson<RawReviewComment[][]>(
+    ["api", `${endpoint}/comments?per_page=100`, "--paginate", "--slurp"],
+    cwd,
+    30000,
+  );
+
+  const [head, filePages, commentPages] = await Promise.all([
+    headPromise,
+    filesPromise,
+    commentsPromise,
+  ]);
+
+  return {
+    headCommitOid: head.headRefOid,
+    files: flattenPages(filePages).map((file) => ({
+      path: file.filename,
+      previousPath: file.previous_filename ?? null,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+      patch: file.patch ?? null,
+    })),
+    comments: flattenPages(commentPages).map(mapReviewComment),
+  };
+}
+
+export async function createPullRequestReviewComment(
+  cwd: string,
+  number: number,
+  input: {
+    body: string;
+    commitId: string;
+    path: string;
+    side: ReviewSide;
+    line: number;
+  },
+): Promise<PullRequestReviewComment> {
+  assertPositiveInt(number, "pull request number");
+  assertPositiveInt(input.line, "line");
+  if (!input.body.trim()) throw new Error("Comment body is required");
+  if (!input.path.trim()) throw new Error("File path is required");
+  const repo = await getRepoInfo(cwd);
+  if (!repo) throw new Error("GitHub repository not found");
+
+  const raw = await runGhJson<RawReviewComment>(
+    [
+      "api",
+      `repos/${repo.nameWithOwner}/pulls/${number}/comments`,
+      "--method",
+      "POST",
+      "--raw-field",
+      `body=${input.body}`,
+      "--raw-field",
+      `commit_id=${input.commitId}`,
+      "--raw-field",
+      `path=${input.path}`,
+      "--raw-field",
+      `side=${input.side}`,
+      "--field",
+      `line=${input.line}`,
+    ],
+    cwd,
+  );
+  return mapReviewComment(raw);
+}
+
+export async function replyToPullRequestReviewComment(
+  cwd: string,
+  number: number,
+  commentId: number,
+  body: string,
+): Promise<PullRequestReviewComment> {
+  assertPositiveInt(number, "pull request number");
+  assertPositiveInt(commentId, "review comment id");
+  if (!body.trim()) throw new Error("Reply body is required");
+  const repo = await getRepoInfo(cwd);
+  if (!repo) throw new Error("GitHub repository not found");
+
+  const raw = await runGhJson<RawReviewComment>(
+    [
+      "api",
+      `repos/${repo.nameWithOwner}/pulls/${number}/comments/${commentId}/replies`,
+      "--method",
+      "POST",
+      "--raw-field",
+      `body=${body}`,
+    ],
+    cwd,
+  );
+  return mapReviewComment(raw);
 }
 
 export async function getPullRequest(
@@ -314,6 +529,18 @@ export async function getPullRequest(
       reviewDecision: string | null;
       mergeable: string | null;
       files: { path: string; additions: number; deletions: number }[];
+      commits: {
+        oid: string;
+        messageHeadline: string;
+        messageBody: string;
+        authoredDate: string;
+        committedDate: string;
+        authors: {
+          login?: string;
+          name?: string;
+          email?: string;
+        }[];
+      }[];
       comments: {
         author: RawPrAuthor | null;
         body: string;
@@ -327,7 +554,7 @@ export async function getPullRequest(
       "view",
       String(number),
       "--json",
-      `${PR_LIST_FIELDS},body,additions,deletions,changedFiles,reviewDecision,mergeable,files,comments,statusCheckRollup`,
+      `${PR_LIST_FIELDS},body,additions,deletions,changedFiles,reviewDecision,mergeable,files,commits,comments,statusCheckRollup`,
     ],
     cwd,
   );
@@ -340,6 +567,18 @@ export async function getPullRequest(
     reviewDecision: raw.reviewDecision,
     mergeable: raw.mergeable,
     files: raw.files ?? [],
+    commits: (raw.commits ?? []).map((commit) => ({
+      oid: commit.oid,
+      messageHeadline: commit.messageHeadline,
+      messageBody: commit.messageBody,
+      authoredDate: commit.authoredDate,
+      committedDate: commit.committedDate,
+      authors: (commit.authors ?? []).map((author) => ({
+        login: author.login ?? null,
+        name: author.name ?? null,
+        email: author.email ?? null,
+      })),
+    })),
     comments: (raw.comments ?? []).map((c) => ({
       author: c.author?.login ?? null,
       body: c.body,

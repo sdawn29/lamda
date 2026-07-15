@@ -53,8 +53,65 @@ export interface PullRequestDetail extends PullRequestSummary {
   reviewDecision: string | null
   mergeable: string | null
   files: { path: string; additions: number; deletions: number }[]
+  commits: PullRequestCommit[]
   comments: { author: string | null; body: string; createdAt: string }[]
   checks: CheckRun[]
+}
+
+export interface PullRequestCommit {
+  oid: string
+  messageHeadline: string
+  messageBody: string
+  authoredDate: string
+  committedDate: string
+  authors: {
+    login: string | null
+    name: string | null
+    email: string | null
+  }[]
+}
+
+export type ReviewSide = "LEFT" | "RIGHT"
+
+export interface PullRequestFile {
+  path: string
+  previousPath: string | null
+  status: string
+  additions: number
+  deletions: number
+  patch: string | null
+}
+
+export interface PullRequestReviewComment {
+  id: number
+  path: string
+  body: string
+  author: string | null
+  createdAt: string
+  updatedAt: string
+  line: number | null
+  originalLine: number | null
+  side: ReviewSide | null
+  startLine: number | null
+  startSide: ReviewSide | null
+  inReplyToId: number | null
+  commitId: string
+  originalCommitId: string
+  url: string
+}
+
+export interface PullRequestReview {
+  headCommitOid: string
+  files: PullRequestFile[]
+  comments: PullRequestReviewComment[]
+}
+
+export interface CreateReviewCommentInput {
+  body: string
+  commitId: string
+  path: string
+  side: ReviewSide
+  line: number
 }
 
 export interface IssueSummary {

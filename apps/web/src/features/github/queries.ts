@@ -5,6 +5,7 @@ import {
   fetchIssue,
   fetchIssues,
   fetchPullRequest,
+  fetchPullRequestReview,
   fetchPullRequests,
   fetchRepoInfo,
   fetchRepositories,
@@ -27,6 +28,8 @@ export const githubKeys = {
     [...root, "prs", ctxKey(ctx), state] as const,
   pr: (ctx: RepoContext, number: number) =>
     [...root, "pr", ctxKey(ctx), number] as const,
+  review: (ctx: RepoContext, number: number) =>
+    [...root, "review", ctxKey(ctx), number] as const,
   issues: (ctx: RepoContext, state: IssueState, search?: string) =>
     [...root, "issues", ctxKey(ctx), state, search ?? ""] as const,
   issue: (ctx: RepoContext, number: number) =>
@@ -85,6 +88,19 @@ export function usePullRequest(ctx: RepoContext, number: number | null) {
     queryKey: githubKeys.pr(ctx, number ?? 0),
     queryFn: ({ signal }) => fetchPullRequest(ctx, number as number, signal),
     enabled: Boolean(ctxKey(ctx)) && number != null,
+    staleTime: 30 * 1000,
+  })
+}
+
+export function usePullRequestReview(
+  ctx: RepoContext,
+  number: number,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: githubKeys.review(ctx, number),
+    queryFn: ({ signal }) => fetchPullRequestReview(ctx, number, signal),
+    enabled: enabled && Boolean(ctxKey(ctx)),
     staleTime: 30 * 1000,
   })
 }

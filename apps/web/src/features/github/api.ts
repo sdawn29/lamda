@@ -1,6 +1,7 @@
 import { ApiError, apiFetch } from "@/shared/lib/client"
 import type {
   CheckRun,
+  CreateReviewCommentInput,
   CreatePrInput,
   GhRepoInfo,
   GhRepositorySummary,
@@ -12,6 +13,8 @@ import type {
   PublishRepositoryInput,
   PrState,
   PullRequestDetail,
+  PullRequestReview,
+  PullRequestReviewComment,
   PullRequestSummary,
   RepoContext,
 } from "./types"
@@ -90,6 +93,43 @@ export async function fetchPullRequest(
     { signal }
   )
   return res.pr
+}
+
+export async function fetchPullRequestReview(
+  ctx: RepoContext,
+  number: number,
+  signal?: AbortSignal
+): Promise<PullRequestReview> {
+  const res = await apiFetch<{ review: PullRequestReview }>(
+    `/github/prs/${number}/review?${ctxQuery(ctx)}`,
+    { signal }
+  )
+  return res.review
+}
+
+export async function createReviewComment(
+  ctx: RepoContext,
+  number: number,
+  input: CreateReviewCommentInput
+): Promise<PullRequestReviewComment> {
+  const res = await apiFetch<{ comment: PullRequestReviewComment }>(
+    `/github/prs/${number}/review-comments`,
+    jsonInit({ ...ctx, ...input })
+  )
+  return res.comment
+}
+
+export async function replyToReviewComment(
+  ctx: RepoContext,
+  number: number,
+  commentId: number,
+  body: string
+): Promise<PullRequestReviewComment> {
+  const res = await apiFetch<{ comment: PullRequestReviewComment }>(
+    `/github/prs/${number}/review-comments/${commentId}/replies`,
+    jsonInit({ ...ctx, body })
+  )
+  return res.comment
 }
 
 export async function createPullRequest(

@@ -46,6 +46,18 @@ const commentIssueSchema = repoContextSchema.extend({
   body: z.string().optional(),
 });
 
+const reviewCommentSchema = repoContextSchema.extend({
+  body: z.string().min(1),
+  commitId: z.string().min(1),
+  path: z.string().min(1),
+  side: z.enum(["LEFT", "RIGHT"]),
+  line: z.number().int().positive(),
+});
+
+const reviewReplySchema = repoContextSchema.extend({
+  body: z.string().trim().min(1),
+});
+
 /**
  * Resolves the repo directory for a request. Callers pass one of:
  *   ?id=<sessionId>   live session (worktree or workspace) — preferred
@@ -157,6 +169,68 @@ github.get("/github/prs/:number", async (c) => {
     return ghErrorResponse(c, err, "Failed to load pull request");
   }
 });
+
+github.get("/github/prs/:number/review", async (c) => {
+  const cwd = resolveCwd(c);
+  if (!cwd) return c.json({ error: "No repo context" }, 400);
+  const number = Number.parseInt(c.req.param("number"), 10);
+  if (!Number.isInteger(number))
+    return c.json({ error: "Invalid PR number" }, 400);
+  try {
+    const review = await gh.getPullRequestReview(cwd, number);
+    return c.json({ review });
+  } catch (err) {
+    return ghErrorResponse(c, err, "Failed to load pull request changes");
+  }
+});
+
+github.post("/github/prs/:number/review-comments", async (c) => {
+  const number = Number.parseInt(c.req.param("number"), 10);
+  if (!Number.isInteger(number))
+    return c.json({ error: "Invalid PR number" }, 400);
+  const parsed = await parseJsonBody(c, reviewCommentSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  const cwd = resolveCwdFromBody(body);
+  if (!cwd) return c.json({ error: "No repo context" }, 400);
+  try {
+    const comment = await gh.createPullRequestReviewComment(cwd, number, {
+      body: body.body,
+      commitId: body.commitId,
+      path: body.path,
+      side: body.side,
+      line: body.line,
+    });
+    return c.json({ comment }, 201);
+  } catch (err) {
+    return ghErrorResponse(c, err, "Failed to add review comment");
+  }
+});
+
+github.post(
+  "/github/prs/:number/review-comments/:commentId/replies",
+  async (c) => {
+    const number = Number.parseInt(c.req.param("number"), 10);
+    const commentId = Number.parseInt(c.req.param("commentId"), 10);
+    if (!Number.isInteger(number) || !Number.isInteger(commentId))
+      return c.json({ error: "Invalid PR or review comment number" }, 400);
+    const parsed = await parseJsonBody(c, reviewReplySchema);
+    if (!parsed.ok) return parsed.response;
+    const cwd = resolveCwdFromBody(parsed.data);
+    if (!cwd) return c.json({ error: "No repo context" }, 400);
+    try {
+      const comment = await gh.replyToPullRequestReviewComment(
+        cwd,
+        number,
+        commentId,
+        parsed.data.body,
+      );
+      return c.json({ comment }, 201);
+    } catch (err) {
+      return ghErrorResponse(c, err, "Failed to reply to review comment");
+    }
+  },
+);
 
 github.post("/github/prs", async (c) => {
   const parsed = await parseJsonBody(c, createPrSchema);

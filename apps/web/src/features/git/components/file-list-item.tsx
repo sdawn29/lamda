@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from "react"
+import { memo, useCallback, useState, type ReactNode } from "react"
 import { Minus, Plus, Trash2, Undo2 } from "lucide-react"
 import { Icon } from "@iconify/react"
 import { getIconName } from "@/shared/ui/file-icon"
@@ -51,6 +51,10 @@ interface FileListItemProps {
   turnId?: number
   /** Pre-fetched diff counts — shown immediately without waiting for the diff to load */
   counts?: { added: number; removed: number }
+  /** Optional metadata rendered at the end of the main file row. */
+  trailing?: ReactNode
+  /** Caller-owned expanded content, used for diff sources outside local git. */
+  expandedContent?: ReactNode
 }
 
 export const FileListItem = memo(function FileListItem({
@@ -69,6 +73,8 @@ export const FileListItem = memo(function FileListItem({
   workspaceId,
   turnId,
   counts: preloadedCounts,
+  trailing,
+  expandedContent,
 }: FileListItemProps) {
   // Internal state for uncontrolled mode
   const [internalExpanded, setInternalExpanded] = useState(false)
@@ -82,12 +88,13 @@ export const FileListItem = memo(function FileListItem({
   const isExpandable = mode !== undefined
   const isCommitMode = !!sha
   const isTurnMode = turnId !== undefined
+  const hasExternalContent = expandedContent !== undefined
 
   const { data: workDiff, isLoading: workDiffLoading } = useGitFileDiff(
     sessionId,
     file.filePath,
     file.raw,
-    !isCommitMode && !isTurnMode
+    !isCommitMode && !isTurnMode && !hasExternalContent
   )
   const { data: commitDiff, isLoading: commitDiffLoading } = useGitShowFileDiff(
     sessionId,
@@ -198,6 +205,7 @@ export const FileListItem = memo(function FileListItem({
               <DiffStat added={counts.added} removed={counts.removed} />
             )}
           </span>
+          {trailing}
         </button>
 
         {showActions && (
@@ -229,7 +237,9 @@ export const FileListItem = memo(function FileListItem({
 
       {isExpanded && mode && (
         <div className="animate-in px-2.5 pt-0.5 pb-2.5 duration-150 fade-in-0">
-          {diffLoading ? (
+          {hasExternalContent ? (
+            expandedContent
+          ) : diffLoading ? (
             <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/10 px-3 py-3 text-xs text-muted-foreground">
               <LoadingSpinner size="sm" />
               Loading diff

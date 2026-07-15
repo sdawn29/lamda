@@ -2,13 +2,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   checkoutPullRequest,
   commentIssue,
+  createReviewComment,
   createIssue,
   createPullRequest,
   mergePullRequest,
   publishRepository,
+  replyToReviewComment,
 } from "./api"
 import { githubKeys } from "./queries"
 import type {
+  CreateReviewCommentInput,
   CreatePrInput,
   MergeMethod,
   PublishRepositoryInput,
@@ -90,6 +93,28 @@ export function useCommentPullRequest(ctx: RepoContext) {
       commentIssue(ctx, number, body),
     onSuccess: (_data, { number }) => {
       qc.invalidateQueries({ queryKey: githubKeys.pr(ctx, number) })
+    },
+  })
+}
+
+export function useCreateReviewComment(ctx: RepoContext, number: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateReviewCommentInput) =>
+      createReviewComment(ctx, number, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: githubKeys.review(ctx, number) })
+    },
+  })
+}
+
+export function useReplyToReviewComment(ctx: RepoContext, number: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ commentId, body }: { commentId: number; body: string }) =>
+      replyToReviewComment(ctx, number, commentId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: githubKeys.review(ctx, number) })
     },
   })
 }
