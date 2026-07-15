@@ -1,6 +1,7 @@
 import { memo, useState } from "react"
 import { GitCommit, Loader2 } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
+import { formatRelativeDate } from "@/shared/lib/formatters"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 import {
   useGitLog,
@@ -11,22 +12,6 @@ import {
 import type { CommitFile, LogEntry } from "../api"
 import { type ChangedFile } from "./status-badge"
 import { FileListItem } from "./file-list-item"
-
-function formatRelativeDate(isoDate: string): string {
-  const date = new Date(isoDate)
-  if (isNaN(date.getTime())) return isoDate
-  const diff = Date.now() - date.getTime()
-  const minutes = Math.floor(diff / 60_000)
-  if (minutes < 1) return "just now"
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days}d ago`
-  const months = Math.floor(days / 30)
-  if (months < 12) return `${months}mo ago`
-  return `${Math.floor(months / 12)}y ago`
-}
 
 function commitFileToChangedFile(f: CommitFile): ChangedFile {
   return {

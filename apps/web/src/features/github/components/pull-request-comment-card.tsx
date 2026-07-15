@@ -6,6 +6,7 @@ import { parseApiError } from "@/features/git"
 import { parseDiff } from "@/features/git/components/diff/parser"
 import type { DiffLine } from "@/features/git/components/diff/types"
 import { RemoteMarkdown } from "@/shared/components/remote-markdown"
+import { formatRelativeDate } from "@/shared/lib/formatters"
 import { cn } from "@/shared/lib/utils"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
@@ -162,8 +163,11 @@ export function PullRequestCommentCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-2xs font-medium">{displayAuthor}</p>
-          <p className="text-3xs text-muted-foreground/60">
-            {new Date(createdAt).toLocaleString()}
+          <p
+            className="text-3xs text-muted-foreground/60"
+            title={new Date(createdAt).toLocaleString()}
+          >
+            {formatRelativeDate(createdAt)}
           </p>
         </div>
         <Badge variant="secondary" className="max-w-[55%] gap-1">

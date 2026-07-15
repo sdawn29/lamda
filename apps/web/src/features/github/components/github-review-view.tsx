@@ -1,7 +1,6 @@
 import { useState } from "react"
 import {
   ArrowLeft,
-  ChevronRight,
   CircleDot,
   ExternalLink,
   GitBranch,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react"
 import { Github } from "@lobehub/icons"
 import { toast } from "sonner"
+import { useIsFetching, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/shared/ui/button"
 import { RemoteMarkdown } from "@/shared/components/remote-markdown"
 import { Badge } from "@/shared/ui/badge"
@@ -49,11 +49,13 @@ import { Input } from "@/shared/ui/input"
 import { SectionLabel } from "@/shared/ui/section-label"
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 import { openExternal } from "@/features/electron/api"
-import { cn } from "@/shared/lib/utils"
+import { formatRelativeDate } from "@/shared/lib/formatters"
 import { parseApiError } from "@/features/git"
 import {
+  githubKeys,
   useChecks,
   useGhStatus,
+  useIssue,
   useIssues,
   usePullRequest,
   usePullRequestReview,
@@ -62,6 +64,7 @@ import {
 } from "../queries"
 import {
   useCheckoutPullRequest,
+  useCommentIssue,
   useCommentPullRequest,
   useMergePullRequest,
   usePublishRepository,
@@ -71,9 +74,19 @@ import { CiChecksBadge } from "./ci-checks-badge"
 import { CreatePrDialog } from "./create-pr-dialog"
 import { PullRequestFiles } from "./pull-request-files"
 import { PullRequestCommentCard } from "./pull-request-comment-card"
+import {
+  humanizeStatus,
+  ListState,
+  PanelMessage,
+  RefreshButton,
+  reviewItemStateIcon,
+  Row,
+  StatusBadge,
+} from "./panel-primitives"
 import type {
   GhRepositoryVisibility,
   MergeMethod,
+  PrState,
   PullRequestCommit,
   PullRequestReviewComment,
   RepoContext,
@@ -98,6 +111,9 @@ export function GithubReviewView({
   const [createOpen, setCreateOpen] = useState(false)
   const [publishOpen, setPublishOpen] = useState(false)
   const [selectedPr, setSelectedPr] = useState<number | null>(null)
+  const [selectedIssue, setSelectedIssue] = useState<number | null>(null)
+  const qc = useQueryClient()
+  const panelFetching = useIsFetching({ queryKey: githubKeys.all }) > 0
 
   const { data: checks = [] } = useChecks(ctx, {}, connected && Boolean(repo))
 
@@ -114,7 +130,7 @@ export function GithubReviewView({
             ? "Sign in to GitHub to manage pull requests and issues."
             : "Install the GitHub CLI (gh) to connect your account."
         }
-        hint="Open Settings → GitHub to connect."
+        hint="Open Settings → Git to connect."
       />
     )
   }
@@ -159,6 +175,16 @@ export function GithubReviewView({
     )
   }
 
+  if (selectedIssue != null) {
+    return (
+      <GithubIssueDetail
+        ctx={ctx}
+        number={selectedIssue}
+        onBack={() => setSelectedIssue(null)}
+      />
+    )
+  }
+
   return (
     <div className="@container/github flex h-full min-h-0 flex-col bg-muted/[0.08]">
       <div className="shrink-0 p-2 pb-0">
@@ -181,6 +207,11 @@ export function GithubReviewView({
           </button>
           <div className="flex items-center justify-between gap-2 @sm/github:justify-end">
             <CiChecksBadge checks={checks} />
+            <RefreshButton
+              spinning={panelFetching}
+              onClick={() => void qc.invalidateQueries({ queryKey: githubKeys.all })}
+              label="Refresh GitHub data"
+            />
             <Button
               size="sm"
               className="h-7 gap-1.5 px-2.5 text-xs"
@@ -195,7 +226,7 @@ export function GithubReviewView({
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2 @sm/github:p-3">
         <PullRequestsSection ctx={ctx} onSelect={setSelectedPr} />
-        <IssuesSection ctx={ctx} />
+        <IssuesSection ctx={ctx} onSelect={setSelectedIssue} />
       </div>
 
       <CreatePrDialog
@@ -204,39 +235,6 @@ export function GithubReviewView({
         ctx={ctx}
         headBranch={branch}
       />
-    </div>
-  )
-}
-
-function PanelMessage({
-  loading,
-  icon,
-  message,
-  hint,
-  children,
-}: {
-  loading?: boolean
-  icon?: React.ReactNode
-  message: string
-  hint?: string
-  children?: React.ReactNode
-}) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 px-4 py-12 text-center">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground/50">
-        {loading ? <Loader2 className="size-5 animate-spin" /> : icon}
-      </div>
-      <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground/70">
-          {message}
-        </p>
-        {hint && (
-          <p className="text-3xs leading-relaxed text-muted-foreground/40">
-            {hint}
-          </p>
-        )}
-      </div>
-      {children && <div className="pt-1">{children}</div>}
     </div>
   )
 }
@@ -354,62 +352,10 @@ function PublishRepositoryDialog({
   )
 }
 
-function Row({
-  onClick,
-  icon,
-  title,
-  meta,
-  external = true,
-}: {
-  onClick: () => void
-  icon: React.ReactNode
-  title: string
-  meta: string
-  external?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex min-h-12 w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/35"
-    >
-      <span className="mt-0.5 shrink-0 text-muted-foreground">{icon}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-medium">{title}</span>
-        <span className="block truncate text-3xs text-muted-foreground">
-          {meta}
-        </span>
-      </span>
-      {external ? (
-        <ExternalLink className="mt-0.5 size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-      ) : (
-        <ChevronRight className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
-      )}
-    </button>
-  )
-}
-
-function ListState({
-  loading,
-  empty,
-  message,
-}: {
-  loading: boolean
-  empty: boolean
-  message: string
-}) {
-  if (loading)
-    return (
-      <div className="flex items-center gap-2 px-3 py-2 text-2xs text-muted-foreground/60">
-        <Loader2 className="size-3 animate-spin" />
-        Loading
-      </div>
-    )
-  if (empty)
-    return (
-      <p className="px-3 py-2 text-2xs text-muted-foreground/50">{message}</p>
-    )
-  return null
+function emptyPrMessage(state: PrState): string {
+  if (state === "closed") return "No closed pull requests"
+  if (state === "all") return "No pull requests"
+  return "No open pull requests"
 }
 
 function PullRequestsSection({
@@ -419,7 +365,7 @@ function PullRequestsSection({
   ctx: RepoContext
   onSelect: (number: number) => void
 }) {
-  const [state, setState] = useState<"open" | "closed" | "all">("open")
+  const [state, setState] = useState<PrState>("open")
   const { data: prs = [], isLoading } = usePullRequests(ctx, state)
   return (
     <section>
@@ -442,28 +388,34 @@ function PullRequestsSection({
         </ToggleGroup>
       </div>
       <div className="divide-y divide-border/40 overflow-hidden rounded-xl border border-border/60 bg-card/65 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-        <ListState
-          loading={isLoading}
-          empty={prs.length === 0}
-          message="No open pull requests"
-        />
+        {isLoading ? <ListState loading empty={false} message="" /> : null}
+        {!isLoading && prs.length === 0 ? (
+          state === "open" ? (
+            <div className="flex flex-col items-center gap-1.5 px-4 py-8 text-center">
+              <GitPullRequestArrow className="size-5 text-muted-foreground/35" />
+              <p className="text-2xs text-muted-foreground/50">
+                {emptyPrMessage(state)}
+              </p>
+            </div>
+          ) : (
+            <ListState loading={false} empty message={emptyPrMessage(state)} />
+          )
+        ) : null}
         {prs.map((pr) => (
           <Row
             key={pr.number}
             onClick={() => onSelect(pr.number)}
             external={false}
-            icon={
-              <GitPullRequest
-                className={cn(
-                  "size-3.5",
-                  pr.isDraft ? "text-muted-foreground" : "text-emerald-600"
-                )}
-              />
-            }
+            icon={reviewItemStateIcon(pr.state, pr.isDraft, "open")}
             title={pr.title}
-            meta={`#${pr.number} · ${pr.headRefName}${
-              pr.author ? ` · ${pr.author}` : ""
-            }`}
+            titleBadge={
+              pr.isDraft ? (
+                <Badge variant="outline" className="shrink-0">
+                  Draft
+                </Badge>
+              ) : null
+            }
+            meta={`#${pr.number}${pr.author ? ` · ${pr.author}` : ""} · updated ${formatRelativeDate(pr.updatedAt)}`}
           />
         ))}
       </div>
@@ -591,12 +543,15 @@ export function PullRequestCommits({
                 <span className="block truncate text-xs font-medium">
                   {commit.messageHeadline}
                 </span>
-                <span className="mt-0.5 block truncate text-3xs text-muted-foreground/60">
+                <span
+                  className="mt-0.5 block truncate text-3xs text-muted-foreground/60"
+                  title={new Date(commit.committedDate).toLocaleString()}
+                >
                   {author?.login ??
                     author?.name ??
                     author?.email ??
                     "Unknown author"}{" "}
-                  · {new Date(commit.committedDate).toLocaleString()}
+                  · {formatRelativeDate(commit.committedDate)}
                 </span>
               </span>
               <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">
@@ -794,15 +749,11 @@ function GithubPullRequestDetail({
             <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge variant={isOpen ? "default" : "secondary"}>
-                  {pr.state}
+                  {humanizeStatus(pr.state).label}
                 </Badge>
                 {pr.isDraft ? <Badge variant="outline">Draft</Badge> : null}
-                {pr.reviewDecision ? (
-                  <Badge variant="outline">{pr.reviewDecision}</Badge>
-                ) : null}
-                {pr.mergeable ? (
-                  <Badge variant="outline">{pr.mergeable}</Badge>
-                ) : null}
+                <StatusBadge value={pr.reviewDecision} />
+                <StatusBadge value={pr.mergeable} />
               </div>
 
               <div className="mt-3 flex min-w-0 items-center gap-2 rounded-lg border border-border/45 bg-background/65 px-2.5 py-2 text-xs text-muted-foreground">
@@ -1027,7 +978,13 @@ function GithubPullRequestDetail({
   )
 }
 
-function IssuesSection({ ctx }: { ctx: RepoContext }) {
+function IssuesSection({
+  ctx,
+  onSelect,
+}: {
+  ctx: RepoContext
+  onSelect: (number: number) => void
+}) {
   const { data: issues = [], isLoading } = useIssues(ctx, "open")
   return (
     <section>
@@ -1040,18 +997,181 @@ function IssuesSection({ ctx }: { ctx: RepoContext }) {
           empty={issues.length === 0}
           message="No open issues"
         />
-        {issues.map((issue) => (
-          <Row
-            key={issue.number}
-            onClick={() => void openExternal(issue.url)}
-            icon={<CircleDot className="size-3.5 text-emerald-600" />}
-            title={issue.title}
-            meta={`#${issue.number}${issue.author ? ` · ${issue.author}` : ""}${
-              issue.labels.length ? ` · ${issue.labels.join(", ")}` : ""
-            }`}
-          />
-        ))}
+        {issues.map((issue) => {
+          const labels = issue.labels.slice(0, 2)
+          return (
+            <Row
+              key={issue.number}
+              onClick={() => onSelect(issue.number)}
+              external={false}
+              icon={<CircleDot className="size-3.5 text-emerald-600" />}
+              title={issue.title}
+              meta={
+                <>
+                  #{issue.number}
+                  {issue.author ? ` · ${issue.author}` : ""} · updated{" "}
+                  {formatRelativeDate(issue.updatedAt)}
+                  {labels.length ? ` · ${labels.join(", ")}` : ""}
+                </>
+              }
+            />
+          )
+        })}
       </div>
     </section>
+  )
+}
+
+function GithubIssueDetail({
+  ctx,
+  number,
+  onBack,
+}: {
+  ctx: RepoContext
+  number: number
+  onBack: () => void
+}) {
+  const { data: issue, isLoading, error } = useIssue(ctx, number)
+  const comment = useCommentIssue(ctx)
+  const [commentBody, setCommentBody] = useState("")
+
+  if (isLoading) return <PanelMessage loading message="Loading issue" />
+  if (error || !issue) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
+        <p className="text-xs text-muted-foreground">
+          {error ? parseApiError(error) : "Issue not found"}
+        </p>
+        <Button size="sm" variant="outline" onClick={onBack}>
+          Back to issues
+        </Button>
+      </div>
+    )
+  }
+
+  const isOpen = issue.state.toLowerCase() === "open"
+
+  function submitComment() {
+    const body = commentBody.trim()
+    if (!body) return
+    comment.mutate(
+      { number, body },
+      {
+        onSuccess: () => {
+          setCommentBody("")
+          toast.success("Comment added")
+        },
+        onError: (commentError) =>
+          toast.error("Couldn't add comment", {
+            description: parseApiError(commentError),
+          }),
+      }
+    )
+  }
+
+  return (
+    <div className="@container/pr flex h-full min-h-0 flex-col bg-muted/[0.08]">
+      <div className="shrink-0 p-2 pb-0">
+        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border/60 bg-background/85 px-2 py-1.5 shadow-sm shadow-black/[0.03] backdrop-blur dark:shadow-black/20">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onBack}
+            aria-label="Back to issues"
+          >
+            <ArrowLeft data-icon="inline-start" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium text-foreground/90">
+              {issue.title}
+            </p>
+            <p className="truncate text-3xs text-muted-foreground/60">
+              Issue #{issue.number} · {issue.author ?? "Unknown author"}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => void openExternal(issue.url)}
+            aria-label="Open on GitHub"
+          >
+            <ExternalLink data-icon="inline-start" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 @sm/pr:px-3">
+        <div className="flex flex-col gap-2.5 pt-2.5">
+          <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant={isOpen ? "default" : "secondary"}>
+                {humanizeStatus(issue.state).label}
+              </Badge>
+              {issue.labels.map((label) => (
+                <Badge key={label} variant="outline">
+                  {label}
+                </Badge>
+              ))}
+            </div>
+          </section>
+
+          {issue.body ? (
+            <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
+              <SectionLabel>Description</SectionLabel>
+              <div className="mt-2">
+                <RemoteMarkdown content={issue.body} />
+              </div>
+            </section>
+          ) : null}
+
+          <section className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 px-0.5">
+              <SectionLabel>Comments</SectionLabel>
+              {issue.comments.length > 0 ? (
+                <Badge variant="secondary">{issue.comments.length}</Badge>
+              ) : null}
+            </div>
+            {issue.comments.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/70 bg-card/45 px-4 py-8 text-center">
+                <MessageSquare className="mx-auto mb-2 size-5 text-muted-foreground/40" />
+                <p className="text-xs font-medium">No comments yet</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {issue.comments.map((item, index) => (
+                  <PullRequestCommentCard
+                    key={`${item.createdAt}-${index}`}
+                    author={item.author}
+                    body={item.body}
+                    createdAt={item.createdAt}
+                    context="Conversation"
+                  />
+                ))}
+              </div>
+            )}
+            <div className="rounded-xl border border-border/60 bg-card/75 p-2.5 shadow-sm shadow-black/[0.025]">
+              <Textarea
+                value={commentBody}
+                onChange={(event) => setCommentBody(event.target.value)}
+                placeholder="Add to the conversation…"
+                disabled={comment.isPending}
+                aria-label="Issue comment"
+                className="min-h-24 resize-y border-border/50 bg-background/70"
+              />
+              <div className="mt-2 flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={submitComment}
+                  disabled={!commentBody.trim() || comment.isPending}
+                >
+                  <MessageSquare data-icon="inline-start" />
+                  Comment
+                </Button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
   )
 }

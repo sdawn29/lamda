@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { parseApiError } from "@/features/git"
 import { DiffModeToggle } from "@/features/git/components/diff-mode-toggle"
 import { DiffStat } from "@/features/git/components/diff-stat"
+import { WrapToggle } from "@/features/git/components/wrap-toggle"
 import { parseDiff } from "@/features/git/components/diff/parser"
 import { buildSideBySideRows } from "@/features/git/components/diff/side-by-side"
 import type { DiffLine, DiffMode } from "@/features/git/components/diff/types"
@@ -178,6 +179,7 @@ export function CodeReviewFiles({
     () => new Set()
   )
   const [mode, setMode] = useState<DiffMode>("inline")
+  const [wrap, setWrap] = useState(false)
   const commentsByPath = useMemo(() => {
     const grouped = new Map<string, CodeReviewComment[]>()
     for (const comment of review?.comments ?? []) {
@@ -235,6 +237,12 @@ export function CodeReviewFiles({
         </span>
         <DiffStat added={additions} removed={deletions} />
         <div className="flex-1" />
+        <WrapToggle
+          wrap={wrap}
+          onWrapChange={setWrap}
+          disabled={mode === "side-by-side"}
+          disabledReason="Line wrapping is only available in same-line view"
+        />
         <DiffModeToggle mode={mode} onModeChange={setMode} />
       </div>
 
@@ -276,6 +284,7 @@ export function CodeReviewFiles({
                       review={review}
                       comments={comments}
                       mode={mode}
+                      wrap={wrap}
                       createCommentPending={createCommentPending}
                       onCreateComment={onCreateComment}
                     />
@@ -295,6 +304,7 @@ function ReviewFileDiff({
   review,
   comments,
   mode,
+  wrap,
   createCommentPending,
   onCreateComment,
 }: {
@@ -302,6 +312,8 @@ function ReviewFileDiff({
   review: CodeReviewPayload
   comments: CodeReviewComment[]
   mode: DiffMode
+  /** Wrap long lines instead of horizontal scrolling. Inline mode only. */
+  wrap: boolean
   createCommentPending: boolean
   onCreateComment: (input: CodeReviewCommentInput) => Promise<unknown>
 }) {
@@ -369,7 +381,7 @@ function ReviewFileDiff({
       ) : (
         <div className="max-h-[min(58vh,32rem)] overflow-auto bg-background/60 font-mono text-xs">
           {mode === "inline" ? (
-            <div className="min-w-max">
+            <div className={wrap ? "min-w-0" : "min-w-max"}>
               {lines.map((line, index) => {
                 const anchor: LineAnchor | null =
                   line.kind === "removed" && line.oldLineNum
@@ -447,7 +459,12 @@ function ReviewFileDiff({
                               : ""}
                         </span>
                       </div>
-                      <pre className="min-w-0 flex-1 px-3 font-mono whitespace-pre">
+                      <pre
+                        className={cn(
+                          "min-w-0 flex-1 px-3 font-mono",
+                          wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre"
+                        )}
+                      >
                         {line.content || " "}
                       </pre>
                     </div>
@@ -529,7 +546,10 @@ function ReviewSideBySideDiff({
 }) {
   const leftScrollRef = useRef<HTMLDivElement>(null)
   const rightScrollRef = useRef<HTMLDivElement>(null)
-  const [composerHeight, setComposerHeight] = useState(0)
+  // Measured natural height of each column's slot content, keyed by
+  // `${rowIndex}:${side}`. Both columns pad a slot row to the max of the two
+  // sides so the grids stay line-aligned.
+  const [slotHeights, setSlotHeights] = useState<Record<string, number>>({})
 
   function syncHorizontalScroll(
     event: UIEvent<HTMLDivElement>,
@@ -544,14 +564,28 @@ function ReviewSideBySideDiff({
     }
   }
 
-  const threads: Array<{
-    key: string
-    label: string
-    comments: CodeReviewComment[]
-  }> = []
+  function reportSlotHeight(rowIndex: number, side: ReviewSide, height: number) {
+    const key = `${rowIndex}:${side}`
+    setSlotHeights((current) =>
+      current[key] === height ? current : { ...current, [key]: height }
+    )
+  }
+
+  function slotMinHeight(rowIndex: number): number {
+    return Math.max(
+      slotHeights[`${rowIndex}:LEFT`] ?? 0,
+      slotHeights[`${rowIndex}:RIGHT`] ?? 0
+    )
+  }
+
+  // Threads anchored per row and side; a row can carry one on each side.
+  const threadsByRow = new Map<
+    number,
+    Partial<Record<ReviewSide, { label: string; comments: CodeReviewComment[] }>>
+  >()
   const seenAnchors = new Set<string>()
   let widestLine = 0
-  for (const row of rows) {
+  rows.forEach((row, rowIndex) => {
     widestLine = Math.max(
       widestLine,
       monospaceColumnWidth(row.left?.line.content ?? ""),
@@ -568,10 +602,25 @@ function ReviewSideBySideDiff({
       seenAnchors.add(key)
       const comments = commentsByAnchor.get(key) ?? []
       if (comments.length > 0) {
-        threads.push({ key, label: `${label} line ${anchor.line}`, comments })
+        const existing = threadsByRow.get(rowIndex) ?? {}
+        existing[side] = { label: `${label} line ${anchor.line}`, comments }
+        threadsByRow.set(rowIndex, existing)
       }
     }
-  }
+  })
+  // Anchored threads whose line never appears in the rendered rows would
+  // otherwise be dropped — keep them visible below the grid.
+  const unplacedThreads = [...commentsByAnchor.entries()]
+    .filter(([key]) => !seenAnchors.has(key))
+    .map(([key, threadComments]) => {
+      const [side, line] = key.split(":")
+      return {
+        key,
+        label: `${side === "LEFT" ? "Old" : "New"} line ${line}`,
+        comments: threadComments,
+      }
+    })
+
   const composerRowIndex = activeAnchor
     ? rows.findIndex((row) => {
         const line =
@@ -596,6 +645,38 @@ function ReviewSideBySideDiff({
     />
   ) : null
 
+  // Per-column slot content: every row with a thread or the open composer
+  // gets a slot in BOTH columns — the owning side renders the content, the
+  // other side an equal-height spacer.
+  const leftSlots = new Map<number, ReactNode>()
+  const rightSlots = new Map<number, ReactNode>()
+  const slotRowIndexes = new Set<number>(threadsByRow.keys())
+  if (composer && composerRowIndex >= 0) slotRowIndexes.add(composerRowIndex)
+  for (const rowIndex of slotRowIndexes) {
+    const rowThreads = threadsByRow.get(rowIndex)
+    for (const side of ["LEFT", "RIGHT"] as const) {
+      const thread = rowThreads?.[side]
+      const showComposer =
+        composer && composerRowIndex === rowIndex && activeAnchor?.side === side
+      const target = side === "LEFT" ? leftSlots : rightSlots
+      target.set(
+        rowIndex,
+        thread || showComposer ? (
+          <div className="flex flex-col gap-2">
+            {thread ? (
+              <ReviewComments
+                contained
+                comments={thread.comments}
+                label={thread.label}
+              />
+            ) : null}
+            {showComposer ? composer : null}
+          </div>
+        ) : null
+      )
+    }
+  }
+
   return (
     <div className="min-w-0">
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] divide-x divide-border/30">
@@ -604,10 +685,11 @@ function ReviewSideBySideDiff({
           lines={rows.map((row) => row.left?.line ?? null)}
           canvasWidthCh={widestLine + 10}
           side="LEFT"
-          composerRowIndex={composerRowIndex}
-          composer={activeAnchor?.side === "LEFT" ? composer : null}
-          composerHeight={composerHeight}
-          onComposerHeightChange={setComposerHeight}
+          slots={leftSlots}
+          slotMinHeight={slotMinHeight}
+          onSlotHeightChange={(rowIndex, height) =>
+            reportSlotHeight(rowIndex, "LEFT", height)
+          }
           onOpenComment={onOpenComment}
           onScroll={(event) => syncHorizontalScroll(event, rightScrollRef)}
         />
@@ -616,16 +698,17 @@ function ReviewSideBySideDiff({
           lines={rows.map((row) => row.right?.line ?? null)}
           canvasWidthCh={widestLine + 10}
           side="RIGHT"
-          composerRowIndex={composerRowIndex}
-          composer={activeAnchor?.side === "RIGHT" ? composer : null}
-          composerHeight={composerHeight}
-          onComposerHeightChange={setComposerHeight}
+          slots={rightSlots}
+          slotMinHeight={slotMinHeight}
+          onSlotHeightChange={(rowIndex, height) =>
+            reportSlotHeight(rowIndex, "RIGHT", height)
+          }
           onOpenComment={onOpenComment}
           onScroll={(event) => syncHorizontalScroll(event, leftScrollRef)}
         />
       </div>
 
-      {threads.map((thread) => (
+      {unplacedThreads.map((thread) => (
         <ReviewComments
           key={thread.key}
           comments={thread.comments}
@@ -641,10 +724,9 @@ function ReviewSideColumn({
   lines,
   canvasWidthCh,
   side,
-  composerRowIndex,
-  composer,
-  composerHeight,
-  onComposerHeightChange,
+  slots,
+  slotMinHeight,
+  onSlotHeightChange,
   onOpenComment,
   onScroll,
 }: {
@@ -652,10 +734,10 @@ function ReviewSideColumn({
   lines: Array<DiffLine | null>
   canvasWidthCh: number
   side: ReviewSide
-  composerRowIndex: number
-  composer: ReactNode
-  composerHeight: number
-  onComposerHeightChange: (height: number) => void
+  /** Rows carrying slot content in either column; value is this column's content (null → spacer). */
+  slots: Map<number, ReactNode>
+  slotMinHeight: (rowIndex: number) => number
+  onSlotHeightChange: (rowIndex: number, height: number) => void
   onOpenComment: (anchor: LineAnchor) => void
   onScroll: (event: UIEvent<HTMLDivElement>) => void
 }) {
@@ -673,13 +755,12 @@ function ReviewSideColumn({
               side={side}
               onOpenComment={onOpenComment}
             />
-            {index === composerRowIndex ? (
+            {slots.has(index) ? (
               <ReviewSideCommentSlot
-                active={composer !== null}
-                height={composerHeight}
-                onHeightChange={onComposerHeightChange}
+                minHeight={slotMinHeight(index)}
+                onHeightChange={(height) => onSlotHeightChange(index, height)}
               >
-                {composer}
+                {slots.get(index)}
               </ReviewSideCommentSlot>
             ) : null}
           </div>
@@ -690,20 +771,24 @@ function ReviewSideColumn({
 }
 
 function ReviewSideCommentSlot({
-  active,
-  height,
+  minHeight,
   onHeightChange,
   children,
 }: {
-  active: boolean
-  height: number
+  /** Shared row height (max of both columns' measured content). */
+  minHeight: number
   onHeightChange: (height: number) => void
   children: ReactNode
 }) {
   const slotRef = useRef<HTMLDivElement>(null)
+  const active = children != null
 
   useEffect(() => {
-    if (!active || !slotRef.current) return
+    if (!active || !slotRef.current) {
+      // Reset so a stale measurement doesn't inflate the opposite spacer.
+      onHeightChange(0)
+      return
+    }
     const node = slotRef.current
     const updateHeight = () =>
       onHeightChange(Math.ceil(node.getBoundingClientRect().height))
@@ -715,11 +800,15 @@ function ReviewSideCommentSlot({
     return () => observer.disconnect()
   }, [active, onHeightChange])
 
-  if (!active) return <div aria-hidden style={{ height }} />
+  if (!active) return <div aria-hidden style={{ height: minHeight }} />
 
+  // minHeight sits on an outer wrapper so the measured node keeps its natural
+  // height — measuring the padded node would never let the shared height shrink.
   return (
-    <div ref={slotRef} className="sticky left-0 w-[50cqw] p-2">
-      {children}
+    <div style={{ minHeight }}>
+      <div ref={slotRef} className="sticky left-0 w-[50cqw] p-2">
+        {children}
+      </div>
     </div>
   )
 }
@@ -905,12 +994,22 @@ function ReviewCommentComposer({
 function ReviewComments({
   comments,
   label,
+  contained = false,
 }: {
   comments: CodeReviewComment[]
   label: string
+  /** Fill the parent (column slot) instead of self-positioning in the scroll canvas. */
+  contained?: boolean
 }) {
   return (
-    <div className="sticky left-0 mx-2 my-1 w-[calc(100cqw-1rem)] max-w-xl overflow-hidden rounded-lg border border-border/60 bg-background/95 font-sans shadow-md shadow-black/[0.04]">
+    <div
+      className={cn(
+        "overflow-hidden rounded-lg border border-border/60 bg-background/95 font-sans shadow-md shadow-black/[0.04]",
+        contained
+          ? "w-full"
+          : "sticky left-0 mx-2 my-1 w-[calc(100cqw-1rem)]"
+      )}
+    >
       <div className="flex h-8 items-center gap-1.5 border-b border-border/50 bg-muted/25 px-2.5">
         <MessageSquare className="size-3 text-muted-foreground" aria-hidden />
         <span className="text-3xs font-medium text-muted-foreground">

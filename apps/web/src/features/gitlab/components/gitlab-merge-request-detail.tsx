@@ -23,8 +23,13 @@ import { RemoteMarkdown } from "@/shared/components/remote-markdown"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { SectionLabel } from "@/shared/ui/section-label"
+import { Switch } from "@/shared/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 import { Textarea } from "@/shared/ui/textarea"
+import {
+  humanizeStatus,
+  StatusBadge,
+} from "@/features/github/components/panel-primitives"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -319,15 +324,13 @@ export function GitlabMergeRequestDetail({
           className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 @sm/pr:px-3"
         >
           <div className="flex flex-col gap-2.5">
-            <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025]">
+            <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge variant={isOpen ? "default" : "secondary"}>
-                  {mr.state}
+                  {humanizeStatus(mr.state).label}
                 </Badge>
                 {mr.isDraft ? <Badge variant="outline">Draft</Badge> : null}
-                {mr.mergeStatus ? (
-                  <Badge variant="outline">{mr.mergeStatus}</Badge>
-                ) : null}
+                <StatusBadge value={mr.mergeStatus} />
               </div>
               <div className="mt-3 flex min-w-0 items-center gap-2 rounded-lg border border-border/45 bg-background/65 px-2.5 py-2 text-xs text-muted-foreground">
                 <GitBranch className="size-3.5 shrink-0" aria-hidden />
@@ -368,7 +371,7 @@ export function GitlabMergeRequestDetail({
             </section>
 
             {mr.description ? (
-              <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025]">
+              <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
                 <SectionLabel>Description</SectionLabel>
                 <div className="mt-2">
                   <RemoteMarkdown content={mr.description} />
@@ -377,7 +380,7 @@ export function GitlabMergeRequestDetail({
             ) : null}
 
             {mr.pipeline ? (
-              <section className="overflow-hidden rounded-xl border border-border/60 bg-card/70 shadow-sm shadow-black/[0.025]">
+              <section className="overflow-hidden rounded-xl border border-border/60 bg-card/70 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
                 <div className="flex items-center justify-between gap-2 border-b border-border/45 px-3 py-2.5">
                   <SectionLabel>Pipeline</SectionLabel>
                   <Badge
@@ -435,7 +438,7 @@ export function GitlabMergeRequestDetail({
                 error={reviewError}
                 onReply={replyToActivity}
               />
-              <div className="rounded-xl border border-border/60 bg-card/75 p-2.5 shadow-sm shadow-black/[0.025]">
+              <div className="rounded-xl border border-border/60 bg-card/75 p-2.5 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
                 <Textarea
                   value={commentBody}
                   onChange={(event) => setCommentBody(event.target.value)}
@@ -522,19 +525,14 @@ export function GitlabMergeRequestDetail({
           </AlertDialogHeader>
           <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 p-2.5">
             <div>
-              <p className="text-xs font-medium">Squash commits</p>
+              <label htmlFor="mr-squash" className="text-xs font-medium">
+                Squash commits
+              </label>
               <p className="text-3xs text-muted-foreground">
                 Combine this merge request into one commit.
               </p>
             </div>
-            <Button
-              type="button"
-              size="xs"
-              variant={squash ? "default" : "outline"}
-              onClick={() => setSquash((value) => !value)}
-            >
-              {squash ? "Enabled" : "Disabled"}
-            </Button>
+            <Switch id="mr-squash" checked={squash} onCheckedChange={setSquash} />
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
