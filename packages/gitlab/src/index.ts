@@ -365,8 +365,19 @@ export interface MergeRequestDetail extends MergeRequestSummary {
   mergeStatus: string | null;
   /** GitLab reports this as a string, e.g. "5" or "1000+". */
   changesCount: string | null;
+  files: { path: string; additions: number; deletions: number }[];
   comments: NoteSummary[];
   pipeline: PipelineDetail | null;
+}
+
+function diffStats(diff: string): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) additions++;
+    if (line.startsWith("-") && !line.startsWith("---")) deletions++;
+  }
+  return { additions, deletions };
 }
 
 export async function getMergeRequest(
@@ -378,16 +389,27 @@ export async function getMergeRequest(
     ["mr", "view", String(number), "--output", "json"],
     cwd,
   );
-  const [comments, pipeline] = await Promise.all([
+  const [comments, pipeline, changesResponse] = await Promise.all([
     listNotes(cwd, "merge_requests", number).catch(() => []),
     getPipeline(cwd, { mr: number }).catch(() => null),
+    runGlabJson<Record<string, unknown>>(
+      ["api", `projects/:id/merge_requests/${number}/changes`],
+      cwd,
+    ).catch(() => null),
   ]);
+  const changes = Array.isArray(changesResponse?.changes)
+    ? (changesResponse.changes as Record<string, unknown>[])
+    : [];
   return {
     ...mapMergeRequest(raw),
     description: String(raw.description ?? ""),
     mergeStatus:
       stringField(raw.detailed_merge_status ?? raw.merge_status) || null,
     changesCount: stringField(raw.changes_count) || null,
+    files: changes.map((change) => ({
+      path: String(change.new_path ?? change.old_path ?? ""),
+      ...diffStats(String(change.diff ?? "")),
+    })),
     comments,
     pipeline,
   };
@@ -535,6 +557,25 @@ export async function commentMergeRequest(
   assertPositiveInt(number, "merge request number");
   if (!body.trim()) throw new GlabError("Comment body is required", "");
   await runGlab(["mr", "note", String(number), "--message", body], cwd);
+}
+
+export async function checkoutMergeRequest(
+  cwd: string,
+  number: number,
+): Promise<void> {
+  assertPositiveInt(number, "merge request number");
+  await runGlab(["mr", "checkout", String(number)], cwd, 30000);
+}
+
+export async function mergeMergeRequest(
+  cwd: string,
+  number: number,
+  squash = false,
+): Promise<void> {
+  assertPositiveInt(number, "merge request number");
+  const args = ["mr", "merge", String(number), "--yes"];
+  if (squash) args.push("--squash");
+  await runGlab(args, cwd, 30000);
 }
 
 // ── Pipelines / CI ───────────────────────────────────────────────────────────

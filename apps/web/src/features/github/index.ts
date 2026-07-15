@@ -20,6 +20,7 @@ export {
   useCheckoutPullRequest,
   useCreateIssue,
   useCommentIssue,
+  useCommentPullRequest,
 } from "./mutations"
 export type {
   GhStatus,

@@ -7,15 +7,25 @@ export {
   useGitlabRepositories,
   useGitlabRepoInfo,
   useMergeRequests,
+  useMergeRequest,
   useGitlabIssues,
 } from "./queries"
-export { usePublishGitlabRepository, useCreateMergeRequest } from "./mutations"
+export {
+  usePublishGitlabRepository,
+  useCreateMergeRequest,
+  useCommentMergeRequest,
+  useCheckoutMergeRequest,
+  useMergeMergeRequest,
+} from "./mutations"
 export type {
   GlabStatus,
   GitlabRepoInfo,
   GitlabRepositorySummary,
   GitlabRepositoryVisibility,
   MergeRequestSummary,
+  MergeRequestDetail,
+  PipelineDetail,
+  PipelineJob,
   IssueSummary,
   RepoContext,
   PublishRepositoryInput,

@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react"
 import { Icon } from "@iconify/react"
+import { Github } from "@lobehub/icons"
 import { Button } from "@/shared/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
@@ -17,6 +18,8 @@ import { useShortcutBinding } from "@/shared/components/keyboard-shortcuts-provi
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { ShortcutKbd } from "@/shared/ui/kbd"
 import { useTerminalStore } from "@/features/terminal/store"
+import { useBranch } from "@/features/git/queries"
+import { GitlabLogo } from "@/features/gitlab/components/gitlab-logo"
 import { useDockStore, openFileTab } from "./store"
 import type { DockId, DockPanelContext, DockPanelDefinition } from "./types"
 
@@ -37,8 +40,32 @@ const SubagentDockPanel = lazy(() =>
     default: m.SubagentDockPanel,
   }))
 )
+const GithubPanel = lazy(() =>
+  import("@/features/github").then((m) => ({ default: m.GithubReviewView }))
+)
+const GitlabPanel = lazy(() =>
+  import("@/features/gitlab").then((m) => ({ default: m.GitlabReviewView }))
+)
 
 const FILE_TAB_MIME = "application/x-files-panel-tab"
+
+function GithubDockPanel({ sessionId }: { sessionId: string }) {
+  const { data: branch } = useBranch(sessionId)
+  return (
+    <Suspense fallback={<div className="h-full bg-background" />}>
+      <GithubPanel sessionId={sessionId} branch={branch?.branch ?? null} />
+    </Suspense>
+  )
+}
+
+function GitlabDockPanel({ sessionId }: { sessionId: string }) {
+  const { data: branch } = useBranch(sessionId)
+  return (
+    <Suspense fallback={<div className="h-full bg-background" />}>
+      <GitlabPanel sessionId={sessionId} branch={branch?.branch ?? null} />
+    </Suspense>
+  )
+}
 // Review and Files both host the file-tree overlay drawer in dock-zone.tsx.
 function FileTreeToggleAction({ label }: { label: string }) {
   const fileTreeOpen = useDockStore((s) => s.fileTreeOpen)
@@ -319,6 +346,30 @@ export const PANELS: Record<string, DockPanelDefinition> = {
           />
         </Suspense>
       ) : null,
+  },
+
+  github: {
+    type: "github",
+    label: "GitHub",
+    singleton: true,
+    keepAlive: false,
+    defaultDock: "right",
+    isAvailable: (ctx) => !!ctx.sessionId,
+    icon: () => <Github size={14} />,
+    render: (_tab, ctx) =>
+      ctx.sessionId ? <GithubDockPanel sessionId={ctx.sessionId} /> : null,
+  },
+
+  gitlab: {
+    type: "gitlab",
+    label: "GitLab",
+    singleton: true,
+    keepAlive: false,
+    defaultDock: "right",
+    isAvailable: (ctx) => !!ctx.sessionId,
+    icon: () => <GitlabLogo className="size-3.5 shrink-0" />,
+    render: (_tab, ctx) =>
+      ctx.sessionId ? <GitlabDockPanel sessionId={ctx.sessionId} /> : null,
   },
 
   files: {

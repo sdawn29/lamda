@@ -32,6 +32,14 @@ const createMrSchema = repoContextSchema.extend({
   removeSourceBranch: z.boolean().optional(),
 });
 
+const commentMrSchema = repoContextSchema.extend({
+  body: z.string().optional(),
+});
+
+const mergeMrSchema = repoContextSchema.extend({
+  squash: z.boolean().optional(),
+});
+
 function resolveCwd(c: Context): string | null {
   const id = c.req.query("id");
   if (id) return sessionCwd(id);
@@ -137,6 +145,21 @@ gitlab.get("/gitlab/mrs", async (c) => {
   }
 });
 
+gitlab.get("/gitlab/mrs/:number", async (c) => {
+  const cwd = resolveCwd(c);
+  if (!cwd) return c.json({ error: "No repo context" }, 400);
+  const number = Number.parseInt(c.req.param("number"), 10);
+  if (!Number.isInteger(number)) {
+    return c.json({ error: "Invalid merge request number" }, 400);
+  }
+  try {
+    const mr = await gl.getMergeRequest(cwd, number);
+    return c.json({ mr });
+  } catch (err) {
+    return glabErrorResponse(c, err, "Failed to load merge request");
+  }
+});
+
 gitlab.post("/gitlab/mrs", async (c) => {
   const parsed = await parseJsonBody(c, createMrSchema);
   if (!parsed.ok) return parsed.response;
@@ -156,6 +179,61 @@ gitlab.post("/gitlab/mrs", async (c) => {
     return c.json(result, 201);
   } catch (err) {
     return glabErrorResponse(c, err, "Failed to create merge request");
+  }
+});
+
+gitlab.post("/gitlab/mrs/:number/comment", async (c) => {
+  const number = Number.parseInt(c.req.param("number"), 10);
+  if (!Number.isInteger(number)) {
+    return c.json({ error: "Invalid merge request number" }, 400);
+  }
+  const parsed = await parseJsonBody(c, commentMrSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  const cwd = resolveCwdFromBody(body);
+  if (!cwd) return c.json({ error: "No repo context" }, 400);
+  if (!body.body?.trim()) {
+    return c.json({ error: "comment body is required" }, 400);
+  }
+  try {
+    await gl.commentMergeRequest(cwd, number, body.body);
+    return c.json({ ok: true });
+  } catch (err) {
+    return glabErrorResponse(c, err, "Failed to add comment");
+  }
+});
+
+gitlab.post("/gitlab/mrs/:number/checkout", async (c) => {
+  const number = Number.parseInt(c.req.param("number"), 10);
+  if (!Number.isInteger(number)) {
+    return c.json({ error: "Invalid merge request number" }, 400);
+  }
+  const parsed = await parseJsonBody(c, repoContextSchema);
+  if (!parsed.ok) return parsed.response;
+  const cwd = resolveCwdFromBody(parsed.data);
+  if (!cwd) return c.json({ error: "No repo context" }, 400);
+  try {
+    await gl.checkoutMergeRequest(cwd, number);
+    return c.json({ ok: true });
+  } catch (err) {
+    return glabErrorResponse(c, err, "Failed to check out merge request");
+  }
+});
+
+gitlab.post("/gitlab/mrs/:number/merge", async (c) => {
+  const number = Number.parseInt(c.req.param("number"), 10);
+  if (!Number.isInteger(number)) {
+    return c.json({ error: "Invalid merge request number" }, 400);
+  }
+  const parsed = await parseJsonBody(c, mergeMrSchema);
+  if (!parsed.ok) return parsed.response;
+  const cwd = resolveCwdFromBody(parsed.data);
+  if (!cwd) return c.json({ error: "No repo context" }, 400);
+  try {
+    await gl.mergeMergeRequest(cwd, number, parsed.data.squash ?? false);
+    return c.json({ ok: true });
+  } catch (err) {
+    return glabErrorResponse(c, err, "Failed to merge merge request");
   }
 });
 

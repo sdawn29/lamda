@@ -7,6 +7,7 @@ import type {
   IssueState,
   IssueSummary,
   MergeRequestState,
+  MergeRequestDetail,
   MergeRequestSummary,
   PublishRepositoryInput,
   RepoContext,
@@ -83,6 +84,41 @@ export async function createMergeRequest(
   input: CreateMergeRequestInput
 ): Promise<{ url: string }> {
   return apiFetch<{ url: string }>("/gitlab/mrs", jsonInit(input))
+}
+
+export async function fetchMergeRequest(
+  ctx: RepoContext,
+  number: number,
+  signal?: AbortSignal
+): Promise<MergeRequestDetail> {
+  const res = await apiFetch<{ mr: MergeRequestDetail }>(
+    `/gitlab/mrs/${number}?${ctxQuery(ctx)}`,
+    { signal }
+  )
+  return res.mr
+}
+
+export async function commentMergeRequest(
+  ctx: RepoContext,
+  number: number,
+  body: string
+): Promise<void> {
+  await apiFetch(`/gitlab/mrs/${number}/comment`, jsonInit({ ...ctx, body }))
+}
+
+export async function checkoutMergeRequest(
+  ctx: RepoContext,
+  number: number
+): Promise<void> {
+  await apiFetch(`/gitlab/mrs/${number}/checkout`, jsonInit(ctx))
+}
+
+export async function mergeMergeRequest(
+  ctx: RepoContext,
+  number: number,
+  squash: boolean
+): Promise<void> {
+  await apiFetch(`/gitlab/mrs/${number}/merge`, jsonInit({ ...ctx, squash }))
 }
 
 export async function fetchIssues(

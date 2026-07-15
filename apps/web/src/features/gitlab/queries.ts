@@ -4,6 +4,7 @@ import {
   fetchGitlabRepositories,
   fetchGlabStatus,
   fetchIssues,
+  fetchMergeRequest,
   fetchMergeRequests,
 } from "./api"
 import type { IssueState, MergeRequestState, RepoContext } from "./types"
@@ -26,6 +27,8 @@ export const gitlabKeys = {
   repo: (ctx: RepoContext) => [...root, "repo", ctxKey(ctx)] as const,
   mrs: (ctx: RepoContext, state: MergeRequestState) =>
     [...root, "mrs", ctxKey(ctx), state] as const,
+  mr: (ctx: RepoContext, number: number) =>
+    [...root, "mr", ctxKey(ctx), number] as const,
   issues: (ctx: RepoContext, state: IssueState) =>
     [...root, "issues", ctxKey(ctx), state] as const,
 }
@@ -70,6 +73,15 @@ export function useMergeRequests(
     queryKey: gitlabKeys.mrs(ctx, state),
     queryFn: ({ signal }) => fetchMergeRequests(ctx, state, signal),
     enabled: enabled && Boolean(ctxKey(ctx)),
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useMergeRequest(ctx: RepoContext, number: number | null) {
+  return useQuery({
+    queryKey: gitlabKeys.mr(ctx, number ?? 0),
+    queryFn: ({ signal }) => fetchMergeRequest(ctx, number as number, signal),
+    enabled: Boolean(ctxKey(ctx)) && number != null,
     staleTime: 30 * 1000,
   })
 }

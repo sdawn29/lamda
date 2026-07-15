@@ -36,6 +36,32 @@ export interface MergeRequestSummary {
   createdAt: string
 }
 
+export interface PipelineJob {
+  name: string
+  stage: string | null
+  bucket: string
+  state: string
+  link: string | null
+  allowFailure: boolean
+}
+
+export interface PipelineDetail {
+  id: number
+  status: string
+  ref: string | null
+  url: string | null
+  jobs: PipelineJob[]
+}
+
+export interface MergeRequestDetail extends MergeRequestSummary {
+  description: string
+  mergeStatus: string | null
+  changesCount: string | null
+  files: { path: string; additions: number; deletions: number }[]
+  comments: { author: string | null; body: string; createdAt: string }[]
+  pipeline: PipelineDetail | null
+}
+
 export interface IssueSummary {
   number: number
   title: string

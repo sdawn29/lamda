@@ -695,7 +695,7 @@ async function createWindow(splash?: BrowserWindow) {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 680,
+    minWidth: 560,
     minHeight: 480,
     show: false,
     backgroundColor: "#09090b",

@@ -47,8 +47,9 @@ export function useMergePullRequest(ctx: RepoContext) {
       number: number
       method?: MergeMethod
     }) => mergePullRequest(ctx, number, method),
-    onSuccess: () => {
+    onSuccess: (_data, { number }) => {
       qc.invalidateQueries({ queryKey: [...githubKeys.all, "prs"] })
+      qc.invalidateQueries({ queryKey: githubKeys.pr(ctx, number) })
     },
   })
 }
@@ -77,6 +78,18 @@ export function useCommentIssue(ctx: RepoContext) {
       commentIssue(ctx, number, body),
     onSuccess: (_data, { number }) => {
       qc.invalidateQueries({ queryKey: githubKeys.issue(ctx, number) })
+    },
+  })
+}
+
+/** GitHub exposes PR conversation comments through the issue-comment API. */
+export function useCommentPullRequest(ctx: RepoContext) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ number, body }: { number: number; body: string }) =>
+      commentIssue(ctx, number, body),
+    onSuccess: (_data, { number }) => {
+      qc.invalidateQueries({ queryKey: githubKeys.pr(ctx, number) })
     },
   })
 }
