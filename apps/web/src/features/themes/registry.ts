@@ -15,6 +15,7 @@ import {
   jellybeanshljslight,
 } from "@/shared/lib/syntax-theme"
 import type { ColorTheme, ThemePalette } from "./types"
+import type { CodePaletteSet } from "./code-tokens"
 
 // ── Lamda (brand default — mirrors index.css) ───────────────────────────────────
 //
@@ -96,6 +97,41 @@ const lamdaDark: ThemePalette = {
   "sidebar-ring": "#e3a563",
 }
 
+// ── Lamda Ember (code) ────────────────────────────────────────────────────────
+//
+// Hand-tuned syntax palette for the house theme: the same warm-neutral, muted
+// register as the UI tokens. Copper keywords echo `primary`; everything else
+// stays low-saturation so code reads calm on the card/sidebar surfaces. Flows
+// to every code surface (Monaco viewers/diffs and Markdown blocks) via
+// `resolveCodePalette`.
+
+const lamdaCode: CodePaletteSet = {
+  light: {
+    text: "#2b2825", // warm near-ink, one step softer than foreground
+    comment: "#7d786e", // warm grey, italic downstream
+    keyword: "#9c4a12", // burnt copper — the brand accent, darkened for light bg
+    string: "#5a7038", // dry olive
+    number: "#8a5e14", // dark amber
+    function: "#7d5c1a", // tarnished gold
+    type: "#3d6b8f", // muted steel blue (matches lamda chart-3)
+    property: "#684d94", // dusty violet (near chart-5)
+    parameter: "#7a5f3a", // warm tan
+    builtin: "#2e6e62", // muted teal
+  },
+  dark: {
+    text: "#d8d5cf",
+    comment: "#7c766c",
+    keyword: "#dda46c", // molten copper — sits beside primary #e3a563
+    string: "#a9bc8f", // sage
+    number: "#d6b578", // soft amber
+    function: "#e2c795", // warm sand
+    type: "#8fb7cf", // hazy steel blue
+    property: "#b7a6d4", // lavender grey
+    parameter: "#cdb79b", // parchment
+    builtin: "#93c7b6", // sea-glass teal
+  },
+}
+
 const lamda: ColorTheme = {
   id: "lamda",
   name: "Lamda",
@@ -105,6 +141,7 @@ const lamda: ColorTheme = {
   radius: "0.625rem",
   light: lamdaLight,
   dark: lamdaDark,
+  code: lamdaCode,
 }
 
 // ── Jellybeans (default — mirrors index.css) ───────────────────────────────────

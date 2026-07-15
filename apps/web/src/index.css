@@ -980,6 +980,14 @@
     border-radius: 99px !important;
   }
 
+  /* Gutter tint: follows the same --code-gutter-bg contract as the Prism
+     viewer's line-number column (set by file-content-view in panel mode).
+     Defaults to transparent, so Monaco instances outside that context are
+     untouched. */
+  .monaco-editor .margin {
+    background-color: var(--code-gutter-bg, transparent) !important;
+  }
+
   /* ── Sonner toast theming ─────────────────────────────────────────────── */
   .sonner-toast {
     background: var(--popover) !important;

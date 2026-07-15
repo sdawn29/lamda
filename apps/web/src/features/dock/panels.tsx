@@ -358,7 +358,7 @@ export const PANELS: Record<string, DockPanelDefinition> = {
     singleton: true,
     keepAlive: false,
     defaultDock: "right",
-    isAvailable: (ctx) => !!ctx.sessionId,
+    isAvailable: (ctx) => !!ctx.sessionId && ctx.githubConnected,
     icon: () => <Github size={14} />,
     render: (_tab, ctx) =>
       ctx.sessionId ? <GithubDockPanel sessionId={ctx.sessionId} /> : null,
@@ -371,7 +371,7 @@ export const PANELS: Record<string, DockPanelDefinition> = {
     singleton: true,
     keepAlive: false,
     defaultDock: "right",
-    isAvailable: (ctx) => !!ctx.sessionId,
+    isAvailable: (ctx) => !!ctx.sessionId && ctx.gitlabConnected,
     icon: () => <GitlabLogo className="size-3.5 shrink-0" />,
     render: (_tab, ctx) =>
       ctx.sessionId ? <GitlabDockPanel sessionId={ctx.sessionId} /> : null,

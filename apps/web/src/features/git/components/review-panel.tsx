@@ -13,19 +13,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
-import { Github } from "@lobehub/icons"
-import { GithubReviewView, useGithubConnected } from "@/features/github"
-import {
-  GitlabLogo,
-  GitlabReviewView,
-  useGitlabConnected,
-} from "@/features/gitlab"
 import {
   useGitDiffStat,
   useTurns,
   useTurnDiffStat,
   useLastCommitAt,
-  useBranch,
 } from "../queries"
 import { type DiffMode } from "./diff-view"
 import { type SortMode } from "./sort-utils"
@@ -48,11 +40,6 @@ export const ReviewPanel = memo(function ReviewPanel({
 
   const { data: diffStat } = useGitDiffStat(workspaceSessionId)
   const { data: turnsData = [] } = useTurns(sessionId)
-
-  // GitHub view is offered only when gh is connected for this repo.
-  const githubConnected = useGithubConnected({ id: sessionId })
-  const gitlabConnected = useGitlabConnected({ id: sessionId })
-  const { data: currentBranch } = useBranch(sessionId)
 
   // Source-control tab state (lifted so toolbar and content share it)
   const [scView, setScView] = useState<ContentView>("turn")
@@ -101,10 +88,6 @@ export const ReviewPanel = memo(function ReviewPanel({
                   <History className="h-3 w-3" />
                 ) : scView === "history" ? (
                   <GitCommit className="h-3 w-3" />
-                ) : scView === "github" ? (
-                  <Github size={12} />
-                ) : scView === "gitlab" ? (
-                  <GitlabLogo className="h-3 w-3" />
                 ) : (
                   <GitCompare className="h-3 w-3" />
                 )}
@@ -112,11 +95,7 @@ export const ReviewPanel = memo(function ReviewPanel({
                   ? "Turns"
                   : scView === "history"
                     ? "History"
-                    : scView === "github"
-                      ? "GitHub"
-                      : scView === "gitlab"
-                        ? "GitLab"
-                        : "All Changes"}
+                    : "All Changes"}
                 <ChevronDown className="h-3 w-3 opacity-60" />
               </Button>
             }
@@ -152,30 +131,6 @@ export const ReviewPanel = memo(function ReviewPanel({
                 <Check className="ml-auto h-3 w-3 text-muted-foreground" />
               )}
             </DropdownMenuItem>
-            {githubConnected && (
-              <DropdownMenuItem
-                onClick={() => setScView("github")}
-                className="flex items-center gap-2"
-              >
-                <Github size={14} />
-                GitHub
-                {scView === "github" && (
-                  <Check className="ml-auto h-3 w-3 text-muted-foreground" />
-                )}
-              </DropdownMenuItem>
-            )}
-            {gitlabConnected && (
-              <DropdownMenuItem
-                onClick={() => setScView("gitlab")}
-                className="flex items-center gap-2"
-              >
-                <GitlabLogo className="h-3.5 w-3.5" />
-                GitLab
-                {scView === "gitlab" && (
-                  <Check className="ml-auto h-3 w-3 text-muted-foreground" />
-                )}
-              </DropdownMenuItem>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -193,8 +148,8 @@ export const ReviewPanel = memo(function ReviewPanel({
 
         <div className="flex-1" />
 
-        {/* Git actions + diff mode — not in history or GitHub views */}
-        {scView !== "history" && scView !== "github" && scView !== "gitlab" && (
+        {/* Git actions + diff mode — not in the history view */}
+        {scView !== "history" && (
           <SourceControlToolbarSection
             workspaceSessionId={workspaceSessionId}
             view={scView}
@@ -214,16 +169,6 @@ export const ReviewPanel = memo(function ReviewPanel({
             file={selectedFile}
             mode={scMode}
             onClose={clearSelectedFile}
-          />
-        ) : scView === "github" ? (
-          <GithubReviewView
-            sessionId={sessionId}
-            branch={currentBranch?.branch ?? null}
-          />
-        ) : scView === "gitlab" ? (
-          <GitlabReviewView
-            sessionId={sessionId}
-            branch={currentBranch?.branch ?? null}
           />
         ) : (
           <SourceControlContent

@@ -45,6 +45,10 @@ export interface DockPanelContext {
   /** Workspace whose PTY tabs the terminal panel currently displays. */
   terminalWorkspaceId: string | null
   terminalCwd: string | null
+  /** gh CLI installed + authenticated — gates the GitHub panel. */
+  githubConnected: boolean
+  /** glab CLI installed + authenticated — gates the GitLab panel. */
+  gitlabConnected: boolean
 }
 
 export interface DockPanelDefinition {

@@ -434,17 +434,24 @@ export default function MonacoCodeViewer({
           domReadOnly: true,
           fontSize: toPx(fontSize),
           fontFamily:
-            "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
+            "var(--app-font-code, var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace))",
           minimap: { enabled: false },
           scrollBeyondLastLine: false,
           glyphMargin: false,
           lineNumbersMinChars: 3,
-          renderLineHighlight: "none",
+          renderLineHighlight: "line",
           multiCursorModifier: "alt",
           smoothScrolling: true,
           automaticLayout: true,
           padding: { top: 8, bottom: 8 },
-          scrollbar: { alwaysConsumeMouseWheel: false },
+          scrollbar: {
+            alwaysConsumeMouseWheel: false,
+            vertical: "auto",
+            horizontal: "auto",
+            verticalScrollbarSize: 6,
+            horizontalScrollbarSize: 6,
+            useShadows: false,
+          },
           stickyScroll: { enabled: false },
           // Strip Monaco's extra built-in features; this viewer only wants
           // syntax highlighting plus the LSP hover/definition and comment

@@ -411,6 +411,10 @@ function editorColors(p: Palette): Record<string, string> {
     "editorLineNumber.activeForeground": p.lineNumberActive,
     "editorGutter.background": "#00000000",
 
+    // ── Current line (renderLineHighlight is enabled by the viewers) ──
+    "editor.lineHighlightBackground": withAlpha(p.foreground, 0.04),
+    "editor.lineHighlightBorder": "#00000000",
+
     // ── Selection / find / occurrence highlights → app primary ──
     "editor.selectionBackground": withAlpha(p.primary, 0.28),
     "editor.inactiveSelectionBackground": withAlpha(p.primary, 0.14),

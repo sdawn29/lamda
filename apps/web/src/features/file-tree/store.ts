@@ -16,7 +16,7 @@ interface FileTreeStore {
    * rows. Set by `reveal`, consumed (and cleared) by the FileTree component.
    */
   revealTarget: string | null
-  /** Expand a directory and all of its ancestors, then scroll it into view. */
+  /** Expand an entry's ancestor directories, then scroll it into view. */
   reveal: (relativePath: string) => void
   clearRevealTarget: () => void
 }
@@ -46,7 +46,9 @@ export const useFileTree = create<FileTreeStore>()((set) => ({
       const rel = relativePath.replace(/^\/+|\/+$/g, "")
       if (!rel) return s
       const next = new Set(s.expanded)
-      const segments = rel.split("/")
+      // Expand ancestors only — the target itself may be a file, and adding a
+      // file path to `expanded` would trigger a directory listing against it.
+      const segments = rel.split("/").slice(0, -1)
       let acc = ""
       for (const seg of segments) {
         acc = acc ? `${acc}/${seg}` : seg

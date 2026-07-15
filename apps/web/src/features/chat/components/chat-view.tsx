@@ -335,6 +335,15 @@ export function ChatView({
         chatTextboxRef.current?.setValue(next)
         chatTextboxRef.current?.focus()
       },
+      addFileMention: (relativePath) => {
+        const current = chatTextboxRef.current?.getValue() ?? ""
+        const mention = `@${relativePath} `
+        const next = current.trim()
+          ? `${current.replace(/\s*$/, " ")}${mention}`
+          : mention
+        chatTextboxRef.current?.setValue(next)
+        chatTextboxRef.current?.focus()
+      },
     }),
     [rootPath, threadId, updateThreadMode]
   )

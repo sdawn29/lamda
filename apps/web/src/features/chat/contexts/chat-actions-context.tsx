@@ -18,6 +18,8 @@ export interface ChatActions {
   implementPlan: (relativePath: string) => void
   /** Add a file-line comment token to the current chat textbox. */
   addFileCommentContext: (context: FileCommentContext) => void
+  /** Append an `@path` file mention to the chat textbox and focus it. */
+  addFileMention: (relativePath: string) => void
 }
 
 interface ChatActionsStore {

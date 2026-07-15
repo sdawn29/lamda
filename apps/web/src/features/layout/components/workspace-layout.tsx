@@ -22,6 +22,8 @@ import {
 } from "@/features/dock"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
 import { usePrefetchThreadsMessages } from "@/features/chat/hooks"
+import { useGithubConnected } from "@/features/github"
+import { useGitlabConnected } from "@/features/gitlab"
 import { CommandPalette } from "@/features/command-palette"
 import { SplashScreen } from "@/shared/components/splash-screen"
 import { cn } from "@/shared/lib/utils"
@@ -330,6 +332,15 @@ export function WorkspaceLayout() {
     ? (activeThread?.sessionId ?? stableRsWorkspaceSessionId)
     : stableRsWorkspaceSessionId
 
+  // The GitHub/GitLab panels only appear in the dock pickers when the
+  // corresponding CLI is installed and authenticated for this repo.
+  const githubConnected = useGithubConnected({
+    id: rsGitSessionId ?? undefined,
+  })
+  const gitlabConnected = useGitlabConnected({
+    id: rsGitSessionId ?? undefined,
+  })
+
   const dockContext: DockPanelContext = useMemo(
     () => ({
       sessionId: rsSessionId,
@@ -344,6 +355,8 @@ export function WorkspaceLayout() {
           ? (activeTerminalCwd ?? terminalHost.path)
           : terminalHost.path
         : null,
+      githubConnected,
+      gitlabConnected,
     }),
     [
       rsSessionId,
@@ -355,6 +368,8 @@ export function WorkspaceLayout() {
       terminalHost,
       activeWorkspaceId,
       activeTerminalCwd,
+      githubConnected,
+      gitlabConnected,
     ]
   )
 
