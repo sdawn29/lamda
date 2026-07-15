@@ -2,7 +2,6 @@ import {
   memo,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
   type RefObject,
@@ -10,44 +9,27 @@ import {
 } from "react"
 import Markdown from "react-markdown"
 import { cn } from "@/shared/lib/utils"
-import { formatDuration } from "@/shared/lib/formatters"
 import { Card, CardContent } from "@/shared/ui/card"
-import type { AgentDto } from "@/features/workspace/api"
+import { Button } from "@/shared/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import { colorStyle, resolveModeIcon } from "./mode-combobox"
-import { AgentModelBadge } from "./agent-info"
 import {
   chatProseClassRich,
   getMarkdownComponents,
   remarkPlugins,
 } from "./markdown-components"
 import { ThinkingBlock } from "./thinking-block"
-import { ToolCallBlock, toolDisplayName } from "./tool-call-block"
-import { RollingTimerText, ToolRunGroup, toolGroupId } from "./working-block"
+import { ToolCallBlock } from "./tool-call-block"
+import { ToolRunGroup, toolGroupId } from "./working-block"
+import { DISCLOSURE_DIM } from "./disclosure"
 import {
-  CollapsibleBody,
-  DISCLOSURE_DIM,
-  DISCLOSURE_LABEL_DONE,
-  DISCLOSURE_ROW_CLASS,
-  DisclosureChevron,
-  SHIMMER_TEXT_CLASS,
-} from "./disclosure"
-import {
-  describeSubagentActivity,
-  delegateAgentId,
   getSubagentDetails,
   subagentBlocksToMessages,
   subagentStatus,
   delegateDescription,
 } from "../lib/subagent"
 import type { Message, ToolMessage } from "../types"
-
-/** Compact token-count label, e.g. "1.2K", "830". Mirrors context-chart.tsx's
- * local formatter — kept separate since that file isn't shared UI. */
-function formatTokenCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
-}
+import { openSubagentPanel } from "../lib/subagent-panel-store"
 
 // Per-subagent-tool-call cache of stabilized child identities, used by
 // SubagentTranscript below. Kept at module scope (rather than a ref) since
@@ -273,181 +255,72 @@ export const SubagentTranscript = memo(function SubagentTranscript({
 })
 
 /**
- * The chat card for a `delegate` tool call — a running subagent. Header shows the
- * agent's identity, live activity, and a ticking timer; the collapsible body
- * renders the subagent's own transcript with the same tool-call blocks as the
- * main conversation (children are never `delegate`, so recursion is one level
- * deep). Open while running, collapsed to a one-liner when settled.
+ * Compact in-thread marker for a delegated run. The transcript lives in the
+ * dedicated subagent panel; the wider pill keeps the agent identity and status
+ * readable without putting nested live output back into the main chat.
  */
 export const SubagentCard = memo(function SubagentCard({
   msg,
   isNew = true,
   entryDelayMs = 0,
-  rootPath,
-  agentsById,
 }: {
   msg: ToolMessage
   isNew?: boolean
   entryDelayMs?: number
   rootPath?: string
-  /** Resolves the agent that ran, for the header's model badge — falls back
-   * to no badge when the map hasn't reached this card. */
-  agentsById?: ReadonlyMap<string, AgentDto>
+  agentsById?: ReadonlyMap<string, unknown>
 }) {
   const details = getSubagentDetails(msg)
   const status = subagentStatus(msg)
-  const isLive = status === "running" || status === "queued"
-
-  // The nested run's own agent id is authoritative once the first snapshot
-  // arrives; before that, fall back to the delegate call's args.
-  const agentId = details?.agent || delegateAgentId(msg.args)
-  const agentDto = agentId ? agentsById?.get(agentId) : undefined
-
-  // null = follow the default (open while live, collapsed once settled);
-  // a click pins the user's choice.
-  const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
-  const expanded = userExpanded ?? isLive
-
   const label = details?.agentLabel ?? "Subagent"
   const description = delegateDescription(msg.args)
-  const iconName = details?.icon ?? "bot"
-  // resolveModeIcon returns module-cached components, so identity is stable
-  // across renders; rendering via the wrapper's property (`visual.Icon`) keeps
-  // the react-compiler static-components rule satisfied.
-  const visual = { Icon: resolveModeIcon(iconName) }
+  const visual = { Icon: resolveModeIcon(details?.icon ?? "bot") }
   const accent = colorStyle(details?.color ?? "violet").iconAccent
-
-  const startedAt = details?.startedAt ?? msg.startTime
-  const elapsed = useElapsed(startedAt, status === "running")
-  const settledDuration =
-    details?.endedAt && details.startedAt
-      ? details.endedAt - details.startedAt
-      : msg.duration
-
-  const rawActivity =
-    details && isLive ? describeSubagentActivity(details) : null
-  // MCP tool names are registered as `mcp__<server>__<tool>` — show the
-  // humanized tool part, not the internal name.
-  const activity = rawActivity ? toolDisplayName(rawActivity) : null
-  const toolCount = details?.stats?.toolCalls ?? 0
-  const totalTokens = details?.stats?.totalTokens ?? 0
-
-  // Keep a lone agent's live transcript bounded just like the focus panel used
-  // for parallel agents. Follow new output while pinned to the bottom, but
-  // release the pin as soon as the user scrolls up to inspect earlier steps.
-  const transcriptScrollRef = useRef<HTMLDivElement>(null)
-  const transcriptPinnedRef = useRef(true)
-  useEffect(() => {
-    if (status !== "running" || !transcriptPinnedRef.current) return
-    const element = transcriptScrollRef.current
-    if (element) element.scrollTop = element.scrollHeight
-  }, [status, details])
-
   const failed = status === "error"
-  const aborted = status === "aborted"
-
-  const headerLabel =
-    status === "queued" ? (
-      <span className={cn("shrink-0 font-medium", DISCLOSURE_DIM)}>
-        {label} agent queued…
-      </span>
-    ) : status === "running" ? (
-      <span className={cn("shrink-0 font-medium", SHIMMER_TEXT_CLASS)}>
-        {label} agent
-      </span>
-    ) : (
-      <span
-        className={cn(
-          "shrink-0 font-medium",
-          failed
-            ? "text-destructive/70"
-            : aborted
-              ? "text-muted-foreground/50"
-              : DISCLOSURE_LABEL_DONE
-        )}
-      >
-        {label} agent
-        {failed ? " failed" : aborted ? " aborted" : ""}
-      </span>
-    )
+  const statusLabel =
+    status === "error" ? "failed" : status === "aborted" ? "stopped" : status
 
   return (
-    <div
-      className={cn("w-full text-xs", isNew && "animate-chat-message-in")}
-      style={
-        isNew && entryDelayMs > 0
-          ? { animationDelay: `${entryDelayMs}ms` }
-          : undefined
-      }
-    >
-      <button
-        type="button"
-        className={DISCLOSURE_ROW_CLASS}
-        onClick={() => setUserExpanded(!expanded)}
-        aria-expanded={expanded}
-      >
-        <visual.Icon
-          className={cn(
-            "h-3 w-3 shrink-0",
-            status === "running"
-              ? cn("animate-pulse", accent)
-              : failed
-                ? "text-destructive/60"
-                : cn(accent, "opacity-70")
-          )}
-        />
-        {headerLabel}
-        <AgentModelBadge model={agentDto?.model} />
-        {description && (
-          <span className={cn("min-w-0 flex-1 truncate", DISCLOSURE_DIM)}>
-            {description}
-          </span>
-        )}
-        {status === "running" && activity && (
-          <span className={cn("shrink-0 text-2xs", DISCLOSURE_DIM)}>
-            {activity}
-          </span>
-        )}
-        {status === "running" && startedAt && (
-          <span className="shrink-0 text-2xs text-muted-foreground/60 tabular-nums">
-            <RollingTimerText text={formatDuration(elapsed)} />
-          </span>
-        )}
-        {!isLive && (
-          <span
-            className={cn("shrink-0 text-2xs tabular-nums", DISCLOSURE_DIM)}
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn(
+              "w-40 justify-start rounded-md",
+              isNew && "animate-chat-message-in",
+              failed && "border-destructive/40"
+            )}
+            style={
+              isNew && entryDelayMs > 0
+                ? { animationDelay: `${entryDelayMs}ms` }
+                : undefined
+            }
+            onClick={() => openSubagentPanel(msg.toolCallId)}
+            aria-label={`Open ${label} subagent`}
           >
-            {[
-              toolCount > 0 &&
-                `${toolCount} ${toolCount === 1 ? "tool" : "tools"}`,
-              totalTokens > 0 && `${formatTokenCount(totalTokens)} tok`,
-              settledDuration ? formatDuration(settledDuration) : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
-        )}
-        <DisclosureChevron expanded={expanded} revealOnHover={!isLive} />
-      </button>
-
-      <CollapsibleBody open={expanded}>
-        <div className="mt-1.5">
-          <SubagentEnvironmentCard
-            scrollRef={transcriptScrollRef}
-            onScroll={() => {
-              const element = transcriptScrollRef.current
-              if (!element) return
-              transcriptPinnedRef.current =
-                element.scrollHeight -
-                  element.scrollTop -
-                  element.clientHeight <
-                24
-            }}
-          >
-            <SubagentTranscript msg={msg} rootPath={rootPath} />
-          </SubagentEnvironmentCard>
-        </div>
-      </CollapsibleBody>
-    </div>
+            <visual.Icon
+              data-icon="inline-start"
+              className={cn(accent, failed && "text-destructive")}
+            />
+            <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+            <span
+              className={cn(
+                "shrink-0 text-2xs text-muted-foreground",
+                failed && "text-destructive"
+              )}
+            >
+              {statusLabel}
+            </span>
+          </Button>
+        }
+      />
+      <TooltipContent>
+        {label} · {status}
+        {description ? ` · ${description}` : ""}
+      </TooltipContent>
+    </Tooltip>
   )
 })

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
-import type { AssistantMessage, ErrorAction } from "../types"
+import type { AssistantMessage, ErrorAction, ToolMessage } from "../types"
 import { WorkingBlock } from "./working-block"
 import { ArrowDownIcon, PlugZapIcon } from "lucide-react"
 
@@ -107,6 +107,11 @@ import {
   buildCompletedTodosByGroup,
 } from "../lib/message-groups"
 import { useChatScroll } from "../hooks/use-chat-scroll"
+import { isDelegateToolMessage } from "../lib/subagent"
+import {
+  clearSubagentRuns,
+  publishSubagentRuns,
+} from "../lib/subagent-panel-store"
 
 // Pending initial inputs keyed by threadId — used to pre-fill the textbox
 // after a fork without threading state through route params.
@@ -460,6 +465,20 @@ export function ChatView({
     () => groupChatMessages(visibleMessages),
     [visibleMessages]
   )
+
+  const subagentRuns = useMemo(() => {
+    const byId = new Map<string, ToolMessage>()
+    for (const message of visibleMessages) {
+      if (message.role === "tool" && isDelegateToolMessage(message)) {
+        byId.set(message.toolCallId, message)
+      }
+    }
+    return [...byId.values()]
+  }, [visibleMessages])
+  useEffect(() => {
+    publishSubagentRuns(sessionId, subagentRuns)
+  }, [sessionId, subagentRuns])
+  useEffect(() => () => clearSubagentRuns(sessionId), [sessionId])
 
   // Stable per-group keys derived from message identity rather than position,
   // so prepending older history doesn't re-key existing rows. Used as the

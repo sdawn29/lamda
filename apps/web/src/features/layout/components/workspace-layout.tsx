@@ -63,7 +63,9 @@ export function WorkspaceLayout() {
   const rightDock = useDockStore((s) => s.docks.right)
   const bottomDock = useDockStore((s) => s.docks.bottom)
   const rightDockFullscreen = useDockStore((s) => s.rightDockFullscreen)
-  const toggleRightDockFullscreen = useDockStore((s) => s.toggleRightDockFullscreen)
+  const toggleRightDockFullscreen = useDockStore(
+    (s) => s.toggleRightDockFullscreen
+  )
   const closeDock = useDockStore((s) => s.closeDock)
   const setDockSize = useDockStore((s) => s.setDockSize)
   const toggleFileTree = useDockStore((s) => s.toggleFileTree)
@@ -226,7 +228,8 @@ export function WorkspaceLayout() {
           Math.min(800, terminalDragStartHeight.current + delta)
         )
         // Bypass React re-renders during drag — update height directly.
-        if (bottomDockRef.current) bottomDockRef.current.style.height = `${next}px`
+        if (bottomDockRef.current)
+          bottomDockRef.current.style.height = `${next}px`
       }
 
       const onUp = (ev: MouseEvent) => {
@@ -285,7 +288,12 @@ export function WorkspaceLayout() {
       return
     }
     syncTerminalCwd(activeWorkspaceId, activeTerminalCwd)
-  }, [activeWorkspaceId, activeTerminalCwd, terminalTabVisible, syncTerminalCwd])
+  }, [
+    activeWorkspaceId,
+    activeTerminalCwd,
+    terminalTabVisible,
+    syncTerminalCwd,
+  ])
 
   const rsSessionId =
     activeThread?.sessionId ??
@@ -451,7 +459,11 @@ export function WorkspaceLayout() {
                 {/* Bottom dock (terminal island) */}
                 <div
                   ref={bottomDockRef}
-                  className="shrink-0 overflow-hidden"
+                  className={cn(
+                    "shrink-0 overflow-hidden",
+                    bottomDockVisible &&
+                      "animate-in duration-200 ease-linear fade-in-0 slide-in-from-bottom-4 motion-reduce:animate-none"
+                  )}
                   style={{
                     height: bottomDock.size,
                     display: bottomDockVisible ? undefined : "none",
@@ -464,68 +476,68 @@ export function WorkspaceLayout() {
           </div>
 
           {/* Right dock — outside the card, mirrors AppSidebar on the left */}
-          {isMobile ? (
-            (rightDock.tabIds.length > 0 || rightDock.isOpen) && (
-              <Sheet
-                open={rightDock.isOpen}
-                onOpenChange={(open) => {
-                  if (!open) closeDock("right")
-                }}
-              >
-                <SheetContent
-                  side="right"
-                  showCloseButton={false}
-                  className="bg-transparent p-0 text-sidebar-foreground shadow-none data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100%-1rem)] data-[side=right]:border-l-0 sm:max-w-none"
-                  style={{ width: 720, maxWidth: "calc(85vw - 1rem)" }}
+          {isMobile
+            ? (rightDock.tabIds.length > 0 || rightDock.isOpen) && (
+                <Sheet
+                  open={rightDock.isOpen}
+                  onOpenChange={(open) => {
+                    if (!open) closeDock("right")
+                  }}
                 >
-                  <DockZone dockId="right" ctx={dockContext} />
-                </SheetContent>
-              </Sheet>
-            )
-          ) : (
-            (rightDock.tabIds.length > 0 || rightDropTarget || rightDock.isOpen) && (
-              <>
-                {rightDock.isOpen && !rightDockFullscreen && (
-                  <div
-                    onMouseDown={handleResizeStart}
-                    className="group relative z-30 w-2 shrink-0 cursor-col-resize"
+                  <SheetContent
+                    side="right"
+                    showCloseButton={false}
+                    className="bg-transparent p-0 text-sidebar-foreground shadow-none data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100%-1rem)] data-[side=right]:border-l-0 sm:max-w-none"
+                    style={{ width: 720, maxWidth: "calc(85vw - 1rem)" }}
                   >
-                    <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-border" />
-                  </div>
-                )}
-                <div
-                  ref={sidebarRef}
-                  style={
-                    {
-                      "--sidebar-width": `${rightDock.size}px`,
-                      // flex-basis comes from the width classes below (flex-none
-                      // resolves an "auto" basis to the element's width); only
-                      // flex-grow toggles here, so fullscreen grows smoothly
-                      // from whatever width is currently on screen instead of
-                      // snapping to a recalculated basis.
-                      flexGrow: rightDockFullscreen ? 1 : 0,
-                    } as React.CSSProperties
-                  }
-                  className={cn(
-                    "h-full min-h-0 overflow-hidden transition-[width,flex-grow] duration-200 ease-linear",
-                    // A foreign drag forces the dock visible even while closed —
-                    // a w-0 dock can't receive the drop.
-                    rightDock.isOpen || rightDropTarget
-                      ? rightDockFullscreen
-                        ? "w-(--sidebar-width) flex-none"
-                        : // Cap at the available space so the dock never
-                          // overflows the right padding as the window shrinks —
-                          // always leaving the chat panel its min width plus the
-                          // 0.5rem resize gutter (MIN_CHAT_PANEL_WIDTH = 500).
-                          "w-(--sidebar-width) max-w-[calc(100%-500px-0.5rem)] flex-none"
-                      : "w-0 flex-none"
+                    <DockZone dockId="right" ctx={dockContext} />
+                  </SheetContent>
+                </Sheet>
+              )
+            : (rightDock.tabIds.length > 0 ||
+                rightDropTarget ||
+                rightDock.isOpen) && (
+                <>
+                  {rightDock.isOpen && !rightDockFullscreen && (
+                    <div
+                      onMouseDown={handleResizeStart}
+                      className="group relative z-30 w-2 shrink-0 cursor-col-resize"
+                    >
+                      <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-border" />
+                    </div>
                   )}
-                >
-                  <DockZone dockId="right" ctx={dockContext} />
-                </div>
-              </>
-            )
-          )}
+                  <div
+                    ref={sidebarRef}
+                    style={
+                      {
+                        "--sidebar-width": `${rightDock.size}px`,
+                        // flex-basis comes from the width classes below (flex-none
+                        // resolves an "auto" basis to the element's width); only
+                        // flex-grow toggles here, so fullscreen grows smoothly
+                        // from whatever width is currently on screen instead of
+                        // snapping to a recalculated basis.
+                        flexGrow: rightDockFullscreen ? 1 : 0,
+                      } as React.CSSProperties
+                    }
+                    className={cn(
+                      "h-full min-h-0 overflow-hidden transition-[width,flex-grow] duration-200 ease-linear",
+                      // A foreign drag forces the dock visible even while closed —
+                      // a w-0 dock can't receive the drop.
+                      rightDock.isOpen || rightDropTarget
+                        ? rightDockFullscreen
+                          ? "w-(--sidebar-width) flex-none"
+                          : // Cap at the available space so the dock never
+                            // overflows the right padding as the window shrinks —
+                            // always leaving the chat panel its min width plus the
+                            // 0.5rem resize gutter (MIN_CHAT_PANEL_WIDTH = 500).
+                            "w-(--sidebar-width) max-w-[calc(100%-500px-0.5rem)] flex-none"
+                        : "w-0 flex-none"
+                    )}
+                  >
+                    <DockZone dockId="right" ctx={dockContext} />
+                  </div>
+                </>
+              )}
         </div>
 
         <CommandPalette />

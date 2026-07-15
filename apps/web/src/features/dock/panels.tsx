@@ -1,5 +1,12 @@
 import { lazy, Suspense, useRef, useState } from "react"
-import { FileDiff, FolderTree, History, TerminalSquare, X } from "lucide-react"
+import {
+  Bot,
+  FileDiff,
+  FolderTree,
+  History,
+  TerminalSquare,
+  X,
+} from "lucide-react"
 import { Icon } from "@iconify/react"
 import { Button } from "@/shared/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
@@ -24,6 +31,11 @@ const TerminalPanel = lazy(() =>
 )
 const FileContentView = lazy(() =>
   import("@/features/main-tabs").then((m) => ({ default: m.FileContentView }))
+)
+const SubagentDockPanel = lazy(() =>
+  import("@/features/chat/components/subagent-panel").then((m) => ({
+    default: m.SubagentDockPanel,
+  }))
 )
 
 const FILE_TAB_MIME = "application/x-files-panel-tab"
@@ -288,6 +300,25 @@ export const PANELS: Record<string, DockPanelDefinition> = {
         />
       ) : null,
     // The inner PTY tab bar already has its own new-tab/kill controls.
+  },
+
+  subagents: {
+    type: "subagents",
+    label: "Subagents",
+    singleton: true,
+    keepAlive: false,
+    defaultDock: "right",
+    isAvailable: (ctx) => !!ctx.sessionId,
+    icon: () => <Bot className="size-3.5 shrink-0" aria-hidden />,
+    render: (_tab, ctx) =>
+      ctx.sessionId ? (
+        <Suspense fallback={<div className="h-full bg-background" />}>
+          <SubagentDockPanel
+            sessionId={ctx.sessionId}
+            rootPath={ctx.workspacePath ?? undefined}
+          />
+        </Suspense>
+      ) : null,
   },
 
   files: {

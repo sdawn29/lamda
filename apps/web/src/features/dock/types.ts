@@ -29,7 +29,7 @@ export interface DockTab {
 }
 
 /**
- * Everything the three panel types need to render, computed once in
+ * Everything the dockable panel types need to render, computed once in
  * workspace-layout.tsx from the active thread/workspace and handed to both
  * dock zones. Intentionally a flat bag of the exact fields the panels read —
  * no more.
