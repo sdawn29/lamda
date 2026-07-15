@@ -46,8 +46,7 @@ import { useWorkspace, useEnvDialog } from "@/features/workspace"
 import { useWorkspaceIndex } from "@/features/workspace/queries"
 import { useSemanticSearch } from "@/features/semantic-search"
 import { useTerminalForWorkspace } from "@/features/terminal"
-import { useMainTabs } from "@/features/main-tabs"
-import { useRightSidebar } from "@/features/layout"
+import { useDockStore, isTabVisible, openFileTab, toggleReviewPanel } from "@/features/dock"
 import { useSidebar } from "@/shared/ui/sidebar"
 import { DEFAULT_SETTINGS_SECTION } from "@/features/settings"
 import { useTheme } from "@/shared/components/theme-provider"
@@ -74,12 +73,9 @@ export function CommandPalette() {
     ws?: string
   }
   const { workspaces } = useWorkspace()
-  const {
-    isOpen: rightSidebarOpen,
-    isFileTreeOpen,
-    togglePanel,
-  } = useRightSidebar()
-  const { addFileTab } = useMainTabs()
+  const reviewOpen = useDockStore((s) => isTabVisible(s, "review"))
+  const fileTreeOpen = useDockStore((s) => s.fileTreeOpen)
+  const toggleFileTree = useDockStore((s) => s.toggleFileTree)
   const { toggleSidebar } = useSidebar()
   const openSettings = useCallback(() => {
     navigate({
@@ -190,10 +186,10 @@ export function CommandPalette() {
         if (!workspacePath) return
         const fileName = relativePath.split(/[/\\]/).pop() || relativePath
         const filePath = `${workspacePath}/${relativePath}`
-        addFileTab({ title: fileName, filePath, workspacePath })
+        openFileTab({ title: fileName, filePath, workspacePath })
       })
     },
-    [run, activeWorkspace, addFileTab]
+    [run, activeWorkspace]
   )
 
   const handleOpenCodeHit = useCallback(
@@ -203,7 +199,7 @@ export function CommandPalette() {
         if (!workspacePath) return
         const fileName = relativePath.split(/[/\\]/).pop() || relativePath
         const filePath = `${workspacePath}/${relativePath}`
-        addFileTab({
+        openFileTab({
           title: fileName,
           filePath,
           workspacePath,
@@ -211,7 +207,7 @@ export function CommandPalette() {
         })
       })
     },
-    [run, activeWorkspace, addFileTab]
+    [run, activeWorkspace]
   )
 
   const allThreads = workspaces.flatMap((ws) =>
@@ -382,18 +378,18 @@ export function CommandPalette() {
             </CommandItem>
             <CommandItem
               value="toggle review source control panel"
-              onSelect={() => run(() => togglePanel("changes"))}
+              onSelect={() => run(toggleReviewPanel)}
             >
               <PanelRightIcon />
-              {rightSidebarOpen ? "Close Review Panel" : "Open Review Panel"}
+              {reviewOpen ? "Close Review Panel" : "Open Review Panel"}
               <ShortcutHint binding={toggleDiffBinding} />
             </CommandItem>
             <CommandItem
               value="toggle file tree explorer panel"
-              onSelect={() => run(() => togglePanel("files"))}
+              onSelect={() => run(toggleFileTree)}
             >
               <FolderTreeIcon />
-              {isFileTreeOpen ? "Close File Tree" : "Open File Tree"}
+              {fileTreeOpen ? "Close File Tree" : "Open File Tree"}
               <ShortcutHint binding={toggleFileTreeBinding} />
             </CommandItem>
             <CommandItem

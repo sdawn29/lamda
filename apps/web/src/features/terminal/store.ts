@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { apiFetch } from "@/shared/lib/client"
+import { useDockStore, isTabVisible } from "@/features/dock/store"
 
 // PTYs are persistent server-side and survive client unmounts (workspace/tab
 // switches, route changes) so the shell is never reset. They are only torn down
@@ -12,6 +13,15 @@ function killServerTerminal(tabId: string): void {
   })
 }
 
+// Reveal/create the singleton "terminal" dock tab. PTY tabs themselves are
+// tracked per-workspace below; this only controls whether the terminal dock
+// zone (wherever the user last moved it) is visible.
+function revealTerminalDockTab(): void {
+  useDockStore
+    .getState()
+    .openTab({ type: "terminal", singleton: true, defaultDock: "bottom", title: "Terminal" })
+}
+
 export interface TerminalTab {
   id: string
   title: string
@@ -20,7 +30,6 @@ export interface TerminalTab {
 }
 
 export interface WorkspaceTerminalState {
-  isOpen: boolean
   tabs: TerminalTab[]
   activeTabId: string | null
 }
@@ -28,13 +37,12 @@ export interface WorkspaceTerminalState {
 // Stable singleton — used as the selector fallback so Zustand's === check
 // never sees a "new" object when a workspace has no state yet.
 const DEFAULT_STATE: WorkspaceTerminalState = {
-  isOpen: false,
   tabs: [],
   activeTabId: null,
 }
 
 function makeDefaultState(): WorkspaceTerminalState {
-  return { isOpen: false, tabs: [], activeTabId: null }
+  return { tabs: [], activeTabId: null }
 }
 
 // Module-level counters — never drive re-renders
@@ -55,20 +63,19 @@ function makeTab(
   }
 }
 
-function openAtCwd(
+function ensureTabAtCwd(
   workspaceId: string,
   cwd: string,
   current: WorkspaceTerminalState
 ): WorkspaceTerminalState {
   const existing = current.tabs.find((tab) => tab.cwd === cwd)
   if (existing) {
-    return { ...current, isOpen: true, activeTabId: existing.id }
+    return { ...current, activeTabId: existing.id }
   }
 
   const tab = makeTab(workspaceId, cwd)
   return {
     ...current,
-    isOpen: true,
     tabs: [...current.tabs, tab],
     activeTabId: tab.id,
   }
@@ -80,7 +87,6 @@ interface TerminalStore {
   toggle: (workspaceId: string, cwd: string) => void
   open: (workspaceId: string, cwd: string) => void
   syncCwd: (workspaceId: string, cwd: string) => void
-  close: (workspaceId: string) => void
   addTab: (workspaceId: string, cwd: string) => string
   runCommand: (workspaceId: string, cwd: string, command: string) => string
   closeTab: (workspaceId: string, tabId: string) => void
@@ -103,49 +109,36 @@ export const useTerminalStore = create<TerminalStore>()((set, get) => ({
 
   getState: (workspaceId) => get().states[workspaceId] ?? makeDefaultState(),
 
-  open: (workspaceId, cwd) =>
+  open: (workspaceId, cwd) => {
     set((s) => ({
       states: updateWorkspace(s.states, workspaceId, (current) =>
-        openAtCwd(workspaceId, cwd, current)
+        ensureTabAtCwd(workspaceId, cwd, current)
       ),
-    })),
+    }))
+    revealTerminalDockTab()
+  },
 
   toggle: (workspaceId, cwd) => {
-    const current = get().states[workspaceId] ?? makeDefaultState()
-    if (current.isOpen) {
-      set((s) => ({
-        states: updateWorkspace(s.states, workspaceId, (p) => ({
-          ...p,
-          isOpen: false,
-        })),
-      }))
-    } else {
-      set((s) => ({
-        states: updateWorkspace(s.states, workspaceId, (p) =>
-          openAtCwd(workspaceId, cwd, p)
-        ),
-      }))
-    }
+    // Ensure this workspace has a PTY tab ready before revealing the dock tab,
+    // preserving the old "opening with zero tabs creates one" behavior —
+    // idempotent, so it's harmless on the close half of the toggle too.
+    set((s) => ({
+      states: updateWorkspace(s.states, workspaceId, (current) =>
+        ensureTabAtCwd(workspaceId, cwd, current)
+      ),
+    }))
+    useDockStore
+      .getState()
+      .toggleTab({ type: "terminal", singleton: true, defaultDock: "bottom", title: "Terminal" })
   },
 
   syncCwd: (workspaceId, cwd) =>
     set((s) => ({
       states: updateWorkspace(s.states, workspaceId, (current) => {
-        if (!current.isOpen) return current
-        const activeTab = current.tabs.find(
-          (tab) => tab.id === current.activeTabId
-        )
+        const activeTab = current.tabs.find((tab) => tab.id === current.activeTabId)
         if (activeTab?.cwd === cwd) return current
-        return openAtCwd(workspaceId, cwd, current)
+        return ensureTabAtCwd(workspaceId, cwd, current)
       }),
-    })),
-
-  close: (workspaceId) =>
-    set((s) => ({
-      states: updateWorkspace(s.states, workspaceId, (p) => ({
-        ...p,
-        isOpen: false,
-      })),
     })),
 
   addTab: (workspaceId, cwd) => {
@@ -165,11 +158,11 @@ export const useTerminalStore = create<TerminalStore>()((set, get) => ({
     set((s) => ({
       states: updateWorkspace(s.states, workspaceId, (p) => ({
         ...p,
-        isOpen: true,
         tabs: [...p.tabs, tab],
         activeTabId: tab.id,
       })),
     }))
+    revealTerminalDockTab()
     return tab.id
   },
 
@@ -180,12 +173,9 @@ export const useTerminalStore = create<TerminalStore>()((set, get) => ({
         if (idx === -1) return p
         killServerTerminal(tabId)
         const next = p.tabs.filter((t) => t.id !== tabId)
-        if (next.length === 0)
-          return { ...p, tabs: [], isOpen: false, activeTabId: null }
+        if (next.length === 0) return { ...p, tabs: [], activeTabId: null }
         const newActive =
-          p.activeTabId === tabId
-            ? next[idx > 0 ? idx - 1 : 0].id
-            : p.activeTabId
+          p.activeTabId === tabId ? next[idx > 0 ? idx - 1 : 0].id : p.activeTabId
         return { ...p, tabs: next, activeTabId: newActive }
       }),
     })),
@@ -222,17 +212,18 @@ export function useTerminal() {
 
 export function useTerminalForWorkspace(workspaceId: string, cwd: string) {
   const state = useTerminalStore((s) => s.states[workspaceId] ?? DEFAULT_STATE)
+  // Terminal visibility is now a single dock-level flag (see features/dock) —
+  // there is only ever one terminal panel on screen, not one per workspace.
+  const isOpen = useDockStore((s) => isTabVisible(s, "terminal"))
   const store = useTerminalStore.getState
   return {
-    isOpen: state.isOpen,
+    isOpen,
     tabs: state.tabs,
     activeTabId: state.activeTabId,
     toggle: () => store().toggle(workspaceId, cwd),
     open: () => store().open(workspaceId, cwd),
-    close: () => store().close(workspaceId),
     addTab: () => store().addTab(workspaceId, cwd),
-    runCommand: (command: string) =>
-      store().runCommand(workspaceId, cwd, command),
+    runCommand: (command: string) => store().runCommand(workspaceId, cwd, command),
     closeTab: (tabId: string) => store().closeTab(workspaceId, tabId),
     setActiveTab: (tabId: string) => store().setActiveTab(workspaceId, tabId),
     renameTab: (tabId: string, title: string) =>

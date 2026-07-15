@@ -18,8 +18,7 @@ import {
   DiffStat,
   parseDiffCounts,
 } from "@/features/git"
-import { useRightSidebar } from "@/features/layout"
-import { useMainTabs } from "@/features/main-tabs"
+import { openFileTab, openReviewPanel } from "@/features/dock"
 import { useGitRevertFile } from "@/features/git/mutations"
 import {
   StatusBadge,
@@ -58,7 +57,6 @@ const ChangedFileItem = memo(function ChangedFileItem({
   const [expanded, setExpanded] = useState(false)
   const [reverting, setReverting] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
-  const { addFileTab } = useMainTabs()
   const { data: platform } = useElectronPlatform()
   const isMac = platform === "darwin"
   const { data: apps = [] } = useOpenWithApps(isMac)
@@ -148,13 +146,13 @@ const ChangedFileItem = memo(function ChangedFileItem({
               const absPath = rootPath
                 ? `${rootPath.replace(/\/$/, "")}/${file.filePath}`
                 : file.filePath
-              addFileTab({
+              openFileTab({
                 filePath: absPath,
                 title: fileName,
                 workspacePath: rootPath,
               })
             }}
-            aria-label="Open in file tab"
+            aria-label="Open in Files panel"
             className="flex size-6 items-center justify-center rounded-md text-muted-foreground/45 transition-colors hover:bg-background hover:text-foreground"
           >
             <Eye className="h-3 w-3" />
@@ -232,7 +230,6 @@ export const FileChangesCard = memo(function FileChangesCard({
   openWithAppId,
   turn,
 }: FileChangesCardProps) {
-  const { open: openRightSidebar } = useRightSidebar()
   const revertToTurn = useRevertToTurn(sessionId)
   const revertFile = useGitRevertFile(sessionId)
 
@@ -326,7 +323,7 @@ export const FileChangesCard = memo(function FileChangesCard({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => openRightSidebar()}
+                onClick={() => openReviewPanel()}
                 className="h-7 gap-1.5 rounded-md px-2.5 text-2xs text-muted-foreground hover:text-foreground"
               >
                 <GitCompare className="h-3 w-3" />

@@ -49,6 +49,7 @@ import {
 import { chatKeys } from "@/features/chat/queries"
 import { gitKeys } from "@/features/git/queries"
 import { useMainTabsStore } from "@/features/main-tabs/store"
+import { useDockStore } from "@/features/dock/store"
 
 function setWorkspacesData(
   queryClient: QueryClient,
@@ -268,10 +269,10 @@ export function useDeleteWorkspace() {
         queryClient,
         workspace.threads.map((thread) => thread.sessionId)
       )
-      useMainTabsStore.getState().closeWorkspaceTabs(
-        workspace.path,
-        workspace.threads.map((t) => t.id)
-      )
+      useMainTabsStore
+        .getState()
+        .closeWorkspaceTabs(workspace.threads.map((t) => t.id))
+      useDockStore.getState().closeWorkspaceFileTabs(workspace.path)
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
   })

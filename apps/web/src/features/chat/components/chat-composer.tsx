@@ -59,7 +59,7 @@ import type { AgentDto } from "@/features/workspace/api"
 import { useEnvDialog, useWorkspace } from "@/features/workspace"
 import { useGitStatus, statusLabel } from "@/features/git"
 import { buildChangedFileMap } from "../file-chip-context"
-import { useMainTabsStore } from "@/features/main-tabs"
+import { useDockStore } from "@/features/dock"
 import { getModeOption, modeOptionFromDto, ModeCombobox } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
 import { ModelCombobox } from "./model-combobox"
@@ -448,10 +448,10 @@ export const ChatComposer = memo(
     }, [slashCommandOpen, useWorkspaceCommands, refetchSessionCommands])
     const { data: contextUsage } = useContextUsage(sessionId)
 
-    // Section inputs for the @-mention dropdown: currently open file tabs and
-    // the working tree's changed files. Sectioning happens here in the data
-    // layer (not in the dropdown) so the flat index the keyboard navigation
-    // walks matches the visual order of the sections.
+    // Section inputs for the @-mention dropdown: files currently open in the
+    // Files panel and the working tree's changed files. Sectioning happens
+    // here in the data layer (not in the dropdown) so the flat index the
+    // keyboard navigation walks matches the visual order of the sections.
     const { workspaces } = useWorkspace()
     const workspacePath = workspaces.find((w) => w.id === workspaceId)?.path
     const { data: gitStatusData } = useGitStatus(sessionId ?? "")
@@ -459,20 +459,22 @@ export const ChatComposer = memo(
       () => buildChangedFileMap(gitStatusData?.raw ?? ""),
       [gitStatusData?.raw]
     )
-    const mainTabs = useMainTabsStore((s) => s.tabs)
-    // Workspace-relative paths of files open as main tabs.
-    const openTabPaths = React.useMemo(() => {
+    const filePreviews = useDockStore((s) => s.filePreviews)
+    // Workspace-relative paths of files open in the Files panel.
+    const openFilePaths = React.useMemo(() => {
       const paths = new Set<string>()
       const root = workspacePath?.replace(/\/$/, "")
-      for (const tab of mainTabs) {
-        if (tab.type !== "file") continue
-        const tabRoot = (tab.workspacePath ?? root)?.replace(/\/$/, "")
-        if (tabRoot && tab.filePath.startsWith(`${tabRoot}/`)) {
-          paths.add(tab.filePath.slice(tabRoot.length + 1))
+      for (const filePreview of filePreviews) {
+        const previewRoot = (filePreview.workspacePath ?? root)?.replace(
+          /\/$/,
+          ""
+        )
+        if (previewRoot && filePreview.filePath.startsWith(`${previewRoot}/`)) {
+          paths.add(filePreview.filePath.slice(previewRoot.length + 1))
         }
       }
       return paths
-    }, [mainTabs, workspacePath])
+    }, [filePreviews, workspacePath])
 
     const mentionEntries2 = React.useMemo((): MentionEntry[] => {
       if (!atMention) return []
@@ -490,7 +492,7 @@ export const ChatComposer = memo(
         const changedFile =
           e.type === "file" ? changedFiles.get(e.path) : undefined
         const label = changedFile ? statusLabel(changedFile) : undefined
-        if (e.type === "file" && openTabPaths.has(e.path)) {
+        if (e.type === "file" && openFilePaths.has(e.path)) {
           open.push({ ...e, section: "open", statusLabel: label })
         } else if (changedFile) {
           changed.push({ ...e, section: "changed", statusLabel: label })
@@ -499,7 +501,7 @@ export const ChatComposer = memo(
         }
       }
       return [...open, ...changed, ...rest].slice(0, 10)
-    }, [fileData, atMention, changedFiles, openTabPaths])
+    }, [fileData, atMention, changedFiles, openFilePaths])
     // Mirrored into a ref (rather than read directly) since it's only
     // consulted from the arrow-key handlers below, not during render.
     React.useEffect(() => {

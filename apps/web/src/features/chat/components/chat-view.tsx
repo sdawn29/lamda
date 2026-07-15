@@ -49,7 +49,7 @@ import {
 } from "@/features/workspace/mutations"
 import { useWorkspace } from "@/features/workspace"
 import { useChatStream } from "../use-chat-stream"
-import { useMainTabsStore } from "@/features/main-tabs"
+import { openFileTab } from "@/features/dock"
 import {
   ChatActionsProvider,
   type ChatActions,
@@ -150,7 +150,7 @@ export function ChatView({
   const activeWorkspace = workspaces.find((w) => w.id === workspaceId)
   const activeThread = activeWorkspace?.threads.find((t) => t.id === threadId)
   // Files this thread touches live in its worktree when it runs in one, so
-  // opened file tabs, file links, and FileChangesCard must resolve against the
+  // opened files, file links, and FileChangesCard must resolve against the
   // worktree dir rather than the workspace path.
   const rootPath = activeThread?.worktreePath ?? activeWorkspace?.path
   const openWithAppId = activeWorkspace?.openWithAppId
@@ -243,7 +243,7 @@ export function ChatView({
       announcedPlansRef.current.add(relativePath)
 
       const fileName = relativePath.split("/").pop() ?? relativePath
-      useMainTabsStore.getState().addFileTab({
+      openFileTab({
         filePath,
         title: fileName,
         workspacePath: rootPath,
@@ -296,7 +296,7 @@ export function ChatView({
     () => ({
       openFile: (filePath, title) => {
         const fileName = title ?? filePath.split("/").pop() ?? filePath
-        useMainTabsStore.getState().addFileTab({
+        openFileTab({
           filePath,
           title: fileName,
           workspacePath: rootPath,

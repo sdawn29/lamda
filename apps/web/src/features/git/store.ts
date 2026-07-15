@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { useShallow } from "zustand/react/shallow"
+import type { ChangedFile } from "./components/status-badge"
 
 export interface ReviewPanelTab {
   id: string
@@ -16,44 +17,43 @@ const SOURCE_CONTROL_TAB: ReviewPanelTab = {
 
 interface ReviewPanelStore {
   isOpen: boolean
-  isFullscreen: boolean
   tabs: ReviewPanelTab[]
   activeTabId: string | null
   pendingTabId: string | null
   currentWorkspacePath: string | null
   workspaceTabs: Record<string, ReviewPanelTab[]>
+  selectedFile: ChangedFile | null
   toggle: () => void
   open: () => void
   close: () => void
-  toggleFullscreen: () => void
   addTab: (tab: Omit<ReviewPanelTab, "id">) => void
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
   clearPendingTab: () => void
   renameTab: (id: string, title: string) => void
   setCurrentWorkspace: (path: string | null) => void
+  selectFile: (file: ChangedFile) => void
+  clearSelectedFile: () => void
 }
 
 export const useReviewPanelStore = create<ReviewPanelStore>()((set) => ({
   isOpen: false,
-  isFullscreen: false,
   tabs: [SOURCE_CONTROL_TAB],
   activeTabId: "tab-source-control",
   pendingTabId: null,
   currentWorkspacePath: null,
   workspaceTabs: {},
+  selectedFile: null,
 
-  toggle: () =>
-    set((s) => ({
-      isOpen: !s.isOpen,
-      isFullscreen: !s.isOpen ? s.isFullscreen : false,
-    })),
+  toggle: () => set((s) => ({ isOpen: !s.isOpen })),
 
   open: () => set({ isOpen: true }),
 
-  close: () => set({ isOpen: false, isFullscreen: false }),
+  close: () => set({ isOpen: false }),
 
-  toggleFullscreen: () => set((s) => ({ isFullscreen: !s.isFullscreen })),
+  selectFile: (file) => set({ selectedFile: file }),
+
+  clearSelectedFile: () => set({ selectedFile: null }),
 
   addTab: (tab) =>
     set((s) => {
@@ -144,6 +144,7 @@ export const useReviewPanelStore = create<ReviewPanelStore>()((set) => ({
             currentWorkspacePath: path,
             tabs: [SOURCE_CONTROL_TAB, ...savedTabs],
             activeTabId: savedTabs[0].id,
+            selectedFile: null,
           }
         }
       }
@@ -153,6 +154,7 @@ export const useReviewPanelStore = create<ReviewPanelStore>()((set) => ({
         currentWorkspacePath: path,
         tabs: [SOURCE_CONTROL_TAB],
         activeTabId: SOURCE_CONTROL_TAB.id,
+        selectedFile: null,
       }
     }),
 }))
@@ -163,13 +165,15 @@ export function useReviewPanel() {
   return useReviewPanelStore(
     useShallow((s) => ({
       isOpen: s.isOpen,
-      isFullscreen: s.isFullscreen,
       currentWorkspacePath: s.currentWorkspacePath,
       toggle: s.toggle,
       open: s.open,
       close: s.close,
-      toggleFullscreen: s.toggleFullscreen,
       setCurrentWorkspace: s.setCurrentWorkspace,
     }))
   )
+}
+
+export function selectReviewFile(file: ChangedFile) {
+  useReviewPanelStore.getState().selectFile(file)
 }

@@ -1,8 +1,6 @@
 import { useCallback, useRef, useState } from "react"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { Loader2, MessageSquare, Plus, X } from "lucide-react"
-import { Icon } from "@iconify/react"
-import { getIconName } from "@/shared/ui/file-icon"
 import { Button } from "@/shared/ui/button"
 import { cn } from "@/shared/lib/utils"
 import { useMainTabs, type MainTab } from "../store"
@@ -24,7 +22,6 @@ export function MainTabBar() {
   const {
     tabs,
     activeTabId,
-    activeTab,
     closeTab,
     setActiveTab,
     reorderTabs,
@@ -42,10 +39,9 @@ export function MainTabBar() {
     before: boolean
   } | null>(null)
 
-  const activeWorkspace =
-    activeTab?.type === "file" && activeTab.workspacePath
-      ? workspaces.find((ws) => ws.path === activeTab.workspacePath)
-      : workspaces.find((ws) => ws.threads.some((t) => t.id === activeThreadId))
+  const activeWorkspace = workspaces.find((ws) =>
+    ws.threads.some((t) => t.id === activeThreadId)
+  )
 
   const handleNewThread = useCallback(() => {
     navigate({
@@ -152,15 +148,7 @@ export function MainTabBar() {
                 dropAfter && "border-r-2 border-primary"
               )}
             >
-              {tab.type === "thread" ? (
-                <ThreadTabIcon threadId={tab.threadId} />
-              ) : (
-                <Icon
-                  icon={`catppuccin:${getIconName(tab.title)}`}
-                  className="size-3.5 shrink-0"
-                  aria-hidden
-                />
-              )}
+              <ThreadTabIcon threadId={tab.threadId} />
               <span className="max-w-32 truncate">{tab.title}</span>
               <Button
                 variant="ghost"

@@ -3,7 +3,7 @@ import { Icon } from "@iconify/react"
 
 import { cn } from "@/shared/lib/utils"
 import { getIconName } from "@/shared/ui/file-icon"
-import { useMainTabsStore } from "@/features/main-tabs"
+import { openFileTab } from "@/features/dock"
 import {
   statusBadgeClasses,
   statusLabel,
@@ -241,7 +241,7 @@ export function FileChip({
       : null
 
   function handleClick() {
-    useMainTabsStore.getState().addFileTab({
+    openFileTab({
       filePath: absolutePath,
       title: basename,
       workspacePath: rootPath,

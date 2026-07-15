@@ -24,7 +24,7 @@ import { Input } from "@/shared/ui/input"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { SidebarHeader } from "@/shared/ui/sidebar"
 import { getFileIcon } from "@/shared/ui/file-icon"
-import { useMainTabs } from "@/features/main-tabs"
+import { openFileTab } from "@/features/dock"
 import {
   useWorkspaceIndex,
   workspaceKeys,
@@ -221,7 +221,6 @@ export function FileTree({
   threadId,
   gitStatus,
 }: FileTreeProps) {
-  const { addFileTab } = useMainTabs()
   const expanded = useFileTree((s) => s.expanded)
   const toggleDir = useFileTree((s) => s.toggleDir)
   const collapseAll = useFileTree((s) => s.collapseAll)
@@ -334,9 +333,9 @@ export function FileTree({
     (relativePath: string) => {
       const filePath = `${workspacePath}/${relativePath}`
       const name = relativePath.split("/").pop() || relativePath
-      addFileTab({ filePath, title: name, workspacePath })
+      openFileTab({ filePath, title: name, workspacePath })
     },
-    [addFileTab, workspacePath]
+    [workspacePath]
   )
 
   const handleRefresh = useCallback(async () => {

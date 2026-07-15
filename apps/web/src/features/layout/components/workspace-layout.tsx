@@ -1,11 +1,4 @@
-import React, {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Outlet,
   useParams,
@@ -15,13 +8,18 @@ import {
 
 import { AppSidebar, useWorkspace } from "@/features/workspace"
 import { TitleBar } from "./title-bar"
-import { RightSidebarContent } from "./right-sidebar"
-import { useRightSidebar } from "../store/right-sidebar"
 import { useLeftSidebarStore } from "../store/left-sidebar"
 import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar"
+import { Sheet, SheetContent } from "@/shared/ui/sheet"
 import { TooltipProvider } from "@/shared/ui/tooltip"
 import { useTerminal } from "@/features/terminal"
-import { useReviewPanel } from "@/features/git"
+import {
+  useDockStore,
+  isTabVisible,
+  DockZone,
+  useIsForeignDockDrag,
+  type DockPanelContext,
+} from "@/features/dock"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
 import { usePrefetchThreadsMessages } from "@/features/chat/hooks"
 import { CommandPalette } from "@/features/command-palette"
@@ -30,12 +28,8 @@ import { cn } from "@/shared/lib/utils"
 import { useShortcutHandler } from "@/shared/components/keyboard-shortcuts-provider"
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 
-const TerminalPanel = lazy(() =>
-  import("@/features/terminal").then((m) => ({ default: m.TerminalPanel }))
-)
-
 // Smallest the central chat/editor column may shrink to. Both the right
-// sidebar's resize gutter and the window-resize layout clamp against this so
+// dock's resize gutter and the window-resize layout clamp against this so
 // the chat panel always stays usable.
 const MIN_CHAT_PANEL_WIDTH = 500
 
@@ -66,13 +60,18 @@ export function WorkspaceLayout() {
     threadId?: string
   }
   const { states: terminalStates, syncCwd: syncTerminalCwd } = useTerminal()
-  const { isFullscreen: diffFullscreen } = useReviewPanel()
-  const {
-    isOpen: rightSidebarOpen,
-    toggleFileTree,
-    width: rightSidebarWidth,
-    setWidth: setRightSidebarWidth,
-  } = useRightSidebar()
+  const rightDock = useDockStore((s) => s.docks.right)
+  const bottomDock = useDockStore((s) => s.docks.bottom)
+  const rightDockFullscreen = useDockStore((s) => s.rightDockFullscreen)
+  const toggleRightDockFullscreen = useDockStore((s) => s.toggleRightDockFullscreen)
+  const closeDock = useDockStore((s) => s.closeDock)
+  const setDockSize = useDockStore((s) => s.setDockSize)
+  const toggleFileTree = useDockStore((s) => s.toggleFileTree)
+  const terminalTabVisible = useDockStore((s) => isTabVisible(s, "terminal"))
+  // Mounts an otherwise-empty dock as a drop target while a tab from the
+  // other dock is being dragged over it (see dock-zone.tsx).
+  const rightDropTarget = useIsForeignDockDrag("right")
+  const bottomDropTarget = useIsForeignDockDrag("bottom")
   const leftSidebarOpen = useLeftSidebarStore((s) => s.isOpen)
   const setLeftSidebarOpen = useLeftSidebarStore((s) => s.setOpen)
 
@@ -87,7 +86,7 @@ export function WorkspaceLayout() {
   const dragStartWidth = useRef(0)
   const sidebarRef = useRef<HTMLDivElement>(null)
 
-  const [terminalHeight, setTerminalHeight] = useState(256)
+  const bottomDockRef = useRef<HTMLDivElement>(null)
   const isTerminalDragging = useRef(false)
   const terminalDragStartY = useRef(0)
   const terminalDragStartHeight = useRef(0)
@@ -160,7 +159,7 @@ export function WorkspaceLayout() {
       e.preventDefault()
       isDragging.current = true
       dragStartX.current = e.clientX
-      dragStartWidth.current = rightSidebarWidth
+      dragStartWidth.current = rightDock.size
       // Suppress the open/close width animation while dragging so resize tracks
       // the cursor 1:1 instead of easing toward each new width.
       if (sidebarRef.current) sidebarRef.current.style.transition = "none"
@@ -194,13 +193,13 @@ export function WorkspaceLayout() {
         document.body.style.userSelect = ""
         // Restore the class-based width transition for subsequent open/close.
         if (sidebarRef.current) sidebarRef.current.style.transition = ""
-        // Commit final width to React state exactly once
+        // Commit final width to the dock store exactly once
         const delta = dragStartX.current - ev.clientX
         const finalWidth = Math.max(
           240,
           Math.min(maxWidth, dragStartWidth.current + delta)
         )
-        setRightSidebarWidth(finalWidth)
+        setDockSize("right", finalWidth)
       }
 
       document.body.style.cursor = "col-resize"
@@ -208,7 +207,7 @@ export function WorkspaceLayout() {
       document.addEventListener("mousemove", onMove)
       document.addEventListener("mouseup", onUp)
     },
-    [rightSidebarWidth, setRightSidebarWidth]
+    [rightDock.size, setDockSize]
   )
 
   const handleTerminalResizeStart = useCallback(
@@ -216,7 +215,8 @@ export function WorkspaceLayout() {
       e.preventDefault()
       isTerminalDragging.current = true
       terminalDragStartY.current = e.clientY
-      terminalDragStartHeight.current = terminalHeight
+      terminalDragStartHeight.current = bottomDock.size
+      if (bottomDockRef.current) bottomDockRef.current.style.transition = "none"
 
       const onMove = (ev: MouseEvent) => {
         if (!isTerminalDragging.current) return
@@ -225,15 +225,23 @@ export function WorkspaceLayout() {
           80,
           Math.min(800, terminalDragStartHeight.current + delta)
         )
-        setTerminalHeight(next)
+        // Bypass React re-renders during drag — update height directly.
+        if (bottomDockRef.current) bottomDockRef.current.style.height = `${next}px`
       }
 
-      const onUp = () => {
+      const onUp = (ev: MouseEvent) => {
         isTerminalDragging.current = false
         document.removeEventListener("mousemove", onMove)
         document.removeEventListener("mouseup", onUp)
         document.body.style.cursor = ""
         document.body.style.userSelect = ""
+        if (bottomDockRef.current) bottomDockRef.current.style.transition = ""
+        const delta = terminalDragStartY.current - ev.clientY
+        const finalHeight = Math.max(
+          80,
+          Math.min(800, terminalDragStartHeight.current + delta)
+        )
+        setDockSize("bottom", finalHeight)
       }
 
       document.body.style.cursor = "row-resize"
@@ -241,7 +249,7 @@ export function WorkspaceLayout() {
       document.addEventListener("mousemove", onMove)
       document.addEventListener("mouseup", onUp)
     },
-    [terminalHeight]
+    [bottomDock.size, setDockSize]
   )
 
   usePrefetchThreadsMessages()
@@ -252,29 +260,16 @@ export function WorkspaceLayout() {
     ws.threads.some((t) => t.id === activeThreadId)
   )
 
-  // On /new, fall back to the ?ws= workspace so the right sidebar can open
+  // On /new, fall back to the ?ws= workspace so the right dock can open
   const rsWorkspace =
     activeWorkspace ??
     (newThreadWsId ? workspaces.find((w) => w.id === newThreadWsId) : undefined)
 
   const terminalHost =
     activeWorkspace ??
-    workspaces.find((ws) => terminalStates[ws.id]?.isOpen) ??
     workspaces.find((ws) => (terminalStates[ws.id]?.tabs.length ?? 0) > 0)
 
-  const activeTerminalOpen =
-    !diffFullscreen &&
-    (terminalHost ? (terminalStates[terminalHost.id]?.isOpen ?? false) : false)
-
-  // Keep the terminal panel mounted as long as any workspace has live tabs, so
-  // switching threads between workspaces doesn't tear down PTYs that are still
-  // running. The panel is hidden (not unmounted) when the active workspace's
-  // terminal isn't open.
-  const anyTerminalTabs = Object.values(terminalStates).some(
-    (s) => s.tabs.length > 0
-  )
-
-  // Session derivation for the right sidebar — follows the active thread, or any
+  // Session derivation for the right dock — follows the active thread, or any
   // thread from the /new-page workspace (git state is workspace-level).
   const activeThread = activeWorkspace?.threads.find(
     (t) => t.id === activeThreadId
@@ -284,25 +279,14 @@ export function WorkspaceLayout() {
   // tree must follow it into that worktree rather than showing the workspace.
   const activeWorktreePath = activeThread?.worktreePath ?? null
   const activeTerminalCwd = activeWorktreePath ?? activeWorkspace?.path
-  const activeWorkspaceTerminalOpen = activeWorkspaceId
-    ? (terminalStates[activeWorkspaceId]?.isOpen ?? false)
-    : false
 
   useEffect(() => {
-    if (
-      !activeWorkspaceId ||
-      !activeTerminalCwd ||
-      !activeWorkspaceTerminalOpen
-    ) {
+    if (!activeWorkspaceId || !activeTerminalCwd || !terminalTabVisible) {
       return
     }
     syncTerminalCwd(activeWorkspaceId, activeTerminalCwd)
-  }, [
-    activeWorkspaceId,
-    activeTerminalCwd,
-    activeWorkspaceTerminalOpen,
-    syncTerminalCwd,
-  ])
+  }, [activeWorkspaceId, activeTerminalCwd, terminalTabVisible, syncTerminalCwd])
+
   const rsSessionId =
     activeThread?.sessionId ??
     rsWorkspace?.threads.find((t) => t.sessionId)?.sessionId ??
@@ -312,7 +296,6 @@ export function WorkspaceLayout() {
   // workspace path.
   const rsWorkspacePath = activeWorktreePath ?? rsWorkspace?.path
   const rsOpenWithAppId = rsWorkspace?.openWithAppId ?? null
-  const rsReady = !!rsSessionId || !!rsWorkspace
 
   // Workspace-stable session for git queries — only changes when the workspace changes,
   // not on every thread switch. Prevents git APIs from re-running when switching between
@@ -339,9 +322,43 @@ export function WorkspaceLayout() {
     ? (activeThread?.sessionId ?? stableRsWorkspaceSessionId)
     : stableRsWorkspaceSessionId
 
+  const dockContext: DockPanelContext = useMemo(
+    () => ({
+      sessionId: rsSessionId,
+      workspaceSessionId: rsGitSessionId,
+      workspaceId: rsWorkspaceId ?? null,
+      workspacePath: rsWorkspacePath ?? null,
+      openWithAppId: rsOpenWithAppId,
+      treeThreadId: activeThread?.id ?? null,
+      terminalWorkspaceId: terminalHost?.id ?? null,
+      terminalCwd: terminalHost
+        ? terminalHost.id === activeWorkspaceId
+          ? (activeTerminalCwd ?? terminalHost.path)
+          : terminalHost.path
+        : null,
+    }),
+    [
+      rsSessionId,
+      rsGitSessionId,
+      rsWorkspaceId,
+      rsWorkspacePath,
+      rsOpenWithAppId,
+      activeThread?.id,
+      terminalHost,
+      activeWorkspaceId,
+      activeTerminalCwd,
+    ]
+  )
+
   useShortcutHandler(
     SHORTCUT_ACTIONS.TOGGLE_FILE_TREE,
     rsWorkspacePath ? toggleFileTree : null
+  )
+  // Disabled while the right dock has no tabs — fullscreen would collapse the
+  // chat column with nothing to show in its place.
+  useShortcutHandler(
+    SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF,
+    rightDock.tabIds.length > 0 ? toggleRightDockFullscreen : null
   )
 
   if (isSettingsRoute) {
@@ -369,6 +386,17 @@ export function WorkspaceLayout() {
     return <SplashScreen />
   }
 
+  // The terminal's PTY sockets stay alive as long as its dock tab exists
+  // (keepAlive, see panels.tsx) — so mounting is driven by tabIds, exactly
+  // like the right dock, not by whether any workspace has live PTYs. An
+  // empty-but-open dock still renders: it shows the panel picker.
+  const showBottomDock =
+    bottomDock.tabIds.length > 0 || bottomDropTarget || bottomDock.isOpen
+  // A foreign drag forces the dock visible even while closed/empty — otherwise
+  // its "Drop here" strip (or header) would be display:none and undroppable.
+  const bottomDockVisible =
+    (bottomDock.isOpen || bottomDropTarget) && !rightDockFullscreen
+
   return (
     <TooltipProvider>
       <SidebarProvider
@@ -393,15 +421,15 @@ export function WorkspaceLayout() {
 
         <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-12 pr-2 pb-2 peer-data-[state=collapsed]:pl-2 max-md:pl-2">
           {/* Editor column: the editor island and (when open) a separate
-              terminal island stacked below it, with a resize gutter as the gap.
+              bottom dock stacked below it, with a resize gutter as the gap.
               Chrome lives in the unified titlebar island above. */}
           <div
             className="flex h-full flex-1 flex-col overflow-hidden transition-[flex-grow,opacity] duration-200 ease-linear"
             style={{
-              flexGrow: diffFullscreen ? 0 : 1,
-              minWidth: diffFullscreen ? 0 : MIN_CHAT_PANEL_WIDTH,
-              opacity: diffFullscreen ? 0 : 1,
-              pointerEvents: diffFullscreen ? "none" : undefined,
+              flexGrow: rightDockFullscreen ? 0 : 1,
+              minWidth: rightDockFullscreen ? 0 : MIN_CHAT_PANEL_WIDTH,
+              opacity: rightDockFullscreen ? 0 : 1,
+              pointerEvents: rightDockFullscreen ? "none" : undefined,
             }}
           >
             <SidebarInset className="min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-border shadow-md">
@@ -410,88 +438,93 @@ export function WorkspaceLayout() {
               </div>
             </SidebarInset>
 
-            {terminalHost && anyTerminalTabs && (
+            {showBottomDock && (
               <>
                 {/* Resize gutter — doubles as the gap between the islands. */}
                 <div
                   onMouseDown={handleTerminalResizeStart}
                   className="group relative h-2 shrink-0 cursor-row-resize"
-                  style={{ display: activeTerminalOpen ? undefined : "none" }}
+                  style={{ display: bottomDockVisible ? undefined : "none" }}
                 >
                   <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-border" />
                 </div>
-                {/* Terminal island */}
+                {/* Bottom dock (terminal island) */}
                 <div
-                  className="shrink-0 overflow-hidden rounded-2xl border border-border bg-background shadow-md"
+                  ref={bottomDockRef}
+                  className="shrink-0 overflow-hidden"
                   style={{
-                    height: terminalHeight,
-                    display: activeTerminalOpen ? undefined : "none",
+                    height: bottomDock.size,
+                    display: bottomDockVisible ? undefined : "none",
                   }}
                 >
-                  <Suspense fallback={<div className="h-full bg-background" />}>
-                    <TerminalPanel
-                      activeWorkspaceId={terminalHost.id}
-                      cwd={
-                        terminalHost.id === activeWorkspaceId
-                          ? (activeTerminalCwd ?? terminalHost.path)
-                          : terminalHost.path
-                      }
-                    />
-                  </Suspense>
+                  <DockZone dockId="bottom" ctx={dockContext} />
                 </div>
               </>
             )}
           </div>
 
-          {/* Right sidebar — outside the card, mirrors AppSidebar on the left */}
-          {rsReady && (
-            <>
-              {!isMobile && rightSidebarOpen && !diffFullscreen && (
-                <div
-                  onMouseDown={handleResizeStart}
-                  className="group relative z-30 w-2 shrink-0 cursor-col-resize"
+          {/* Right dock — outside the card, mirrors AppSidebar on the left */}
+          {isMobile ? (
+            (rightDock.tabIds.length > 0 || rightDock.isOpen) && (
+              <Sheet
+                open={rightDock.isOpen}
+                onOpenChange={(open) => {
+                  if (!open) closeDock("right")
+                }}
+              >
+                <SheetContent
+                  side="right"
+                  showCloseButton={false}
+                  className="bg-transparent p-0 text-sidebar-foreground shadow-none data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100%-1rem)] data-[side=right]:border-l-0 sm:max-w-none"
+                  style={{ width: 720, maxWidth: "calc(85vw - 1rem)" }}
                 >
-                  <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-border" />
-                </div>
-              )}
-              <SidebarProvider
-                ref={sidebarRef}
-                style={
-                  {
-                    "--sidebar-width": `${rightSidebarWidth}px`,
-                    // flex-basis comes from the width classes below (flex-none
-                    // resolves an "auto" basis to the element's width); only
-                    // flex-grow toggles here, so fullscreen grows smoothly
-                    // from whatever width is currently on screen instead of
-                    // snapping to a recalculated basis.
-                    flexGrow: diffFullscreen ? 1 : 0,
-                  } as React.CSSProperties
-                }
-                className={cn(
-                  "h-full min-h-0 overflow-hidden transition-[width,flex-grow] duration-200 ease-linear",
-                  isMobile
-                    ? "hidden"
-                    : rightSidebarOpen
-                      ? diffFullscreen
+                  <DockZone dockId="right" ctx={dockContext} />
+                </SheetContent>
+              </Sheet>
+            )
+          ) : (
+            (rightDock.tabIds.length > 0 || rightDropTarget || rightDock.isOpen) && (
+              <>
+                {rightDock.isOpen && !rightDockFullscreen && (
+                  <div
+                    onMouseDown={handleResizeStart}
+                    className="group relative z-30 w-2 shrink-0 cursor-col-resize"
+                  >
+                    <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-border" />
+                  </div>
+                )}
+                <div
+                  ref={sidebarRef}
+                  style={
+                    {
+                      "--sidebar-width": `${rightDock.size}px`,
+                      // flex-basis comes from the width classes below (flex-none
+                      // resolves an "auto" basis to the element's width); only
+                      // flex-grow toggles here, so fullscreen grows smoothly
+                      // from whatever width is currently on screen instead of
+                      // snapping to a recalculated basis.
+                      flexGrow: rightDockFullscreen ? 1 : 0,
+                    } as React.CSSProperties
+                  }
+                  className={cn(
+                    "h-full min-h-0 overflow-hidden transition-[width,flex-grow] duration-200 ease-linear",
+                    // A foreign drag forces the dock visible even while closed —
+                    // a w-0 dock can't receive the drop.
+                    rightDock.isOpen || rightDropTarget
+                      ? rightDockFullscreen
                         ? "w-(--sidebar-width) flex-none"
-                        : // Cap at the available space so the sidebar never
+                        : // Cap at the available space so the dock never
                           // overflows the right padding as the window shrinks —
                           // always leaving the chat panel its min width plus the
                           // 0.5rem resize gutter (MIN_CHAT_PANEL_WIDTH = 500).
                           "w-(--sidebar-width) max-w-[calc(100%-500px-0.5rem)] flex-none"
                       : "w-0 flex-none"
-                )}
-              >
-                <RightSidebarContent
-                  sessionId={rsSessionId}
-                  workspaceSessionId={rsGitSessionId}
-                  openWithAppId={rsOpenWithAppId}
-                  workspaceId={rsWorkspaceId}
-                  workspacePath={rsWorkspacePath}
-                  treeThreadId={activeThread?.id}
-                />
-              </SidebarProvider>
-            </>
+                  )}
+                >
+                  <DockZone dockId="right" ctx={dockContext} />
+                </div>
+              </>
+            )
           )}
         </div>
 

@@ -5,7 +5,7 @@ import { Icon } from "@iconify/react"
 import { cn } from "@/shared/lib/utils"
 import { getIconName } from "@/shared/ui/file-icon"
 import { SectionLabel } from "@/shared/ui/section-label"
-import { useMainTabsStore } from "@/features/main-tabs"
+import { openFileTab } from "@/features/dock"
 import type { AgentDto } from "@/features/workspace/api"
 import { attachmentUrl, type SlashCommand } from "../api"
 import type { UserMessage } from "../types"
@@ -136,7 +136,7 @@ function FileContextChip({ context }: { context: FileCommentContext }) {
     !!context.code && context.code.trim() === context.comment.trim()
 
   function handleClick() {
-    useMainTabsStore.getState().addFileTab({
+    openFileTab({
       filePath: resolveAbsolutePath(context.path, rootPath),
       title: basename,
       workspacePath: rootPath,
@@ -214,7 +214,7 @@ function AttachmentList({
     a: NonNullable<UserMessage["attachments"]>[number],
     src: string
   ) => {
-    useMainTabsStore.getState().addFileTab({
+    openFileTab({
       filePath: a.filename,
       title: a.filename,
       sourceUrl: src,

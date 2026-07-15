@@ -1,5 +1,4 @@
 import { create } from "zustand"
-import { useRightSidebarStore } from "@/features/layout/store/right-sidebar"
 
 export interface ThreadMainTab {
   id: string
@@ -8,34 +7,16 @@ export interface ThreadMainTab {
   title: string
 }
 
-export interface FileMainTab {
-  id: string
-  type: "file"
-  filePath: string
-  title: string
-  workspacePath?: string
-  openWithAppId?: string | null
-  scrollToLine?: number
-  /**
-   * When set, the viewer loads the file bytes from this fully-qualified,
-   * token-appended URL instead of `/file?path=`. Used for chat attachments,
-   * which live outside any workspace directory.
-   */
-  sourceUrl?: string
-}
-
-export type MainTab = ThreadMainTab | FileMainTab
+export type MainTab = ThreadMainTab
 
 interface MainTabsStore {
   tabs: MainTab[]
   activeTabId: string | null
   pendingThreadIds: Set<string>
   addThreadTab: (threadId: string, title: string, pending?: boolean) => void
-  addFileTab: (tab: Omit<FileMainTab, "id" | "type">) => void
   closeTab: (id: string) => void
-  closeWorkspaceTabs: (workspacePath: string, threadIds: string[]) => void
+  closeWorkspaceTabs: (threadIds: string[]) => void
   setActiveTab: (id: string) => void
-  clearActiveTab: () => void
   updateThreadTitle: (threadId: string, title: string) => void
   confirmThread: (threadId: string) => void
   reorderTabs: (draggedId: string, targetId: string, before: boolean) => void
@@ -60,32 +41,6 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
       return { tabs: [...s.tabs, newTab], activeTabId: id, pendingThreadIds }
     }),
 
-  addFileTab: (tab) => {
-    useRightSidebarStore.getState().open()
-    set((s) => {
-      const existing = s.tabs.find(
-        (t) => t.type === "file" && t.filePath === tab.filePath
-      )
-      if (existing) {
-        return {
-          activeTabId: existing.id,
-          tabs: s.tabs.map((item) =>
-            item.id === existing.id && item.type === "file"
-              ? {
-                  ...item,
-                  scrollToLine: tab.scrollToLine,
-                  sourceUrl: tab.sourceUrl,
-                }
-              : item
-          ),
-        }
-      }
-      const id = `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-      const newTab: FileMainTab = { id, type: "file", ...tab }
-      return { tabs: [...s.tabs, newTab], activeTabId: id }
-    })
-  },
-
   closeTab: (id) =>
     set((s) => {
       const idx = s.tabs.findIndex((t) => t.id === id)
@@ -100,13 +55,11 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
       return { tabs: newTabs, activeTabId: newActiveTabId }
     }),
 
-  closeWorkspaceTabs: (workspacePath, threadIds) =>
+  closeWorkspaceTabs: (threadIds) =>
     set((s) => {
       const threadIdSet = new Set(threadIds)
       const newTabs = s.tabs.filter(
-        (t) =>
-          !(t.type === "thread" && threadIdSet.has(t.threadId)) &&
-          !(t.type === "file" && t.workspacePath === workspacePath)
+        (t) => !(t.type === "thread" && threadIdSet.has(t.threadId))
       )
       if (newTabs.length === s.tabs.length) return s
       const activeStillExists = newTabs.some((t) => t.id === s.activeTabId)
@@ -119,7 +72,6 @@ export const useMainTabsStore = create<MainTabsStore>()((set) => ({
     }),
 
   setActiveTab: (id) => set({ activeTabId: id }),
-  clearActiveTab: () => set({ activeTabId: null }),
 
   confirmThread: (threadId) =>
     set((s) => {

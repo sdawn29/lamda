@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState, useSyncExternalStore } from "react"
 import {
-  TerminalSquare,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -12,6 +11,7 @@ import {
   Copy,
   ChevronLeft,
   ChevronRight,
+  PanelBottom,
   PanelRight,
   MessageSquarePlus,
   Search,
@@ -28,7 +28,7 @@ import {
 } from "@tanstack/react-router"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
-import { Toggle } from "@/shared/ui/toggle"
+import { ButtonGroup } from "@/shared/ui/button-group"
 import { useSidebar, SidebarTrigger } from "@/shared/ui/sidebar"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 import {
@@ -44,7 +44,6 @@ import {
   BranchSelector,
   WorktreeSelector,
   useThreadBranchControls,
-  useReviewPanel,
 } from "@/features/git"
 import {
   AlertDialog,
@@ -57,7 +56,7 @@ import {
 } from "@/shared/ui/alert-dialog"
 import { useSkillsSearchStore, useSkillDetails } from "@/features/skills"
 import { useAutomationsUiStore } from "@/features/automations"
-import { useRightSidebar } from "../store/right-sidebar"
+import { useDockStore, toggleReviewPanel } from "@/features/dock"
 import {
   useElectronFullscreen,
   useElectronPlatform,
@@ -74,7 +73,6 @@ import {
 import { SHORTCUT_ACTIONS } from "@/shared/lib/keyboard-shortcuts"
 import { ShortcutKbd } from "@/shared/ui/kbd"
 import { TasksDropdown } from "@/features/tasks"
-import { useMainTabs } from "@/features/main-tabs"
 import { useCommandPalette } from "@/features/command-palette"
 import { NotificationBell } from "@/features/notifications"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
@@ -193,23 +191,22 @@ export function TitleBar() {
   // sheet, surface the new-thread + search shortcuts here.
   const isMobile = useIsMobile(900)
   const openPalette = useCommandPalette((state) => state.openPalette)
-  const {
-    isOpen: rightSidebarOpen,
-    close: closeRightSidebar,
-    togglePanel,
-    toggle: toggleRightSidebar,
-  } = useRightSidebar()
-  const { isFullscreen: diffFullscreen, toggleFullscreen } = useReviewPanel()
-  const toggleDiff = () => togglePanel("changes")
+  const bottomDockOpen = useDockStore((s) => s.docks.bottom.isOpen)
+  const rightDockOpen = useDockStore((s) => s.docks.right.isOpen)
+  const rightDockFullscreen = useDockStore((s) => s.rightDockFullscreen)
+  const toggleRightDockFullscreen = useDockStore(
+    (s) => s.toggleRightDockFullscreen
+  )
+  const toggleRightDock = useDockStore((s) => s.toggleDock)
+  const closeRightDock = useDockStore((s) => s.closeDock)
   const handleToggleRightSidebar = () => {
-    if (diffFullscreen) {
-      toggleFullscreen()
-      closeRightSidebar()
+    if (rightDockFullscreen) {
+      toggleRightDockFullscreen()
+      closeRightDock("right")
     } else {
-      toggleRightSidebar()
+      toggleRightDock("right")
     }
   }
-  const { activeTab } = useMainTabs()
 
   // URL-based thread — drives center display and thread actions
   const { threadId, id: skillDetailId } = useParams({ strict: false }) as {
@@ -239,16 +236,6 @@ export function TitleBar() {
     [workspaces, urlActiveThread]
   )
 
-  // File tab from the right-sidebar store — shown in title bar when a file is open
-  const activeTabFile = activeTab?.type === "file" ? activeTab : null
-
-  const fileWorkspace = useMemo(() => {
-    if (!activeTabFile) return null
-    return (
-      workspaces.find((ws) => ws.path === activeTabFile.workspacePath) ?? null
-    )
-  }, [activeTabFile, workspaces])
-
   // On /new the URL has ?ws=<id>; use it to drive action buttons when no thread is active
   const { ws: newThreadWsId } = useSearch({ strict: false }) as { ws?: string }
   const actionWorkspace =
@@ -256,9 +243,7 @@ export function TitleBar() {
     (newThreadWsId ? workspaces.find((w) => w.id === newThreadWsId) : undefined)
 
   const effectiveWorkspacePath =
-    urlActiveThread?.worktreePath ??
-    actionWorkspace?.path ??
-    fileWorkspace?.path
+    urlActiveThread?.worktreePath ?? actionWorkspace?.path
 
   // Branch selector + "working location" (worktree) controls for the active
   // thread — rendered as an island beside the thread name below.
@@ -275,14 +260,11 @@ export function TitleBar() {
     worktreeBranch: urlActiveThread?.worktreeBranch,
   })
 
-  const {
-    isOpen: terminalOpen,
-    toggle: toggleTerminal,
-    runCommand: runTerminalCommand,
-  } = useTerminalForWorkspace(
-    actionWorkspace?.id ?? "",
-    effectiveWorkspacePath ?? ""
-  )
+  const { toggle: toggleTerminal, runCommand: runTerminalCommand } =
+    useTerminalForWorkspace(
+      actionWorkspace?.id ?? "",
+      effectiveWorkspacePath ?? ""
+    )
   const { data: platform } = useElectronPlatform()
   const { data: isFullscreen = false } = useElectronFullscreen()
   const isMac = platform === "darwin"
@@ -376,7 +358,7 @@ export function TitleBar() {
   useShortcutHandler(SHORTCUT_ACTIONS.TOGGLE_SIDEBAR, toggleSidebar)
   useShortcutHandler(
     SHORTCUT_ACTIONS.TOGGLE_REVIEW_PANEL,
-    isSettings ? null : toggleDiff
+    isSettings ? null : toggleReviewPanel
   )
   useShortcutHandler(
     SHORTCUT_ACTIONS.TOGGLE_TERMINAL,
@@ -394,7 +376,6 @@ export function TitleBar() {
     SHORTCUT_ACTIONS.NAVIGATE_FORWARD,
     canGoForward ? () => router.history.forward() : null
   )
-  const terminalBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_TERMINAL)
   const renameBinding = useShortcutBinding(SHORTCUT_ACTIONS.RENAME_THREAD)
   const sidebarBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_SIDEBAR)
   const backBinding = useShortcutBinding(SHORTCUT_ACTIONS.NAVIGATE_BACK)
@@ -678,7 +659,7 @@ export function TitleBar() {
                           variant="ghost"
                           size="icon-xs"
                           style={noDrag}
-                          className="ml-0 max-w-0 shrink-0 translate-x-1 overflow-hidden text-muted-foreground/50 opacity-0 transition-all duration-150 group-hover/thread-title:ml-0.5 group-hover/thread-title:max-w-5 group-hover/thread-title:translate-x-0 group-hover/thread-title:opacity-100 aria-expanded:ml-0.5 aria-expanded:max-w-5 aria-expanded:translate-x-0 aria-expanded:opacity-100 focus-visible:ml-0.5 focus-visible:max-w-5 focus-visible:translate-x-0 focus-visible:opacity-100"
+                          className="ml-0 max-w-0 shrink-0 translate-x-1 overflow-hidden text-muted-foreground/50 opacity-0 transition-all duration-150 group-hover/thread-title:ml-0.5 group-hover/thread-title:max-w-5 group-hover/thread-title:translate-x-0 group-hover/thread-title:opacity-100 focus-visible:ml-0.5 focus-visible:max-w-5 focus-visible:translate-x-0 focus-visible:opacity-100 aria-expanded:ml-0.5 aria-expanded:max-w-5 aria-expanded:translate-x-0 aria-expanded:opacity-100"
                         />
                       }
                     >
@@ -748,19 +729,21 @@ export function TitleBar() {
         )}
 
         {/* ── Working location (worktree) island ─────────────────────────────── */}
-        {urlActiveThread && !isMobile && (branch !== null || branches.length > 0) && (
-          <div className={cn(island, "shrink-0")} style={noDrag}>
-            <WorktreeSelector
-              threadId={urlActiveThread.id}
-              sessionId={urlActiveThread.sessionId ?? undefined}
-              threadTitle={urlActiveThread.title}
-              branches={branches}
-              currentBranch={branch}
-              worktreeBranch={urlActiveThread.worktreeBranch}
-              onError={handleGitError}
-            />
-          </div>
-        )}
+        {urlActiveThread &&
+          !isMobile &&
+          (branch !== null || branches.length > 0) && (
+            <div className={cn(island, "shrink-0")} style={noDrag}>
+              <WorktreeSelector
+                threadId={urlActiveThread.id}
+                sessionId={urlActiveThread.sessionId ?? undefined}
+                threadTitle={urlActiveThread.title}
+                branches={branches}
+                currentBranch={branch}
+                worktreeBranch={urlActiveThread.worktreeBranch}
+                onError={handleGitError}
+              />
+            </div>
+          )}
 
         {/* Flexible filler — draggable gap separating left and right islands. */}
         <div className="h-full min-w-4 flex-1" />
@@ -779,7 +762,7 @@ export function TitleBar() {
             </div>
           )}
 
-        {/* Task, open-with, terminal and right-sidebar islands are workspace/
+        {/* Task, open-with, and dock-control islands are workspace/
           thread-scoped, so they're hidden on the (global) automations and
           skills pages. */}
         {!isAutomations && !isSkills && !isSkillDetail && (
@@ -803,31 +786,30 @@ export function TitleBar() {
               />
             </div>
 
-            {/* ── Terminal ───────────────────────────────────────────────────── */}
-            <div className={island} style={noDrag}>
+            {/* ── Sidebar controls ────────────────────────────────────────────── */}
+            <ButtonGroup
+              className={island}
+              style={noDrag}
+              aria-label="Sidebar controls"
+            >
               <Tooltip>
                 <TooltipTrigger
                   render={
-                    <Toggle
-                      pressed={terminalOpen}
-                      onPressedChange={() => toggleTerminal()}
-                      disabled={!effectiveWorkspacePath}
-                      className="size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30 aria-pressed:bg-muted aria-pressed:text-foreground"
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => toggleRightDock("bottom")}
+                      aria-pressed={bottomDockOpen}
+                      className="size-7 text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
                     >
-                      <TerminalSquare className="size-4" />
-                      <span className="sr-only">Toggle terminal</span>
-                    </Toggle>
+                      <PanelBottom data-icon="inline-start" />
+                      <span className="sr-only">Toggle bottom sidebar</span>
+                    </Button>
                   }
                 />
-                <TooltipContent>
-                  Toggle terminal{" "}
-                  <ShortcutKbd binding={terminalBinding} className="ml-1" />
-                </TooltipContent>
+                <TooltipContent>Toggle bottom sidebar</TooltipContent>
               </Tooltip>
-            </div>
 
-            {/* ── Right sidebar toggle ───────────────────────────────────────── */}
-            <div className={island} style={noDrag}>
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -835,10 +817,10 @@ export function TitleBar() {
                       variant="ghost"
                       size="icon-sm"
                       onClick={handleToggleRightSidebar}
-                      aria-pressed={rightSidebarOpen || diffFullscreen}
+                      aria-pressed={rightDockOpen || rightDockFullscreen}
                       className="size-7 text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
                     >
-                      <PanelRight className="size-4" />
+                      <PanelRight data-icon="inline-start" />
                       <span className="sr-only">Toggle right sidebar</span>
                     </Button>
                   }
@@ -848,7 +830,7 @@ export function TitleBar() {
                   <ShortcutKbd binding={rightSidebarBinding} className="ml-1" />
                 </TooltipContent>
               </Tooltip>
-            </div>
+            </ButtonGroup>
           </>
         )}
       </div>

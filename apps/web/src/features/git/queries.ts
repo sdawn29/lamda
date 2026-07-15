@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   gitStatus,
@@ -25,6 +26,11 @@ import {
   listBranches,
   listSessionWorktrees,
 } from "@/features/chat/api"
+import {
+  parseStatusLines,
+  statusLabel,
+  statusTextClass,
+} from "./components/status-badge"
 
 const gitRootKey = ["git"] as const
 const gitSessionKey = (sessionId: string) =>
@@ -73,6 +79,23 @@ export function useGitStatus(sessionId: string) {
     staleTime: 0,
     placeholderData: { raw: "", isGitRepo: true },
   })
+}
+
+/**
+ * Git status per path, for highlighting changed files with their status
+ * letter/colour (e.g. in the file tree). Keyed by repo-relative path, which
+ * matches the tree's entry.relativePath (both resolve against the same root).
+ */
+export function useGitStatusByPath(sessionId: string) {
+  const { data } = useGitStatus(sessionId)
+  return useMemo(() => {
+    const map = new Map<string, { label: string; className: string }>()
+    for (const file of parseStatusLines(data?.raw ?? "")) {
+      const label = statusLabel(file)
+      map.set(file.filePath, { label, className: statusTextClass(label) })
+    }
+    return map
+  }, [data])
 }
 
 // ── Git file diff ─────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
-export { useReviewPanel } from "./store"
+export { selectReviewFile, useReviewPanel, useReviewPanelStore } from "./store"
 export { ReviewPanel } from "./components/review-panel"
+export { ModifiedFilesNavigator } from "./components/modified-files-navigator"
 export { HistoryView } from "./components/history-view"
 export { CommitInputSection } from "./components/commit-dialog"
 export { BranchSelector } from "./components/branch-selector"
@@ -22,6 +23,7 @@ export {
   useWorkspaceBranches,
   gitStatusKey,
   useGitStatus,
+  useGitStatusByPath,
   useGitFileDiff,
   useTurns,
   useLastCommitAt,
