@@ -51,6 +51,8 @@ export interface DockPanelDefinition {
   type: string
   /** Human-readable name — the picker entry and the default tab title. */
   label: string
+  /** One-line summary shown under the label in the empty-dock picker. */
+  description?: string
   /** Only one tab of this type may exist across both docks. */
   singleton: boolean
   /** Content stays mounted (display:none) while another tab in its dock is active. */

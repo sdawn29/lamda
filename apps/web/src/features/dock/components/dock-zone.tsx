@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useMemo, useRef, useState } from "react"
-import { Maximize2, Minimize2, Plus, X } from "lucide-react"
+import { LayoutGrid, Maximize2, Minimize2, Plus, X } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -181,26 +181,58 @@ export function DockZone({ dockId, ctx }: DockZoneProps) {
         onDragLeave={() => setHeaderDropActive(false)}
         onDrop={handleHeaderDrop}
         className={cn(
-          "flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border bg-background shadow-md transition-colors",
+          "flex h-full w-full flex-col overflow-y-auto rounded-2xl border bg-background shadow-md transition-colors",
           headerDropActive ? "border-primary/60 bg-primary/5" : "border-border"
         )}
       >
-        <span className="text-xs text-muted-foreground/60">
-          {headerDropActive ? "Drop here" : "No panels open"}
-        </span>
-        <div className="flex items-center gap-1.5">
-          {availablePanels.map((def) => (
-            <Button
-              key={def.type}
-              variant="ghost"
-              size="sm"
-              onClick={() => openPanelInDock(def.type, dockId, ctx)}
-              className="h-7 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+        {/* m-auto (not justify-center) so the content scrolls instead of
+            clipping at the top when the dock is shorter than the picker. */}
+        <div className="m-auto flex w-full max-w-md flex-col items-center gap-4 px-4 py-6">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <div
+              className={cn(
+                "flex size-10 items-center justify-center rounded-xl border transition-colors",
+                headerDropActive
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border/60 bg-muted/60 text-muted-foreground"
+              )}
             >
-              {def.icon({ id: "", type: def.type, title: def.label })}
-              {def.label}
-            </Button>
-          ))}
+              <LayoutGrid className="size-4.5" aria-hidden />
+            </div>
+            <span className="text-sm font-medium">
+              {headerDropActive ? "Drop tab here" : "No panels open"}
+            </span>
+            <p className="text-xs leading-relaxed text-balance text-muted-foreground">
+              {headerDropActive
+                ? "Release to move the tab into this dock."
+                : "Open a panel to get started, or drag a tab here from another dock."}
+            </p>
+          </div>
+
+          {availablePanels.length > 0 && (
+            <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-1.5">
+              {availablePanels.map((def) => (
+                <button
+                  key={def.type}
+                  type="button"
+                  onClick={() => openPanelInDock(def.type, dockId, ctx)}
+                  className="group flex flex-col items-start gap-1 rounded-lg border border-border/50 bg-muted/30 p-2 text-left transition-colors hover:border-border hover:bg-accent/60 focus-visible:border-border focus-visible:bg-accent/60 focus-visible:outline-none"
+                >
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors group-hover:bg-background group-hover:text-foreground">
+                    {def.icon({ id: "", type: def.type, title: def.label })}
+                  </span>
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-xs font-medium">{def.label}</span>
+                    {def.description && (
+                      <span className="text-2xs leading-snug text-muted-foreground">
+                        {def.description}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     )

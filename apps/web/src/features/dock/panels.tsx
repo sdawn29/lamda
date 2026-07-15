@@ -272,6 +272,7 @@ export const PANELS: Record<string, DockPanelDefinition> = {
   review: {
     type: "review",
     label: "Review",
+    description: "Diffs and commit history for this thread",
     singleton: true,
     keepAlive: false,
     defaultDock: "right",
@@ -313,6 +314,7 @@ export const PANELS: Record<string, DockPanelDefinition> = {
   terminal: {
     type: "terminal",
     label: "Terminal",
+    description: "Shell sessions in this workspace",
     singleton: true,
     // PTY sessions stay connected while the terminal tab isn't active/visible.
     keepAlive: true,
@@ -332,6 +334,7 @@ export const PANELS: Record<string, DockPanelDefinition> = {
   subagents: {
     type: "subagents",
     label: "Subagents",
+    description: "Live subagent runs and transcripts",
     singleton: true,
     keepAlive: false,
     defaultDock: "right",
@@ -351,6 +354,7 @@ export const PANELS: Record<string, DockPanelDefinition> = {
   github: {
     type: "github",
     label: "GitHub",
+    description: "Pull request details and comments",
     singleton: true,
     keepAlive: false,
     defaultDock: "right",
@@ -363,6 +367,7 @@ export const PANELS: Record<string, DockPanelDefinition> = {
   gitlab: {
     type: "gitlab",
     label: "GitLab",
+    description: "Merge request details and comments",
     singleton: true,
     keepAlive: false,
     defaultDock: "right",
@@ -375,6 +380,7 @@ export const PANELS: Record<string, DockPanelDefinition> = {
   files: {
     type: "files",
     label: "Files",
+    description: "Browse and open workspace files",
     singleton: true,
     keepAlive: false,
     defaultDock: "right",

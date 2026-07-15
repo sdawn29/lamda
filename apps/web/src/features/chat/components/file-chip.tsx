@@ -7,19 +7,23 @@ import { openFileTab } from "@/features/dock"
 import {
   statusBadgeClasses,
   statusLabel,
-  statusTextClass,
 } from "@/features/git/components/status-badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/ui/tooltip"
 import { useFileChipGitStatus, useFileChipRootPath } from "../file-chip-context"
 import { useFilePeek } from "../queries"
-import { MessageChip } from "./message-chip"
 
 /**
  * The one file chip used everywhere in a transcript — assistant markdown
- * references (`path:line`) and user @-mentions. Inline it stays compact
- * (icon · basename · full path/location · git-status letter); hovering opens a card
- * with the full path, git state, file stats, and a line-numbered peek
- * centered on the referenced line. Clicking opens the file in the review
- * panel and scrolls to that line.
+ * references (`path:line`) and user @-mentions. Inline it renders as a plain
+ * inline-code run (workspace-relative path + location) that wraps like normal
+ * text; hovering opens a card with the full path, git state, file stats, and
+ * a line-numbered peek centered on the referenced line. Clicking opens the
+ * file in the review panel and scrolls to that line.
  */
 
 /** Human-readable git status names for the hover-card pill. The staged+unstaged
@@ -252,41 +256,44 @@ export function FileChip({
   const dotSeparator = <span className="text-muted-foreground/40">·</span>
 
   return (
-    <MessageChip
-      onClick={handleClick}
-      onOpenChange={(open) => {
-        if (open) setHasHovered(true)
-      }}
-      className={notFound && !isDeleted ? "opacity-60" : undefined}
-      icon={
-        <Icon
-          icon={`catppuccin:${getIconName(basename)}`}
-          data-icon="inline-start"
-          aria-hidden
+    <TooltipProvider delay={250}>
+      <Tooltip
+        onOpenChange={(open) => {
+          if (open) setHasHovered(true)
+        }}
+      >
+        <TooltipTrigger
+          render={
+            // A real <button> is an atomic inline-block and can't fragment
+            // across lines — a <code> run with box-decoration-clone wraps
+            // mid-path like the surrounding markdown text.
+            <code
+              role="button"
+              tabIndex={0}
+              onClick={handleClick}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  handleClick()
+                }
+              }}
+              className={cn(
+                "cursor-pointer rounded bg-muted box-decoration-clone px-1.5 py-0.5 font-mono text-[0.8125rem] break-all text-primary underline underline-offset-4 transition-colors hover:bg-primary/10 focus-visible:outline-none",
+                isDeleted && "line-through opacity-70",
+                notFound && !isDeleted && "opacity-60"
+              )}
+            >
+              {relPath}
+              {locationSuffix}
+            </code>
+          }
         />
-      }
-      label={
-        <span className={cn(isDeleted && "line-through opacity-70")}>
-          {basename}
-        </span>
-      }
-      meta={`${relPath}${locationSuffix}`}
-      statusDot={
-        label ? (
-          <span
-            className={cn(
-              "font-mono text-3xs leading-none font-bold",
-              statusTextClass(label)
-            )}
-            aria-label={STATUS_NAMES[label] ?? "Changed"}
-          >
-            {label}
-          </span>
-        ) : undefined
-      }
-      detailClassName="w-80 max-w-[calc(100vw-2rem)] flex-col items-stretch gap-0 overflow-hidden p-0"
-      detail={
-        <>
+        <TooltipContent
+          side="top"
+          align="start"
+          sideOffset={8}
+          className="w-80 max-w-[calc(100vw-2rem)] flex-col items-stretch gap-0 overflow-hidden p-0"
+        >
           {/* Header: icon · basename · status pill, full path underneath */}
           <div className="flex w-full items-center gap-2.5 border-b border-foreground/10 px-3 py-2.5">
             <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-foreground/5">
@@ -377,8 +384,8 @@ export function FileChip({
               Click to open in review panel
             </div>
           )}
-        </>
-      }
-    />
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }

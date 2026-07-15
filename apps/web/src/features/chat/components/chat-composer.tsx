@@ -1189,10 +1189,11 @@ export const ChatComposer = memo(
                 </span>
               </div>
             )}
-            <div className="flex items-center gap-1.5">
-              {/* Centers the single-line input (and its placeholder) against
-                  the 28px send button; the input itself is one line-height
-                  tall and grows naturally when the text wraps. */}
+            <div className="flex items-end gap-1.5">
+              {/* items-end keeps the 28px send button pinned to the bottom row
+                  as the input grows; single-line, the min-h-7 wrapper matches
+                  the button height so the input (and placeholder) still sit
+                  centered against it. */}
               <div className="flex min-h-7 min-w-0 flex-1 items-center">
                 <RichInput
                   ref={richInputRef}
