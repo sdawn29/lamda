@@ -1,4 +1,7 @@
+import { useState } from "react"
 import {
+  CheckCircle2,
+  ChevronDown,
   ChevronRight,
   ExternalLink,
   GitMerge,
@@ -7,7 +10,9 @@ import {
   GitPullRequestDraft,
   Loader2,
   RefreshCw,
+  XCircle,
 } from "lucide-react"
+import { openExternal } from "@/features/electron/api"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Skeleton } from "@/shared/ui/skeleton"
@@ -184,6 +189,204 @@ export function reviewItemStateIcon(
     return <GitPullRequest className="size-3.5 text-emerald-600" />
   }
   return <GitPullRequest className="size-3.5 text-muted-foreground" />
+}
+
+export type MergeReadinessKind =
+  | "merged"
+  | "closed"
+  | "draft"
+  | "ready"
+  | "conflicts"
+  | "checking"
+
+/**
+ * Derives the merge-readiness of a PR/MR from provider data. Accepts both
+ * vocabularies: GitHub `MERGEABLE`/`CONFLICTING` and GitLab
+ * `can_be_merged`/`cannot_be_merged`; anything else (UNKNOWN, GitLab
+ * checking states, null) counts as still checking.
+ */
+export function mergeReadinessKind(
+  state: string,
+  isDraft: boolean,
+  mergeStatus: string | null | undefined
+): MergeReadinessKind {
+  const normalizedState = state.toLowerCase()
+  if (normalizedState === "merged") return "merged"
+  if (normalizedState === "closed") return "closed"
+  if (isDraft) return "draft"
+  const normalizedStatus = mergeStatus?.toLowerCase() ?? null
+  if (normalizedStatus === "can_be_merged" || normalizedStatus === "mergeable")
+    return "ready"
+  if (
+    normalizedStatus === "cannot_be_merged" ||
+    normalizedStatus === "conflicting"
+  )
+    return "conflicts"
+  return "checking"
+}
+
+/** Slim tinted strip summarizing whether the PR/MR can be merged right now. */
+export function MergeReadinessBanner({
+  kind,
+  baseRefName,
+}: {
+  kind: MergeReadinessKind
+  baseRefName: string
+}) {
+  const { icon, text, tone } = (() => {
+    switch (kind) {
+      case "merged":
+        return {
+          icon: <GitMerge className="size-3.5 shrink-0" aria-hidden />,
+          text: "Merged",
+          tone: "border-purple-600/25 bg-purple-500/10 text-purple-600 dark:text-purple-400",
+        }
+      case "closed":
+        return {
+          icon: (
+            <GitPullRequestClosed className="size-3.5 shrink-0" aria-hidden />
+          ),
+          text: "Closed",
+          tone: "border-border/60 bg-muted/40 text-muted-foreground",
+        }
+      case "draft":
+        return {
+          icon: (
+            <GitPullRequestDraft className="size-3.5 shrink-0" aria-hidden />
+          ),
+          text: "Draft — mark as ready before merging",
+          tone: "border-border/60 bg-muted/40 text-muted-foreground",
+        }
+      case "ready":
+        return {
+          icon: <CheckCircle2 className="size-3.5 shrink-0" aria-hidden />,
+          text: "Ready to merge",
+          tone: "border-emerald-600/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-500",
+        }
+      case "conflicts":
+        return {
+          icon: <XCircle className="size-3.5 shrink-0" aria-hidden />,
+          text: `Has conflicts with ${baseRefName}`,
+          tone: "border-destructive/25 bg-destructive/10 text-destructive",
+        }
+      default:
+        return {
+          icon: (
+            <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+          ),
+          text: "Checking mergeability…",
+          tone: "border-border/60 bg-muted/40 text-muted-foreground",
+        }
+    }
+  })()
+
+  return (
+    <div
+      className={cn(
+        "flex w-fit max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium",
+        tone
+      )}
+    >
+      {icon}
+      <span className="min-w-0 truncate">{text}</span>
+    </div>
+  )
+}
+
+/** Provider-agnostic check/job row for the merge box summary. */
+export interface ChecksSummaryItem {
+  name: string
+  state: string
+  bucket: string
+  link: string | null
+  /** Grouping prefix — GitHub workflow / GitLab pipeline stage. */
+  group: string | null
+}
+
+/**
+ * One-line CI summary ("3/5 checks passed" + overall icon) that expands into
+ * the per-check rows. Collapsed by default.
+ */
+export function CollapsibleChecksSummary({
+  items,
+  noun = "checks",
+}: {
+  items: ChecksSummaryItem[]
+  noun?: string
+}) {
+  const [open, setOpen] = useState(false)
+
+  let passed = 0
+  let failed = 0
+  for (const item of items) {
+    if (item.bucket === "fail" || item.bucket === "cancel") failed++
+    else if (item.bucket === "pass" || item.bucket === "skipping") passed++
+  }
+  const pending = items.length - passed - failed
+  const overall = failed > 0 ? "fail" : pending > 0 ? "pending" : "pass"
+
+  const Chevron = open ? ChevronDown : ChevronRight
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border/45 bg-background/65">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-xs transition-colors hover:bg-muted/30"
+      >
+        <Chevron className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+        {overall === "fail" ? (
+          <XCircle className="size-3.5 shrink-0 text-destructive" aria-hidden />
+        ) : overall === "pending" ? (
+          <Loader2
+            className="size-3.5 shrink-0 animate-spin text-muted-foreground"
+            aria-hidden
+          />
+        ) : (
+          <CheckCircle2
+            className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-500"
+            aria-hidden
+          />
+        )}
+        <span className="min-w-0 flex-1 truncate">
+          {passed}/{items.length} {noun} passed
+        </span>
+      </button>
+      {open ? (
+        <div className="divide-y divide-border/40 border-t border-border/45">
+          {items.map((item) => (
+            <button
+              key={`${item.group}-${item.name}`}
+              type="button"
+              disabled={!item.link}
+              onClick={() => item.link && void openExternal(item.link)}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/30 disabled:cursor-default"
+            >
+              <span className="min-w-0 truncate">
+                {item.group ? `${item.group} / ` : ""}
+                {item.name}
+              </span>
+              <span className="flex shrink-0 items-center gap-1.5 text-3xs text-muted-foreground">
+                <span
+                  aria-hidden
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    item.bucket === "pass" || item.bucket === "skipping"
+                      ? "bg-emerald-500"
+                      : item.bucket === "fail" || item.bucket === "cancel"
+                        ? "bg-red-500"
+                        : "animate-pulse bg-muted-foreground/50"
+                  )}
+                />
+                {item.state}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 type StatusTone = "positive" | "negative" | "neutral"

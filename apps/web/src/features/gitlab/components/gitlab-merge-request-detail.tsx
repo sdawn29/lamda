@@ -2,6 +2,7 @@ import { useState } from "react"
 import {
   ArrowLeft,
   CircleDot,
+  Copy,
   ExternalLink,
   GitBranch,
   GitCommitHorizontal,
@@ -19,7 +20,7 @@ import {
 } from "@/features/github/components/pull-request-files"
 import { PullRequestCommentCard } from "@/features/github/components/pull-request-comment-card"
 import { PullRequestCommits } from "@/features/github/components/github-review-view"
-import { RemoteMarkdown } from "@/shared/components/remote-markdown"
+import { formatRelativeDate } from "@/shared/lib/formatters"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { SectionLabel } from "@/shared/ui/section-label"
@@ -27,7 +28,10 @@ import { Switch } from "@/shared/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 import { Textarea } from "@/shared/ui/textarea"
 import {
-  humanizeStatus,
+  CollapsibleChecksSummary,
+  MergeReadinessBanner,
+  mergeReadinessKind,
+  reviewItemStateIcon,
   StatusBadge,
 } from "@/features/github/components/panel-primitives"
 import {
@@ -169,6 +173,12 @@ export function GitlabMergeRequestDetail({
 
   const isOpen = mr.state.toLowerCase() === "opened"
   const pending = comment.isPending || checkout.isPending || merge.isPending
+  const readiness = mergeReadinessKind(mr.state, mr.isDraft, mr.mergeStatus)
+  const mergeBlockedReason = mr.isDraft
+    ? "Draft merge requests can't be merged"
+    : mr.mergeStatus === "cannot_be_merged"
+      ? "Resolve conflicts before merging"
+      : null
   const reviewFilesByPath = new Map(
     (review?.files ?? []).map((file) => [file.path, file] as const)
   )
@@ -256,7 +266,7 @@ export function GitlabMergeRequestDetail({
   return (
     <div className="@container/pr flex h-full min-h-0 flex-col bg-muted/[0.08]">
       <div className="shrink-0 p-2 pb-0">
-        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border/60 bg-background/85 px-2 py-1.5 shadow-sm shadow-black/[0.03] backdrop-blur">
+        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border/60 bg-background/85 px-2 py-1.5 shadow-sm shadow-black/[0.03] backdrop-blur dark:shadow-black/20">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -265,12 +275,19 @@ export function GitlabMergeRequestDetail({
           >
             <ArrowLeft data-icon="inline-start" />
           </Button>
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
+            {reviewItemStateIcon(mr.state, mr.isDraft, "opened")}
+          </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium text-foreground/90">
               {mr.title}
             </p>
-            <p className="truncate text-3xs text-muted-foreground/60">
-              Merge request !{mr.number} · {mr.author ?? "Unknown author"}
+            <p
+              className="truncate text-3xs text-muted-foreground/60"
+              title={new Date(mr.createdAt).toLocaleString()}
+            >
+              !{mr.number} · {mr.author ?? "Unknown author"} · opened{" "}
+              {formatRelativeDate(mr.createdAt)}
             </p>
           </div>
           <Button
@@ -324,45 +341,52 @@ export function GitlabMergeRequestDetail({
           className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 @sm/pr:px-3"
         >
           <div className="flex flex-col gap-2.5">
-            <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge variant={isOpen ? "default" : "secondary"}>
-                  {humanizeStatus(mr.state).label}
-                </Badge>
-                {mr.isDraft ? <Badge variant="outline">Draft</Badge> : null}
-                <StatusBadge value={mr.mergeStatus} />
-              </div>
-              <div className="mt-3 flex min-w-0 items-center gap-2 rounded-lg border border-border/45 bg-background/65 px-2.5 py-2 text-xs text-muted-foreground">
+            <section className="rounded-xl border border-border/60 bg-card/70 p-2.5 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
+              <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border/45 bg-background/65 px-2.5 py-1.5 text-xs text-muted-foreground">
                 <GitBranch className="size-3.5 shrink-0" aria-hidden />
                 <span className="min-w-0 truncate font-mono">
                   {mr.headRefName}
                 </span>
                 <span className="shrink-0 text-muted-foreground/40">→</span>
-                <span className="min-w-0 truncate font-mono">
+                <span className="min-w-0 flex-1 truncate font-mono">
                   {mr.baseRefName}
                 </span>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="shrink-0"
+                  aria-label="Copy source branch name"
+                  title="Copy source branch name"
+                  onClick={() =>
+                    void navigator.clipboard
+                      .writeText(mr.headRefName)
+                      .then(() => toast.success("Branch name copied"))
+                  }
+                >
+                  <Copy className="size-3" aria-hidden />
+                </Button>
               </div>
-              <div className="mt-3 grid grid-cols-4 divide-x divide-border/50 rounded-lg bg-muted/35 py-2 text-center">
+              <div className="mt-2.5 grid grid-cols-4 divide-x divide-border/50 rounded-lg bg-muted/35 py-2 text-center">
                 <div>
-                  <p className="text-xs font-semibold tabular-nums">
+                  <p className="text-sm font-semibold tabular-nums">
                     {mr.changedFiles}
                   </p>
                   <p className="text-3xs text-muted-foreground">Files</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold tabular-nums">
+                  <p className="text-sm font-semibold tabular-nums">
                     {mr.commits.length}
                   </p>
                   <p className="text-3xs text-muted-foreground">Commits</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-diff-add tabular-nums">
+                  <p className="text-sm font-semibold text-diff-add tabular-nums">
                     +{mr.additions}
                   </p>
                   <p className="text-3xs text-muted-foreground">Added</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-diff-remove tabular-nums">
+                  <p className="text-sm font-semibold text-diff-remove tabular-nums">
                     -{mr.deletions}
                   </p>
                   <p className="text-3xs text-muted-foreground">Removed</p>
@@ -370,68 +394,21 @@ export function GitlabMergeRequestDetail({
               </div>
             </section>
 
-            {mr.description ? (
-              <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-                <SectionLabel>Description</SectionLabel>
-                <div className="mt-2">
-                  <RemoteMarkdown content={mr.description} />
-                </div>
-              </section>
-            ) : null}
-
-            {mr.pipeline ? (
-              <section className="overflow-hidden rounded-xl border border-border/60 bg-card/70 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-                <div className="flex items-center justify-between gap-2 border-b border-border/45 px-3 py-2.5">
-                  <SectionLabel>Pipeline</SectionLabel>
-                  <Badge
-                    variant={
-                      mr.pipeline.status === "success"
-                        ? "secondary"
-                        : mr.pipeline.status === "failed"
-                          ? "destructive"
-                          : "outline"
-                    }
-                  >
-                    {mr.pipeline.status}
-                  </Badge>
-                </div>
-                <div className="divide-y divide-border/40">
-                  {mr.pipeline.jobs.map((job) => (
-                    <button
-                      key={`${job.stage}-${job.name}`}
-                      type="button"
-                      disabled={!job.link}
-                      onClick={() => job.link && void openExternal(job.link)}
-                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/30 disabled:cursor-default"
-                    >
-                      <span className="min-w-0 truncate">
-                        {job.stage ? `${job.stage} / ` : ""}
-                        {job.name}
-                      </span>
-                      <Badge
-                        variant={
-                          job.bucket === "pass"
-                            ? "secondary"
-                            : job.bucket === "fail"
-                              ? "destructive"
-                              : "outline"
-                        }
-                      >
-                        {job.state}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
             <section className="flex flex-col gap-2">
               <div className="flex items-center gap-2 px-0.5">
-                <SectionLabel>Comments</SectionLabel>
+                <SectionLabel>Conversation</SectionLabel>
                 {activity.length > 0 ? (
                   <Badge variant="secondary">{activity.length}</Badge>
                 ) : null}
               </div>
+              {mr.description ? (
+                <PullRequestCommentCard
+                  author={mr.author}
+                  body={mr.description}
+                  createdAt={mr.createdAt}
+                  context="Description"
+                />
+              ) : null}
               <ActivityList
                 items={activity}
                 loading={reviewLoading}
@@ -459,6 +436,66 @@ export function GitlabMergeRequestDetail({
                 </div>
               </div>
             </section>
+
+            <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <MergeReadinessBanner
+                  kind={readiness}
+                  baseRefName={mr.baseRefName}
+                />
+                {mr.isDraft && readiness !== "draft" ? (
+                  <Badge variant="outline">Draft</Badge>
+                ) : null}
+                {readiness === "draft" ? (
+                  <StatusBadge value={mr.mergeStatus} />
+                ) : null}
+              </div>
+              {mr.pipeline && mr.pipeline.jobs.length > 0 ? (
+                <div className="mt-2.5">
+                  <CollapsibleChecksSummary
+                    noun="jobs"
+                    items={mr.pipeline.jobs.map((job) => ({
+                      name: job.name,
+                      state: job.state,
+                      bucket: job.bucket,
+                      link: job.link,
+                      group: job.stage,
+                    }))}
+                  />
+                </div>
+              ) : null}
+              {isOpen ? (
+                <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/45 pt-2.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() =>
+                      checkout.mutate(number, {
+                        onSuccess: () =>
+                          toast.success("Merge request checked out"),
+                        onError: (checkoutError) =>
+                          toast.error("Couldn't check out merge request", {
+                            description: parseApiError(checkoutError),
+                          }),
+                      })
+                    }
+                  >
+                    <GitBranch data-icon="inline-start" />
+                    Checkout
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={pending || mergeBlockedReason !== null}
+                    title={mergeBlockedReason ?? undefined}
+                    onClick={() => setMergeOpen(true)}
+                  >
+                    <GitMerge data-icon="inline-start" />
+                    Merge
+                  </Button>
+                </div>
+              ) : null}
+            </section>
           </div>
         </TabsContent>
 
@@ -483,36 +520,6 @@ export function GitlabMergeRequestDetail({
           />
         </TabsContent>
       </Tabs>
-
-      {isOpen ? (
-        <div className="mx-2 mb-2 flex shrink-0 items-center justify-end gap-2 rounded-xl border border-border/60 bg-background/90 p-2 shadow-md backdrop-blur">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pending}
-            onClick={() =>
-              checkout.mutate(number, {
-                onSuccess: () => toast.success("Merge request checked out"),
-                onError: (checkoutError) =>
-                  toast.error("Couldn't check out merge request", {
-                    description: parseApiError(checkoutError),
-                  }),
-              })
-            }
-          >
-            <GitBranch data-icon="inline-start" />
-            Checkout
-          </Button>
-          <Button
-            size="sm"
-            disabled={pending}
-            onClick={() => setMergeOpen(true)}
-          >
-            <GitMerge data-icon="inline-start" />
-            Merge
-          </Button>
-        </div>
-      ) : null}
 
       <AlertDialog open={mergeOpen} onOpenChange={setMergeOpen}>
         <AlertDialogContent>

@@ -2,6 +2,7 @@ import { useState } from "react"
 import {
   ArrowLeft,
   CircleDot,
+  Copy,
   ExternalLink,
   GitBranch,
   GitCommitHorizontal,
@@ -75,8 +76,11 @@ import { CreatePrDialog } from "./create-pr-dialog"
 import { PullRequestFiles } from "./pull-request-files"
 import { PullRequestCommentCard } from "./pull-request-comment-card"
 import {
+  CollapsibleChecksSummary,
   humanizeStatus,
   ListState,
+  MergeReadinessBanner,
+  mergeReadinessKind,
   PanelMessage,
   RefreshButton,
   reviewItemStateIcon,
@@ -605,6 +609,12 @@ function GithubPullRequestDetail({
 
   const isOpen = pr.state.toLowerCase() === "open"
   const pending = comment.isPending || checkout.isPending || merge.isPending
+  const readiness = mergeReadinessKind(pr.state, pr.isDraft, pr.mergeable)
+  const mergeBlockedReason = pr.isDraft
+    ? "Draft pull requests can't be merged"
+    : pr.mergeable?.toLowerCase() === "conflicting"
+      ? "Resolve conflicts before merging"
+      : null
   const reviewFilesByPath = new Map(
     (review?.files ?? []).map((file) => [file.path, file] as const)
   )
@@ -686,12 +696,19 @@ function GithubPullRequestDetail({
           >
             <ArrowLeft data-icon="inline-start" />
           </Button>
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
+            {reviewItemStateIcon(pr.state, pr.isDraft, "open")}
+          </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium text-foreground/90">
               {pr.title}
             </p>
-            <p className="truncate text-3xs text-muted-foreground/60">
-              Pull request #{pr.number} · {pr.author ?? "Unknown author"}
+            <p
+              className="truncate text-3xs text-muted-foreground/60"
+              title={new Date(pr.createdAt).toLocaleString()}
+            >
+              #{pr.number} · {pr.author ?? "Unknown author"} · opened{" "}
+              {formatRelativeDate(pr.createdAt)}
             </p>
           </div>
           <Button
@@ -746,48 +763,53 @@ function GithubPullRequestDetail({
           className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 @sm/pr:px-3"
         >
           <div className="flex flex-col gap-2.5">
-            <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge variant={isOpen ? "default" : "secondary"}>
-                  {humanizeStatus(pr.state).label}
-                </Badge>
-                {pr.isDraft ? <Badge variant="outline">Draft</Badge> : null}
-                <StatusBadge value={pr.reviewDecision} />
-                <StatusBadge value={pr.mergeable} />
-              </div>
-
-              <div className="mt-3 flex min-w-0 items-center gap-2 rounded-lg border border-border/45 bg-background/65 px-2.5 py-2 text-xs text-muted-foreground">
+            <section className="rounded-xl border border-border/60 bg-card/70 p-2.5 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
+              <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border/45 bg-background/65 px-2.5 py-1.5 text-xs text-muted-foreground">
                 <GitBranch className="size-3.5 shrink-0" aria-hidden />
                 <span className="min-w-0 truncate font-mono">
                   {pr.headRefName}
                 </span>
                 <span className="shrink-0 text-muted-foreground/40">→</span>
-                <span className="min-w-0 truncate font-mono">
+                <span className="min-w-0 flex-1 truncate font-mono">
                   {pr.baseRefName}
                 </span>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="shrink-0"
+                  aria-label="Copy source branch name"
+                  title="Copy source branch name"
+                  onClick={() =>
+                    void navigator.clipboard
+                      .writeText(pr.headRefName)
+                      .then(() => toast.success("Branch name copied"))
+                  }
+                >
+                  <Copy className="size-3" aria-hidden />
+                </Button>
               </div>
 
-              <div className="mt-3 grid grid-cols-4 divide-x divide-border/50 rounded-lg bg-muted/35 py-2 text-center">
+              <div className="mt-2.5 grid grid-cols-4 divide-x divide-border/50 rounded-lg bg-muted/35 py-2 text-center">
                 <div>
-                  <p className="text-xs font-semibold tabular-nums">
+                  <p className="text-sm font-semibold tabular-nums">
                     {pr.changedFiles}
                   </p>
                   <p className="text-3xs text-muted-foreground">Files</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold tabular-nums">
+                  <p className="text-sm font-semibold tabular-nums">
                     {pr.commits.length}
                   </p>
                   <p className="text-3xs text-muted-foreground">Commits</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-diff-add tabular-nums">
+                  <p className="text-sm font-semibold text-diff-add tabular-nums">
                     +{pr.additions}
                   </p>
                   <p className="text-3xs text-muted-foreground">Added</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-diff-remove tabular-nums">
+                  <p className="text-sm font-semibold text-diff-remove tabular-nums">
                     -{pr.deletions}
                   </p>
                   <p className="text-3xs text-muted-foreground">Removed</p>
@@ -795,59 +817,21 @@ function GithubPullRequestDetail({
               </div>
             </section>
 
-            {pr.body ? (
-              <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-                <SectionLabel>Description</SectionLabel>
-                <div className="mt-2">
-                  <RemoteMarkdown content={pr.body} />
-                </div>
-              </section>
-            ) : null}
-
-            {pr.checks.length > 0 ? (
-              <section className="overflow-hidden rounded-xl border border-border/60 bg-card/70 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-                <div className="border-b border-border/45 px-3 py-2.5">
-                  <SectionLabel>Checks</SectionLabel>
-                </div>
-                <div className="divide-y divide-border/40">
-                  {pr.checks.map((check) => (
-                    <button
-                      key={`${check.workflow}-${check.name}`}
-                      type="button"
-                      disabled={!check.link}
-                      onClick={() =>
-                        check.link && void openExternal(check.link)
-                      }
-                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/30 disabled:cursor-default"
-                    >
-                      <span className="min-w-0 truncate">
-                        {check.workflow ? `${check.workflow} / ` : ""}
-                        {check.name}
-                      </span>
-                      <Badge
-                        variant={
-                          check.bucket === "pass"
-                            ? "secondary"
-                            : check.bucket === "fail"
-                              ? "destructive"
-                              : "outline"
-                        }
-                      >
-                        {check.state}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
             <section className="flex flex-col gap-2">
               <div className="flex items-center gap-2 px-0.5">
-                <SectionLabel>Comments</SectionLabel>
+                <SectionLabel>Conversation</SectionLabel>
                 {commentCount > 0 ? (
                   <Badge variant="secondary">{commentCount}</Badge>
                 ) : null}
               </div>
+              {pr.body ? (
+                <PullRequestCommentCard
+                  author={pr.author}
+                  body={pr.body}
+                  createdAt={pr.createdAt}
+                  context="Description"
+                />
+              ) : null}
               <PullRequestActivityList
                 items={activity}
                 reviewLoading={reviewLoading}
@@ -875,6 +859,63 @@ function GithubPullRequestDetail({
                 </div>
               </div>
             </section>
+
+            <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <MergeReadinessBanner
+                  kind={readiness}
+                  baseRefName={pr.baseRefName}
+                />
+                <StatusBadge value={pr.reviewDecision} />
+                {pr.isDraft && readiness !== "draft" ? (
+                  <Badge variant="outline">Draft</Badge>
+                ) : null}
+              </div>
+              {pr.checks.length > 0 ? (
+                <div className="mt-2.5">
+                  <CollapsibleChecksSummary
+                    items={pr.checks.map((check) => ({
+                      name: check.name,
+                      state: check.state,
+                      bucket: check.bucket,
+                      link: check.link,
+                      group: check.workflow,
+                    }))}
+                  />
+                </div>
+              ) : null}
+              {isOpen ? (
+                <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/45 pt-2.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() =>
+                      checkout.mutate(number, {
+                        onSuccess: () =>
+                          toast.success("Pull request checked out"),
+                        onError: (checkoutError) =>
+                          toast.error("Couldn't check out pull request", {
+                            description: parseApiError(checkoutError),
+                          }),
+                      })
+                    }
+                  >
+                    <GitBranch data-icon="inline-start" />
+                    Checkout
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={pending || mergeBlockedReason !== null}
+                    title={mergeBlockedReason ?? undefined}
+                    onClick={() => setMergeOpen(true)}
+                  >
+                    <GitMerge data-icon="inline-start" />
+                    Merge
+                  </Button>
+                </div>
+              ) : null}
+            </section>
           </div>
         </TabsContent>
 
@@ -896,36 +937,6 @@ function GithubPullRequestDetail({
           />
         </TabsContent>
       </Tabs>
-
-      {isOpen ? (
-        <div className="mx-2 mb-2 flex shrink-0 items-center justify-end gap-2 rounded-xl border border-border/60 bg-background/90 p-2 shadow-md backdrop-blur">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pending}
-            onClick={() =>
-              checkout.mutate(number, {
-                onSuccess: () => toast.success("Pull request checked out"),
-                onError: (checkoutError) =>
-                  toast.error("Couldn't check out pull request", {
-                    description: parseApiError(checkoutError),
-                  }),
-              })
-            }
-          >
-            <GitBranch data-icon="inline-start" />
-            Checkout
-          </Button>
-          <Button
-            size="sm"
-            disabled={pending}
-            onClick={() => setMergeOpen(true)}
-          >
-            <GitMerge data-icon="inline-start" />
-            Merge
-          </Button>
-        </div>
-      ) : null}
 
       <AlertDialog open={mergeOpen} onOpenChange={setMergeOpen}>
         <AlertDialogContent>
