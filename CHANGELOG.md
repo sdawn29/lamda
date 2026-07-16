@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.54.0](../../releases/tag/v0.54.0) — 2026-07-16
+
+### Features
+
+* **github:** enhance pull request detail view with merge readiness and copy branch functionality
+* **gitlab:** enhance merge request detail and review view with improved status handling and UI components
+* add support for merge request reviews and comments
+* enhance pull request review functionality with comments and file diffs
+* **chat:** add addFileMention action to chat actions context
+* **chat:** improve UI for chat components and enhance message display feat(dock): add descriptions for dock panels and improve layout
+
 ## [0.53.0](../../releases/tag/v0.53.0) — 2026-07-15
 
 ### Features
