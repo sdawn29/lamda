@@ -70,15 +70,18 @@ function parseModelId(
 }
 
 /**
- * The model a subagent runs on: the agent definition's override when it names
- * a model that actually exists, otherwise the parent thread's model (a bad
- * frontmatter `model` must soften to inheritance, never fail the spawn),
- * otherwise the SDK default.
+ * The model a subagent runs on: the caller's per-call override (already
+ * validated by the delegate tool) wins, then the agent definition's override
+ * when it names a model that actually exists, otherwise the parent thread's
+ * model (a bad frontmatter `model` must soften to inheritance, never fail the
+ * spawn), otherwise the SDK default.
  */
 function resolveModel(
   agent: AgentConfig,
   parentThreadId: string,
+  override?: { provider: string; model: string },
 ): { provider: string; model: string } | undefined {
+  if (override) return override;
   if (agent.model) {
     try {
       const available = getAvailableModels();
@@ -122,6 +125,12 @@ export interface RunSubagentOptions {
   /** Directory the subagent works in — the parent session's (worktree-aware) cwd. */
   cwd: string;
   /**
+   * Per-call model override chosen by the delegating agent (the delegate
+   * tool's `model` param, already validated against the registry). Takes
+   * precedence over the agent definition's frontmatter `model`.
+   */
+  modelOverride?: { provider: string; model: string };
+  /**
    * Thinking level inherited from the parent turn. Without it the subagent
    * session falls back to the pi settings default (often "off"), so its
    * transcript would never contain thinking. The SDK clamps it to the
@@ -154,7 +163,11 @@ export interface SubagentRunResult {
 export async function runSubagent(
   opts: RunSubagentOptions,
 ): Promise<SubagentRunResult> {
-  const model = resolveModel(opts.agent, opts.parentThreadId);
+  const model = resolveModel(
+    opts.agent,
+    opts.parentThreadId,
+    opts.modelOverride,
+  );
   const recorder = new SubagentTranscriptRecorder({
     agent: opts.agent.id,
     agentLabel: opts.agent.label,

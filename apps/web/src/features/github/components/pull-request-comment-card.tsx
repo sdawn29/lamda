@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react"
+import { useId, useMemo, useState, type SubmitEvent } from "react"
 import { Code2, Loader2, MessageSquare, Reply, Send } from "lucide-react"
 import { toast } from "sonner"
 
@@ -129,7 +129,7 @@ export function PullRequestCommentCard({
   const [replyBody, setReplyBody] = useState("")
   const [replyPending, setReplyPending] = useState(false)
 
-  async function submitReply(event: React.FormEvent<HTMLFormElement>) {
+  async function submitReply(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     const reply = replyBody.trim()
     if (!reply || !onReply) return

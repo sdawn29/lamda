@@ -392,7 +392,7 @@ export function ModeCombobox({
                       <ListChecksIcon className="size-3.5 shrink-0" />
                     </span>
                     <span className="text-xs font-medium">
-                      Customize allowed tools…
+                      Customize allowed tools
                     </span>
                   </CommandItem>
                 </CommandGroup>

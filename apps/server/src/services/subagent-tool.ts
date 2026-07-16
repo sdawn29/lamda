@@ -1,9 +1,11 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
   getAgentConfig,
+  getAvailableModels,
   getModeConfig,
   listAgents,
   normalizeMode,
+  parseAgentModel,
   DELEGATE_TOOL_NAME,
   type AgentConfig,
 } from "@lamda/pi-sdk";
@@ -35,8 +37,26 @@ Do not send vague prompts such as "look into this" or force the subagent to redi
 
 To run subagents in parallel, emit multiple delegate calls in a single message (at most 4 execute concurrently; extras wait in a queue). Prefer the cheapest agent that can do the job — use \`explore\` for read-only codebase questions, \`research\` for reading external docs and web pages, and reserve \`general\` for work that needs edits or shell access. The active mode may restrict which agents can be launched (read-only modes only allow read-only agents); a disallowed launch fails with the permitted list.
 
+Each call may also set \`model\` to run the subagent on a specific model — pick a cheaper/faster model for simple mechanical tasks and a stronger one for hard reasoning. Omit it to use the agent's default.
+
 Available agents:
 ${list}`;
+}
+
+/** List the registry's model ids so the parent knows what `model` accepts. */
+function buildModelParamDescription(): string {
+  let ids: string[] = [];
+  try {
+    ids = getAvailableModels().map((m) => `${m.provider}::${m.id}`);
+  } catch {
+    // Registry unavailable — the param still documents its format.
+  }
+  return (
+    "Optional model override for this run, as `provider::model`. Overrides the agent's default model. " +
+    (ids.length > 0
+      ? `Available models: ${ids.join(", ")}.`
+      : "Must name a model available in this app.")
+  );
 }
 
 /**
@@ -79,6 +99,10 @@ export function createDelegateTool(
           description:
             "A detailed, self-contained brief. Include the objective, relevant context/files, scope and constraints, expected work, and required report/validation. The agent cannot see this conversation or ask the user questions.",
         },
+        model: {
+          type: "string",
+          description: buildModelParamDescription(),
+        },
       },
     },
     execute: async (toolCallId, params, signal, onUpdate) => {
@@ -116,11 +140,35 @@ export function createDelegateTool(
       }
       if (!prompt) throw new Error("`prompt` is required.");
 
+      // Validate an explicit model override eagerly: unlike a bad frontmatter
+      // `model` (which softens to inheritance), a bad tool param should fail
+      // loudly so the parent can correct it and retry.
+      const modelParam = typeof p.model === "string" ? p.model.trim() : "";
+      let modelOverride: { provider: string; model: string } | undefined;
+      if (modelParam) {
+        const parsed = parseAgentModel(modelParam);
+        const available = getAvailableModels();
+        const match =
+          parsed &&
+          available.find(
+            (m) => m.provider === parsed.provider && m.id === parsed.model,
+          );
+        if (!match) {
+          throw new Error(
+            `Unknown model "${modelParam}". Use \`provider::model\` with one of: ${available
+              .map((m) => `${m.provider}::${m.id}`)
+              .join(", ")}.`,
+          );
+        }
+        modelOverride = parsed;
+      }
+
       const { finalText, details, failed } = await runSubagent({
         parentThreadId: threadId,
         agent,
         prompt,
         cwd,
+        modelOverride,
         // Inherit the parent turn's thinking effort so the subagent reasons
         // (and streams thinking into its transcript) like the parent does.
         thinkingLevel: live

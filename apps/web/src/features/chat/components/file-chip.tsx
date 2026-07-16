@@ -265,8 +265,8 @@ export function FileChip({
         <TooltipTrigger
           render={
             // A real <button> is an atomic inline-block and can't fragment
-            // across lines — a <code> run with box-decoration-clone wraps
-            // mid-path like the surrounding markdown text.
+            // across lines — a plain <code> run wraps mid-path like the
+            // surrounding markdown text.
             <code
               role="button"
               tabIndex={0}
@@ -278,7 +278,9 @@ export function FileChip({
                 }
               }}
               className={cn(
-                "cursor-pointer rounded bg-muted box-decoration-clone px-1.5 py-0.5 font-mono text-[0.8125rem] break-all text-primary underline underline-offset-4 transition-colors hover:bg-primary/10 focus-visible:outline-none",
+                // The mono glyphs at 13px optically sink below the chat font's
+                // baseline — the 1px vertical-align raise re-centers them.
+                "cursor-pointer align-[1px] font-mono text-[0.8125rem] break-all text-primary underline decoration-[0.5px] underline-offset-4 transition-[filter] hover:brightness-125 focus-visible:outline-none",
                 isDeleted && "line-through opacity-70",
                 notFound && !isDeleted && "opacity-60"
               )}
