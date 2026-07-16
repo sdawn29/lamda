@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.55.0](../../releases/tag/v0.55.0) — 2026-07-16
+
+### Features
+
+* **subagent:** add model override support and enhance model description in delegate tool
+
+### Bug Fixes
+
+* **rich-input:** adjust padding for consistent button alignment
+
 ## [0.54.0](../../releases/tag/v0.54.0) — 2026-07-16
 
 ### Features
