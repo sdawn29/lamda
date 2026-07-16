@@ -714,7 +714,10 @@ export const RichInput = React.forwardRef<
       onInput={handleInput}
       onPaste={handlePaste}
       className={cn(
-        "rich-input max-h-48 min-h-7 w-full cursor-text overflow-y-auto bg-transparent p-1.5 text-sm leading-relaxed wrap-break-word outline-none",
+        // py-0.5 keeps a single line (1lh at text-sm/relaxed ≈ 23px) within
+        // the composer's 28px min-h-7 row, so the send button gets equal
+        // padding on all sides instead of extra space above it.
+        "rich-input max-h-48 min-h-7 w-full cursor-text overflow-y-auto bg-transparent px-1.5 py-0.5 text-sm leading-relaxed wrap-break-word outline-none",
         minHeightClassName
       )}
     />
