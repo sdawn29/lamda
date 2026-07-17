@@ -45,7 +45,7 @@ describe("isValidModeId", () => {
 describe("getModeConfig", () => {
   it("configures ask as read-only with read-only agents", () => {
     const ask = getModeConfig("ask");
-    expect(ask.agents).toEqual(["explore"]);
+    expect(ask.agents).toEqual(["explore", "research", "reviewer"]);
     expect(ask.tools).toEqual(
       expect.arrayContaining([
         "read",
@@ -67,14 +67,13 @@ describe("getModeConfig", () => {
 
   it("configures plan for research and plan artifact writes only", () => {
     const plan = getModeConfig("plan");
-    expect(plan.agents).toEqual(["explore", "research"]);
+    expect(plan.agents).toEqual(["explore", "research", "reviewer"]);
     expect(plan.tools).toEqual(
       expect.arrayContaining([
         "read",
         "grep",
         "find",
         "ls",
-        "bash",
         "plan",
         "question",
         "memory",
@@ -85,7 +84,7 @@ describe("getModeConfig", () => {
       ]),
     );
     expect(plan.tools).not.toEqual(
-      expect.arrayContaining(["edit", "write", "todo"]),
+      expect.arrayContaining(["bash", "edit", "write", "todo"]),
     );
   });
 
@@ -210,7 +209,8 @@ describe("ensureModeFiles", () => {
       "ask",
       serializeModeFile({
         label: "Ask",
-        description: "Read-only Q&A. Cannot edit, write, or run shell commands.",
+        description:
+          "Read-only Q&A. Cannot edit, write, or run shell commands.",
         preamble: getModeConfig("ask").preamble,
         tools: ["read", "grep", "find", "ls", "question", "memory", "delegate"],
         agents: ["explore"],
@@ -232,7 +232,8 @@ describe("ensureModeFiles", () => {
       "ask",
       serializeModeFile({
         label: "Ask",
-        description: "Read-only Q&A. Cannot edit, write, or run shell commands.",
+        description:
+          "Read-only Q&A. Cannot edit, write, or run shell commands.",
         preamble: "My custom ask prompt.",
         tools: ["read"],
         agents: ["explore"],
@@ -253,7 +254,8 @@ describe("ensureModeFiles", () => {
       "ask",
       serializeModeFile({
         label: "Ask",
-        description: "Read-only Q&A. Cannot edit, write, or run shell commands.",
+        description:
+          "Read-only Q&A. Cannot edit, write, or run shell commands.",
         preamble: getModeConfig("ask").preamble,
         tools: ["read"],
         agents: ["explore"],

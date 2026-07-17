@@ -14,23 +14,24 @@ lamda is a local-first desktop coding workspace for running Pi coding agent sess
 
 ## User Guides
 
-| Feature                | Guide                                          | What you will learn                                                                                         |
-| ---------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Workspaces and threads | [Workspaces](features/workspaces.md)           | Create workspaces, clone repositories, manage threads, pin, archive, and fork work                          |
-| Chat                   | [Chat](features/chat.md)                       | Send prompts, choose modes, attach context, approve tools, answer questions, and compact long conversations |
-| Files and tabs         | [Files and Tabs](features/files-and-tabs.md)   | Browse files, search the tree, open tabs, inspect code, and use diagnostics                                 |
-| Git                    | [Git](features/git.md)                         | Review changed files, compare turns, stage, commit, branch, stash, push, and revert                         |
-| GitHub and GitLab      | [Git Hosting](features/git-hosting.md)         | Connect hosting accounts, inspect PR/MR context, create PRs/MRs, and review CI status                       |
-| Terminal               | [Terminal](features/terminal.md)               | Open persistent terminal tabs, run commands, and use task-launched shells                                   |
-| Tasks                  | [Tasks](features/tasks.md)                     | Save frequently used shell commands per workspace                                                           |
-| Automations            | [Automations](features/automations.md)         | Schedule recurring prompts that run while the app is open                                                   |
-| Command palette        | [Command Palette](features/command-palette.md) | Navigate, search files, toggle panels, and run actions from the keyboard                                    |
-| Skills                 | [Skills](features/skills.md)                   | Search, install, inspect, and remove global agent skills                                                    |
-| MCP servers            | [MCP](features/mcp.md)                         | Connect external tools through Model Context Protocol                                                       |
-| LSP diagnostics        | [LSP](features/lsp.md)                         | Configure language servers and read code diagnostics in the file viewer                                     |
-| Settings               | [Settings](features/settings.md)               | Configure appearance, chat, API keys, subscriptions, usage, memory, shortcuts, retry, and data              |
-| Themes                 | [Themes](features/themes.md)                   | Pick built-in themes, edit custom themes, and configure fonts                                               |
-| Desktop app            | [Desktop](features/desktop.md)                 | Use native folder picking, open-with apps, server recovery, and updates                                     |
+| Feature                | Guide                                              | What you will learn                                                                                         |
+| ---------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Workspaces and threads | [Workspaces](features/workspaces.md)               | Create workspaces, clone repositories, manage threads, pin, archive, and fork work                          |
+| Chat                   | [Chat](features/chat.md)                           | Send prompts, choose modes, attach context, approve tools, answer questions, and compact long conversations |
+| Files and tabs         | [Files and Tabs](features/files-and-tabs.md)       | Browse files, search the tree, open tabs, inspect code, and use diagnostics                                 |
+| Git                    | [Git](features/git.md)                             | Review changed files, compare turns, stage, commit, branch, stash, push, and revert                         |
+| GitHub and GitLab      | [Git Hosting](features/git-hosting.md)             | Connect hosting accounts, inspect PR/MR context, create PRs/MRs, and review CI status                       |
+| Terminal               | [Terminal](features/terminal.md)                   | Open persistent terminal tabs, run commands, and use task-launched shells                                   |
+| Tasks                  | [Tasks](features/tasks.md)                         | Save frequently used shell commands per workspace                                                           |
+| Automations            | [Automations](features/automations.md)             | Schedule recurring prompts that run while the app is open                                                   |
+| Command palette        | [Command Palette](features/command-palette.md)     | Navigate, search files, toggle panels, and run actions from the keyboard                                    |
+| Skills                 | [Skills](features/skills.md)                       | Search, install, inspect, and remove global agent skills                                                    |
+| Agent harness          | [Agent harness prompts](features/agent-harness.md) | Understand prompt layers, modes, subagents, routing, and prompt security                                    |
+| MCP servers            | [MCP](features/mcp.md)                             | Connect external tools through Model Context Protocol                                                       |
+| LSP diagnostics        | [LSP](features/lsp.md)                             | Configure language servers and read code diagnostics in the file viewer                                     |
+| Settings               | [Settings](features/settings.md)                   | Configure appearance, chat, API keys, subscriptions, usage, memory, shortcuts, retry, and data              |
+| Themes                 | [Themes](features/themes.md)                       | Pick built-in themes, edit custom themes, and configure fonts                                               |
+| Desktop app            | [Desktop](features/desktop.md)                     | Use native folder picking, open-with apps, server recovery, and updates                                     |
 
 ## Reference
 

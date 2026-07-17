@@ -17,9 +17,9 @@ import {
 } from "@/features/lsp"
 import { useChatActions } from "@/features/chat/contexts/chat-actions-context"
 import { subscribeToWorkspaceFileUpdates } from "@/features/chat/thread-status-store"
-import ReactMarkdown from "react-markdown"
+import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
-import type { Plugin } from "unified"
+import type { PluggableList, Plugin } from "unified"
 import type { Element as HastElement, Root } from "hast"
 
 const MIN_SCALE = 1
@@ -100,6 +100,9 @@ const rehypeSourcePositions: Plugin<[], Root> = () => {
     visit(tree)
   }
 }
+
+const markdownRemarkPlugins: PluggableList = [remarkGfm]
+const markdownRehypePlugins: PluggableList = [rehypeSourcePositions]
 
 function findSelectionLineRangeFromSource(
   source: string,
@@ -500,6 +503,43 @@ function resolveFilePath(currentFilePath: string, href: string): string {
 
 const EXTERNAL_URL_PATTERN = /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i
 
+function splitUrlSuffix(url: string): { path: string; suffix: string } {
+  const suffixIndex = url.search(/[?#]/)
+  return suffixIndex === -1
+    ? { path: url, suffix: "" }
+    : { path: url.slice(0, suffixIndex), suffix: url.slice(suffixIndex) }
+}
+
+function decodeLocalUrlPath(path: string): string {
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
+
+function resolveMarkdownFilePath(
+  currentFilePath: string,
+  workspacePath: string | undefined,
+  url: string
+): string | null {
+  if (!url || EXTERNAL_URL_PATTERN.test(url)) return null
+
+  const { path } = splitUrlSuffix(url)
+  if (!path) return null
+  const decodedPath = decodeLocalUrlPath(path)
+
+  if (decodedPath.startsWith("/") && workspacePath) {
+    return resolveFilePath(
+      `${workspacePath}/index.md`,
+      decodedPath.replace(/^\/+/, "")
+    )
+  }
+  return decodedPath.startsWith("/")
+    ? decodedPath
+    : resolveFilePath(currentFilePath, decodedPath)
+}
+
 function resolveHtmlAssetPath(
   currentFilePath: string,
   workspacePath: string | undefined,
@@ -604,9 +644,8 @@ export const FileContentView = memo(function FileContentView({
   // Sync scrollToLine from the prop whenever it changes — this component is
   // reused (not remounted) across file/line switches in the review panel, so
   // this is adjusted during render instead of inside an effect.
-  const [lastInitialScrollToLine, setLastInitialScrollToLine] = useState(
-    initialScrollToLine
-  )
+  const [lastInitialScrollToLine, setLastInitialScrollToLine] =
+    useState(initialScrollToLine)
   if (initialScrollToLine !== lastInitialScrollToLine) {
     setLastInitialScrollToLine(initialScrollToLine)
     if (initialScrollToLine) setScrollToLine(initialScrollToLine)
@@ -670,34 +709,123 @@ export const FileContentView = memo(function FileContentView({
   useOpenDocument(lsp, lspFilePath, isCodeView ? content : null)
   const diagnostics = useFileDiagnostics(lsp, lspFilePath)
 
-  const markdownLinkComponents = useMemo(
+  const markdownComponents = useMemo<Components>(
     () => ({
-      a: ({ href, children }: React.ComponentProps<"a">) => {
-        const isExternal = !href || /^(https?:|mailto:|#)/.test(href)
-        if (isExternal) {
+      a: ({ href, children, node, ...props }) => {
+        void node
+        if (!href || href.startsWith("#")) {
           return (
             <a
               href={href}
-              target="_blank"
-              rel="noreferrer"
-              className="underline underline-offset-4"
+              className="text-primary underline underline-offset-4"
+              {...props}
             >
               {children}
             </a>
           )
         }
-        const resolvedPath = href.startsWith("/")
-          ? href
-          : resolveFilePath(filePath, href)
+
+        if (EXTERNAL_URL_PATTERN.test(href)) {
+          return (
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline underline-offset-4"
+              {...props}
+            >
+              {children}
+            </a>
+          )
+        }
+
+        const resolvedPath = resolveMarkdownFilePath(
+          filePath,
+          workspacePath,
+          href
+        )
+        if (!resolvedPath) return <>{children}</>
         const linkFileName = resolvedPath.split(/[/\\]/).pop() || resolvedPath
         return (
-          <button
-            type="button"
-            onClick={() => onOpenFile?.(resolvedPath, linkFileName)}
-            className="cursor-pointer underline underline-offset-4"
+          <a
+            href={href}
+            onClick={(event) => {
+              event.preventDefault()
+              onOpenFile?.(resolvedPath, linkFileName)
+            }}
+            className="text-primary underline underline-offset-4"
+            {...props}
           >
             {children}
-          </button>
+          </a>
+        )
+      },
+      table: ({ children, node, ...props }) => {
+        void node
+        return (
+          <div className="not-prose my-3 overflow-x-auto rounded-lg border border-border">
+            <table
+              className="w-full border-collapse text-sm leading-[1.4]"
+              {...props}
+            >
+              {children}
+            </table>
+          </div>
+        )
+      },
+      thead: ({ children, node, ...props }) => {
+        void node
+        return (
+          <thead className="bg-muted/50" {...props}>
+            {children}
+          </thead>
+        )
+      },
+      th: ({ children, node, ...props }) => {
+        void node
+        return (
+          <th
+            className="border-b border-border px-3 py-2 text-left font-semibold"
+            {...props}
+          >
+            {children}
+          </th>
+        )
+      },
+      td: ({ children, node, ...props }) => {
+        void node
+        return (
+          <td className="border-b border-border/60 px-3 py-2" {...props}>
+            {children}
+          </td>
+        )
+      },
+      pre: ({ children, node, ...props }) => {
+        void node
+        return (
+          <pre
+            className="not-prose my-3 overflow-x-auto rounded-lg border border-border bg-muted/40 p-3 font-code text-xs leading-[1.45] text-foreground"
+            {...props}
+          >
+            {children}
+          </pre>
+        )
+      },
+      code: ({ className, children, node, ...props }) => {
+        void node
+        const isBlock =
+          String(children).endsWith("\n") || className?.startsWith("language-")
+        return (
+          <code
+            className={cn(
+              className,
+              !isBlock &&
+                "rounded bg-muted px-1 py-0.5 font-code text-[0.85em] leading-none text-foreground"
+            )}
+            {...props}
+          >
+            {children}
+          </code>
         )
       },
       // GFM task lists (`- [ ]` / `- [x]`). remark-gfm tags the wrapping list
@@ -731,7 +859,10 @@ export const FileContentView = memo(function FileContentView({
         const isTask = (className ?? "").includes("task-list-item")
         if (isTask) {
           return (
-            <li className="my-1 flex items-start gap-2 pl-0 [&::marker]:content-['']">
+            <li
+              className="my-1 flex items-start gap-2 pl-0 [&::marker]:content-['']"
+              {...props}
+            >
               {children}
             </li>
           )
@@ -761,25 +892,31 @@ export const FileContentView = memo(function FileContentView({
           </span>
         )
       },
-      img: ({ src, alt }: { src?: string; alt?: string }) => {
+      img: ({ src, alt, node, ...props }) => {
+        void node
         if (!src) return null
-        const resolvedSrc = /^https?:/.test(src)
-          ? src
-          : appendToken(
-              `${serverUrl}/file?path=${encodeURIComponent(
-                src.startsWith("/") ? src : resolveFilePath(filePath, src)
-              )}`
+        const resolvedPath = resolveMarkdownFilePath(
+          filePath,
+          workspacePath,
+          src
+        )
+        const resolvedSrc = resolvedPath
+          ? appendToken(
+              `${serverUrl}/file?path=${encodeURIComponent(resolvedPath)}`
             )
+          : src
         return (
           <img
             src={resolvedSrc}
             alt={alt ?? ""}
-            className="max-w-full rounded"
+            className="max-w-full rounded-lg border border-border/50"
+            loading="lazy"
+            {...props}
           />
         )
       },
     }),
-    [filePath, serverUrl, onOpenFile]
+    [filePath, onOpenFile, serverUrl, workspacePath]
   )
 
   // Reset the preview toggles to match the new file whenever `filePath`
@@ -925,7 +1062,7 @@ export const FileContentView = memo(function FileContentView({
             isHtml && htmlPreview && "overflow-hidden",
             !isImage &&
               markdownPreview &&
-              "prose prose-sm max-w-none p-4 dark:prose-invert",
+              "prose prose-sm max-w-none p-4 text-foreground dark:prose-invert prose-headings:leading-tight prose-p:leading-[1.45] prose-a:text-primary prose-blockquote:leading-[1.45] prose-strong:text-foreground prose-li:leading-[1.45] prose-hr:border-border",
             !isImage &&
               !markdownPreview &&
               !(isHtml && htmlPreview) &&
@@ -960,9 +1097,9 @@ export const FileContentView = memo(function FileContentView({
               contextPath={relativePath}
             >
               <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeSourcePositions]}
-                components={markdownLinkComponents}
+                remarkPlugins={markdownRemarkPlugins}
+                rehypePlugins={markdownRehypePlugins}
+                components={markdownComponents}
               >
                 {content ?? ""}
               </ReactMarkdown>

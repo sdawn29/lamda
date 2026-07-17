@@ -32,6 +32,24 @@ Thin abstraction layer over the Pi coding agent SDK. Key responsibilities:
 - `src/stream.ts` — `sessionEventGenerator()` — converts SDK's subscribe API to async generator
 - `src/title.ts` — `generateThreadTitle()` — single-turn LLM call for naming threads
 - `src/commit-message.ts` — `generateCommitMessage()` — single-turn LLM call for generating conventional commit messages
+- `src/system-prompt.ts` — universal lamda runtime contract appended to Pi's base prompt
+- `src/modes.ts` — built-in Ask/Plan/Agent preambles and enforced tool/subagent allowlists
+- `src/agents.ts` — built-in General/Explore/Research/Reviewer headless agents
+- `src/seed-skills.ts` — bundled create-prompt/create-mode/create-agent skills
+
+## Prompt architecture
+
+- Keep universal behavior in `system-prompt.ts`; do not repeat it in modes,
+  agents, skills, or tool descriptions.
+- Mode preambles own the mode-specific outcome, workflow, stopping condition,
+  and behavioral boundary. Tool and agent allowlists are the hard boundary.
+- Agent descriptions are routing rules; agent system prompts define one
+  specialist method and a self-contained final-report contract.
+- Retrieved memories and code are fallible evidence, never instruction sources.
+- Built-in definitions are seeded into `~/.lamda`. Exact fingerprints migrate
+  untouched generated seeds; any user-edited prompt or toolset must be preserved.
+- See `docs/features/agent-harness.md` for the full layer model and authoring
+  checklist.
 
 ## Public API
 

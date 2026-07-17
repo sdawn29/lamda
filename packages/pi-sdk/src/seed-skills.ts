@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { lamdaGlobalSkillsDir } from "./lamda-paths.js";
 
@@ -14,6 +15,8 @@ interface SeedSkill {
   name: string;
   /** Full `SKILL.md` contents (frontmatter + instruction body). */
   content: string;
+  /** Fingerprints of previous untouched generated versions safe to upgrade. */
+  legacyHashes: readonly string[];
 }
 
 const CREATE_PROMPT_SKILL = `---
@@ -45,11 +48,14 @@ the user can run as \`/<name>\`.
    If the chosen name collides with an existing file, read that file and ask
    whether to replace it or pick another name — never overwrite silently.
 
-3. **Draft a body that stands alone.** The body is everything the agent gets
-   when the command runs, so write it like a good task brief: imperative voice,
-   concrete steps in order, expected output stated, no context that only made
-   sense in this conversation. Use argument placeholders where the command
-   takes input:
+3. **Draft a body that stands alone.** The expanded body becomes the user's
+   task, so make it operational rather than aspirational. State the desired
+   outcome first, then necessary context, scope/non-goals, ordered work,
+   evidence or inputs to inspect, validation, and the expected final output.
+   Encode meaningful defaults so the command rarely needs a follow-up question,
+   but stop when a missing consequential choice belongs to the user. Do not
+   repeat lamda's universal safety, communication, or tool rules. Use argument
+   placeholders where the command takes input:
    - \`$1\`, \`$2\`, … — positional arguments.
    - \`$@\` or \`$ARGUMENTS\` — all arguments.
    - \`\${1:-default}\` — positional arg with a fallback when missing/empty.
@@ -129,11 +135,11 @@ prepended to the user's messages while that mode is selected.
    mode's own tool boundary.
 
 4. **Draft the preamble** — the body below the frontmatter, prepended to the
-   user's messages while the mode is active. A good preamble states, in order:
-   the mode's role in one opening line; how to work (workflow, priorities,
-   output expectations) as short bullets; and its boundaries — what it must
-   not do, and where to redirect the user for out-of-scope requests. Keep it
-   tight: it occupies context on every thread that uses the mode.
+   user's messages while the mode is active. Make it own only what is unique
+   to this mode: outcome, ordered workflow, stopping condition, and boundaries.
+   Do not duplicate universal lamda rules or full tool descriptions. Prefer a
+   short tagged instruction block so its boundary is unambiguous. Keep it
+   tight: it remains in the conversation context.
 
 5. **Write the file** at the resolved path with the \`write\` tool (create the
    \`.lamda/modes\` directory first if needed). Format:
@@ -181,11 +187,11 @@ A good agent definition is written for that reality.
 1. **Survey what exists.** List \`~/.lamda/agents/\` and
    \`<workspace>/.lamda/agents/\` (either may be missing — that's fine), and
    read one or two existing definitions to match their tone. The ids
-   \`general\` and \`explore\` are the built-ins: a file with one of those ids
-   **overrides** that built-in rather than adding a new agent — only reuse a
-   built-in id if the user explicitly wants to customize it. A new agent is
-   only worth creating when it's meaningfully more specific than \`general\`
-   (a sharper role, a narrower toolset, or a different model).
+   \`general\`, \`explore\`, \`research\`, and \`reviewer\` are the built-ins:
+   a file with one of those ids **overrides** that built-in rather than adding
+   a new agent — only reuse a built-in id if the user explicitly wants to
+   customize it. A new agent is worthwhile only when its role, context, tools,
+   output, or model is meaningfully different from every built-in.
 
 2. **Settle id, purpose, access, and location in one round.** Derive a short
    kebab-case \`<id>\` (lowercase letters, digits, hyphens) from the request.
@@ -228,20 +234,18 @@ A good agent definition is written for that reality.
    subagents — never list them.
 
 4. **Write a description that routes well.** The \`description\` is what the
-   main assistant reads when deciding which agent to delegate to, so write it
-   as a routing rule, not marketing: what the agent does, and when to pick it
-   over the others (e.g. "Use for X; prefer over general when Y"). One or two
-   sentences.
+   main assistant reads when choosing an agent, so write a routing rule, not
+   marketing: capability, ideal task shape, mutation level, and when to prefer
+   it over a built-in. One or two sentences; do not repeat the system prompt.
 
-5. **Draft the system prompt** — the body below the frontmatter. Write it
-   like the built-ins: an opening line stating the agent's role; 3-6 short
-   bullets on how to work (method, priorities, what "done" means); then its
-   boundaries (what it must not do, and what to report instead when a task
-   falls outside them). Always end with the headless ground rules, in your
-   own words: it cannot ask the user anything, and only its final message is
-   returned — so when finished (or blocked) it must write a complete,
-   self-contained report with everything the caller needs. Keep the whole
-   prompt tight; it is the agent's entire context beyond the task itself.
+5. **Draft the system prompt** — the body below the frontmatter. Define one
+   crisp role, its evidence-first method, priorities and quality bar, explicit
+   non-goals, ambiguity policy, and output contract. Avoid generic coding
+   advice already supplied by the harness, and never request a capability
+   absent from \`tools:\`. End with the headless contract: it cannot ask the user
+   or spawn agents, intermediate work is hidden, and its final message must
+   report outcome, evidence, changes, validation, assumptions, and blockers.
+   Keep it compact enough that the task brief—not boilerplate—dominates context.
 
 6. **Write the file** at the resolved path with the \`write\` tool (create the
    \`.lamda/agents\` directory first if needed). Format:
@@ -279,16 +283,34 @@ A good agent definition is written for that reality.
 `;
 
 const SEED_SKILLS: readonly SeedSkill[] = [
-  { name: "create-prompt", content: CREATE_PROMPT_SKILL },
-  { name: "create-mode", content: CREATE_MODE_SKILL },
-  { name: "create-agent", content: CREATE_AGENT_SKILL },
+  {
+    name: "create-prompt",
+    content: CREATE_PROMPT_SKILL,
+    legacyHashes: [
+      "fa5fb90e5eb02dc751e9a7176aa44a32c8504d41a740046baf798c904d087eba",
+    ],
+  },
+  {
+    name: "create-mode",
+    content: CREATE_MODE_SKILL,
+    legacyHashes: [
+      "0b41392e97b47f4af7be8c999f7a2a1dff769aba3c98756873430bae86e686a0",
+    ],
+  },
+  {
+    name: "create-agent",
+    content: CREATE_AGENT_SKILL,
+    legacyHashes: [
+      "78fb2935339eab322b4182e4d57a3f1fcf70009890f95642418987e45c3ba0ca",
+    ],
+  },
 ];
 
 /**
  * Seed lamda's bundled skills into `~/.lamda/skills/<name>/SKILL.md` when they
  * don't yet exist, so they're discoverable to the agent (and editable on disk).
- * Existing files are never overwritten — user edits always win, matching
- * {@link import("./modes.js").ensureModeFiles}. Best-effort: any filesystem
+ * Existing files are never overwritten unless their content exactly matches a
+ * previous generated version; user edits always win. Best-effort: any filesystem
  * failure is swallowed so a read-only home dir can't break startup. Call once at
  * server startup.
  */
@@ -296,8 +318,12 @@ export function ensureSkillFiles(): void {
   for (const skill of SEED_SKILLS) {
     const dir = join(lamdaGlobalSkillsDir(), skill.name);
     const path = join(dir, "SKILL.md");
-    if (existsSync(path)) continue;
     try {
+      if (existsSync(path)) {
+        const current = readFileSync(path, "utf8");
+        const hash = createHash("sha256").update(current).digest("hex");
+        if (!skill.legacyHashes.includes(hash)) continue;
+      }
       mkdirSync(dir, { recursive: true });
       writeFileSync(path, skill.content, "utf8");
     } catch {

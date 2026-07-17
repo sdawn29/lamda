@@ -68,7 +68,12 @@ describe("getAgentConfig", () => {
   it("returns built-in defaults when no file exists", () => {
     const general = getAgentConfig("general");
     expect(general?.source).toBe("builtin");
-    expect(general?.tools).toEqual([...SUBAGENT_TOOL_NAMES, "memory"]);
+    expect(general?.tools).toEqual([
+      ...SUBAGENT_TOOL_NAMES,
+      "memory",
+      "lsp",
+      "semantic_search",
+    ]);
 
     const explore = getAgentConfig("explore");
     expect(explore?.tools).toEqual([
@@ -77,6 +82,7 @@ describe("getAgentConfig", () => {
       "find",
       "ls",
       "memory",
+      "lsp",
       "semantic_search",
     ]);
 
@@ -88,6 +94,17 @@ describe("getAgentConfig", () => {
       "find",
       "ls",
       "memory",
+      "semantic_search",
+    ]);
+
+    const reviewer = getAgentConfig("reviewer");
+    expect(reviewer?.tools).toEqual([
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "memory",
+      "lsp",
       "semantic_search",
     ]);
   });
@@ -191,6 +208,7 @@ describe("getAgentConfig", () => {
       "find",
       "ls",
       "memory",
+      "lsp",
       "semantic_search",
     ]);
   });
@@ -210,7 +228,14 @@ describe("listAgents", () => {
     );
 
     const ids = listAgents(cwd).map((a) => a.id);
-    expect(ids).toEqual(["general", "explore", "research", "alpha", "zeta"]);
+    expect(ids).toEqual([
+      "general",
+      "explore",
+      "research",
+      "reviewer",
+      "alpha",
+      "zeta",
+    ]);
   });
 
   it("ignores invalid ids and non-md files", () => {
@@ -222,6 +247,7 @@ describe("listAgents", () => {
       "general",
       "explore",
       "research",
+      "reviewer",
     ]);
   });
 });
@@ -250,8 +276,7 @@ describe("ensureAgentFiles", () => {
       "explore",
       serializeAgentFile({
         label: "Explore",
-        description:
-          'Read-only codebase scout for searches and "where/how is X done" questions. Fast and safe: it can read and search but never modifies anything.',
+        description: explore!.description,
         systemPrompt: explore!.systemPrompt,
         tools: ["read", "grep", "find", "ls", "memory"],
         color: "teal",

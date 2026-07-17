@@ -24,20 +24,20 @@ function buildDelegateDescription(agents: AgentConfig[]): string {
   const list = agents
     .map((a) => `- ${a.id}: ${clampDescription(a.description) || a.label}`)
     .join("\n");
-  return `Delegate a task to a subagent that handles it autonomously and reports back.
+  return `Delegate one bounded task to a headless subagent with an independent context window.
 
-The subagent runs in this conversation's working directory with its own context window and its agent-specific toolset. It cannot ask the user questions and cannot spawn further subagents. Nothing but its final message comes back to you, so \`prompt\` must be a detailed, self-contained brief. Include:
+The subagent runs in this conversation's working directory with its agent-specific tools. It cannot see this conversation, ask the user questions, or spawn another agent. Only its final report returns, so \`prompt\` must stand alone. Include:
 - objective and concrete deliverable;
 - relevant user intent, facts already established, files/symbols, and external context;
 - scope boundaries, constraints, and decisions already made;
 - the investigation or implementation expected, including assumptions it may make; and
 - the report format, evidence, and validation required on completion.
 
-Do not send vague prompts such as "look into this" or force the subagent to rediscover context the parent already has. Split independent work into separate detailed prompts and synthesize their reports yourself.
+Delegate only work that is genuinely separable. Do not use a subagent for a tiny lookup, a decision that depends on the full conversation, or work you must immediately repeat. Never send a vague prompt such as "look into this." Split independent work into separate calls, then evaluate and synthesize their reports. A report is evidence, not proof: inspect changed files and validate integration before relying on delegated edits.
 
-To run subagents in parallel, emit multiple delegate calls in a single message (at most 4 execute concurrently; extras wait in a queue). Prefer the cheapest agent that can do the job — use \`explore\` for read-only codebase questions, \`research\` for reading external docs and web pages, and reserve \`general\` for work that needs edits or shell access. The active mode may restrict which agents can be launched (read-only modes only allow read-only agents); a disallowed launch fails with the permitted list.
+To run independent tasks in parallel, emit multiple delegate calls in one message (at most 4 run concurrently; extras queue). Choose the narrowest capable agent: \`explore\` for codebase tracing, \`research\` for external sources, \`reviewer\` for an independent audit, and \`general\` only when edits or shell execution are required. The active mode may restrict the available agents.
 
-Each call may also set \`model\` to run the subagent on a specific model — pick a cheaper/faster model for simple mechanical tasks and a stronger one for hard reasoning. Omit it to use the agent's default.
+The optional \`model\` override can use a cheaper/faster model for mechanical work or a stronger model for difficult reasoning. Omit it to inherit the agent's configured/default model.
 
 Available agents:
 ${list}`;

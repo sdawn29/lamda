@@ -3,6 +3,7 @@ import { ArrowLeft, ChevronRight } from "lucide-react"
 import { useParams, useRouter } from "@tanstack/react-router"
 
 import { Button } from "@/shared/ui/button"
+import { SidebarTrigger, useSidebar } from "@/shared/ui/sidebar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import { ShortcutKbd } from "@/shared/ui/kbd"
 import { useShortcutBinding } from "@/shared/components/keyboard-shortcuts-provider"
@@ -21,6 +22,8 @@ import { useAppSettings } from "../queries"
  */
 export function SettingsTitleBar() {
   const router = useRouter()
+  const { isMobile, openMobile, state: sidebarState } = useSidebar()
+  const isSidebarOpen = isMobile ? openMobile : sidebarState === "expanded"
   const closeBinding = useShortcutBinding(SHORTCUT_ACTIONS.OPEN_SETTINGS)
   const { workspaces } = useWorkspace()
   const { data: settings } = useAppSettings()
@@ -73,6 +76,27 @@ export function SettingsTitleBar() {
       {isMac && !isFullscreen && (
         <div className={cn(island, "w-[4.75rem]")} aria-hidden />
       )}
+
+      {/* ── Settings sidebar toggle ────────────────────────────────────── */}
+      <div className={island} style={noDrag}>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <SidebarTrigger
+                aria-label={
+                  isSidebarOpen
+                    ? "Close settings sidebar"
+                    : "Open settings sidebar"
+                }
+                className="size-7 text-muted-foreground/70 hover:text-foreground"
+              />
+            }
+          />
+          <TooltipContent>
+            {isSidebarOpen ? "Close settings sidebar" : "Open settings sidebar"}
+          </TooltipContent>
+        </Tooltip>
+      </div>
 
       {/* ── Back to threads ──────────────────────────────────────────────── */}
       <div className={island} style={noDrag}>

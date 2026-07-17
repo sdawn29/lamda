@@ -6,6 +6,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { parseFrontmatter, parseList, unquote } from "./frontmatter.js";
 import {
@@ -136,6 +137,15 @@ const DEFAULT_MODE_COLOR = "violet";
 /** Fallback icon for custom modes that omit `icon`. */
 const DEFAULT_MODE_ICON = "sparkles";
 
+/** Previous built-in prompt fingerprints, used only to migrate untouched seeds. */
+const LEGACY_MODE_PROMPT_HASHES: Partial<
+  Record<BuiltinMode, readonly string[]>
+> = {
+  ask: ["eca806b7bf8b19a9fc3b596f6fea8cee7ae2be412a8109348e486df6149c61c7"],
+  plan: ["a214bfe622898c3e04e984eaf26ec9398c488967e2316005393147c3530bcf8e"],
+  agent: ["4574f507522b38a49d6d43adee27dee25566e73011c2510d5bafca9392147413"],
+};
+
 // Fixed names of server-registered git-host tools, so the built-in modes can
 // allowlist them explicitly (MCP tool names are workspace-specific and can't
 // be listed here — add them to a mode file by name to enable them).
@@ -175,14 +185,16 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
     label: "Ask",
     description: "Read-only Q&A. Cannot edit, write, or run shell commands.",
     preamble:
-      "Ask mode — read-only Q&A about this codebase. You have `read`, `grep`, `find`, `ls`, read-only research tools, and `delegate` (read-only agents only); editing, writing, and shell are disabled here.\n\n" +
-      "- Identify the question type before investigating: use code search/read/LSP or semantic search for workspace facts, git-host tools for repository history or review data, and `web_fetch` for external behavior. Prefer the smallest source that can prove the answer.\n" +
-      "- Ground every non-trivial answer in evidence you actually inspected. For broad questions that span many files, fan out independent `delegate` explore tasks and synthesize their reports; an explicit `#explore` request must be delegated.\n" +
-      "- Answer at the depth the question was asked: a factual question gets a direct answer plus its evidence, not a tour of everything you read.\n" +
-      "- Cite concrete locations as `path/to/file.ts:line`, and quote only the minimal snippet that proves the point.\n" +
-      "- Separate fact from inference: state what you actually read as fact with its citation; flag deductions with \"likely\"/\"appears\" — never present a guess as verified.\n" +
-      "- If the question is ambiguous or the answer changes with a user preference, clarify via `question`; otherwise state a reasonable assumption and proceed.\n" +
-      "- You cannot change files here. If the user asks for a change, outline what you would change (files and approach) and point them to Plan or Agent mode — never describe an edit as if it were applied.",
+      '<active_mode name="ask">\n' +
+      "Ask mode is read-only. Answer questions from inspected evidence; do not modify files, run shell commands, or change external state.\n\n" +
+      "- Start with the direct answer the user needs, then gather only the evidence required to support it.\n" +
+      "- Use workspace search/read/LSP for code facts, git-host tools for repository history, and primary documentation for external behavior. Match documentation to the versions actually present in the workspace.\n" +
+      "- Trace definitions, call sites, state transitions, and edge cases when the question is about behavior; do not infer behavior from names alone.\n" +
+      "- For broad, separable reconnaissance, delegate read-only exploration or research and synthesize the results. Honor an explicit permitted agent mention.\n" +
+      "- Cite the smallest useful evidence with concrete file locations or source URLs. Clearly label uncertainty and inference.\n" +
+      "- Ask a question only when materially different interpretations would produce different answers; otherwise state the assumption and continue.\n" +
+      "- If the user requests a change, explain the recommended change and affected areas, then tell them implementation requires Agent mode. Never imply that a change was applied.\n" +
+      "</active_mode>",
     tools: [
       "read",
       "grep",
@@ -196,7 +208,7 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "semantic_search",
       ...GIT_HOST_READ_TOOLS,
     ],
-    agents: ["explore"],
+    agents: ["explore", "research", "reviewer"],
   },
   plan: {
     id: "plan",
@@ -207,23 +219,25 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
     description:
       "Research and propose a plan. Saves the plan to .lamda/plans/.",
     preamble:
-      "Plan mode — produce exactly one implementation-ready plan for the user's request, saved under `.lamda/plans/`. You investigate and write the plan; you implement nothing here.\n\n" +
-      "Investigate first (read-only): trace real code paths, data models, call sites, workspace instructions, and relevant git state with `read`, `grep`, `find`, `ls`, read-only `bash`, LSP, and semantic search. Fan out independent `delegate` explore tasks for broad reconnaissance; delegate `research` for external libraries, APIs, or version behavior; an explicit `#explore` or `#research` request must be delegated. Use the returned evidence to make the plan specific, and do not repeat the same investigation locally. Plan against the code as it is, not as you assume it is. Don't modify source, config, tests, or docs; the only file you write is the plan, via the `plan` tool (`list` existing plans first, `read` to revisit one, `write` to save to `.lamda/plans/<2-5-word-kebab-slug>.md`; to revise an existing plan, write to its existing name).\n\n" +
-      "Clarify before writing when the request is vague or has materially different viable approaches: use `question` for goals, scope, constraints, or approach whenever the answer would change the plan. If approaches genuinely compete, weigh them briefly in the plan and commit to one recommendation — don't hand the user a menu. State assumptions only for minor gaps with an obvious default.\n\n" +
-      "Scale the plan to the task: a small fix needs a few tight paragraphs and a short todo list; reserve the full structure for genuinely complex work. Every step must be executable by an implementer with no extra context — name the file, the symbol, and the intended change; avoid vague verbs like \"improve\" or \"handle properly\". Include literal code only where the exact shape is the point (a tricky signature, a schema), not for routine edits.\n\n" +
-      "The plan must cover:\n" +
-      "- Problem summary and current-state findings, with `path:line` references.\n" +
-      "- Step-by-step implementation, ordered by execution, naming the specific files/modules to change and the intended change in each.\n" +
-      "- Risks, edge cases, dependencies, and a validation strategy (the exact tests/commands and manual checks that prove it works).\n" +
-      "- A clear definition of done.\n\n" +
-      "End the plan with a `## Todos` section as the very last section: a GitHub-style checklist (`- [ ] …`) of the concrete, ordered, actionable steps from the plan, each one short enough to be a single unit of work. This is what the agent will work through when implementing.\n\n" +
-      "After the `plan` write succeeds, reply with a 2-3 sentence summary of the recommended approach and any open questions, then stop and wait for review — implement nothing in this mode.",
+      '<active_mode name="plan">\n' +
+      "Plan mode produces one implementation-ready plan under `.lamda/plans/`. Investigate and decide; do not implement. The plan artifact is the only state you may change.\n\n" +
+      "1. Define the outcome, constraints, and definition of done from the request. Ask once, before planning, only if a missing user decision would materially alter the design.\n" +
+      "2. Inspect the real system: applicable instructions, architecture, relevant symbols and call sites, data flow, existing tests, configuration, and dependency versions. Use read-only agents in parallel for independent codebase or external research; do not duplicate their work without a verification reason.\n" +
+      "3. Resolve the design. Compare genuinely viable approaches against correctness, compatibility, complexity, migration cost, and operability, then recommend one. Do not leave core design choices to the implementer.\n" +
+      "4. Write a plan scaled to the task. Every implementation step must name the file/module and symbol or surface, describe the exact behavioral change, note dependencies on earlier steps, and state how that step is verified. Avoid vague verbs and speculative cleanup.\n\n" +
+      "The plan must include:\n" +
+      "- problem statement, goals, non-goals, and evidence-backed current state;\n" +
+      "- chosen design and any important rejected alternative;\n" +
+      "- ordered implementation steps, including schema/API/type changes and migration or compatibility work where relevant;\n" +
+      "- failure modes, security/privacy concerns, edge cases, rollout or rollback considerations when applicable;\n" +
+      "- exact automated and manual validation, plus a measurable definition of done.\n\n" +
+      "End with `## Todos` as the final section: an ordered GitHub checklist whose items are independently executable and collectively complete. Save via the `plan` tool, then reply with a brief recommendation and unresolved blocker, if any. Stop without implementing.\n" +
+      "</active_mode>",
     tools: [
       "read",
       "grep",
       "find",
       "ls",
-      "bash",
       "plan",
       "question",
       "memory",
@@ -233,7 +247,7 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
       "semantic_search",
       ...GIT_HOST_READ_TOOLS,
     ],
-    agents: ["explore", "research"],
+    agents: ["explore", "research", "reviewer"],
   },
   agent: {
     id: "agent",
@@ -243,15 +257,16 @@ const DEFAULT_MODE_CONFIG: Record<BuiltinMode, ModeConfig> = {
     label: "Agent",
     description: "Full coding agent. Can edit, write, and run shell commands.",
     preamble:
-      "Agent mode — you are a skilled software engineer with full `read`, `edit`, `write`, and `bash` access. Own the request end to end: implement it, verify it, and leave the workspace in a working state.\n\n" +
-      "- Orient before changing: read workspace instructions, inspect the relevant code and current git state, then trace the actual cause. If a plan for this task exists in `.lamda/plans/`, review it, follow its todos, and revise it only when evidence makes it stale.\n" +
-      "- Match tools to the work: use search/read/LSP/semantic search for code facts, `web_fetch` for verified external behavior, and available MCP or git-host tools when they are the source of truth. Review the diff and surrounding call sites after edits.\n" +
-      "- Delegate liberally to keep your context on the core change: hand self-contained pieces — broad exploration, research across many files, an independent side task, a verification pass — to `delegate`, and launch independent ones in parallel. A user-selected `#subagent` is mandatory delegation. Every subagent prompt must be detailed and self-contained: objective/deliverable, relevant context and files, scope/constraints, expected work, and required evidence/validation in its final report. Use its result rather than repeating its investigation. Do quick targeted lookups and the changes that need your full picture yourself.\n" +
-      "- Track multi-step work (beyond 2–3 steps) with the `todo` tool: lay out the steps up front and update statuses as you go so the user sees live progress; skip it for trivial tasks.\n" +
-      "- Implement incrementally: make the smallest change that fully solves the problem; don't refactor or reformat unrelated code. If you notice unrelated problems along the way, mention them — don't fix them unasked.\n" +
-      "- Verify before finishing: review the final diff, run the narrowest relevant check first (the failing test, changed-file lint or type-check), then the broader suite or build when warranted. Exercise the affected UI or workflow when it is practical. The task isn't done until verified — if you can't verify, say exactly what you could not check and why.\n" +
-      "- Recover honestly: if the same approach fails twice, step back and rethink instead of iterating blindly. If genuinely blocked, stop and report what's done and what remains — never leave the workspace half-migrated or silently narrow the task.\n" +
-      "- Clarify with `question` before coding only when blocked on a decision that is genuinely the user's and would change what you build (scope, approach, trade-offs, conflicting requirements). Pick obvious defaults yourself, mention them, and proceed.",
+      '<active_mode name="agent">\n' +
+      "Agent mode is execution mode. Own the requested engineering outcome: diagnose, implement, validate, and leave the workspace coherent.\n\n" +
+      "1. Orient: read applicable instructions, inspect relevant user changes and git state, trace the actual behavior, and review an existing task plan if one applies.\n" +
+      "2. Frame the change: identify the root cause, invariants, affected interfaces, risks, and the smallest complete solution. Use `todo` for substantial work and keep it synchronized with reality.\n" +
+      "3. Execute: make cohesive changes in dependency order. Preserve compatibility unless the request authorizes a break. Update tests, types, docs, migrations, and generated artifacts only when the behavior requires them.\n" +
+      "4. Validate: inspect the diff and call sites, run the narrowest meaningful checks first, then broader checks proportional to blast radius. Exercise the changed UI or workflow when practical. A passing command is evidence only for what it covers.\n" +
+      "5. Deliver: close every todo, state the outcome first, summarize material changes and verification, and identify only genuine residual risk or blocked validation.\n\n" +
+      "Delegate when work is independent and self-contained; keep core decisions and tightly coupled edits local. Honor explicit permitted agent mentions. If delegated work changes files, inspect its diff and validate integration yourself.\n\n" +
+      "Ask before coding only when a consequential choice belongs to the user. Otherwise make the safest reversible assumption and proceed. If blocked, preserve a buildable/coherent state and report the exact blocker—never silently narrow the request or declare partial work complete.\n" +
+      "</active_mode>",
     tools: [
       "read",
       "bash",
@@ -385,15 +400,52 @@ function modeFileMatchesDefaultSeed(
   const { frontmatter, body } = parseModeFile(raw);
   const tools = frontmatter.tools ?? defaults.tools;
   const agents = frontmatter.agents ?? defaults.agents;
+  const promptHash = createHash("sha256").update(body).digest("hex");
+  const knownPrompt =
+    body === defaults.preamble ||
+    (LEGACY_MODE_PROMPT_HASHES[defaults.id as BuiltinMode]?.includes(
+      promptHash,
+    ) ??
+      false);
+  const knownConfig =
+    (sameStringList(tools, defaults.tools) &&
+      sameStringList(agents, defaults.agents)) ||
+    isPreviousDefaultModeConfig(defaults.id, tools, agents) ||
+    isKnownStaleModeSeed(defaults.id, tools, agents);
   return (
     (frontmatter.label ?? defaults.label) === defaults.label &&
     (frontmatter.description ?? defaults.description) ===
       defaults.description &&
     (frontmatter.color ?? defaults.color) === defaults.color &&
     (frontmatter.icon ?? defaults.icon) === defaults.icon &&
-    body === defaults.preamble &&
-    !sameStringList(tools, defaults.tools) &&
-    isKnownStaleModeSeed(defaults.id, tools, agents)
+    knownPrompt &&
+    knownConfig
+  );
+}
+
+function isPreviousDefaultModeConfig(
+  mode: string,
+  tools: readonly string[],
+  agents: readonly string[] | null,
+): boolean {
+  const current = DEFAULT_MODE_CONFIG[mode as BuiltinMode];
+  if (!current) return false;
+  if (mode === "ask") {
+    return (
+      sameStringList(tools, current.tools) &&
+      sameStringList(agents, ["explore"])
+    );
+  }
+  if (mode === "plan") {
+    const previousTools = [...current.tools];
+    previousTools.splice(4, 0, "bash");
+    return (
+      sameStringList(tools, previousTools) &&
+      sameStringList(agents, ["explore", "research"])
+    );
+  }
+  return (
+    mode === "agent" && sameStringList(tools, current.tools) && agents === null
   );
 }
 

@@ -1,12 +1,18 @@
 import { useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react"
+import { Search, X } from "lucide-react"
 import { Link, useMatchRoute } from "@tanstack/react-router"
 
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { SectionLabel } from "@/shared/ui/section-label"
 import { Input } from "@/shared/ui/input"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  useSidebar,
+} from "@/shared/ui/sidebar"
 import { cn } from "@/shared/lib/utils"
 import {
   matchesSearch,
@@ -15,63 +21,37 @@ import {
   type SettingsSectionMeta,
 } from "../sections"
 
-function SidebarLink({
-  collapsed,
-  section,
-}: {
-  collapsed: boolean
-  section: SettingsSectionMeta
-}) {
+function SidebarLink({ section }: { section: SettingsSectionMeta }) {
   const Icon = section.icon
   const matchRoute = useMatchRoute()
+  const { isMobile, setOpenMobile } = useSidebar()
   const isActive = !!matchRoute({
     to: "/settings/$section",
     params: { section: section.slug },
   })
 
-  const link = (
+  return (
     <Link
       to="/settings/$section"
       params={{ section: section.slug }}
       preload="intent"
-      aria-label={collapsed ? section.label : undefined}
+      onClick={() => {
+        if (isMobile) setOpenMobile(false)
+      }}
       className={cn(
-        "group relative flex h-8 w-full items-center rounded-md text-sm transition-colors",
-        collapsed ? "justify-center px-2" : "gap-2 px-2",
+        "group relative flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm transition-colors",
         isActive
           ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
           : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
       )}
     >
-      <Icon
-        className={cn(
-          "size-3.5 shrink-0 transition-colors",
-          isActive ? "text-foreground" : "text-muted-foreground/80"
-        )}
-      />
-      {!collapsed && <span className="truncate">{section.label}</span>}
+      <Icon className="size-3.5 shrink-0 transition-colors" />
+      <span className="truncate">{section.label}</span>
     </Link>
   )
-
-  if (!collapsed) return link
-
-  return (
-    <Tooltip>
-      <TooltipTrigger render={link} />
-      <TooltipContent side="right">{section.label}</TooltipContent>
-    </Tooltip>
-  )
 }
 
-interface SettingsSidebarProps {
-  collapsed: boolean
-  onCollapsedChange: (collapsed: boolean) => void
-}
-
-export function SettingsSidebar({
-  collapsed,
-  onCollapsedChange,
-}: SettingsSidebarProps) {
+export function SettingsSidebar() {
   const [search, setSearch] = useState("")
 
   const filtered = useMemo(
@@ -93,108 +73,72 @@ export function SettingsSidebar({
   }, [filtered])
 
   return (
-    <aside
-      className={cn(
-        "flex h-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-md transition-[width] duration-200",
-        collapsed ? "w-12" : "w-60"
-      )}
+    <Sidebar
+      variant="floating"
+      collapsible="offcanvas"
+      className="top-10! h-[calc(100svh-2.5rem)]"
+      mobileClassName="inset-y-12! left-4! h-auto! w-72! max-w-[calc(100%-2rem)]! overflow-hidden rounded-2xl border border-border bg-background shadow-xl"
     >
-      <div
-        className={cn(
-          "flex shrink-0",
-          collapsed ? "justify-center p-2" : "justify-end px-2 pt-2"
-        )}
-      >
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => onCollapsedChange(!collapsed)}
-          aria-label={
-            collapsed ? "Expand settings sidebar" : "Collapse settings sidebar"
-          }
-        >
-          {collapsed ? <ChevronRight /> : <ChevronLeft />}
-        </Button>
-      </div>
-
       {/* Search */}
-      {!collapsed && (
-        <div className="px-3 pt-2 pb-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
-            <Input
-              placeholder="Search settings"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-7 bg-sidebar-accent/40 pr-7 pl-7 text-xs shadow-none"
-            />
-            {search && (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => setSearch("")}
-                className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X />
-                <span className="sr-only">Clear search</span>
-              </Button>
-            )}
-          </div>
+      <SidebarHeader className="px-3 pt-3 pb-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
+          <Input
+            placeholder="Search settings"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-7 bg-sidebar-accent/40 pr-7 pl-7 text-xs shadow-none"
+          />
+          {search && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => setSearch("")}
+              className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X />
+              <span className="sr-only">Clear search</span>
+            </Button>
+          )}
         </div>
-      )}
+      </SidebarHeader>
 
-      {/* Nav */}
-      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        {filtered.length === 0 ? (
-          <p className="px-2 py-3 text-xs text-muted-foreground">
-            No settings match.
-          </p>
-        ) : search.trim() ? (
-          <div className="flex flex-col gap-0.5 pt-1">
-            {filtered.map((section) => (
-              <SidebarLink
-                key={section.slug}
-                collapsed={collapsed}
-                section={section}
-              />
-            ))}
-          </div>
-        ) : (
-          SETTINGS_GROUPS.map((group) => {
-            const items = visibleByGroup.get(group.id)
-            if (!items?.length) return null
-            return (
-              <div
-                key={group.id}
-                className={cn("first:mt-1", collapsed ? "mt-2" : "mt-3")}
-              >
-                {!collapsed && (
+      <SidebarContent>
+        {/* Nav */}
+        <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+          {filtered.length === 0 ? (
+            <p className="px-2 py-3 text-xs text-muted-foreground">
+              No settings match.
+            </p>
+          ) : search.trim() ? (
+            <div className="flex flex-col gap-0.5 pt-1">
+              {filtered.map((section) => (
+                <SidebarLink key={section.slug} section={section} />
+              ))}
+            </div>
+          ) : (
+            SETTINGS_GROUPS.map((group) => {
+              const items = visibleByGroup.get(group.id)
+              if (!items?.length) return null
+              return (
+                <div key={group.id} className="mt-3 first:mt-1">
                   <SectionLabel className="mb-1 block px-2">
                     {group.label}
                   </SectionLabel>
-                )}
-                <div className="flex flex-col gap-0.5">
-                  {items.map((section) => (
-                    <SidebarLink
-                      key={section.slug}
-                      collapsed={collapsed}
-                      section={section}
-                    />
-                  ))}
+                  <div className="flex flex-col gap-0.5">
+                    {items.map((section) => (
+                      <SidebarLink key={section.slug} section={section} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )
-          })
-        )}
-      </nav>
+              )
+            })
+          )}
+        </nav>
+      </SidebarContent>
 
       {/* Footer */}
-      <div
-        className={cn(
-          "flex shrink-0 items-center border-t border-border py-2.5",
-          collapsed ? "justify-center px-2" : "justify-between gap-2 px-4"
-        )}
-      >
+      <SidebarFooter className="flex-row items-center justify-between gap-2 border-t border-border px-4 py-2.5">
         <div className="flex items-center gap-1.5">
           <span
             className="text-base leading-none font-black"
@@ -202,23 +146,20 @@ export function SettingsSidebar({
           >
             Λ
           </span>
-          {!collapsed && (
-            <span className="text-2xs font-medium text-muted-foreground">
-              Lamda
-            </span>
-          )}
+          <span className="text-2xs font-medium text-muted-foreground">
+            Lamda
+          </span>
         </div>
-        {!collapsed &&
-          (import.meta.env.DEV ? (
-            <Badge variant="outline" className="font-mono text-3xs">
-              dev
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="font-mono text-3xs">
-              v{__APP_VERSION__}
-            </Badge>
-          ))}
-      </div>
-    </aside>
+        {import.meta.env.DEV ? (
+          <Badge variant="outline" className="font-mono text-3xs">
+            dev
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="font-mono text-3xs">
+            v{__APP_VERSION__}
+          </Badge>
+        )}
+      </SidebarFooter>
+    </Sidebar>
   )
 }
