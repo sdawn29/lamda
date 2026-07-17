@@ -52,6 +52,9 @@ export interface PullRequestDetail extends PullRequestSummary {
   changedFiles: number
   reviewDecision: string | null
   mergeable: string | null
+  autoMergeEnabled: boolean
+  reviewRequests: string[]
+  latestReviews: { author: string | null; state: string }[]
   files: { path: string; additions: number; deletions: number }[]
   commits: PullRequestCommit[]
   comments: { author: string | null; body: string; createdAt: string }[]
@@ -87,6 +90,7 @@ export interface PullRequestReviewComment {
   path: string
   body: string
   author: string | null
+  authorAvatarUrl: string | null
   createdAt: string
   updatedAt: string
   line: number | null
@@ -104,6 +108,15 @@ export interface PullRequestReview {
   headCommitOid: string
   files: PullRequestFile[]
   comments: PullRequestReviewComment[]
+}
+
+export interface CommitDiffFile {
+  path: string
+  previousPath: string | null
+  status: string
+  additions: number
+  deletions: number
+  patch: string | null
 }
 
 export interface CreateReviewCommentInput {

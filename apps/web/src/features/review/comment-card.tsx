@@ -12,9 +12,12 @@ import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Field, FieldLabel } from "@/shared/ui/field"
 import { Textarea } from "@/shared/ui/textarea"
+import { UserAvatar } from "./panel-primitives"
 
-export interface PullRequestCommentCardProps {
+export interface CommentCardProps {
   author: string | null
+  /** Avatar image for the author; falls back to their initial when absent. */
+  avatarUrl?: string | null
   body: string
   createdAt: string
   context?: string
@@ -30,7 +33,7 @@ export interface PullRequestCommentCardProps {
 
 function matchesAnchor(
   line: DiffLine,
-  anchor: PullRequestCommentCardProps["diff"]
+  anchor: CommentCardProps["diff"]
 ): boolean {
   if (!anchor?.line) return false
   const lineNumber = String(anchor.line)
@@ -43,7 +46,7 @@ function CommentDiffPreview({
   patch,
   line,
   side,
-}: NonNullable<PullRequestCommentCardProps["diff"]>) {
+}: NonNullable<CommentCardProps["diff"]>) {
   const snippet = useMemo(() => {
     const lines = parseDiff(patch)
     if (lines.length === 0) return []
@@ -113,8 +116,9 @@ function CommentDiffPreview({
 }
 
 /** Shared presentation for PR conversation and inline file-review comments. */
-export function PullRequestCommentCard({
+export function CommentCard({
   author,
+  avatarUrl,
   body,
   createdAt,
   context,
@@ -122,7 +126,7 @@ export function PullRequestCommentCard({
   embedded = false,
   diff,
   onReply,
-}: PullRequestCommentCardProps) {
+}: CommentCardProps) {
   const displayAuthor = author ?? "Unknown"
   const replyId = useId()
   const [replyOpen, setReplyOpen] = useState(false)
@@ -158,9 +162,11 @@ export function PullRequestCommentCard({
       )}
     >
       <div className="flex items-center gap-2 border-b border-border/40 bg-muted/20 px-3 py-2">
-        <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-3xs font-semibold text-primary">
-          {displayAuthor.slice(0, 1).toUpperCase()}
-        </div>
+        <UserAvatar
+          src={avatarUrl}
+          name={author}
+          className="size-6 shrink-0"
+        />
         <div className="min-w-0 flex-1">
           <p className="truncate text-2xs font-medium">{displayAuthor}</p>
           <p
@@ -239,15 +245,17 @@ export function PullRequestCommentCard({
               </div>
             </form>
           ) : (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              onClick={() => setReplyOpen(true)}
-            >
-              <Reply data-icon="inline-start" />
-              Reply
-            </Button>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                size="xs"
+                onClick={() => setReplyOpen(true)}
+              >
+                <Reply data-icon="inline-start" />
+                Reply
+              </Button>
+            </div>
           )}
         </div>
       ) : null}

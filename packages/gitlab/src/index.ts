@@ -332,6 +332,7 @@ export async function listMergeRequests(
 export interface NoteSummary {
   id: number;
   author: string | null;
+  authorAvatarUrl: string | null;
   body: string;
   createdAt: string;
 }
@@ -352,10 +353,15 @@ async function listNotes(
   return raws
     .filter((raw) => raw.system !== true && raw.type == null)
     .map((raw) => {
-      const author = raw.author as { username?: string; name?: string } | null;
+      const author = raw.author as {
+        username?: string;
+        name?: string;
+        avatar_url?: string;
+      } | null;
       return {
         id: Number(raw.id ?? 0),
         author: author?.username ?? author?.name ?? null,
+        authorAvatarUrl: author?.avatar_url ?? null,
         body: String(raw.body ?? ""),
         createdAt: String(raw.created_at ?? raw.createdAt ?? ""),
       };
@@ -364,6 +370,10 @@ async function listNotes(
 
 export interface MergeRequestDetail extends MergeRequestSummary {
   description: string;
+  authorAvatarUrl: string | null;
+  reviewers: { login: string; name: string | null; avatarUrl: string | null }[];
+  /** True when the MR is set to merge automatically when the pipeline passes. */
+  autoMergeEnabled: boolean;
   mergeStatus: string | null;
   /** GitLab reports this as a string, e.g. "5" or "1000+". */
   changesCount: string | null;
@@ -459,9 +469,22 @@ export async function getMergeRequest(
     }),
     { additions: 0, deletions: 0 },
   );
+  const author = raw.author as { avatar_url?: string } | null;
+  const reviewerRaws = Array.isArray(raw.reviewers)
+    ? (raw.reviewers as Record<string, unknown>[])
+    : [];
   return {
     ...mapMergeRequest(raw),
     description: String(raw.description ?? ""),
+    authorAvatarUrl: stringField(author?.avatar_url) || null,
+    reviewers: reviewerRaws
+      .map((reviewer) => ({
+        login: stringField(reviewer.username),
+        name: stringField(reviewer.name) || null,
+        avatarUrl: stringField(reviewer.avatar_url) || null,
+      }))
+      .filter((reviewer) => reviewer.login !== ""),
+    autoMergeEnabled: raw.merge_when_pipeline_succeeds === true,
     mergeStatus:
       stringField(raw.detailed_merge_status ?? raw.merge_status) || null,
     changesCount: stringField(raw.changes_count) || null,
@@ -492,6 +515,7 @@ export interface MergeRequestReviewComment {
   path: string;
   body: string;
   author: string | null;
+  authorAvatarUrl: string | null;
   createdAt: string;
   updatedAt: string;
   line: number | null;
@@ -528,7 +552,11 @@ function mapReviewNote(
   fallback?: MergeRequestReviewComment,
 ): MergeRequestReviewComment | null {
   if (raw.system === true) return null;
-  const author = raw.author as { username?: string; name?: string } | null;
+  const author = raw.author as {
+    username?: string;
+    name?: string;
+    avatar_url?: string;
+  } | null;
   const position =
     typeof raw.position === "object" && raw.position !== null
       ? (raw.position as Record<string, unknown>)
@@ -545,6 +573,7 @@ function mapReviewNote(
     path,
     body: String(raw.body ?? ""),
     author: author?.username ?? author?.name ?? null,
+    authorAvatarUrl: author?.avatar_url ?? null,
     createdAt: String(raw.created_at ?? ""),
     updatedAt: String(raw.updated_at ?? raw.created_at ?? ""),
     line: newLine ?? fallback?.line ?? null,
@@ -725,13 +754,18 @@ export async function replyToMergeRequestReviewComment(
   );
   const mapped = mapReviewNote(raw, discussionId, null, "");
   if (!mapped) {
-    const author = raw.author as { username?: string; name?: string } | null;
+    const author = raw.author as {
+      username?: string;
+      name?: string;
+      avatar_url?: string;
+    } | null;
     return {
       id: Number(raw.id ?? 0),
       discussionId,
       path: "",
       body: String(raw.body ?? body),
       author: author?.username ?? author?.name ?? null,
+      authorAvatarUrl: author?.avatar_url ?? null,
       createdAt: String(raw.created_at ?? ""),
       updatedAt: String(raw.updated_at ?? raw.created_at ?? ""),
       line: null,
@@ -900,14 +934,53 @@ export async function checkoutMergeRequest(
   await runGlab(["mr", "checkout", String(number)], cwd, 30000);
 }
 
+export interface CommitDiffFile {
+  path: string;
+  previousPath: string | null;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch: string | null;
+}
+
+/** Changed files (with patches) for a single commit, via the REST API. */
+export async function getCommitDiff(
+  cwd: string,
+  sha: string,
+): Promise<CommitDiffFile[]> {
+  if (!/^[0-9a-f]{7,40}$/i.test(sha)) {
+    throw new GlabError("Invalid commit id", "");
+  }
+  const raws = await runGlabJson<Record<string, unknown>[]>(
+    ["api", `projects/:id/repository/commits/${sha}/diff`],
+    cwd,
+  );
+  return raws.map((change) => {
+    const diff = String(change.diff ?? "");
+    return {
+      path: String(change.new_path ?? change.old_path ?? ""),
+      previousPath:
+        change.renamed_file === true && change.old_path
+          ? String(change.old_path)
+          : null,
+      status: reviewFileStatus(change),
+      ...diffStats(diff),
+      patch: diff || null,
+    };
+  });
+}
+
 export async function mergeMergeRequest(
   cwd: string,
   number: number,
   squash = false,
+  /** Merge automatically when the pipeline succeeds instead of immediately. */
+  auto = false,
 ): Promise<void> {
   assertPositiveInt(number, "merge request number");
   const args = ["mr", "merge", String(number), "--yes"];
   if (squash) args.push("--squash");
+  if (auto) args.push("--auto-merge");
   await runGlab(args, cwd, 30000);
 }
 

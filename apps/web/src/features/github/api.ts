@@ -1,6 +1,7 @@
 import { ApiError, apiFetch } from "@/shared/lib/client"
 import type {
   CheckRun,
+  CommitDiffFile,
   CreateReviewCommentInput,
   CreatePrInput,
   GhRepoInfo,
@@ -95,6 +96,18 @@ export async function fetchPullRequest(
   return res.pr
 }
 
+export async function fetchCommitDiff(
+  ctx: RepoContext,
+  oid: string,
+  signal?: AbortSignal
+): Promise<CommitDiffFile[]> {
+  const res = await apiFetch<{ files: CommitDiffFile[] }>(
+    `/github/commits/${oid}/diff?${ctxQuery(ctx)}`,
+    { signal }
+  )
+  return res.files
+}
+
 export async function fetchPullRequestReview(
   ctx: RepoContext,
   number: number,
@@ -151,9 +164,13 @@ export async function publishRepository(
 export async function mergePullRequest(
   ctx: RepoContext,
   number: number,
-  method: MergeMethod
+  method: MergeMethod,
+  auto = false
 ): Promise<void> {
-  await apiFetch(`/github/prs/${number}/merge`, jsonInit({ ...ctx, method }))
+  await apiFetch(
+    `/github/prs/${number}/merge`,
+    jsonInit({ ...ctx, method, auto })
+  )
 }
 
 export async function checkoutPullRequest(

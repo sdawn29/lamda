@@ -46,10 +46,12 @@ export function useMergePullRequest(ctx: RepoContext) {
     mutationFn: ({
       number,
       method = "squash",
+      auto = false,
     }: {
       number: number
       method?: MergeMethod
-    }) => mergePullRequest(ctx, number, method),
+      auto?: boolean
+    }) => mergePullRequest(ctx, number, method, auto),
     onSuccess: (_data, { number }) => {
       qc.invalidateQueries({ queryKey: [...githubKeys.all, "prs"] })
       qc.invalidateQueries({ queryKey: githubKeys.pr(ctx, number) })

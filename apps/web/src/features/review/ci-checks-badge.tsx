@@ -1,6 +1,14 @@
 import { CheckCircle2, CircleSlash, Loader2, XCircle } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
-import type { CheckRun } from "../types"
+
+/** Provider-neutral CI check/job; GitHub checks and GitLab jobs both map here. */
+export interface CheckRun {
+  name: string
+  bucket: string
+  state: string
+  link: string | null
+  workflow: string | null
+}
 
 /** Aggregate state of a set of check runs, in priority order. */
 export function summarizeChecks(checks: CheckRun[]): {

@@ -1,6 +1,6 @@
 export { GithubReviewView } from "./components/github-review-view"
 export { CreatePrDialog } from "./components/create-pr-dialog"
-export { CiChecksBadge, summarizeChecks } from "./components/ci-checks-badge"
+export { CiChecksBadge, summarizeChecks } from "@/features/review"
 export {
   useGhStatus,
   useGithubConnected,

@@ -35,6 +35,7 @@ const createPrSchema = repoContextSchema.extend({
 
 const mergePrSchema = repoContextSchema.extend({
   method: z.string().optional(),
+  auto: z.boolean().optional(),
 });
 
 const createIssueSchema = repoContextSchema.extend({
@@ -184,6 +185,18 @@ github.get("/github/prs/:number/review", async (c) => {
   }
 });
 
+github.get("/github/commits/:oid/diff", async (c) => {
+  const cwd = resolveCwd(c);
+  if (!cwd) return c.json({ error: "No repo context" }, 400);
+  const oid = c.req.param("oid");
+  try {
+    const files = await gh.getCommitDiff(cwd, oid);
+    return c.json({ files });
+  } catch (err) {
+    return ghErrorResponse(c, err, "Failed to load commit diff");
+  }
+});
+
 github.post("/github/prs/:number/review-comments", async (c) => {
   const number = Number.parseInt(c.req.param("number"), 10);
   if (!Number.isInteger(number))
@@ -275,7 +288,7 @@ github.post("/github/prs/:number/merge", async (c) => {
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   try {
     const method = body.method as gh.MergeMethod | undefined;
-    await gh.mergePullRequest(cwd, number, method ?? "squash");
+    await gh.mergePullRequest(cwd, number, method ?? "squash", body.auto ?? false);
     return c.json({ ok: true });
   } catch (err) {
     return ghErrorResponse(c, err, "Failed to merge pull request");

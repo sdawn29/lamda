@@ -38,6 +38,7 @@ const commentMrSchema = repoContextSchema.extend({
 
 const mergeMrSchema = repoContextSchema.extend({
   squash: z.boolean().optional(),
+  auto: z.boolean().optional(),
 });
 
 const reviewCommentSchema = repoContextSchema.extend({
@@ -203,6 +204,18 @@ gitlab.get("/gitlab/mrs/:number/review", async (c) => {
   }
 });
 
+gitlab.get("/gitlab/commits/:oid/diff", async (c) => {
+  const cwd = resolveCwd(c);
+  if (!cwd) return c.json({ error: "No repo context" }, 400);
+  const oid = c.req.param("oid");
+  try {
+    const files = await gl.getCommitDiff(cwd, oid);
+    return c.json({ files });
+  } catch (err) {
+    return glabErrorResponse(c, err, "Failed to load commit diff");
+  }
+});
+
 gitlab.post("/gitlab/mrs/:number/review-comments", async (c) => {
   const number = Number.parseInt(c.req.param("number"), 10);
   if (!Number.isInteger(number)) {
@@ -319,7 +332,12 @@ gitlab.post("/gitlab/mrs/:number/merge", async (c) => {
   const cwd = resolveCwdFromBody(parsed.data);
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   try {
-    await gl.mergeMergeRequest(cwd, number, parsed.data.squash ?? false);
+    await gl.mergeMergeRequest(
+      cwd,
+      number,
+      parsed.data.squash ?? false,
+      parsed.data.auto ?? false,
+    );
     return c.json({ ok: true });
   } catch (err) {
     return glabErrorResponse(c, err, "Failed to merge merge request");

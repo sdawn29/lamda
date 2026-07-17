@@ -55,6 +55,9 @@ export interface PipelineDetail {
 
 export interface MergeRequestDetail extends MergeRequestSummary {
   description: string
+  authorAvatarUrl: string | null
+  reviewers: { login: string; name: string | null; avatarUrl: string | null }[]
+  autoMergeEnabled: boolean
   mergeStatus: string | null
   changesCount: string | null
   additions: number
@@ -65,6 +68,7 @@ export interface MergeRequestDetail extends MergeRequestSummary {
   comments: {
     id: number
     author: string | null
+    authorAvatarUrl: string | null
     body: string
     createdAt: string
   }[]
@@ -101,6 +105,7 @@ export interface MergeRequestReviewComment {
   path: string
   body: string
   author: string | null
+  authorAvatarUrl: string | null
   createdAt: string
   updatedAt: string
   line: number | null
@@ -112,6 +117,15 @@ export interface MergeRequestReviewComment {
   commitId: string
   originalCommitId: string
   url: string
+}
+
+export interface CommitDiffFile {
+  path: string
+  previousPath: string | null
+  status: string
+  additions: number
+  deletions: number
+  patch: string | null
 }
 
 export interface MergeRequestReview {

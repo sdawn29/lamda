@@ -1,5 +1,6 @@
 import { apiFetch } from "@/shared/lib/client"
 import type {
+  CommitDiffFile,
   CreateMergeRequestInput,
   GlabStatus,
   GitlabRepoInfo,
@@ -116,6 +117,18 @@ export async function fetchMergeRequest(
   return res.mr
 }
 
+export async function fetchCommitDiff(
+  ctx: RepoContext,
+  oid: string,
+  signal?: AbortSignal
+): Promise<CommitDiffFile[]> {
+  const res = await apiFetch<{ files: CommitDiffFile[] }>(
+    `/gitlab/commits/${oid}/diff?${ctxQuery(ctx)}`,
+    { signal }
+  )
+  return res.files
+}
+
 export async function fetchMergeRequestReview(
   ctx: RepoContext,
   number: number,
@@ -171,9 +184,13 @@ export async function checkoutMergeRequest(
 export async function mergeMergeRequest(
   ctx: RepoContext,
   number: number,
-  squash: boolean
+  squash: boolean,
+  auto = false
 ): Promise<void> {
-  await apiFetch(`/gitlab/mrs/${number}/merge`, jsonInit({ ...ctx, squash }))
+  await apiFetch(
+    `/gitlab/mrs/${number}/merge`,
+    jsonInit({ ...ctx, squash, auto })
+  )
 }
 
 export async function fetchIssues(

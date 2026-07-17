@@ -10,6 +10,7 @@ import {
   GitPullRequestDraft,
   Loader2,
   RefreshCw,
+  UserRound,
   XCircle,
 } from "lucide-react"
 import { openExternal } from "@/features/electron/api"
@@ -439,5 +440,218 @@ export function StatusBadge({ value }: { value: string | null | undefined }) {
     >
       {label}
     </Badge>
+  )
+}
+
+/** Avatar URL for a GitHub login; bot authors come through as `app/<slug>`. */
+export function githubAvatarUrl(login: string | null): string | null {
+  const slug = login?.replace(/^app\//, "")
+  return slug ? `https://github.com/${slug}.png?size=64` : null
+}
+
+/**
+ * Small round user avatar. Renders `src` when given, and falls back to the
+ * user's initial (or a generic person icon) when there is no image or it 404s.
+ */
+export function UserAvatar({
+  src,
+  name,
+  className,
+}: {
+  src: string | null | undefined
+  name: string | null | undefined
+  className?: string
+}) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
+    return (
+      <span
+        className={cn(
+          "flex items-center justify-center rounded-full bg-primary/10 text-3xs font-semibold text-primary",
+          className
+        )}
+        title={name ?? undefined}
+        aria-hidden
+      >
+        {name ? (
+          name.slice(0, 1).toUpperCase()
+        ) : (
+          <UserRound className="size-[62%]" />
+        )}
+      </span>
+    )
+  }
+  return (
+    <img
+      src={src}
+      alt={name ?? undefined}
+      title={name ?? undefined}
+      className={cn("rounded-full bg-muted object-cover", className)}
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+/**
+ * One reviewer avatar in the detail header's stack, with a status dot when
+ * the review state is known: approved, changes requested, pending.
+ */
+export function ReviewerAvatar({
+  name,
+  src,
+  state,
+}: {
+  name: string
+  src: string | null
+  state?: string
+}) {
+  const tone =
+    state === "APPROVED"
+      ? "bg-diff-add"
+      : state === "CHANGES_REQUESTED"
+        ? "bg-destructive"
+        : "bg-amber-400"
+  return (
+    <span
+      className="relative inline-flex"
+      title={state ? `${name} · ${reviewStateLabel(state)}` : name}
+    >
+      <UserAvatar src={src} name={name} className="size-5 ring-2 ring-background" />
+      {state ? (
+        <span
+          className={cn(
+            "absolute -right-px -bottom-px size-2 rounded-full ring-2 ring-background",
+            tone
+          )}
+          aria-hidden
+        />
+      ) : null}
+    </span>
+  )
+}
+
+export function reviewStateLabel(state: string): string {
+  switch (state) {
+    case "APPROVED":
+      return "Approved"
+    case "CHANGES_REQUESTED":
+      return "Changes requested"
+    case "PENDING":
+      return "Review requested"
+    default:
+      return state.charAt(0) + state.slice(1).toLowerCase().replace(/_/g, " ")
+  }
+}
+
+/** Meta-line status text, e.g. "Ready for review" for an open non-draft PR. */
+export function readinessLabel(kind: MergeReadinessKind): string {
+  switch (kind) {
+    case "merged":
+      return "Merged"
+    case "closed":
+      return "Closed"
+    case "draft":
+      return "Draft"
+    case "conflicts":
+      return "Has conflicts"
+    default:
+      return "Ready for review"
+  }
+}
+
+export interface MergeButtonState {
+  label: string
+  disabled: boolean
+  /** Tooltip explaining the state; null when merging is plainly available. */
+  reason: string | null
+  /** True when clicking arms auto-merge instead of merging immediately. */
+  auto: boolean
+}
+
+/**
+ * Context-aware state for the detail view's merge button, shared by the
+ * GitHub and GitLab panels. Derives what the button should say and do from
+ * merge readiness, CI state, and whether auto-merge is already armed.
+ */
+export function mergeButtonState({
+  readiness,
+  checksBucket,
+  autoMergeEnabled,
+}: {
+  readiness: MergeReadinessKind
+  checksBucket: "pass" | "fail" | "pending" | "none"
+  autoMergeEnabled: boolean
+}): MergeButtonState {
+  if (autoMergeEnabled) {
+    return {
+      label: "Auto-merge on",
+      disabled: true,
+      reason: "Will merge automatically once all requirements pass",
+      auto: false,
+    }
+  }
+  if (readiness === "draft") {
+    return {
+      label: "Merge",
+      disabled: true,
+      reason: "Drafts can't be merged — mark as ready first",
+      auto: false,
+    }
+  }
+  if (readiness === "conflicts") {
+    return {
+      label: "Merge",
+      disabled: true,
+      reason: "Resolve conflicts before merging",
+      auto: false,
+    }
+  }
+  if (checksBucket === "pending") {
+    return {
+      label: "Auto-merge",
+      disabled: false,
+      reason: "Checks are still running — merges automatically once they pass",
+      auto: true,
+    }
+  }
+  if (readiness === "checking") {
+    return {
+      label: "Merge",
+      disabled: true,
+      reason: "Checking mergeability…",
+      auto: false,
+    }
+  }
+  if (checksBucket === "fail") {
+    return {
+      label: "Merge",
+      disabled: false,
+      reason: "Some checks are failing",
+      auto: false,
+    }
+  }
+  return { label: "Merge", disabled: false, reason: null, auto: false }
+}
+
+/** Label + value row in the detail header's property list. */
+export function PropertyRow({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <dt className="flex w-26 shrink-0 items-center gap-2 text-muted-foreground/75">
+        {icon}
+        {label}
+      </dt>
+      <dd className="flex min-w-0 flex-1 items-center gap-1.5 text-foreground/90">
+        {children}
+      </dd>
+    </div>
   )
 }

@@ -1,49 +1,52 @@
 import { useState } from "react"
 import {
-  ArrowLeft,
+  ChevronRight,
   CircleDot,
+  CircleUserRound,
+  Clock,
   Copy,
-  ExternalLink,
   GitBranch,
   GitCommitHorizontal,
   GitMerge,
-  Loader2,
-  MessageSquare,
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { openExternal } from "@/features/electron/api"
 import { parseApiError } from "@/features/git"
-import {
-  CodeReviewFiles,
-  type CodeReviewCommentInput,
-} from "@/features/github/components/pull-request-files"
-import { PullRequestCommentCard } from "@/features/github/components/pull-request-comment-card"
-import { PullRequestCommits } from "@/features/github/components/github-review-view"
-import { formatRelativeDate } from "@/shared/lib/formatters"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { SectionLabel } from "@/shared/ui/section-label"
 import { Switch } from "@/shared/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
-import { Textarea } from "@/shared/ui/textarea"
+import { Tabs, TabsContent } from "@/shared/ui/tabs"
 import {
+  ActivityList,
+  checksSummaryText,
+  CodeReviewFiles,
   CollapsibleChecksSummary,
+  CommentCard,
+  CommentComposer,
+  CommitList,
+  DetailActionsFooter,
+  DetailHeader,
+  DetailNotFound,
+  DetailTab,
+  DetailTabsList,
+  DetailTopBar,
+  MergeDialog,
+  mergeButtonState,
   MergeReadinessBanner,
   mergeReadinessKind,
+  PanelMessage,
+  PropertyRow,
+  readinessLabel,
+  ReviewerAvatar,
   reviewItemStateIcon,
+  SectionHeading,
   StatusBadge,
-} from "@/features/github/components/panel-primitives"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/shared/ui/alert-dialog"
+  summarizeChecks,
+  type ActivityItem,
+  type CodeReviewCommentInput,
+} from "@/features/review"
+import { fetchCommitDiff } from "../api"
 import {
   useCheckoutMergeRequest,
   useCommentMergeRequest,
@@ -54,84 +57,11 @@ import {
 import { useMergeRequest, useMergeRequestReview } from "../queries"
 import type { RepoContext } from "../types"
 
-interface ActivityItem {
-  key: string
-  author: string | null
-  body: string
-  createdAt: string
-  context: string
-  reviewComment: boolean
+interface MrActivityItem extends ActivityItem {
   discussionId?: string
-  diff?: {
-    patch: string
-    line: number | null
-    side: "LEFT" | "RIGHT" | null
-  }
 }
 
-function DetailMessage({ message }: { message: string }) {
-  return (
-    <div className="flex h-full items-center justify-center p-4 text-center text-xs text-muted-foreground">
-      {message}
-    </div>
-  )
-}
-
-function ActivityList({
-  items,
-  loading,
-  error,
-  onReply,
-}: {
-  items: ActivityItem[]
-  loading: boolean
-  error: unknown
-  onReply: (item: ActivityItem, body: string) => Promise<unknown>
-}) {
-  if (loading && items.length === 0) {
-    return (
-      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
-        <Loader2 className="size-3 animate-spin" aria-hidden />
-        Loading comments
-      </div>
-    )
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-card/45 px-4 py-8 text-center">
-        <MessageSquare className="mx-auto mb-2 size-5 text-muted-foreground/40" />
-        <p className="text-xs font-medium">No conversation yet</p>
-        <p className="mt-0.5 text-3xs text-muted-foreground">
-          General and file review comments will appear here.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col gap-2.5">
-      {error ? (
-        <p className="px-1 text-3xs text-destructive">
-          File review comments could not be loaded.
-        </p>
-      ) : null}
-      {items.map((item) => (
-        <PullRequestCommentCard
-          key={item.key}
-          author={item.author}
-          body={item.body}
-          createdAt={item.createdAt}
-          context={item.context}
-          reviewComment={item.reviewComment}
-          diff={item.diff}
-          onReply={(body) => onReply(item, body)}
-        />
-      ))}
-    </div>
-  )
-}
-
+/** GitLab merge-request detail; mirrors the GitHub PR detail page. */
 export function GitlabMergeRequestDetail({
   ctx,
   number,
@@ -157,35 +87,28 @@ export function GitlabMergeRequestDetail({
   const [squash, setSquash] = useState(true)
   const [detailTab, setDetailTab] = useState("overview")
 
-  if (isLoading) return <DetailMessage message="Loading merge request" />
+  if (isLoading) return <PanelMessage loading message="Loading merge request" />
   if (error || !mr) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
-        <p className="text-xs text-muted-foreground">
-          {error ? parseApiError(error) : "Merge request not found"}
-        </p>
-        <Button size="sm" variant="outline" onClick={onBack}>
-          Back to merge requests
-        </Button>
-      </div>
+      <DetailNotFound
+        message={error ? parseApiError(error) : "Merge request not found"}
+        backLabel="Back to merge requests"
+        onBack={onBack}
+      />
     )
   }
 
   const isOpen = mr.state.toLowerCase() === "opened"
   const pending = comment.isPending || checkout.isPending || merge.isPending
   const readiness = mergeReadinessKind(mr.state, mr.isDraft, mr.mergeStatus)
-  const mergeBlockedReason = mr.isDraft
-    ? "Draft merge requests can't be merged"
-    : mr.mergeStatus === "cannot_be_merged"
-      ? "Resolve conflicts before merging"
-      : null
   const reviewFilesByPath = new Map(
     (review?.files ?? []).map((file) => [file.path, file] as const)
   )
-  const activity: ActivityItem[] = [
+  const activity: MrActivityItem[] = [
     ...mr.comments.map((item) => ({
       key: `conversation-${item.id}`,
       author: item.author,
+      avatarUrl: item.authorAvatarUrl,
       body: item.body,
       createdAt: item.createdAt,
       context: "Conversation",
@@ -197,6 +120,7 @@ export function GitlabMergeRequestDetail({
       return {
         key: `review-${item.id}`,
         author: item.author,
+        avatarUrl: item.authorAvatarUrl,
         body: item.body,
         createdAt: item.createdAt,
         context: line
@@ -212,6 +136,25 @@ export function GitlabMergeRequestDetail({
       new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
   )
   const repositoryUrl = mr.url.replace(/\/-\/merge_requests\/\d+\/?$/, "")
+  const jobsSummary = summarizeChecks(
+    (mr.pipeline?.jobs ?? []).map((job) => ({
+      name: job.name,
+      bucket: job.bucket,
+      state: job.state,
+      link: job.link,
+      workflow: job.stage,
+    }))
+  )
+  const checksText = checksSummaryText(jobsSummary, {
+    singular: "job",
+    plural: "jobs",
+    none: "No pipeline",
+  })
+  const mergeState = mergeButtonState({
+    readiness,
+    checksBucket: jobsSummary.bucket,
+    autoMergeEnabled: mr.autoMergeEnabled,
+  })
 
   function submitComment() {
     const body = commentBody.trim()
@@ -231,7 +174,7 @@ export function GitlabMergeRequestDetail({
     )
   }
 
-  async function replyToActivity(item: ActivityItem, body: string) {
+  async function replyToActivity(item: MrActivityItem, body: string) {
     if (item.discussionId) {
       return replyToReviewComment.mutateAsync({
         discussionId: item.discussionId,
@@ -265,91 +208,75 @@ export function GitlabMergeRequestDetail({
 
   return (
     <div className="@container/pr flex h-full min-h-0 flex-col bg-muted/[0.08]">
-      <div className="shrink-0 p-2 pb-0">
-        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border/60 bg-background/85 px-2 py-1.5 shadow-sm shadow-black/[0.03] backdrop-blur dark:shadow-black/20">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onBack}
-            aria-label="Back to merge requests"
-          >
-            <ArrowLeft data-icon="inline-start" />
-          </Button>
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
-            {reviewItemStateIcon(mr.state, mr.isDraft, "opened")}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-foreground/90">
-              {mr.title}
-            </p>
-            <p
-              className="truncate text-3xs text-muted-foreground/60"
-              title={new Date(mr.createdAt).toLocaleString()}
-            >
-              !{mr.number} · {mr.author ?? "Unknown author"} · opened{" "}
-              {formatRelativeDate(mr.createdAt)}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => void openExternal(mr.url)}
-            aria-label="Open on GitLab"
-          >
-            <ExternalLink data-icon="inline-start" />
-          </Button>
-        </div>
-      </div>
+      <DetailTopBar
+        onBack={onBack}
+        backLabel="Back to merge requests"
+        stateIcon={reviewItemStateIcon(mr.state, mr.isDraft, "opened")}
+        title={`Merge request !${mr.number}`}
+        url={mr.url}
+        openLabel="Open on GitLab"
+      />
 
       <Tabs
         value={detailTab}
         onValueChange={setDetailTab}
         className="min-h-0 flex-1 gap-0 overflow-hidden"
       >
-        <TabsList className="mx-2 my-2 h-8 max-w-[calc(100%-1rem)] shrink-0 self-start overflow-x-auto rounded-full border border-border/55 bg-background/75 p-1 shadow-xs">
-          <TabsTrigger
+        <DetailTabsList>
+          <DetailTab
             value="overview"
-            className="h-6 flex-none rounded-full px-2.5 has-data-[icon=inline-start]:pl-2 data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm"
-          >
-            <CircleDot data-icon="inline-start" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger
+            icon={<CircleDot data-icon="inline-start" />}
+            label="Overview"
+          />
+          <DetailTab
             value="files"
-            className="h-6 flex-none rounded-full px-2.5 has-data-[icon=inline-start]:pl-2 data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm"
-          >
-            <GitMerge data-icon="inline-start" />
-            Files
-            <span className="rounded-full bg-foreground/5 px-1.5 text-3xs text-current tabular-nums">
-              {mr.changedFiles}
-            </span>
-          </TabsTrigger>
-          <TabsTrigger
+            icon={<GitMerge data-icon="inline-start" />}
+            label="Files"
+            count={mr.changedFiles}
+          />
+          <DetailTab
             value="commits"
-            className="h-6 flex-none rounded-full px-2.5 has-data-[icon=inline-start]:pl-2 data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm"
-          >
-            <GitCommitHorizontal data-icon="inline-start" />
-            Commits
-            <span className="rounded-full bg-foreground/5 px-1.5 text-3xs text-current tabular-nums">
-              {mr.commits.length}
-            </span>
-          </TabsTrigger>
-        </TabsList>
+            icon={<GitCommitHorizontal data-icon="inline-start" />}
+            label="Commits"
+            count={mr.commits.length}
+          />
+        </DetailTabsList>
 
         <TabsContent
           value="overview"
           className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 @sm/pr:px-3"
         >
           <div className="flex flex-col gap-2.5">
-            <section className="rounded-xl border border-border/60 bg-card/70 p-2.5 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-              <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border/45 bg-background/65 px-2.5 py-1.5 text-xs text-muted-foreground">
-                <GitBranch className="size-3.5 shrink-0" aria-hidden />
+            <DetailHeader
+              title={mr.title}
+              avatarSrc={mr.authorAvatarUrl}
+              author={mr.author}
+              createdAt={mr.createdAt}
+              status={
+                mr.autoMergeEnabled
+                  ? "Auto-merge enabled"
+                  : readinessLabel(readiness)
+              }
+            >
+              <PropertyRow
+                icon={<GitBranch className="size-3.5 shrink-0" aria-hidden />}
+                label="Branch"
+              >
                 <span className="min-w-0 truncate font-mono">
                   {mr.headRefName}
                 </span>
-                <span className="shrink-0 text-muted-foreground/40">→</span>
-                <span className="min-w-0 flex-1 truncate font-mono">
+                <ChevronRight
+                  className="size-3 shrink-0 text-muted-foreground/40"
+                  aria-hidden
+                />
+                <span className="min-w-0 truncate font-mono">
                   {mr.baseRefName}
+                </span>
+                <span className="ml-1 shrink-0 font-medium text-diff-add tabular-nums">
+                  +{mr.additions}
+                </span>
+                <span className="shrink-0 font-medium text-diff-remove tabular-nums">
+                  -{mr.deletions}
                 </span>
                 <Button
                   variant="ghost"
@@ -365,45 +292,44 @@ export function GitlabMergeRequestDetail({
                 >
                   <Copy className="size-3" aria-hidden />
                 </Button>
-              </div>
-              <div className="mt-2.5 grid grid-cols-4 divide-x divide-border/50 rounded-lg bg-muted/35 py-2 text-center">
-                <div>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {mr.changedFiles}
-                  </p>
-                  <p className="text-3xs text-muted-foreground">Files</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {mr.commits.length}
-                  </p>
-                  <p className="text-3xs text-muted-foreground">Commits</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-diff-add tabular-nums">
-                    +{mr.additions}
-                  </p>
-                  <p className="text-3xs text-muted-foreground">Added</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-diff-remove tabular-nums">
-                    -{mr.deletions}
-                  </p>
-                  <p className="text-3xs text-muted-foreground">Removed</p>
-                </div>
-              </div>
-            </section>
+              </PropertyRow>
+              <PropertyRow
+                icon={
+                  <CircleUserRound className="size-3.5 shrink-0" aria-hidden />
+                }
+                label="Reviewers"
+              >
+                {mr.reviewers.length > 0 ? (
+                  <div className="flex items-center -space-x-1">
+                    {mr.reviewers.map((reviewer) => (
+                      <ReviewerAvatar
+                        key={reviewer.login}
+                        name={reviewer.name ?? reviewer.login}
+                        src={reviewer.avatarUrl}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">No reviewers</span>
+                )}
+              </PropertyRow>
+              <PropertyRow
+                icon={<Clock className="size-3.5 shrink-0" aria-hidden />}
+                label="Checks"
+              >
+                {checksText}
+              </PropertyRow>
+            </DetailHeader>
 
             <section className="flex flex-col gap-2">
-              <div className="flex items-center gap-2 px-0.5">
-                <SectionLabel>Conversation</SectionLabel>
-                {activity.length > 0 ? (
-                  <Badge variant="secondary">{activity.length}</Badge>
-                ) : null}
-              </div>
+              <SectionHeading
+                label={<SectionLabel>Conversation</SectionLabel>}
+                count={activity.length}
+              />
               {mr.description ? (
-                <PullRequestCommentCard
+                <CommentCard
                   author={mr.author}
+                  avatarUrl={mr.authorAvatarUrl}
                   body={mr.description}
                   createdAt={mr.createdAt}
                   context="Description"
@@ -415,26 +341,13 @@ export function GitlabMergeRequestDetail({
                 error={reviewError}
                 onReply={replyToActivity}
               />
-              <div className="rounded-xl border border-border/60 bg-card/75 p-2.5 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-                <Textarea
-                  value={commentBody}
-                  onChange={(event) => setCommentBody(event.target.value)}
-                  placeholder="Add to the conversation…"
-                  disabled={pending}
-                  aria-label="Merge request comment"
-                  className="min-h-24 resize-y border-border/50 bg-background/70"
-                />
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    size="sm"
-                    onClick={submitComment}
-                    disabled={!commentBody.trim() || pending}
-                  >
-                    <MessageSquare data-icon="inline-start" />
-                    Comment
-                  </Button>
-                </div>
-              </div>
+              <CommentComposer
+                value={commentBody}
+                onChange={setCommentBody}
+                disabled={pending}
+                ariaLabel="Merge request comment"
+                onSubmit={submitComment}
+              />
             </section>
 
             <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
@@ -465,35 +378,21 @@ export function GitlabMergeRequestDetail({
                 </div>
               ) : null}
               {isOpen ? (
-                <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/45 pt-2.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() =>
-                      checkout.mutate(number, {
-                        onSuccess: () =>
-                          toast.success("Merge request checked out"),
-                        onError: (checkoutError) =>
-                          toast.error("Couldn't check out merge request", {
-                            description: parseApiError(checkoutError),
-                          }),
-                      })
-                    }
-                  >
-                    <GitBranch data-icon="inline-start" />
-                    Checkout
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={pending || mergeBlockedReason !== null}
-                    title={mergeBlockedReason ?? undefined}
-                    onClick={() => setMergeOpen(true)}
-                  >
-                    <GitMerge data-icon="inline-start" />
-                    Merge
-                  </Button>
-                </div>
+                <DetailActionsFooter
+                  pending={pending}
+                  mergeState={mergeState}
+                  onCheckout={() =>
+                    checkout.mutate(number, {
+                      onSuccess: () =>
+                        toast.success("Merge request checked out"),
+                      onError: (checkoutError) =>
+                        toast.error("Couldn't check out merge request", {
+                          description: parseApiError(checkoutError),
+                        }),
+                    })
+                  }
+                  onMerge={() => setMergeOpen(true)}
+                />
               ) : null}
             </section>
           </div>
@@ -506,6 +405,17 @@ export function GitlabMergeRequestDetail({
             error={reviewError}
             createCommentPending={createReviewComment.isPending}
             onCreateComment={createInlineComment}
+            onReplyToComment={(comment, body) => {
+              if (!comment.discussionId) {
+                return Promise.reject(
+                  new Error("GitLab discussion reference is missing")
+                )
+              }
+              return replyToReviewComment.mutateAsync({
+                discussionId: comment.discussionId,
+                body,
+              })
+            }}
           />
         </TabsContent>
 
@@ -513,59 +423,54 @@ export function GitlabMergeRequestDetail({
           value="commits"
           className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 @sm/pr:px-3"
         >
-          <PullRequestCommits
+          <CommitList
             commits={mr.commits}
             repositoryUrl={repositoryUrl}
             commitUrl={(oid) => `${repositoryUrl}/-/commit/${oid}`}
+            getCommitDiff={(oid) => fetchCommitDiff(ctx, oid)}
           />
         </TabsContent>
       </Tabs>
 
-      <AlertDialog open={mergeOpen} onOpenChange={setMergeOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Merge request !{number}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action updates the remote repository and cannot be undone
-              from this panel.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 p-2.5">
-            <div>
-              <label htmlFor="mr-squash" className="text-xs font-medium">
-                Squash commits
-              </label>
-              <p className="text-3xs text-muted-foreground">
-                Combine this merge request into one commit.
-              </p>
-            </div>
-            <Switch id="mr-squash" checked={squash} onCheckedChange={setSquash} />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={merge.isPending}
-              onClick={() =>
-                merge.mutate(
-                  { number, squash },
-                  {
-                    onSuccess: () => {
-                      setMergeOpen(false)
-                      toast.success("Merge request merged")
-                    },
-                    onError: (mergeError) =>
-                      toast.error("Couldn't merge merge request", {
-                        description: parseApiError(mergeError),
-                      }),
-                  }
+      <MergeDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        subject={`merge request !${number}`}
+        auto={mergeState.auto}
+        pending={merge.isPending}
+        onConfirm={() =>
+          merge.mutate(
+            { number, squash, auto: mergeState.auto },
+            {
+              onSuccess: () => {
+                setMergeOpen(false)
+                toast.success(
+                  mergeState.auto ? "Auto-merge enabled" : "Merge request merged"
                 )
-              }
-            >
-              Merge
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              },
+              onError: (mergeError) =>
+                toast.error(
+                  mergeState.auto
+                    ? "Couldn't enable auto-merge"
+                    : "Couldn't merge merge request",
+                  { description: parseApiError(mergeError) }
+                ),
+            }
+          )
+        }
+      >
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 p-2.5">
+          <div>
+            <label htmlFor="mr-squash" className="text-xs font-medium">
+              Squash commits
+            </label>
+            <p className="text-3xs text-muted-foreground">
+              Combine this merge request into one commit.
+            </p>
+          </div>
+          <Switch id="mr-squash" checked={squash} onCheckedChange={setSquash} />
+        </div>
+      </MergeDialog>
     </div>
   )
 }

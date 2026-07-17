@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode, RefObject, UIEvent } from "react"
 import {
   FileWarning,
@@ -26,10 +26,7 @@ import { Field, FieldLabel } from "@/shared/ui/field"
 import { LoadingSpinner } from "@/shared/ui/loading-spinner"
 import { Separator } from "@/shared/ui/separator"
 import { Textarea } from "@/shared/ui/textarea"
-import { useCreateReviewComment } from "../mutations"
-import { usePullRequestReview } from "../queries"
-import { PullRequestCommentCard } from "./pull-request-comment-card"
-import type { RepoContext } from "../types"
+import { CommentCard } from "./comment-card"
 
 export type ReviewSide = "LEFT" | "RIGHT"
 
@@ -44,9 +41,12 @@ export interface CodeReviewFile {
 
 export interface CodeReviewComment {
   id: number
+  /** GitLab discussion the comment belongs to; replies target this. */
+  discussionId?: string
   path: string
   body: string
   author: string | null
+  authorAvatarUrl?: string | null
   createdAt: string
   updatedAt: string
   line: number | null
@@ -127,53 +127,24 @@ function asChangedFile(file: CodeReviewFile): ChangedFile {
   }
 }
 
-export function PullRequestFiles({
-  ctx,
-  number,
-  enabled,
-}: {
-  ctx: RepoContext
-  number: number
-  enabled: boolean
-}) {
-  const {
-    data: review,
-    isLoading,
-    error,
-  } = usePullRequestReview(ctx, number, enabled)
-  const createComment = useCreateReviewComment(ctx, number)
-
-  return (
-    <CodeReviewFiles
-      review={review}
-      isLoading={isLoading}
-      error={error}
-      createCommentPending={createComment.isPending}
-      onCreateComment={(input) =>
-        createComment.mutateAsync({
-          body: input.body,
-          commitId: input.commitId,
-          path: input.path,
-          side: input.side,
-          line: input.line,
-        })
-      }
-    />
-  )
-}
-
 export function CodeReviewFiles({
   review,
   isLoading,
   error,
   createCommentPending,
   onCreateComment,
+  onReplyToComment,
 }: {
   review: CodeReviewPayload | undefined
   isLoading: boolean
   error: unknown
   createCommentPending: boolean
   onCreateComment: (input: CodeReviewCommentInput) => Promise<unknown>
+  /** Reply to an existing inline thread; omitting hides the reply action. */
+  onReplyToComment?: (
+    comment: CodeReviewComment,
+    body: string
+  ) => Promise<unknown>
 }) {
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
     () => new Set()
@@ -237,12 +208,7 @@ export function CodeReviewFiles({
         </span>
         <DiffStat added={additions} removed={deletions} />
         <div className="flex-1" />
-        <WrapToggle
-          wrap={wrap}
-          onWrapChange={setWrap}
-          disabled={mode === "side-by-side"}
-          disabledReason="Line wrapping is only available in same-line view"
-        />
+        <WrapToggle wrap={wrap} onWrapChange={setWrap} />
         <DiffModeToggle mode={mode} onModeChange={setMode} />
       </div>
 
@@ -287,6 +253,7 @@ export function CodeReviewFiles({
                       wrap={wrap}
                       createCommentPending={createCommentPending}
                       onCreateComment={onCreateComment}
+                      onReplyToComment={onReplyToComment}
                     />
                   }
                 />
@@ -307,6 +274,7 @@ function ReviewFileDiff({
   wrap,
   createCommentPending,
   onCreateComment,
+  onReplyToComment,
 }: {
   file: CodeReviewFile
   review: CodeReviewPayload
@@ -316,6 +284,10 @@ function ReviewFileDiff({
   wrap: boolean
   createCommentPending: boolean
   onCreateComment: (input: CodeReviewCommentInput) => Promise<unknown>
+  onReplyToComment?: (
+    comment: CodeReviewComment,
+    body: string
+  ) => Promise<unknown>
 }) {
   const [activeAnchor, setActiveAnchor] = useState<LineAnchor | null>(null)
   const [commentBody, setCommentBody] = useState("")
@@ -375,7 +347,11 @@ function ReviewFileDiff({
             </AlertDescription>
           </Alert>
           {comments.length > 0 ? (
-            <ReviewComments comments={comments} label="Review comments" />
+            <ReviewComments
+              comments={comments}
+              label="Review comments"
+              onReply={onReplyToComment}
+            />
           ) : null}
         </div>
       ) : (
@@ -473,6 +449,7 @@ function ReviewFileDiff({
                       <ReviewComments
                         comments={lineComments}
                         label={`${anchor?.side === "LEFT" ? "Old" : "New"} line ${anchor?.line}`}
+                        onReply={onReplyToComment}
                       />
                     ) : null}
 
@@ -499,6 +476,7 @@ function ReviewFileDiff({
               activeAnchor={activeAnchor}
               commentBody={commentBody}
               pending={createCommentPending}
+              wrap={wrap}
               onOpenComment={(anchor) => {
                 setActiveAnchor(anchor)
                 setCommentBody("")
@@ -506,6 +484,7 @@ function ReviewFileDiff({
               onBodyChange={setCommentBody}
               onCancel={() => setActiveAnchor(null)}
               onSubmit={submitComment}
+              onReply={onReplyToComment}
             />
           )}
 
@@ -513,6 +492,7 @@ function ReviewFileDiff({
             <ReviewComments
               comments={unplacedComments}
               label="Outdated comments"
+              onReply={onReplyToComment}
             />
           ) : null}
         </div>
@@ -528,10 +508,12 @@ function ReviewSideBySideDiff({
   activeAnchor,
   commentBody,
   pending,
+  wrap = false,
   onOpenComment,
   onBodyChange,
   onCancel,
   onSubmit,
+  onReply,
 }: {
   rows: ReturnType<typeof buildSideBySideRows>
   filePath: string
@@ -539,10 +521,13 @@ function ReviewSideBySideDiff({
   activeAnchor: LineAnchor | null
   commentBody: string
   pending: boolean
+  /** Wrap long lines instead of horizontal scrolling. */
+  wrap?: boolean
   onOpenComment: (anchor: LineAnchor) => void
   onBodyChange: (body: string) => void
   onCancel: () => void
   onSubmit: () => void
+  onReply?: (comment: CodeReviewComment, body: string) => Promise<unknown>
 }) {
   const leftScrollRef = useRef<HTMLDivElement>(null)
   const rightScrollRef = useRef<HTMLDivElement>(null)
@@ -645,6 +630,79 @@ function ReviewSideBySideDiff({
     />
   ) : null
 
+  // With wrapping on there is no horizontal overflow, so the two-column
+  // scroll-synced layout is unnecessary: a row-paired grid keeps both sides
+  // height-aligned for free, even when one side wraps taller than the other.
+  if (wrap) {
+    const slotFor = (side: ReviewSide, rowIndex: number): ReactNode => {
+      const thread = threadsByRow.get(rowIndex)?.[side]
+      const showComposer =
+        composer && composerRowIndex === rowIndex && activeAnchor?.side === side
+      if (!thread && !showComposer) return null
+      return (
+        <div className="flex flex-col gap-2 p-2">
+          {thread ? (
+            <ReviewComments
+              contained
+              comments={thread.comments}
+              label={thread.label}
+              onReply={onReply}
+            />
+          ) : null}
+          {showComposer ? composer : null}
+        </div>
+      )
+    }
+
+    return (
+      <div className="min-w-0">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          {rows.map((row, rowIndex) => {
+            const leftSlot = slotFor("LEFT", rowIndex)
+            const rightSlot = slotFor("RIGHT", rowIndex)
+            return (
+              <Fragment key={rowIndex}>
+                <div className="min-w-0 border-r border-border/30">
+                  <ReviewSideCell
+                    line={row.left?.line ?? null}
+                    side="LEFT"
+                    wrap
+                    onOpenComment={onOpenComment}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <ReviewSideCell
+                    line={row.right?.line ?? null}
+                    side="RIGHT"
+                    wrap
+                    onOpenComment={onOpenComment}
+                  />
+                </div>
+                {leftSlot || rightSlot ? (
+                  <>
+                    <div className="min-w-0 border-r border-border/30">
+                      {leftSlot}
+                    </div>
+                    <div className="min-w-0">{rightSlot}</div>
+                  </>
+                ) : null}
+              </Fragment>
+            )
+          })}
+        </div>
+
+        {unplacedThreads.map((thread) => (
+          <ReviewComments
+            key={thread.key}
+            comments={thread.comments}
+            label={thread.label}
+            onReply={onReply}
+          />
+        ))}
+      </div>
+    )
+  }
+
   // Per-column slot content: every row with a thread or the open composer
   // gets a slot in BOTH columns — the owning side renders the content, the
   // other side an equal-height spacer.
@@ -668,6 +726,7 @@ function ReviewSideBySideDiff({
                 contained
                 comments={thread.comments}
                 label={thread.label}
+                onReply={onReply}
               />
             ) : null}
             {showComposer ? composer : null}
@@ -713,6 +772,7 @@ function ReviewSideBySideDiff({
           key={thread.key}
           comments={thread.comments}
           label={thread.label}
+          onReply={onReply}
         />
       ))}
     </div>
@@ -832,13 +892,24 @@ function sideAnchor(
 function ReviewSideCell({
   line,
   side,
+  wrap = false,
   onOpenComment,
 }: {
   line: DiffLine | null
   side: ReviewSide
+  /** Wrap long lines; the cell must live in a height-paired grid row. */
+  wrap?: boolean
   onOpenComment: (anchor: LineAnchor) => void
 }) {
-  if (!line) return <div className="h-5 min-w-full bg-muted/10" />
+  if (!line)
+    return (
+      <div
+        className={cn(
+          "min-w-full bg-muted/10",
+          wrap ? "h-full min-h-5" : "h-5"
+        )}
+      />
+    )
 
   const anchor = sideAnchor(line, side)
   const canComment = anchor && (side === "RIGHT" || line.kind === "removed")
@@ -850,6 +921,7 @@ function ReviewSideCell({
     <div
       className={cn(
         "group/diff-cell flex min-w-full leading-5",
+        wrap && "h-full",
         isAdded && "bg-diff-add/14 hover:bg-diff-add/20",
         isRemoved && "bg-diff-remove/14 hover:bg-diff-remove/20"
       )}
@@ -905,7 +977,12 @@ function ReviewSideCell({
           {isAdded ? "+" : isRemoved ? "−" : ""}
         </span>
       </div>
-      <pre className="min-w-max flex-1 px-2 font-mono whitespace-pre [tab-size:4]">
+      <pre
+        className={cn(
+          "flex-1 px-2 font-mono [tab-size:4]",
+          wrap ? "min-w-0 whitespace-pre-wrap break-words" : "min-w-max whitespace-pre"
+        )}
+      >
         {line.content || " "}
       </pre>
     </div>
@@ -995,11 +1072,14 @@ function ReviewComments({
   comments,
   label,
   contained = false,
+  onReply,
 }: {
   comments: CodeReviewComment[]
   label: string
   /** Fill the parent (column slot) instead of self-positioning in the scroll canvas. */
   contained?: boolean
+  /** Reply to this thread; rendered on the thread's last comment. */
+  onReply?: (comment: CodeReviewComment, body: string) => Promise<unknown>
 }) {
   return (
     <div
@@ -1025,12 +1105,18 @@ function ReviewComments({
       {comments.map((comment, index) => (
         <div key={comment.id}>
           {index > 0 ? <Separator /> : null}
-          <PullRequestCommentCard
+          <CommentCard
             author={comment.author}
+            avatarUrl={comment.authorAvatarUrl}
             body={comment.body}
             createdAt={comment.createdAt}
             reviewComment
             embedded
+            onReply={
+              onReply && index === comments.length - 1
+                ? (body) => onReply(comment, body)
+                : undefined
+            }
           />
         </div>
       ))}

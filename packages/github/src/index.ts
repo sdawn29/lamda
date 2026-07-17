@@ -295,6 +295,12 @@ export interface PullRequestDetail extends PullRequestSummary {
   changedFiles: number;
   reviewDecision: string | null;
   mergeable: string | null;
+  /** True when GitHub auto-merge is armed for this PR. */
+  autoMergeEnabled: boolean;
+  /** Logins of users/teams whose review is requested but not yet given. */
+  reviewRequests: string[];
+  /** Most recent review per reviewer, e.g. state APPROVED / CHANGES_REQUESTED. */
+  latestReviews: { author: string | null; state: string }[];
   files: { path: string; additions: number; deletions: number }[];
   commits: PullRequestCommit[];
   comments: { author: string | null; body: string; createdAt: string }[];
@@ -330,6 +336,7 @@ export interface PullRequestReviewComment {
   path: string;
   body: string;
   author: string | null;
+  authorAvatarUrl: string | null;
   createdAt: string;
   updatedAt: string;
   line: number | null;
@@ -362,7 +369,7 @@ interface RawReviewComment {
   id: number;
   path: string;
   body: string;
-  user: { login?: string } | null;
+  user: { login?: string; avatar_url?: string } | null;
   created_at: string;
   updated_at: string;
   line: number | null;
@@ -386,6 +393,7 @@ function mapReviewComment(raw: RawReviewComment): PullRequestReviewComment {
     path: raw.path,
     body: raw.body,
     author: raw.user?.login ?? null,
+    authorAvatarUrl: raw.user?.avatar_url ?? null,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
     line: raw.line,
@@ -528,6 +536,11 @@ export async function getPullRequest(
       changedFiles: number;
       reviewDecision: string | null;
       mergeable: string | null;
+      autoMergeRequest: { enabledAt?: string | null } | null;
+      reviewRequests:
+        | { login?: string; name?: string; slug?: string }[]
+        | null;
+      latestReviews: { author: RawPrAuthor | null; state: string }[] | null;
       files: { path: string; additions: number; deletions: number }[];
       commits: {
         oid: string;
@@ -554,7 +567,7 @@ export async function getPullRequest(
       "view",
       String(number),
       "--json",
-      `${PR_LIST_FIELDS},body,additions,deletions,changedFiles,reviewDecision,mergeable,files,commits,comments,statusCheckRollup`,
+      `${PR_LIST_FIELDS},body,additions,deletions,changedFiles,reviewDecision,mergeable,autoMergeRequest,reviewRequests,latestReviews,files,commits,comments,statusCheckRollup`,
     ],
     cwd,
   );
@@ -566,6 +579,14 @@ export async function getPullRequest(
     changedFiles: raw.changedFiles,
     reviewDecision: raw.reviewDecision,
     mergeable: raw.mergeable,
+    autoMergeEnabled: raw.autoMergeRequest != null,
+    reviewRequests: (raw.reviewRequests ?? [])
+      .map((r) => r.login ?? r.name ?? r.slug ?? null)
+      .filter((login): login is string => login !== null),
+    latestReviews: (raw.latestReviews ?? []).map((r) => ({
+      author: r.author?.login ?? null,
+      state: r.state,
+    })),
     files: raw.files ?? [],
     commits: (raw.commits ?? []).map((commit) => ({
       oid: commit.oid,
@@ -626,15 +647,53 @@ export async function createPullRequest(
   return { url };
 }
 
+export interface CommitDiffFile {
+  path: string;
+  previousPath: string | null;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch: string | null;
+}
+
+/** Changed files (with patches) for a single commit, via the REST API. */
+export async function getCommitDiff(
+  cwd: string,
+  oid: string,
+): Promise<CommitDiffFile[]> {
+  if (!/^[0-9a-f]{7,40}$/i.test(oid)) {
+    throw new Error("Invalid commit id");
+  }
+  const repo = await getRepoInfo(cwd);
+  if (!repo) throw new Error("GitHub repository not found");
+  const raw = await runGhJson<{ files?: RawPullRequestFile[] }>(
+    ["api", `repos/${repo.nameWithOwner}/commits/${oid}`],
+    cwd,
+    30000,
+  );
+  return (raw.files ?? []).map((file) => ({
+    path: file.filename,
+    previousPath: file.previous_filename ?? null,
+    status: file.status,
+    additions: file.additions,
+    deletions: file.deletions,
+    patch: file.patch ?? null,
+  }));
+}
+
 export type MergeMethod = "merge" | "squash" | "rebase";
 
 export async function mergePullRequest(
   cwd: string,
   number: number,
   method: MergeMethod = "squash",
+  /** Arm GitHub auto-merge instead of merging immediately. */
+  auto = false,
 ): Promise<void> {
   assertPositiveInt(number, "pull request number");
-  await runGh(["pr", "merge", String(number), `--${method}`], cwd, 30000);
+  const args = ["pr", "merge", String(number), `--${method}`];
+  if (auto) args.push("--auto");
+  await runGh(args, cwd, 30000);
 }
 
 export async function checkoutPullRequest(

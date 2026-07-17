@@ -57,8 +57,15 @@ export function useCheckoutMergeRequest(ctx: RepoContext) {
 export function useMergeMergeRequest(ctx: RepoContext) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ number, squash }: { number: number; squash: boolean }) =>
-      mergeMergeRequest(ctx, number, squash),
+    mutationFn: ({
+      number,
+      squash,
+      auto = false,
+    }: {
+      number: number
+      squash: boolean
+      auto?: boolean
+    }) => mergeMergeRequest(ctx, number, squash, auto),
     onSuccess: (_data, { number }) => {
       qc.invalidateQueries({ queryKey: [...gitlabKeys.all, "mrs"] })
       qc.invalidateQueries({ queryKey: gitlabKeys.mr(ctx, number) })

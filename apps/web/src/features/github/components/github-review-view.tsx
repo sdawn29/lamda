@@ -1,57 +1,67 @@
 import { useState } from "react"
 import {
-  ArrowLeft,
+  ChevronRight,
   CircleDot,
+  CircleUserRound,
+  Clock,
   Copy,
-  ExternalLink,
   GitBranch,
   GitCommitHorizontal,
-  GitMerge,
   GitPullRequest,
   GitPullRequestArrow,
-  Loader2,
-  MessageSquare,
+  MessageCircle,
+  Tag,
   UploadCloud,
 } from "lucide-react"
 import { Github } from "@lobehub/icons"
 import { toast } from "sonner"
 import { useIsFetching, useQueryClient } from "@tanstack/react-query"
-import { Button } from "@/shared/ui/button"
-import { RemoteMarkdown } from "@/shared/components/remote-markdown"
-import { Badge } from "@/shared/ui/badge"
-import { Textarea } from "@/shared/ui/textarea"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/shared/ui/alert-dialog"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/ui/dialog"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/shared/ui/field"
-import { Input } from "@/shared/ui/input"
-import { SectionLabel } from "@/shared/ui/section-label"
-import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
-import { openExternal } from "@/features/electron/api"
+
 import { formatRelativeDate } from "@/shared/lib/formatters"
 import { parseApiError } from "@/features/git"
+import { Badge } from "@/shared/ui/badge"
+import { Button } from "@/shared/ui/button"
+import { SectionLabel } from "@/shared/ui/section-label"
+import { Tabs, TabsContent } from "@/shared/ui/tabs"
+import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
+import {
+  ActivityList,
+  checksSummaryText,
+  CiChecksBadge,
+  CollapsibleChecksSummary,
+  CommentCard,
+  CommentComposer,
+  CommitList,
+  DetailActionsFooter,
+  DetailHeader,
+  DetailNotFound,
+  DetailTab,
+  DetailTabsList,
+  DetailTopBar,
+  EmptyPlaceholder,
+  githubAvatarUrl,
+  humanizeStatus,
+  ListCard,
+  ListState,
+  MergeDialog,
+  mergeButtonState,
+  MergeReadinessBanner,
+  mergeReadinessKind,
+  PanelMessage,
+  PropertyRow,
+  PublishRepositoryDialog,
+  readinessLabel,
+  RefreshButton,
+  RepoPanelHeader,
+  ReviewerAvatar,
+  reviewItemStateIcon,
+  Row,
+  SectionHeading,
+  StatusBadge,
+  summarizeChecks,
+  type ActivityItem,
+} from "@/features/review"
+import { fetchCommitDiff } from "../api"
 import {
   githubKeys,
   useChecks,
@@ -71,27 +81,11 @@ import {
   usePublishRepository,
   useReplyToReviewComment,
 } from "../mutations"
-import { CiChecksBadge } from "./ci-checks-badge"
 import { CreatePrDialog } from "./create-pr-dialog"
 import { PullRequestFiles } from "./pull-request-files"
-import { PullRequestCommentCard } from "./pull-request-comment-card"
-import {
-  CollapsibleChecksSummary,
-  humanizeStatus,
-  ListState,
-  MergeReadinessBanner,
-  mergeReadinessKind,
-  PanelMessage,
-  RefreshButton,
-  reviewItemStateIcon,
-  Row,
-  StatusBadge,
-} from "./panel-primitives"
 import type {
-  GhRepositoryVisibility,
   MergeMethod,
   PrState,
-  PullRequestCommit,
   PullRequestReviewComment,
   RepoContext,
 } from "../types"
@@ -99,7 +93,8 @@ import type {
 /**
  * GitHub view for the review panel — repo overview, current-branch CI status,
  * and open pull requests + issues, with a Create PR action. Scoped to the
- * thread's session (its worktree).
+ * thread's session (its worktree). All shared visuals come from
+ * `@/features/review`; this file wires GitHub data and mutations into them.
  */
 export function GithubReviewView({
   sessionId,
@@ -160,7 +155,7 @@ export function GithubReviewView({
             Publish to GitHub
           </Button>
         </PanelMessage>
-        <PublishRepositoryDialog
+        <GithubPublishDialog
           open={publishOpen}
           onOpenChange={setPublishOpen}
           ctx={ctx}
@@ -190,45 +185,30 @@ export function GithubReviewView({
   }
 
   return (
-    <div className="@container/github flex h-full min-h-0 flex-col bg-muted/[0.08]">
-      <div className="shrink-0 p-2 pb-0">
-        <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-background/90 p-2.5 shadow-sm shadow-black/[0.03] backdrop-blur @sm/github:flex-row @sm/github:items-center @sm/github:justify-between dark:shadow-black/20">
-          <button
-            type="button"
-            className="flex min-w-0 items-center gap-2 text-left text-xs font-medium hover:underline"
-            onClick={() => void openExternal(repo.url)}
-            title={repo.nameWithOwner}
-          >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
-              <Github size={15} />
-            </div>
-            <span className="min-w-0">
-              <span className="block truncate">{repo.nameWithOwner}</span>
-              <span className="block text-3xs font-normal text-muted-foreground/60">
-                GitHub repository
-              </span>
-            </span>
-          </button>
-          <div className="flex items-center justify-between gap-2 @sm/github:justify-end">
-            <CiChecksBadge checks={checks} />
-            <RefreshButton
-              spinning={panelFetching}
-              onClick={() => void qc.invalidateQueries({ queryKey: githubKeys.all })}
-              label="Refresh GitHub data"
-            />
-            <Button
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs"
-              onClick={() => setCreateOpen(true)}
-            >
-              <GitPullRequestArrow className="size-3.5" />
-              Create PR
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div className="@container/panel flex h-full min-h-0 flex-col bg-muted/[0.08]">
+      <RepoPanelHeader
+        icon={<Github size={15} />}
+        name={repo.nameWithOwner}
+        subtitle="GitHub repository"
+        url={repo.url}
+      >
+        <CiChecksBadge checks={checks} />
+        <RefreshButton
+          spinning={panelFetching}
+          onClick={() => void qc.invalidateQueries({ queryKey: githubKeys.all })}
+          label="Refresh GitHub data"
+        />
+        <Button
+          size="sm"
+          className="h-7 gap-1.5 px-2.5 text-xs"
+          onClick={() => setCreateOpen(true)}
+        >
+          <GitPullRequestArrow className="size-3.5" />
+          Create PR
+        </Button>
+      </RepoPanelHeader>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2 @sm/github:p-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2 @sm/panel:p-3">
         <PullRequestsSection ctx={ctx} onSelect={setSelectedPr} />
         <IssuesSection ctx={ctx} onSelect={setSelectedIssue} />
       </div>
@@ -243,7 +223,7 @@ export function GithubReviewView({
   )
 }
 
-function PublishRepositoryDialog({
+function GithubPublishDialog({
   open,
   onOpenChange,
   ctx,
@@ -252,107 +232,34 @@ function PublishRepositoryDialog({
   onOpenChange: (open: boolean) => void
   ctx: RepoContext
 }) {
-  const [name, setName] = useState("")
-  const [visibility, setVisibility] =
-    useState<GhRepositoryVisibility>("private")
   const publishRepository = usePublishRepository(ctx)
 
-  function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen && !publishRepository.isPending) {
-      setName("")
-      setVisibility("private")
-    }
-    onOpenChange(nextOpen)
-  }
-
-  function handlePublish() {
-    publishRepository.mutate(
-      { name: name.trim() || undefined, visibility },
-      {
-        onSuccess: (repo) => {
-          toast.success(`Published ${repo.nameWithOwner}`)
-          handleOpenChange(false)
-        },
-        onError: (error) => {
-          toast.error("Couldn't publish repository", {
-            description: parseApiError(error),
-          })
-        },
-      }
-    )
-  }
-
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent showCloseButton={!publishRepository.isPending}>
-        <DialogHeader>
-          <DialogTitle>Publish to GitHub</DialogTitle>
-          <DialogDescription>
-            Create a GitHub repository for this folder, add a GitHub remote, and
-            push the current branch.
-          </DialogDescription>
-        </DialogHeader>
-
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="github-repo-name">Repository name</FieldLabel>
-            <Input
-              id="github-repo-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Defaults to folder name"
-              disabled={publishRepository.isPending}
-            />
-            <FieldDescription>
-              Use `owner/name` to publish under a specific organization.
-            </FieldDescription>
-          </Field>
-
-          <Field>
-            <FieldLabel>Visibility</FieldLabel>
-            <ToggleGroup
-              variant="outline"
-              size="sm"
-              value={[visibility]}
-              onValueChange={(values) => {
-                const next = values.find((value) => value !== visibility)
-                if (next === "private" || next === "public") {
-                  setVisibility(next)
-                }
-              }}
-            >
-              <ToggleGroupItem value="private">Private</ToggleGroupItem>
-              <ToggleGroupItem value="public">Public</ToggleGroupItem>
-            </ToggleGroup>
-          </Field>
-        </FieldGroup>
-
-        <DialogFooter>
-          <DialogClose
-            render={<Button variant="outline" />}
-            disabled={publishRepository.isPending}
-          >
-            Cancel
-          </DialogClose>
-          <Button
-            onClick={handlePublish}
-            disabled={publishRepository.isPending}
-          >
-            {publishRepository.isPending ? (
-              <>
-                <Loader2 className="size-3 animate-spin" />
-                Publishing
-              </>
-            ) : (
-              <>
-                <UploadCloud className="size-3" />
-                Publish
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <PublishRepositoryDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Publish to GitHub"
+      description="Create a GitHub repository for this folder, add a GitHub remote, and push the current branch."
+      nameLabel="Repository name"
+      namePlaceholder="Defaults to folder name"
+      nameDescription="Use `owner/name` to publish under a specific organization."
+      pending={publishRepository.isPending}
+      onPublish={(name, visibility, close) =>
+        publishRepository.mutate(
+          { name, visibility },
+          {
+            onSuccess: (repo) => {
+              toast.success(`Published ${repo.nameWithOwner}`)
+              close()
+            },
+            onError: (error) =>
+              toast.error("Couldn't publish repository", {
+                description: parseApiError(error),
+              }),
+          }
+        )
+      }
+    />
   )
 }
 
@@ -391,7 +298,7 @@ function PullRequestsSection({
           <ToggleGroupItem value="all">All</ToggleGroupItem>
         </ToggleGroup>
       </div>
-      <div className="divide-y divide-border/40 overflow-hidden rounded-xl border border-border/60 bg-card/65 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
+      <ListCard>
         {isLoading ? <ListState loading empty={false} message="" /> : null}
         {!isLoading && prs.length === 0 ? (
           state === "open" ? (
@@ -422,151 +329,19 @@ function PullRequestsSection({
             meta={`#${pr.number}${pr.author ? ` · ${pr.author}` : ""} · updated ${formatRelativeDate(pr.updatedAt)}`}
           />
         ))}
-      </div>
+      </ListCard>
     </section>
   )
 }
 
-interface PullRequestActivityItem {
-  key: string
-  author: string | null
-  body: string
-  createdAt: string
-  context: string
-  reviewComment: boolean
+interface PullRequestActivityItem extends ActivityItem {
   reviewCommentId?: number
-  diff?: {
-    patch: string
-    line: number | null
-    side: "LEFT" | "RIGHT" | null
-  }
 }
 
 function reviewCommentContext(comment: PullRequestReviewComment): string {
   const line = comment.line ?? comment.originalLine
   const side = comment.side === "LEFT" ? "Old" : "New"
   return line ? `${comment.path} · ${side} line ${line}` : comment.path
-}
-
-function PullRequestActivityList({
-  items,
-  reviewLoading,
-  reviewError,
-  onReply,
-}: {
-  items: PullRequestActivityItem[]
-  reviewLoading: boolean
-  reviewError: unknown
-  onReply: (item: PullRequestActivityItem, body: string) => Promise<unknown>
-}) {
-  if (reviewLoading && items.length === 0) {
-    return (
-      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
-        <Loader2 className="size-3 animate-spin" aria-hidden />
-        Loading comments
-      </div>
-    )
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-card/45 px-4 py-8 text-center">
-        <MessageSquare className="mx-auto mb-2 size-5 text-muted-foreground/40" />
-        <p className="text-xs font-medium">No conversation yet</p>
-        <p className="mt-0.5 text-3xs text-muted-foreground">
-          General and file review comments will appear here.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col gap-2.5">
-      {reviewError ? (
-        <p className="px-1 text-3xs text-destructive">
-          File review comments could not be loaded.
-        </p>
-      ) : null}
-      {items.map((item) => (
-        <PullRequestCommentCard
-          key={item.key}
-          author={item.author}
-          body={item.body}
-          createdAt={item.createdAt}
-          context={item.context}
-          reviewComment={item.reviewComment}
-          diff={item.diff}
-          onReply={(body) => onReply(item, body)}
-        />
-      ))}
-    </div>
-  )
-}
-
-export function PullRequestCommits({
-  commits,
-  repositoryUrl,
-  commitUrl,
-}: {
-  commits: PullRequestCommit[]
-  repositoryUrl: string
-  commitUrl?: (oid: string) => string
-}) {
-  if (commits.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-card/45 px-4 py-8 text-center">
-        <GitCommitHorizontal className="mx-auto mb-2 size-5 text-muted-foreground/40" />
-        <p className="text-xs font-medium">No commits found</p>
-      </div>
-    )
-  }
-
-  return (
-    <section className="overflow-hidden rounded-xl border border-border/60 bg-card/70 shadow-sm shadow-black/[0.025]">
-      <div className="flex items-center gap-2 border-b border-border/45 px-3 py-2.5">
-        <SectionLabel>Commits</SectionLabel>
-        <Badge variant="secondary">{commits.length}</Badge>
-      </div>
-      <div className="divide-y divide-border/40">
-        {commits.map((commit) => {
-          const author = commit.authors[0]
-          return (
-            <button
-              key={commit.oid}
-              type="button"
-              className="group flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/30"
-              onClick={() =>
-                void openExternal(
-                  commitUrl?.(commit.oid) ??
-                    `${repositoryUrl}/commit/${commit.oid}`
-                )
-              }
-            >
-              <GitCommitHorizontal className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/60" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium">
-                  {commit.messageHeadline}
-                </span>
-                <span
-                  className="mt-0.5 block truncate text-3xs text-muted-foreground/60"
-                  title={new Date(commit.committedDate).toLocaleString()}
-                >
-                  {author?.login ??
-                    author?.name ??
-                    author?.email ??
-                    "Unknown author"}{" "}
-                  · {formatRelativeDate(commit.committedDate)}
-                </span>
-              </span>
-              <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">
-                {commit.oid.slice(0, 7)}
-              </code>
-            </button>
-          )
-        })}
-      </div>
-    </section>
-  )
 }
 
 function GithubPullRequestDetail({
@@ -596,25 +371,17 @@ function GithubPullRequestDetail({
   if (isLoading) return <PanelMessage loading message="Loading pull request" />
   if (error || !pr) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
-        <p className="text-xs text-muted-foreground">
-          {error ? parseApiError(error) : "Pull request not found"}
-        </p>
-        <Button size="sm" variant="outline" onClick={onBack}>
-          Back to pull requests
-        </Button>
-      </div>
+      <DetailNotFound
+        message={error ? parseApiError(error) : "Pull request not found"}
+        backLabel="Back to pull requests"
+        onBack={onBack}
+      />
     )
   }
 
   const isOpen = pr.state.toLowerCase() === "open"
   const pending = comment.isPending || checkout.isPending || merge.isPending
   const readiness = mergeReadinessKind(pr.state, pr.isDraft, pr.mergeable)
-  const mergeBlockedReason = pr.isDraft
-    ? "Draft pull requests can't be merged"
-    : pr.mergeable?.toLowerCase() === "conflicting"
-      ? "Resolve conflicts before merging"
-      : null
   const reviewFilesByPath = new Map(
     (review?.files ?? []).map((file) => [file.path, file] as const)
   )
@@ -622,6 +389,7 @@ function GithubPullRequestDetail({
     ...pr.comments.map((item, index) => ({
       key: `conversation-${item.createdAt}-${index}`,
       author: item.author,
+      avatarUrl: githubAvatarUrl(item.author),
       body: item.body,
       createdAt: item.createdAt,
       context: "Conversation",
@@ -632,6 +400,7 @@ function GithubPullRequestDetail({
       return {
         key: `review-${item.id}`,
         author: item.author,
+        avatarUrl: item.authorAvatarUrl ?? githubAvatarUrl(item.author),
         body: item.body,
         createdAt: item.createdAt,
         context: reviewCommentContext(item),
@@ -652,6 +421,27 @@ function GithubPullRequestDetail({
   )
   const commentCount = activity.length
   const repositoryUrl = pr.url.replace(/\/pull\/\d+\/?$/, "")
+  const reviewers = (() => {
+    const byLogin = new Map<string, string>()
+    for (const review of pr.latestReviews) {
+      if (review.author) byLogin.set(review.author, review.state)
+    }
+    for (const login of pr.reviewRequests) {
+      if (!byLogin.has(login)) byLogin.set(login, "PENDING")
+    }
+    return [...byLogin.entries()].map(([login, state]) => ({ login, state }))
+  })()
+  const checksSummary = summarizeChecks(pr.checks)
+  const checksText = checksSummaryText(checksSummary, {
+    singular: "check",
+    plural: "checks",
+    none: "No CI checks",
+  })
+  const mergeState = mergeButtonState({
+    readiness,
+    checksBucket: checksSummary.bucket,
+    autoMergeEnabled: pr.autoMergeEnabled,
+  })
 
   function submitComment() {
     const body = commentBody.trim()
@@ -686,92 +476,76 @@ function GithubPullRequestDetail({
 
   return (
     <div className="@container/pr flex h-full min-h-0 flex-col bg-muted/[0.08]">
-      <div className="shrink-0 p-2 pb-0">
-        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border/60 bg-background/85 px-2 py-1.5 shadow-sm shadow-black/[0.03] backdrop-blur dark:shadow-black/20">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onBack}
-            aria-label="Back to pull requests"
-          >
-            <ArrowLeft data-icon="inline-start" />
-          </Button>
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
-            {reviewItemStateIcon(pr.state, pr.isDraft, "open")}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-foreground/90">
-              {pr.title}
-            </p>
-            <p
-              className="truncate text-3xs text-muted-foreground/60"
-              title={new Date(pr.createdAt).toLocaleString()}
-            >
-              #{pr.number} · {pr.author ?? "Unknown author"} · opened{" "}
-              {formatRelativeDate(pr.createdAt)}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => void openExternal(pr.url)}
-            aria-label="Open on GitHub"
-          >
-            <ExternalLink data-icon="inline-start" />
-          </Button>
-        </div>
-      </div>
+      <DetailTopBar
+        onBack={onBack}
+        backLabel="Back to pull requests"
+        stateIcon={reviewItemStateIcon(pr.state, pr.isDraft, "open")}
+        title={`Pull request #${pr.number}`}
+        url={pr.url}
+        openLabel="Open on GitHub"
+      />
 
       <Tabs
         value={detailTab}
         onValueChange={setDetailTab}
         className="min-h-0 flex-1 gap-0 overflow-hidden"
       >
-        <TabsList className="mx-2 my-2 h-8 max-w-[calc(100%-1rem)] shrink-0 self-start overflow-x-auto rounded-full border border-border/55 bg-background/75 p-1 shadow-xs">
-          <TabsTrigger
+        <DetailTabsList>
+          <DetailTab
             value="overview"
-            className="h-6 flex-none rounded-full px-2.5 has-data-[icon=inline-start]:pl-2 data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm"
-          >
-            <CircleDot data-icon="inline-start" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger
+            icon={<CircleDot data-icon="inline-start" />}
+            label="Overview"
+          />
+          <DetailTab
             value="files"
+            icon={<GitPullRequest data-icon="inline-start" />}
+            label="Files"
+            count={pr.changedFiles}
             title={`${pr.changedFiles} changed files`}
-            className="h-6 flex-none rounded-full px-2.5 has-data-[icon=inline-start]:pl-2 data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm"
-          >
-            <GitPullRequest data-icon="inline-start" />
-            Files
-            <span className="rounded-full bg-foreground/5 px-1.5 text-3xs text-current tabular-nums">
-              {pr.changedFiles}
-            </span>
-          </TabsTrigger>
-          <TabsTrigger
+          />
+          <DetailTab
             value="commits"
-            className="h-6 flex-none rounded-full px-2.5 has-data-[icon=inline-start]:pl-2 data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm"
-          >
-            <GitCommitHorizontal data-icon="inline-start" />
-            Commits
-            <span className="rounded-full bg-foreground/5 px-1.5 text-3xs text-current tabular-nums">
-              {pr.commits.length}
-            </span>
-          </TabsTrigger>
-        </TabsList>
+            icon={<GitCommitHorizontal data-icon="inline-start" />}
+            label="Commits"
+            count={pr.commits.length}
+          />
+        </DetailTabsList>
 
         <TabsContent
           value="overview"
           className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 @sm/pr:px-3"
         >
           <div className="flex flex-col gap-2.5">
-            <section className="rounded-xl border border-border/60 bg-card/70 p-2.5 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-              <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border/45 bg-background/65 px-2.5 py-1.5 text-xs text-muted-foreground">
-                <GitBranch className="size-3.5 shrink-0" aria-hidden />
+            <DetailHeader
+              title={pr.title}
+              avatarSrc={githubAvatarUrl(pr.author)}
+              author={pr.author}
+              createdAt={pr.createdAt}
+              status={
+                pr.autoMergeEnabled
+                  ? "Auto-merge enabled"
+                  : readinessLabel(readiness)
+              }
+            >
+              <PropertyRow
+                icon={<GitBranch className="size-3.5 shrink-0" aria-hidden />}
+                label="Branch"
+              >
                 <span className="min-w-0 truncate font-mono">
                   {pr.headRefName}
                 </span>
-                <span className="shrink-0 text-muted-foreground/40">→</span>
-                <span className="min-w-0 flex-1 truncate font-mono">
+                <ChevronRight
+                  className="size-3 shrink-0 text-muted-foreground/40"
+                  aria-hidden
+                />
+                <span className="min-w-0 truncate font-mono">
                   {pr.baseRefName}
+                </span>
+                <span className="ml-1 shrink-0 font-medium text-diff-add tabular-nums">
+                  +{pr.additions}
+                </span>
+                <span className="shrink-0 font-medium text-diff-remove tabular-nums">
+                  -{pr.deletions}
                 </span>
                 <Button
                   variant="ghost"
@@ -787,77 +561,71 @@ function GithubPullRequestDetail({
                 >
                   <Copy className="size-3" aria-hidden />
                 </Button>
-              </div>
-
-              <div className="mt-2.5 grid grid-cols-4 divide-x divide-border/50 rounded-lg bg-muted/35 py-2 text-center">
-                <div>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {pr.changedFiles}
-                  </p>
-                  <p className="text-3xs text-muted-foreground">Files</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {pr.commits.length}
-                  </p>
-                  <p className="text-3xs text-muted-foreground">Commits</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-diff-add tabular-nums">
-                    +{pr.additions}
-                  </p>
-                  <p className="text-3xs text-muted-foreground">Added</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-diff-remove tabular-nums">
-                    -{pr.deletions}
-                  </p>
-                  <p className="text-3xs text-muted-foreground">Removed</p>
-                </div>
-              </div>
-            </section>
+              </PropertyRow>
+              <PropertyRow
+                icon={
+                  <CircleUserRound className="size-3.5 shrink-0" aria-hidden />
+                }
+                label="Reviewers"
+              >
+                {reviewers.length > 0 ? (
+                  <div className="flex items-center -space-x-1">
+                    {reviewers.map((reviewer) => (
+                      <ReviewerAvatar
+                        key={reviewer.login}
+                        name={reviewer.login}
+                        src={githubAvatarUrl(reviewer.login)}
+                        state={reviewer.state}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">No reviewers</span>
+                )}
+              </PropertyRow>
+              <PropertyRow
+                icon={<MessageCircle className="size-3.5 shrink-0" aria-hidden />}
+                label="Comments"
+              >
+                {commentCount > 0
+                  ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`
+                  : "No comments"}
+              </PropertyRow>
+              <PropertyRow
+                icon={<Clock className="size-3.5 shrink-0" aria-hidden />}
+                label="Checks"
+              >
+                {checksText}
+              </PropertyRow>
+            </DetailHeader>
 
             <section className="flex flex-col gap-2">
-              <div className="flex items-center gap-2 px-0.5">
-                <SectionLabel>Conversation</SectionLabel>
-                {commentCount > 0 ? (
-                  <Badge variant="secondary">{commentCount}</Badge>
-                ) : null}
-              </div>
+              <SectionHeading
+                label={<SectionLabel>Conversation</SectionLabel>}
+                count={commentCount}
+              />
               {pr.body ? (
-                <PullRequestCommentCard
+                <CommentCard
                   author={pr.author}
+                  avatarUrl={githubAvatarUrl(pr.author)}
                   body={pr.body}
                   createdAt={pr.createdAt}
                   context="Description"
                 />
               ) : null}
-              <PullRequestActivityList
+              <ActivityList
                 items={activity}
-                reviewLoading={reviewLoading}
-                reviewError={reviewError}
+                loading={reviewLoading}
+                error={reviewError}
                 onReply={replyToActivity}
               />
-              <div className="rounded-xl border border-border/60 bg-card/75 p-2.5 shadow-sm shadow-black/[0.025]">
-                <Textarea
-                  value={commentBody}
-                  onChange={(event) => setCommentBody(event.target.value)}
-                  placeholder="Add to the conversation…"
-                  disabled={pending}
-                  aria-label="Pull request comment"
-                  className="min-h-24 resize-y border-border/50 bg-background/70"
-                />
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    size="sm"
-                    onClick={submitComment}
-                    disabled={!commentBody.trim() || pending}
-                  >
-                    <MessageSquare data-icon="inline-start" />
-                    Comment
-                  </Button>
-                </div>
-              </div>
+              <CommentComposer
+                value={commentBody}
+                onChange={setCommentBody}
+                disabled={pending}
+                ariaLabel="Pull request comment"
+                onSubmit={submitComment}
+              />
             </section>
 
             <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
@@ -885,35 +653,21 @@ function GithubPullRequestDetail({
                 </div>
               ) : null}
               {isOpen ? (
-                <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/45 pt-2.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() =>
-                      checkout.mutate(number, {
-                        onSuccess: () =>
-                          toast.success("Pull request checked out"),
-                        onError: (checkoutError) =>
-                          toast.error("Couldn't check out pull request", {
-                            description: parseApiError(checkoutError),
-                          }),
-                      })
-                    }
-                  >
-                    <GitBranch data-icon="inline-start" />
-                    Checkout
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={pending || mergeBlockedReason !== null}
-                    title={mergeBlockedReason ?? undefined}
-                    onClick={() => setMergeOpen(true)}
-                  >
-                    <GitMerge data-icon="inline-start" />
-                    Merge
-                  </Button>
-                </div>
+                <DetailActionsFooter
+                  pending={pending}
+                  mergeState={mergeState}
+                  onCheckout={() =>
+                    checkout.mutate(number, {
+                      onSuccess: () =>
+                        toast.success("Pull request checked out"),
+                      onError: (checkoutError) =>
+                        toast.error("Couldn't check out pull request", {
+                          description: parseApiError(checkoutError),
+                        }),
+                    })
+                  }
+                  onMerge={() => setMergeOpen(true)}
+                />
               ) : null}
             </section>
           </div>
@@ -931,60 +685,55 @@ function GithubPullRequestDetail({
           value="commits"
           className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 @sm/pr:px-3"
         >
-          <PullRequestCommits
+          <CommitList
             commits={pr.commits}
             repositoryUrl={repositoryUrl}
+            getCommitDiff={(oid) => fetchCommitDiff(ctx, oid)}
           />
         </TabsContent>
       </Tabs>
 
-      <AlertDialog open={mergeOpen} onOpenChange={setMergeOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Merge pull request #{number}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action updates the remote repository and cannot be undone
-              from this panel.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <ToggleGroup
-            variant="outline"
-            value={[mergeMethod]}
-            onValueChange={(values) => {
-              const next = values.find((value) => value !== mergeMethod)
-              if (next === "merge" || next === "squash" || next === "rebase")
-                setMergeMethod(next)
-            }}
-          >
-            <ToggleGroupItem value="merge">Merge</ToggleGroupItem>
-            <ToggleGroupItem value="squash">Squash</ToggleGroupItem>
-            <ToggleGroupItem value="rebase">Rebase</ToggleGroupItem>
-          </ToggleGroup>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={merge.isPending}
-              onClick={() =>
-                merge.mutate(
-                  { number, method: mergeMethod },
-                  {
-                    onSuccess: () => {
-                      setMergeOpen(false)
-                      toast.success("Pull request merged")
-                    },
-                    onError: (mergeError) =>
-                      toast.error("Couldn't merge pull request", {
-                        description: parseApiError(mergeError),
-                      }),
-                  }
+      <MergeDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        subject={`pull request #${number}`}
+        auto={mergeState.auto}
+        pending={merge.isPending}
+        onConfirm={() =>
+          merge.mutate(
+            { number, method: mergeMethod, auto: mergeState.auto },
+            {
+              onSuccess: () => {
+                setMergeOpen(false)
+                toast.success(
+                  mergeState.auto ? "Auto-merge enabled" : "Pull request merged"
                 )
-              }
-            >
-              Merge
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              },
+              onError: (mergeError) =>
+                toast.error(
+                  mergeState.auto
+                    ? "Couldn't enable auto-merge"
+                    : "Couldn't merge pull request",
+                  { description: parseApiError(mergeError) }
+                ),
+            }
+          )
+        }
+      >
+        <ToggleGroup
+          variant="outline"
+          value={[mergeMethod]}
+          onValueChange={(values) => {
+            const next = values.find((value) => value !== mergeMethod)
+            if (next === "merge" || next === "squash" || next === "rebase")
+              setMergeMethod(next)
+          }}
+        >
+          <ToggleGroupItem value="merge">Merge</ToggleGroupItem>
+          <ToggleGroupItem value="squash">Squash</ToggleGroupItem>
+          <ToggleGroupItem value="rebase">Rebase</ToggleGroupItem>
+        </ToggleGroup>
+      </MergeDialog>
     </div>
   )
 }
@@ -1002,7 +751,7 @@ function IssuesSection({
       <div className="mb-2 px-0.5">
         <SectionLabel>Issues</SectionLabel>
       </div>
-      <div className="divide-y divide-border/40 overflow-hidden rounded-xl border border-border/60 bg-card/65 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
+      <ListCard>
         <ListState
           loading={isLoading}
           empty={issues.length === 0}
@@ -1028,7 +777,7 @@ function IssuesSection({
             />
           )
         })}
-      </div>
+      </ListCard>
     </section>
   )
 }
@@ -1049,18 +798,13 @@ function GithubIssueDetail({
   if (isLoading) return <PanelMessage loading message="Loading issue" />
   if (error || !issue) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
-        <p className="text-xs text-muted-foreground">
-          {error ? parseApiError(error) : "Issue not found"}
-        </p>
-        <Button size="sm" variant="outline" onClick={onBack}>
-          Back to issues
-        </Button>
-      </div>
+      <DetailNotFound
+        message={error ? parseApiError(error) : "Issue not found"}
+        backLabel="Back to issues"
+        onBack={onBack}
+      />
     )
   }
-
-  const isOpen = issue.state.toLowerCase() === "open"
 
   function submitComment() {
     const body = commentBody.trim()
@@ -1082,77 +826,73 @@ function GithubIssueDetail({
 
   return (
     <div className="@container/pr flex h-full min-h-0 flex-col bg-muted/[0.08]">
-      <div className="shrink-0 p-2 pb-0">
-        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border/60 bg-background/85 px-2 py-1.5 shadow-sm shadow-black/[0.03] backdrop-blur dark:shadow-black/20">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onBack}
-            aria-label="Back to issues"
-          >
-            <ArrowLeft data-icon="inline-start" />
-          </Button>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-foreground/90">
-              {issue.title}
-            </p>
-            <p className="truncate text-3xs text-muted-foreground/60">
-              Issue #{issue.number} · {issue.author ?? "Unknown author"}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => void openExternal(issue.url)}
-            aria-label="Open on GitHub"
-          >
-            <ExternalLink data-icon="inline-start" />
-          </Button>
-        </div>
-      </div>
+      <DetailTopBar
+        onBack={onBack}
+        backLabel="Back to issues"
+        stateIcon={<CircleDot className="size-3.5 text-emerald-600" />}
+        title={`Issue #${issue.number}`}
+        url={issue.url}
+        openLabel="Open on GitHub"
+      />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 @sm/pr:px-3">
-        <div className="flex flex-col gap-2.5 pt-2.5">
-          <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Badge variant={isOpen ? "default" : "secondary"}>
-                {humanizeStatus(issue.state).label}
-              </Badge>
-              {issue.labels.map((label) => (
-                <Badge key={label} variant="outline">
-                  {label}
-                </Badge>
-              ))}
-            </div>
-          </section>
-
-          {issue.body ? (
-            <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
-              <SectionLabel>Description</SectionLabel>
-              <div className="mt-2">
-                <RemoteMarkdown content={issue.body} />
-              </div>
-            </section>
-          ) : null}
+        <div className="flex flex-col gap-2.5">
+          <DetailHeader
+            title={issue.title}
+            avatarSrc={githubAvatarUrl(issue.author)}
+            author={issue.author}
+            createdAt={issue.createdAt}
+            status={humanizeStatus(issue.state).label}
+          >
+            <PropertyRow
+              icon={<Tag className="size-3.5 shrink-0" aria-hidden />}
+              label="Labels"
+            >
+              {issue.labels.length > 0 ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-1">
+                  {issue.labels.map((label) => (
+                    <Badge key={label} variant="outline">
+                      {label}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-muted-foreground">No labels</span>
+              )}
+            </PropertyRow>
+            <PropertyRow
+              icon={<MessageCircle className="size-3.5 shrink-0" aria-hidden />}
+              label="Comments"
+            >
+              {issue.comments.length > 0
+                ? `${issue.comments.length} ${issue.comments.length === 1 ? "comment" : "comments"}`
+                : "No comments"}
+            </PropertyRow>
+          </DetailHeader>
 
           <section className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 px-0.5">
-              <SectionLabel>Comments</SectionLabel>
-              {issue.comments.length > 0 ? (
-                <Badge variant="secondary">{issue.comments.length}</Badge>
-              ) : null}
-            </div>
+            <SectionHeading
+              label={<SectionLabel>Conversation</SectionLabel>}
+              count={issue.comments.length}
+            />
+            {issue.body ? (
+              <CommentCard
+                author={issue.author}
+                avatarUrl={githubAvatarUrl(issue.author)}
+                body={issue.body}
+                createdAt={issue.createdAt}
+                context="Description"
+              />
+            ) : null}
             {issue.comments.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border/70 bg-card/45 px-4 py-8 text-center">
-                <MessageSquare className="mx-auto mb-2 size-5 text-muted-foreground/40" />
-                <p className="text-xs font-medium">No comments yet</p>
-              </div>
+              <EmptyPlaceholder title="No comments yet" />
             ) : (
               <div className="flex flex-col gap-2.5">
                 {issue.comments.map((item, index) => (
-                  <PullRequestCommentCard
+                  <CommentCard
                     key={`${item.createdAt}-${index}`}
                     author={item.author}
+                    avatarUrl={githubAvatarUrl(item.author)}
                     body={item.body}
                     createdAt={item.createdAt}
                     context="Conversation"
@@ -1160,26 +900,13 @@ function GithubIssueDetail({
                 ))}
               </div>
             )}
-            <div className="rounded-xl border border-border/60 bg-card/75 p-2.5 shadow-sm shadow-black/[0.025]">
-              <Textarea
-                value={commentBody}
-                onChange={(event) => setCommentBody(event.target.value)}
-                placeholder="Add to the conversation…"
-                disabled={comment.isPending}
-                aria-label="Issue comment"
-                className="min-h-24 resize-y border-border/50 bg-background/70"
-              />
-              <div className="mt-2 flex justify-end">
-                <Button
-                  size="sm"
-                  onClick={submitComment}
-                  disabled={!commentBody.trim() || comment.isPending}
-                >
-                  <MessageSquare data-icon="inline-start" />
-                  Comment
-                </Button>
-              </div>
-            </div>
+            <CommentComposer
+              value={commentBody}
+              onChange={setCommentBody}
+              disabled={comment.isPending}
+              ariaLabel="Issue comment"
+              onSubmit={submitComment}
+            />
           </section>
         </div>
       </div>
