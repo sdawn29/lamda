@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.56.0](../../releases/tag/v0.56.0) — 2026-07-17
+
+### Features
+
+* enhance pull request and merge request features
+* add Pull Request comment card and panel primitives for review functionality
+
+### Other Changes
+
+* Refactor mode configurations and enhance agent prompts
+
 ## [0.55.0](../../releases/tag/v0.55.0) — 2026-07-16
 
 ### Features
