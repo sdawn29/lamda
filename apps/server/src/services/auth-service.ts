@@ -2,10 +2,6 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { homedir } from "os";
 import { join, dirname } from "path";
-import { AuthStorage } from "@earendil-works/pi-coding-agent";
-
-export const sharedAuthStorage = AuthStorage.create();
-
 export const AUTH_FILE = join(homedir(), ".pi", "agent", "auth.json");
 
 export type AuthEntry = { type: string; key?: string; [k: string]: unknown };

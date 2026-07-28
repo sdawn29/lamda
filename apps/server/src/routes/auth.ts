@@ -2,15 +2,15 @@ import { Hono } from "hono";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import type { WebSocket } from "ws";
+import type { AuthInteraction } from "@earendil-works/pi-ai";
 import {
-  sharedAuthStorage,
   readAuthJson,
   writeAuthJson,
   activeLogins,
   type OAuthSseEvent,
   type ActiveLogin,
 } from "../services/auth-service.js";
-import { invalidateModelCache } from "@lamda/pi-sdk";
+import { sharedModelRuntime, resetModelRuntime } from "@lamda/pi-sdk";
 import { parseJsonBody } from "../lib/validate.js";
 
 const auth = new Hono();
@@ -26,12 +26,18 @@ const providersSchema = z.object({
 
 // ── OAuth ─────────────────────────────────────────────────────────────────────
 
-auth.get("/auth/oauth/providers", (c) => {
-  sharedAuthStorage.reload();
-  const providers = sharedAuthStorage.getOAuthProviders().map((p) => {
-    const cred = sharedAuthStorage.get(p.id);
-    return { id: p.id, name: p.name, loggedIn: cred?.type === "oauth" };
-  });
+auth.get("/auth/oauth/providers", async (c) => {
+  // The shared runtime is reset (not just refreshed) whenever auth.json is
+  // written, so this instance already reflects current credentials.
+  const runtime = await sharedModelRuntime();
+  const providers = runtime
+    .getProviders()
+    .filter((p) => p.auth?.oauth)
+    .map((p) => ({
+      id: p.id,
+      name: p.auth!.oauth!.name,
+      loggedIn: runtime.isUsingOAuth(p.id),
+    }));
   return c.json({ providers });
 });
 
@@ -61,52 +67,90 @@ auth.post("/auth/oauth/:providerId/login", async (c) => {
     login.rejectManualInput = reject;
   });
 
-  sharedAuthStorage
-    .login(providerId, {
-      signal: login.abortController.signal,
-      onAuth: (info) =>
+  // pi 0.80.8+ unified the old per-event callbacks into a single
+  // AuthInteraction: `notify` for one-way events, `prompt` for anything that
+  // needs a user response (text/secret/select/manual_code).
+  const interaction: AuthInteraction = {
+    signal: login.abortController.signal,
+    notify: (event) => {
+      if (event.type === "auth_url") {
         emit({
           type: "auth_url",
-          url: info.url,
-          instructions: info.instructions,
-        }),
-      onDeviceCode: (info) =>
+          url: event.url,
+          instructions: event.instructions,
+        });
+      } else if (event.type === "device_code") {
         emit({
           type: "device_code",
-          userCode: info.userCode,
-          verificationUri: info.verificationUri,
-          expiresInSeconds: info.expiresInSeconds,
-          intervalSeconds: info.intervalSeconds,
+          userCode: event.userCode,
+          verificationUri: event.verificationUri,
+          expiresInSeconds: event.expiresInSeconds,
+          intervalSeconds: event.intervalSeconds,
+        });
+      } else {
+        // "progress" and "info" both render as status text in the UI.
+        emit({ type: "progress", message: event.message });
+      }
+    },
+    prompt: (prompt) => {
+      // The manual paste-the-code fallback is never answered through this API
+      // — it races the local callback server and unwinds via abort, which is
+      // what closes the SDK's listener on port 1455.
+      if (prompt.type === "manual_code") return manualInputPromise;
+
+      const promptId = randomUUID();
+      const pending =
+        prompt.type === "select"
+          ? new Promise<string>((resolve, reject) => {
+              emit({
+                type: "select",
+                promptId,
+                message: prompt.message,
+                options: prompt.options.map((o) => ({
+                  id: o.id,
+                  label: o.label,
+                })),
+              });
+              login.selectResolvers.set(promptId, (value) =>
+                value === undefined
+                  ? reject(new Error("Selection cancelled"))
+                  : resolve(value),
+              );
+            })
+          : new Promise<string>((resolve) => {
+              emit({
+                type: "prompt",
+                promptId,
+                message: prompt.message,
+                placeholder: prompt.placeholder,
+              });
+              login.promptResolvers.set(promptId, resolve);
+            });
+
+      // A per-prompt signal cancels just this step (the whole-flow signal is
+      // passed separately above), so drop the resolver and unwind.
+      if (!prompt.signal) return pending;
+      return Promise.race([
+        pending,
+        new Promise<string>((_resolve, reject) => {
+          prompt.signal!.addEventListener(
+            "abort",
+            () => {
+              login.promptResolvers.delete(promptId);
+              login.selectResolvers.delete(promptId);
+              reject(new Error("Prompt cancelled"));
+            },
+            { once: true },
+          );
         }),
-      onProgress: (message) => emit({ type: "progress", message }),
-      onPrompt: (prompt) => {
-        const promptId = randomUUID();
-        emit({
-          type: "prompt",
-          promptId,
-          message: prompt.message,
-          placeholder: prompt.placeholder,
-        });
-        return new Promise<string>((resolve) => {
-          login.promptResolvers.set(promptId, resolve);
-        });
-      },
-      onSelect: (prompt) => {
-        const promptId = randomUUID();
-        emit({
-          type: "select",
-          promptId,
-          message: prompt.message,
-          options: prompt.options.map((o) => ({ id: o.id, label: o.label })),
-        });
-        return new Promise<string | undefined>((resolve) => {
-          login.selectResolvers.set(promptId, resolve);
-        });
-      },
-      onManualCodeInput: () => manualInputPromise,
-    })
+      ]);
+    },
+  };
+
+  void sharedModelRuntime()
+    .then((runtime) => runtime.login(providerId, "oauth", interaction))
     .then(() => {
-      invalidateModelCache();
+      resetModelRuntime();
       emit({ type: "done" });
       activeLogins.delete(loginId);
     })
@@ -165,11 +209,11 @@ auth.post("/auth/oauth/:loginId/abort", (c) => {
   return c.json({ ok: true });
 });
 
-auth.delete("/auth/oauth/:providerId", (c) => {
+auth.delete("/auth/oauth/:providerId", async (c) => {
   const providerId = c.req.param("providerId");
-  sharedAuthStorage.reload();
-  sharedAuthStorage.logout(providerId);
-  invalidateModelCache();
+  const runtime = await sharedModelRuntime();
+  await runtime.logout(providerId);
+  resetModelRuntime();
   return c.json({ ok: true });
 });
 
@@ -203,7 +247,7 @@ auth.put("/providers", async (c) => {
   }
 
   await writeAuthJson(authData);
-  invalidateModelCache();
+  resetModelRuntime();
   return c.json({ ok: true });
 });
 

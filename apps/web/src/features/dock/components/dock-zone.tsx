@@ -94,7 +94,6 @@ export function DockZone({ dockId, ctx }: DockZoneProps) {
     before: boolean
   } | null>(null)
   const [headerDropActive, setHeaderDropActive] = useState(false)
-  const [contextMenuTabId, setContextMenuTabId] = useState<string | null>(null)
 
   const handleHeaderDragOver = useCallback((e: React.DragEvent) => {
     if (!e.dataTransfer.types.includes(DOCK_TAB_MIME)) return
@@ -259,120 +258,90 @@ export function DockZone({ dockId, ctx }: DockZoneProps) {
             const dropBefore = dropTarget?.id === tab.id && dropTarget.before
             const dropAfter = dropTarget?.id === tab.id && !dropTarget.before
             return (
-              <DropdownMenu
+              <div
                 key={tab.id}
-                open={contextMenuTabId === tab.id}
-                onOpenChange={(open) =>
-                  setContextMenuTabId(open ? tab.id : null)
-                }
-              >
-                <DropdownMenuTrigger
-                  render={
-                    <div
-                      role="tab"
-                      aria-selected={isActive}
-                      draggable
-                      onClick={() => setActiveTab(dockId, tab.id)}
-                      onContextMenu={(e) => {
-                        e.preventDefault()
-                        setContextMenuTabId(tab.id)
-                      }}
-                      onDragStart={(e) => {
-                        draggedTabId.current = tab.id
-                        setDraggingTab(tab.id)
-                        e.dataTransfer.effectAllowed = "move"
-                        e.dataTransfer.setData(DOCK_TAB_MIME, tab.id)
-                        e.dataTransfer.setData("text/plain", tab.id)
-                      }}
-                      onDragEnd={() => {
-                        draggedTabId.current = null
-                        setDraggingTab(null)
-                        setDropTarget(null)
-                        setHeaderDropActive(false)
-                      }}
-                      onDragOver={(e) => {
-                        if (!e.dataTransfer.types.includes(DOCK_TAB_MIME))
-                          return
-                        e.preventDefault()
-                        e.stopPropagation()
-                        e.dataTransfer.dropEffect = "move"
-                        const rect = e.currentTarget.getBoundingClientRect()
-                        const before = e.clientX < rect.left + rect.width / 2
-                        setDropTarget({ id: tab.id, before })
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        const draggedId =
-                          e.dataTransfer.getData(DOCK_TAB_MIME) ||
-                          draggingTabId ||
-                          draggedTabId.current
-                        setHeaderDropActive(false)
-                        if (draggedId && draggedId !== tab.id) {
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          const before = e.clientX < rect.left + rect.width / 2
-                          if (dock.tabIds.includes(draggedId)) {
-                            reorderTab(dockId, draggedId, tab.id, before)
-                          } else {
-                            const targetIndex = dock.tabIds.indexOf(tab.id)
-                            moveTab(
-                              draggedId,
-                              dockId,
-                              before ? targetIndex : targetIndex + 1
-                            )
-                          }
-                        }
-                        draggedTabId.current = null
-                        setDraggingTab(null)
-                        setDropTarget(null)
-                      }}
-                      className={cn(
-                        "group flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md pr-1.5 pl-2.5 text-xs font-medium transition-all duration-150 select-none",
-                        isActive
-                          ? "bg-accent text-accent-foreground shadow-sm ring-1 ring-border/60"
-                          : "text-muted-foreground/70 hover:bg-accent/60 hover:text-foreground",
-                        isDragging && "opacity-40",
-                        dropBefore && "border-l-2 border-primary",
-                        dropAfter && "border-r-2 border-primary"
-                      )}
-                    >
-                      {def?.icon(tab)}
-                      <span className="max-w-28 truncate">{tab.title}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`Close ${tab.title}`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          closeTab(tab.id)
-                        }}
-                        className={cn(
-                          "ml-auto shrink-0 text-muted-foreground/50",
-                          isActive
-                            ? "opacity-60 hover:opacity-100"
-                            : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100"
-                        )}
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </Button>
-                    </div>
+                role="tab"
+                aria-selected={isActive}
+                draggable
+                onClick={() => setActiveTab(dockId, tab.id)}
+                onDragStart={(e) => {
+                  draggedTabId.current = tab.id
+                  setDraggingTab(tab.id)
+                  e.dataTransfer.effectAllowed = "move"
+                  e.dataTransfer.setData(DOCK_TAB_MIME, tab.id)
+                  e.dataTransfer.setData("text/plain", tab.id)
+                }}
+                onDragEnd={() => {
+                  draggedTabId.current = null
+                  setDraggingTab(null)
+                  setDropTarget(null)
+                  setHeaderDropActive(false)
+                }}
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes(DOCK_TAB_MIME)) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  e.dataTransfer.dropEffect = "move"
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const before = e.clientX < rect.left + rect.width / 2
+                  setDropTarget({ id: tab.id, before })
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const draggedId =
+                    e.dataTransfer.getData(DOCK_TAB_MIME) ||
+                    draggingTabId ||
+                    draggedTabId.current
+                  setHeaderDropActive(false)
+                  if (draggedId && draggedId !== tab.id) {
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    const before = e.clientX < rect.left + rect.width / 2
+                    if (dock.tabIds.includes(draggedId)) {
+                      reorderTab(dockId, draggedId, tab.id, before)
+                    } else {
+                      const targetIndex = dock.tabIds.indexOf(tab.id)
+                      moveTab(
+                        draggedId,
+                        dockId,
+                        before ? targetIndex : targetIndex + 1
+                      )
+                    }
                   }
-                />
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem
-                    disabled={dockId === "right"}
-                    onClick={() => moveTab(tab.id, "right")}
-                  >
-                    Move to right panel
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={dockId === "bottom"}
-                    onClick={() => moveTab(tab.id, "bottom")}
-                  >
-                    Move to bottom panel
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  draggedTabId.current = null
+                  setDraggingTab(null)
+                  setDropTarget(null)
+                }}
+                className={cn(
+                  "group flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md pr-1.5 pl-2.5 text-xs font-medium transition-all duration-150 select-none",
+                  isActive
+                    ? "bg-accent text-accent-foreground shadow-sm ring-1 ring-border/60"
+                    : "text-muted-foreground/70 hover:bg-accent/60 hover:text-foreground",
+                  isDragging && "opacity-40",
+                  dropBefore && "border-l-2 border-primary",
+                  dropAfter && "border-r-2 border-primary"
+                )}
+              >
+                {def?.icon(tab)}
+                <span className="max-w-28 truncate">{tab.title}</span>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`Close ${tab.title}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    closeTab(tab.id)
+                  }}
+                  className={cn(
+                    "ml-auto shrink-0 text-muted-foreground/50",
+                    isActive
+                      ? "opacity-60 hover:opacity-100"
+                      : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100"
+                  )}
+                >
+                  <X className="h-2.5 w-2.5" />
+                </Button>
+              </div>
             )
           })}
 

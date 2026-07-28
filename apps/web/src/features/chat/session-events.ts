@@ -243,6 +243,27 @@ export function subscribeToSessionEvents(
         case "auto_retry_end":
           handlers.onAutoRetryEnd(data as unknown as SessionAutoRetryEndEvent)
           break
+        // Compaction/branch-summary retries (pi 0.81.1+) reuse the agent-turn
+        // retry banner rather than adding a parallel UI — same approach the
+        // server takes for synthetic healing-status events.
+        case "summarization_retry_scheduled": {
+          const d = data as unknown as {
+            attempt: number
+            maxAttempts: number
+            errorMessage: string
+          }
+          handlers.onAutoRetryStart({
+            attempt: d.attempt,
+            errorMessage: `Summarization failed (attempt ${d.attempt}/${d.maxAttempts}): ${d.errorMessage}`,
+          } as unknown as SessionAutoRetryStartEvent)
+          break
+        }
+        case "summarization_retry_finished":
+          // Clears the banner; the following compaction_end reports the verdict.
+          handlers.onAutoRetryEnd({
+            success: true,
+          } as unknown as SessionAutoRetryEndEvent)
+          break
         case "compaction_start":
           handlers.onCompactionStart(
             data as unknown as { reason: "manual" | "threshold" | "overflow" }

@@ -55,19 +55,19 @@ async function buildSessionCustomTools(
           ...createPlanModeTools(cwd),
           createMemoryTool(undefined),
           questionTool,
-          createDelegateTool(threadId, cwd),
+          await createDelegateTool(threadId, cwd),
         ]
       : mode === "ask"
         ? [
             createMemoryTool(undefined),
             questionTool,
-            createDelegateTool(threadId, cwd),
+            await createDelegateTool(threadId, cwd),
           ]
         : [
             createTodoTool(threadId),
             createMemoryTool(undefined),
             questionTool,
-            createDelegateTool(threadId, cwd),
+            await createDelegateTool(threadId, cwd),
           ];
 
   return { customTools, mode };
@@ -421,7 +421,7 @@ export async function collectCustomTools(
     createSemanticSearchTool(workspaceId),
     // The delegate (subagent) tool is thread-bound like todo: its approval bridge
     // and transcript streaming key off the thread's live session.
-    ...(threadId ? [createDelegateTool(threadId, workspacePath)] : []),
+    ...(threadId ? [await createDelegateTool(threadId, workspacePath)] : []),
     ...planTools,
     ...mcpTools,
     ...lspTools,

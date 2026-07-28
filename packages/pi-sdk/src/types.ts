@@ -1,7 +1,6 @@
 import type {
   AgentSessionEvent,
-  AuthStorage,
-  ModelRegistry,
+  ModelRuntime,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { Mode } from "./modes.js";
@@ -95,10 +94,8 @@ export interface SdkConfig {
   model?: string;
   /** Thinking/reasoning effort level. Only applies to models with reasoning support. */
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
-  /** Pre-configured auth storage (creates one if not provided). */
-  authStorage?: AuthStorage;
-  /** Pre-configured model registry (creates one if not provided). */
-  modelRegistry?: ModelRegistry;
+  /** Pre-configured model/auth runtime (creates one if not provided). */
+  modelRuntime?: ModelRuntime;
   /** Additional custom tools to register with the agent (e.g., MCP tools). */
   customTools?: ToolDefinition[];
   /** Agent mode — controls base tool set ("agent" = full, "plan"/"ask" = read-only). Defaults to "agent". */

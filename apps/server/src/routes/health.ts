@@ -302,7 +302,9 @@ function getResourceSnapshot() {
   };
 }
 
-health.get("/models", (c) => c.json({ models: getAvailableModels() }));
+health.get("/models", async (c) =>
+  c.json({ models: await getAvailableModels() }),
+);
 
 health.get("/background-queue", (c) =>
   c.json({ queues: backgroundTaskQueue.stats() }),

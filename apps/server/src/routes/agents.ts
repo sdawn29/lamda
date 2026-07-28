@@ -104,7 +104,9 @@ const saveRawAgentSchema = z.object({
   content: z.string().trim().min(1, "content is required"),
 });
 
-function validateRawAgentContent(content: string): string | null {
+async function validateRawAgentContent(
+  content: string,
+): Promise<string | null> {
   const { fields, body } = parseFrontmatter(content);
   const name = unquote(fields.get("name") ?? "").trim();
   if (!name) return "name is required";
@@ -121,7 +123,7 @@ function validateRawAgentContent(content: string): string | null {
   if (modelValue) {
     const model = parseAgentModel(modelValue);
     if (!model) return 'model must be "provider::model"';
-    const known = getAvailableModels().some(
+    const known = (await getAvailableModels()).some(
       (m) => m.provider === model.provider && m.id === model.model,
     );
     if (!known) return `Model "${modelValue}" is not configured`;
@@ -163,7 +165,7 @@ agents.put("/agents/:id", async (c) => {
     if (!model) {
       return c.json({ error: 'model must be "provider::model"' }, 400);
     }
-    const known = getAvailableModels().some(
+    const known = (await getAvailableModels()).some(
       (m) => m.provider === model!.provider && m.id === model!.model,
     );
     if (!known) {
@@ -251,7 +253,7 @@ agents.put("/agents/:id/raw", async (c) => {
   const parsed = await parseJsonBody(c, saveRawAgentSchema);
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
-  const invalid = validateRawAgentContent(body.content);
+  const invalid = await validateRawAgentContent(body.content);
   if (invalid) return c.json({ error: invalid }, 400);
 
   let dir: string;

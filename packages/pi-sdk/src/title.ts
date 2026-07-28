@@ -1,9 +1,8 @@
 import {
   createAgentSession,
-  ModelRegistry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { buildAuthStorage } from "./auth.js";
+import { resolveModelRuntime } from "./model-runtime.js";
 import type { SdkConfig } from "./types.js";
 
 /**
@@ -26,18 +25,16 @@ export async function generateThreadTitle(
   promptTemplate?: string,
 ): Promise<string> {
   const template = promptTemplate?.trim() || DEFAULT_TITLE_PROMPT;
-  const authStorage = buildAuthStorage(config);
-  const modelRegistry = ModelRegistry.create(authStorage);
+  const modelRuntime = await resolveModelRuntime(config);
   const sessionManager = SessionManager.inMemory(config.cwd ?? process.cwd());
 
   const model =
     config.provider && config.model
-      ? modelRegistry.find(config.provider, config.model)
+      ? modelRuntime.getModel(config.provider, config.model)
       : undefined;
 
   const { session } = await createAgentSession({
-    authStorage,
-    modelRegistry,
+    modelRuntime,
     sessionManager,
     tools: [],
     model,

@@ -76,15 +76,15 @@ function parseModelId(
  * model (a bad frontmatter `model` must soften to inheritance, never fail the
  * spawn), otherwise the SDK default.
  */
-function resolveModel(
+async function resolveModel(
   agent: AgentConfig,
   parentThreadId: string,
   override?: { provider: string; model: string },
-): { provider: string; model: string } | undefined {
+): Promise<{ provider: string; model: string } | undefined> {
   if (override) return override;
   if (agent.model) {
     try {
-      const available = getAvailableModels();
+      const available = await getAvailableModels();
       if (
         available.some(
           (m) =>
@@ -163,7 +163,7 @@ export interface SubagentRunResult {
 export async function runSubagent(
   opts: RunSubagentOptions,
 ): Promise<SubagentRunResult> {
-  const model = resolveModel(
+  const model = await resolveModel(
     opts.agent,
     opts.parentThreadId,
     opts.modelOverride,

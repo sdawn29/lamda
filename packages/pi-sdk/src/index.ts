@@ -3,11 +3,13 @@ export {
   openManagedSession,
   readSessionHistory,
 } from "./session.js";
+export { getAvailableModels, getModelsConfigError } from "./models.js";
 export {
-  getAvailableModels,
-  invalidateModelCache,
-  getModelsConfigError,
-} from "./models.js";
+  sharedModelRuntime,
+  resolveModelRuntime,
+  resetModelRuntime,
+  refreshModelCatalogs,
+} from "./model-runtime.js";
 export { generateThreadTitle, DEFAULT_TITLE_PROMPT } from "./title.js";
 export {
   generateCommitMessage,

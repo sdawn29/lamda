@@ -44,10 +44,10 @@ ${list}`;
 }
 
 /** List the registry's model ids so the parent knows what `model` accepts. */
-function buildModelParamDescription(): string {
+async function buildModelParamDescription(): Promise<string> {
   let ids: string[] = [];
   try {
-    ids = getAvailableModels().map((m) => `${m.provider}::${m.id}`);
+    ids = (await getAvailableModels()).map((m) => `${m.provider}::${m.id}`);
   } catch {
     // Registry unavailable — the param still documents its format.
   }
@@ -69,10 +69,11 @@ function buildModelParamDescription(): string {
  * `execute` re-resolves the agent from disk so a stale description still runs
  * the current definition.
  */
-export function createDelegateTool(
+export async function createDelegateTool(
   threadId: string,
   workspacePath: string,
-): ToolDefinition {
+): Promise<ToolDefinition> {
+  const modelParamDescription = await buildModelParamDescription();
   return {
     name: DELEGATE_TOOL_NAME,
     label: "delegate",
@@ -101,7 +102,7 @@ export function createDelegateTool(
         },
         model: {
           type: "string",
-          description: buildModelParamDescription(),
+          description: modelParamDescription,
         },
       },
     },
@@ -147,7 +148,7 @@ export function createDelegateTool(
       let modelOverride: { provider: string; model: string } | undefined;
       if (modelParam) {
         const parsed = parseAgentModel(modelParam);
-        const available = getAvailableModels();
+        const available = await getAvailableModels();
         const match =
           parsed &&
           available.find(

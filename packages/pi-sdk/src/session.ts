@@ -6,10 +6,10 @@ import {
   createAgentSessionRuntime,
   createAgentSessionServices,
   getAgentDir,
-  ModelRegistry,
+  ModelRuntime,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { buildAuthStorage } from "./auth.js";
+import { resolveModelRuntime } from "./model-runtime.js";
 import { sessionEventGenerator } from "./stream.js";
 import {
   BUILTIN_TOOL_NAMES,
@@ -105,15 +105,15 @@ function buildRuntimeHandle(
     dispose: () => runtime.session.dispose(),
     events: () => sessionEventGenerator(runtime.session),
     setModel: async (provider, modelId) => {
-      let model = runtime.services.modelRegistry.find(provider, modelId);
+      let model = runtime.services.modelRuntime.getModel(provider, modelId);
       if (!model) {
         // The model may have been added to ~/.pi/agent/models.json after this
-        // session's registry was loaded (e.g. a newly configured local
+        // session's runtime was loaded (e.g. a newly configured local
         // provider). Reload from disk and try once more before giving up —
         // otherwise selecting the new model silently no-ops and the session
         // keeps running the previous one.
-        runtime.services.modelRegistry.refresh();
-        model = runtime.services.modelRegistry.find(provider, modelId);
+        await runtime.services.modelRuntime.refresh();
+        model = runtime.services.modelRuntime.getModel(provider, modelId);
       }
       if (!model) {
         throw new Error(
@@ -252,12 +252,11 @@ function buildRuntimeHandle(
 
 function buildRuntimeFactory(
   config: SdkConfig,
-  authStorage: ReturnType<typeof buildAuthStorage>,
-  modelRegistry: ModelRegistry,
+  modelRuntime: ModelRuntime,
 ): CreateAgentSessionRuntimeFactory {
   const model =
     config.provider && config.model
-      ? modelRegistry.find(config.provider, config.model)
+      ? modelRuntime.getModel(config.provider, config.model)
       : undefined;
 
   return async ({
@@ -269,8 +268,7 @@ function buildRuntimeFactory(
     const services = await createAgentSessionServices({
       cwd: effectiveCwd,
       agentDir,
-      authStorage,
-      modelRegistry,
+      modelRuntime,
       resourceLoaderOptions: {
         // Subagent sessions are headless workers: they get their agent
         // definition's prompt instead of lamda's chat-app context, and none of
@@ -322,11 +320,9 @@ export async function createManagedSession(
   config: SdkConfig,
 ): Promise<ManagedSessionHandle> {
   const cwd = config.cwd ?? process.cwd();
-  const authStorage = config.authStorage ?? buildAuthStorage(config);
-  const modelRegistry =
-    config.modelRegistry ?? ModelRegistry.create(authStorage);
+  const modelRuntime = await resolveModelRuntime(config);
 
-  const createRuntime = buildRuntimeFactory(config, authStorage, modelRegistry);
+  const createRuntime = buildRuntimeFactory(config, modelRuntime);
   const runtime = await createAgentSessionRuntime(createRuntime, {
     cwd,
     agentDir: getAgentDir(),
@@ -444,11 +440,9 @@ export async function openManagedSession(
   config: SdkConfig = {},
 ): Promise<ManagedSessionHandle> {
   const cwd = config.cwd ?? process.cwd();
-  const authStorage = config.authStorage ?? buildAuthStorage(config);
-  const modelRegistry =
-    config.modelRegistry ?? ModelRegistry.create(authStorage);
+  const modelRuntime = await resolveModelRuntime(config);
 
-  const createRuntime = buildRuntimeFactory(config, authStorage, modelRegistry);
+  const createRuntime = buildRuntimeFactory(config, modelRuntime);
   const runtime = await createAgentSessionRuntime(createRuntime, {
     cwd,
     agentDir: getAgentDir(),

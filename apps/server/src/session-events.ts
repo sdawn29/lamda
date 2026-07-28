@@ -656,6 +656,9 @@ class SessionEventHub {
       "auto_retry_end",
       "compaction_start",
       "compaction_end",
+      "summarization_retry_scheduled",
+      "summarization_retry_attempt_start",
+      "summarization_retry_finished",
     ]);
     this.recentEvents = this.recentEvents.filter(
       (record) => !errorTypes.has(record.event.type),
@@ -1377,6 +1380,40 @@ class SessionEventHub {
           retryable: true,
         };
       }
+    } else if (event.type === "summarization_retry_scheduled") {
+      // pi 0.81.1+ retries transient provider failures during compaction and
+      // branch summarization instead of failing outright. Surface the attempt
+      // through the same banner as agent-turn retries — without this the UI
+      // just sits on "Compacting…" for the whole backoff. Not user-retryable:
+      // the SDK is already retrying, and `compaction_end` reports the verdict
+      // once the budget is spent.
+      const sr = event as {
+        attempt: number;
+        maxAttempts: number;
+        errorMessage: string;
+      };
+      this.pendingErrorState = {
+        title: `Retrying compaction (${sr.attempt}/${sr.maxAttempts})`,
+        message: sr.errorMessage,
+        retryable: false,
+        retryCount: sr.attempt,
+      };
+    } else if (event.type === "summarization_retry_attempt_start") {
+      // A retried compaction re-enters the compacting state; the original
+      // compaction_start already fired before the first failure. Branch
+      // summaries are not compaction, so they leave the flag alone.
+      const sa = event as {
+        source: "compaction" | "branchSummary";
+        reason?: "manual" | "threshold" | "overflow";
+      };
+      if (sa.source === "compaction") {
+        this.isCompacting = true;
+        this.compactionReason = sa.reason ?? this.compactionReason;
+      }
+    } else if (event.type === "summarization_retry_finished") {
+      // Retries are done — drop the retry banner and let the terminal
+      // compaction_end decide success vs. "Compaction Failed".
+      this.pendingErrorState = null;
     }
 
     if (event.type === "agent_end" || event.type === "server_error") {

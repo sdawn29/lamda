@@ -1,5 +1,10 @@
 import { Hono } from "hono";
-import { invalidateModelCache, getModelsConfigError } from "@lamda/pi-sdk";
+import {
+  resetModelRuntime,
+  refreshModelCatalogs,
+  getModelsConfigError,
+  getAvailableModels,
+} from "@lamda/pi-sdk";
 import {
   readProviders,
   upsertProvider,
@@ -183,7 +188,7 @@ function validateProvider(body: unknown): {
 
 localModels.get("/local-providers", async (c) => {
   const providers = await readProviders();
-  return c.json({ providers, error: getModelsConfigError() });
+  return c.json({ providers, error: await getModelsConfigError() });
 });
 
 localModels.put("/local-providers/:id", async (c) => {
@@ -201,12 +206,12 @@ localModels.put("/local-providers/:id", async (c) => {
     baseUrl: normalizeBaseUrl(result.config.baseUrl),
   };
   await upsertProvider(id, config);
-  invalidateModelCache();
+  resetModelRuntime();
   // Surface any schema error the SDK detects after the write, plus a
   // non-blocking warning when the endpoint doesn't actually respond.
   return c.json({
     ok: true,
-    error: getModelsConfigError(),
+    error: await getModelsConfigError(),
     warning: await reachabilityWarning(config),
   });
 });
@@ -215,8 +220,31 @@ localModels.delete("/local-providers/:id", async (c) => {
   const id = c.req.param("id");
   if (!id.trim()) return c.json({ error: "provider id is required" }, 400);
   await removeProvider(id);
-  invalidateModelCache();
+  resetModelRuntime();
   return c.json({ ok: true });
+});
+
+/**
+ * Force a model-catalog refresh (the SDK equivalent of `pi update --models`).
+ *
+ * Dynamic catalogs — pi.dev overlays, OpenRouter, a llama.cpp router — change
+ * without any local file changing, so there is otherwise nothing to react to.
+ * This refreshes in place rather than resetting, so sessions already holding
+ * the runtime observe the new models without being restarted.
+ */
+localModels.post("/local-providers/refresh", async (c) => {
+  try {
+    await refreshModelCatalogs({ allowNetwork: true });
+  } catch (err) {
+    return c.json(
+      {
+        error:
+          err instanceof Error ? err.message : "Failed to refresh model catalogs",
+      },
+      502,
+    );
+  }
+  return c.json({ ok: true, models: await getAvailableModels() });
 });
 
 export default localModels;

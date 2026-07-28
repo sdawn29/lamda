@@ -1,9 +1,8 @@
 import {
   createAgentSession,
-  ModelRegistry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { buildAuthStorage } from "./auth.js";
+import { resolveModelRuntime } from "./model-runtime.js";
 import type { SdkConfig } from "./types.js";
 
 /** A memory the reflection pass proposes extracting from a thread transcript. */
@@ -115,12 +114,11 @@ export async function generateMemoryProposals(
 ): Promise<MemoryProposal[] | null> {
   if (!transcript.trim()) return [];
 
-  const authStorage = buildAuthStorage(config);
-  const modelRegistry = ModelRegistry.create(authStorage);
+  const modelRuntime = await resolveModelRuntime(config);
   const sessionManager = SessionManager.inMemory(config.cwd ?? process.cwd());
   const model =
     config.provider && config.model
-      ? modelRegistry.find(config.provider, config.model)
+      ? modelRuntime.getModel(config.provider, config.model)
       : undefined;
 
   const existing =
@@ -132,8 +130,7 @@ export async function generateMemoryProposals(
   let answer = "";
   try {
     const { session } = await createAgentSession({
-      authStorage,
-      modelRegistry,
+      modelRuntime,
       sessionManager,
       tools: [],
       model,
