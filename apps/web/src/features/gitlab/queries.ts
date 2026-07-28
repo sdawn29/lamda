@@ -13,6 +13,16 @@ import type { IssueState, MergeRequestState, RepoContext } from "./types"
 
 const root = ["gitlab"] as const
 
+/**
+ * Polling cadence for the GitLab panel — mirrors the GitHub side. React Query
+ * pauses `refetchInterval` while the document is hidden, and the panel
+ * unmounts when it isn't the active dock tab (`keepAlive: false`), so neither
+ * tier costs anything when nobody is looking. Config-shaped queries (status,
+ * repo info, repositories) are deliberately left un-polled.
+ */
+const DETAIL_POLL_MS = 30 * 1000
+const LIST_POLL_MS = 60 * 1000
+
 function ctxKey(ctx: RepoContext): string {
   return ctx.id ?? ctx.ws ?? ctx.path ?? ""
 }
@@ -80,6 +90,7 @@ export function useMergeRequests(
     queryFn: ({ signal }) => fetchMergeRequests(ctx, state, signal),
     enabled: enabled && Boolean(ctxKey(ctx)),
     staleTime: 30 * 1000,
+    refetchInterval: LIST_POLL_MS,
   })
 }
 
@@ -93,6 +104,7 @@ export function useGitlabPipeline(
     queryFn: ({ signal }) => fetchGitlabPipeline(ctx, ref, signal),
     enabled: enabled && Boolean(ctxKey(ctx)),
     staleTime: 30 * 1000,
+    refetchInterval: LIST_POLL_MS,
   })
 }
 
@@ -102,6 +114,7 @@ export function useMergeRequest(ctx: RepoContext, number: number | null) {
     queryFn: ({ signal }) => fetchMergeRequest(ctx, number as number, signal),
     enabled: Boolean(ctxKey(ctx)) && number != null,
     staleTime: 30 * 1000,
+    refetchInterval: DETAIL_POLL_MS,
   })
 }
 
@@ -115,6 +128,7 @@ export function useMergeRequestReview(
     queryFn: ({ signal }) => fetchMergeRequestReview(ctx, number, signal),
     enabled: enabled && Boolean(ctxKey(ctx)),
     staleTime: 30 * 1000,
+    refetchInterval: DETAIL_POLL_MS,
   })
 }
 
@@ -128,5 +142,6 @@ export function useGitlabIssues(
     queryFn: ({ signal }) => fetchIssues(ctx, state, signal),
     enabled: enabled && Boolean(ctxKey(ctx)),
     staleTime: 30 * 1000,
+    refetchInterval: LIST_POLL_MS,
   })
 }

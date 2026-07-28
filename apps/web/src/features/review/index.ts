@@ -7,6 +7,7 @@ export {
   CollapsibleChecksSummary,
   githubAvatarUrl,
   humanizeStatus,
+  LastUpdatedLabel,
   ListState,
   mergeButtonState,
   MergeReadinessBanner,

@@ -17,6 +17,7 @@ import { Github } from "@lobehub/icons"
 import { toast } from "sonner"
 import { useIsFetching, useQueryClient } from "@tanstack/react-query"
 
+import { useQueryFreshness } from "@/shared/hooks/use-query-freshness"
 import { formatRelativeDate } from "@/shared/lib/formatters"
 import { parseApiError } from "@/features/git"
 import { Badge } from "@/shared/ui/badge"
@@ -41,6 +42,7 @@ import {
   EmptyPlaceholder,
   githubAvatarUrl,
   humanizeStatus,
+  LastUpdatedLabel,
   ListCard,
   ListState,
   MergeDialog,
@@ -113,6 +115,7 @@ export function GithubReviewView({
   const [selectedIssue, setSelectedIssue] = useState<number | null>(null)
   const qc = useQueryClient()
   const panelFetching = useIsFetching({ queryKey: githubKeys.all }) > 0
+  const lastUpdated = useQueryFreshness(githubKeys.all)
 
   const { data: checks = [] } = useChecks(ctx, {}, connected && Boolean(repo))
 
@@ -193,6 +196,7 @@ export function GithubReviewView({
         url={repo.url}
       >
         <CiChecksBadge checks={checks} />
+        <LastUpdatedLabel updatedAt={lastUpdated} />
         <RefreshButton
           spinning={panelFetching}
           onClick={() => void qc.invalidateQueries({ queryKey: githubKeys.all })}
@@ -367,6 +371,7 @@ function GithubPullRequestDetail({
   const [mergeOpen, setMergeOpen] = useState(false)
   const [mergeMethod, setMergeMethod] = useState<MergeMethod>("squash")
   const [detailTab, setDetailTab] = useState("overview")
+  const lastUpdated = useQueryFreshness(githubKeys.pr(ctx, number))
 
   if (isLoading) return <PanelMessage loading message="Loading pull request" />
   if (error || !pr) {
@@ -483,6 +488,7 @@ function GithubPullRequestDetail({
         title={`Pull request #${pr.number}`}
         url={pr.url}
         openLabel="Open on GitHub"
+        meta={<LastUpdatedLabel updatedAt={lastUpdated} />}
       />
 
       <Tabs
@@ -794,6 +800,7 @@ function GithubIssueDetail({
   const { data: issue, isLoading, error } = useIssue(ctx, number)
   const comment = useCommentIssue(ctx)
   const [commentBody, setCommentBody] = useState("")
+  const lastUpdated = useQueryFreshness(githubKeys.issue(ctx, number))
 
   if (isLoading) return <PanelMessage loading message="Loading issue" />
   if (error || !issue) {
@@ -833,6 +840,7 @@ function GithubIssueDetail({
         title={`Issue #${issue.number}`}
         url={issue.url}
         openLabel="Open on GitHub"
+        meta={<LastUpdatedLabel updatedAt={lastUpdated} />}
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 @sm/pr:px-3">

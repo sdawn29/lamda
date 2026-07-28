@@ -61,7 +61,15 @@ export function formatPercent(value: number, decimals = 1): string {
 export function formatRelativeDate(isoDate: string): string {
   const date = new Date(isoDate)
   if (isNaN(date.getTime())) return isoDate
-  const diff = Date.now() - date.getTime()
+  return formatRelativeTimestamp(date.getTime())
+}
+
+/**
+ * Same coarse relative duration as {@link formatRelativeDate}, for a Unix
+ * timestamp (ms).
+ */
+export function formatRelativeTimestamp(timestamp: number): string {
+  const diff = Date.now() - timestamp
   const minutes = Math.floor(diff / 60_000)
   if (minutes < 1) return "just now"
   if (minutes < 60) return `${minutes}m ago`

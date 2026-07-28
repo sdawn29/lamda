@@ -8,10 +8,12 @@ import { Button } from "@/shared/ui/button"
 import { SectionLabel } from "@/shared/ui/section-label"
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 import { openExternal } from "@/features/electron/api"
+import { useQueryFreshness } from "@/shared/hooks/use-query-freshness"
 import { formatRelativeDate } from "@/shared/lib/formatters"
 import { parseApiError } from "@/features/git"
 import {
   CiChecksBadge,
+  LastUpdatedLabel,
   ListCard,
   ListState,
   PanelMessage,
@@ -58,6 +60,7 @@ export function GitlabReviewView({
   const [selectedMr, setSelectedMr] = useState<number | null>(null)
   const qc = useQueryClient()
   const panelFetching = useIsFetching({ queryKey: gitlabKeys.all }) > 0
+  const lastUpdated = useQueryFreshness(gitlabKeys.all)
   const { data: pipeline } = useGitlabPipeline(
     ctx,
     branch ?? undefined,
@@ -139,6 +142,7 @@ export function GitlabReviewView({
             workflow: job.stage,
           }))}
         />
+        <LastUpdatedLabel updatedAt={lastUpdated} />
         <RefreshButton
           spinning={panelFetching}
           onClick={() => void qc.invalidateQueries({ queryKey: gitlabKeys.all })}

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   CheckCircle2,
   ChevronDown,
@@ -17,6 +17,7 @@ import { openExternal } from "@/features/electron/api"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Skeleton } from "@/shared/ui/skeleton"
+import { formatRelativeTimestamp } from "@/shared/lib/formatters"
 import { cn } from "@/shared/lib/utils"
 
 /**
@@ -160,6 +161,33 @@ export function RefreshButton({
     >
       <RefreshCw className={cn("size-3.5", spinning && "animate-spin")} />
     </Button>
+  )
+}
+
+/** How often the "updated ..." label re-renders to advance its own clock. */
+const FRESHNESS_TICK_MS = 30_000
+
+/**
+ * "Updated 2m ago" for a polling panel header. Renders nothing until the
+ * panel's first fetch lands, so it never flashes a bogus timestamp.
+ */
+export function LastUpdatedLabel({ updatedAt }: { updatedAt: number | null }) {
+  const [, setTick] = useState(0)
+
+  useEffect(() => {
+    if (updatedAt == null) return
+    const timer = setInterval(() => setTick((n) => n + 1), FRESHNESS_TICK_MS)
+    return () => clearInterval(timer)
+  }, [updatedAt])
+
+  if (updatedAt == null) return null
+  return (
+    <span
+      className="shrink-0 text-3xs whitespace-nowrap text-muted-foreground/60 tabular-nums"
+      title={`Last updated ${new Date(updatedAt).toLocaleTimeString()}`}
+    >
+      Updated {formatRelativeTimestamp(updatedAt)}
+    </span>
   )
 }
 

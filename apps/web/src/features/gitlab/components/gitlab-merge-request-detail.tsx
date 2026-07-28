@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner"
 
 import { parseApiError } from "@/features/git"
+import { useQueryFreshness } from "@/shared/hooks/use-query-freshness"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { SectionLabel } from "@/shared/ui/section-label"
@@ -31,6 +32,7 @@ import {
   DetailTab,
   DetailTabsList,
   DetailTopBar,
+  LastUpdatedLabel,
   MergeDialog,
   mergeButtonState,
   MergeReadinessBanner,
@@ -54,7 +56,7 @@ import {
   useMergeMergeRequest,
   useReplyToMergeRequestReviewComment,
 } from "../mutations"
-import { useMergeRequest, useMergeRequestReview } from "../queries"
+import { gitlabKeys, useMergeRequest, useMergeRequestReview } from "../queries"
 import type { RepoContext } from "../types"
 
 interface MrActivityItem extends ActivityItem {
@@ -86,6 +88,7 @@ export function GitlabMergeRequestDetail({
   const [mergeOpen, setMergeOpen] = useState(false)
   const [squash, setSquash] = useState(true)
   const [detailTab, setDetailTab] = useState("overview")
+  const lastUpdated = useQueryFreshness(gitlabKeys.mr(ctx, number))
 
   if (isLoading) return <PanelMessage loading message="Loading merge request" />
   if (error || !mr) {
@@ -215,6 +218,7 @@ export function GitlabMergeRequestDetail({
         title={`Merge request !${mr.number}`}
         url={mr.url}
         openLabel="Open on GitLab"
+        meta={<LastUpdatedLabel updatedAt={lastUpdated} />}
       />
 
       <Tabs

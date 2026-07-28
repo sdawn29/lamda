@@ -64,6 +64,7 @@ export function DetailTopBar({
   title,
   url,
   openLabel,
+  meta,
 }: {
   onBack: () => void
   backLabel: string
@@ -71,6 +72,8 @@ export function DetailTopBar({
   title: string
   url: string
   openLabel: string
+  /** Optional trailing status slot, e.g. a freshness label. */
+  meta?: ReactNode
 }) {
   return (
     <div className="shrink-0 p-2 pb-0">
@@ -93,6 +96,7 @@ export function DetailTopBar({
             {title}
           </p>
         </div>
+        {meta}
         <Button
           variant="ghost"
           size="icon-sm"

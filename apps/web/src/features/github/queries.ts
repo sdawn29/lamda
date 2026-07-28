@@ -14,6 +14,17 @@ import type { IssueState, PrState, RepoContext } from "./types"
 
 const root = ["github"] as const
 
+/**
+ * Polling cadence for the GitHub panel, so activity on a PR/issue shows up
+ * without a manual refresh. React Query pauses `refetchInterval` while the
+ * document is hidden, and the panel unmounts when it isn't the active dock
+ * tab (`keepAlive: false`), so neither tier costs anything when nobody is
+ * looking. Config-shaped queries (status, repo info, repositories) and the
+ * heavy PR files/diff query are deliberately left un-polled.
+ */
+const DETAIL_POLL_MS = 30 * 1000
+const LIST_POLL_MS = 60 * 1000
+
 /** Stable cache discriminator for a repo context. */
 function ctxKey(ctx: RepoContext): string {
   return ctx.id ?? ctx.ws ?? ctx.path ?? ""
@@ -80,6 +91,7 @@ export function usePullRequests(
     queryFn: ({ signal }) => fetchPullRequests(ctx, state, signal),
     enabled: enabled && Boolean(ctxKey(ctx)),
     staleTime: 30 * 1000,
+    refetchInterval: LIST_POLL_MS,
   })
 }
 
@@ -89,6 +101,7 @@ export function usePullRequest(ctx: RepoContext, number: number | null) {
     queryFn: ({ signal }) => fetchPullRequest(ctx, number as number, signal),
     enabled: Boolean(ctxKey(ctx)) && number != null,
     staleTime: 30 * 1000,
+    refetchInterval: DETAIL_POLL_MS,
   })
 }
 
@@ -102,6 +115,7 @@ export function usePullRequestReview(
     queryFn: ({ signal }) => fetchPullRequestReview(ctx, number, signal),
     enabled: enabled && Boolean(ctxKey(ctx)),
     staleTime: 30 * 1000,
+    refetchInterval: DETAIL_POLL_MS,
   })
 }
 
@@ -116,6 +130,7 @@ export function useIssues(
     queryFn: ({ signal }) => fetchIssues(ctx, state, search, signal),
     enabled: enabled && Boolean(ctxKey(ctx)),
     staleTime: 30 * 1000,
+    refetchInterval: LIST_POLL_MS,
   })
 }
 
@@ -125,6 +140,7 @@ export function useIssue(ctx: RepoContext, number: number | null) {
     queryFn: ({ signal }) => fetchIssue(ctx, number as number, signal),
     enabled: Boolean(ctxKey(ctx)) && number != null,
     staleTime: 30 * 1000,
+    refetchInterval: DETAIL_POLL_MS,
   })
 }
 
@@ -138,6 +154,6 @@ export function useChecks(
     queryFn: ({ signal }) => fetchChecks(ctx, opts, signal),
     enabled: enabled && Boolean(ctxKey(ctx)),
     staleTime: 20 * 1000,
-    refetchInterval: 60 * 1000,
+    refetchInterval: LIST_POLL_MS,
   })
 }
