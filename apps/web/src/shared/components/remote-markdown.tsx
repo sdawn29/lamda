@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm"
 import type { PluggableList } from "unified"
 
 import { cn } from "@/shared/lib/utils"
+import { isMermaidFence, isMermaidPre, MermaidDiagram } from "./mermaid-diagram"
 
 const remarkPlugins: PluggableList = [remarkGfm]
 const rehypePlugins: PluggableList = [rehypeRaw, rehypeSanitize]
@@ -15,6 +16,17 @@ const components: Components = {
       {children}
     </a>
   ),
+  // Diagrams bring their own frame, so unwrap the prose `pre` around them.
+  pre: ({ children, node, ...props }) =>
+    isMermaidPre(node) ? <>{children}</> : <pre {...props}>{children}</pre>,
+  code: ({ className, children, ...props }) =>
+    isMermaidFence(className) ? (
+      <MermaidDiagram code={String(children).replace(/\n$/, "")} />
+    ) : (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    ),
 }
 
 const proseClass =

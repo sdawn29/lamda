@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router"
-import ReactMarkdown from "react-markdown"
+import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import {
   AlertCircle,
@@ -11,6 +11,11 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { chatProseClassRich } from "@/features/chat/components/markdown-components"
+import {
+  isMermaidFence,
+  isMermaidPre,
+  MermaidDiagram,
+} from "@/shared/components/mermaid-diagram"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
@@ -23,6 +28,24 @@ import {
   useSkillInstallJobs,
 } from "../queries"
 import { SkillAvatar } from "./skill-avatar"
+
+/**
+ * The skill body is plain prose apart from ```mermaid fences, which render as
+ * diagrams — and need the prose `pre` frame unwrapped so they don't sit inside
+ * a code block.
+ */
+const skillBodyComponents: Components = {
+  pre: ({ children, node, ...props }) =>
+    isMermaidPre(node) ? <>{children}</> : <pre {...props}>{children}</pre>,
+  code: ({ className, children, ...props }) =>
+    isMermaidFence(className) ? (
+      <MermaidDiagram code={String(children).replace(/\n$/, "")} />
+    ) : (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    ),
+}
 
 export function SkillDetailPage({ source }: { source: string }) {
   const navigate = useNavigate()
@@ -151,7 +174,10 @@ export function SkillDetailPage({ source }: { source: string }) {
 
               {details.body && (
                 <div className={chatProseClassRich}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={skillBodyComponents}
+                  >
                     {details.body}
                   </ReactMarkdown>
                 </div>

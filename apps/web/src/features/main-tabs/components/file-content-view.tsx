@@ -4,6 +4,11 @@ import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Button } from "@/shared/ui/button"
 import { FileHeader } from "@/features/git/components/file-header"
 import { useElectronPlatform, useOpenWithApps } from "@/features/electron"
+import {
+  isMermaidFence,
+  isMermaidPre,
+  MermaidDiagram,
+} from "@/shared/components/mermaid-diagram"
 import { appendToken, getServerUrl } from "@/shared/lib/client"
 import { cn } from "@/shared/lib/utils"
 import { LANGUAGE_MAP } from "@/shared/lib/language-map"
@@ -801,7 +806,8 @@ export const FileContentView = memo(function FileContentView({
         )
       },
       pre: ({ children, node, ...props }) => {
-        void node
+        // Diagrams render their own frame — don't wrap them in the code shell.
+        if (isMermaidPre(node)) return <>{children}</>
         return (
           <pre
             className="not-prose my-3 overflow-x-auto rounded-lg border border-border bg-muted/40 p-3 font-code text-xs leading-[1.45] text-foreground"
@@ -813,6 +819,9 @@ export const FileContentView = memo(function FileContentView({
       },
       code: ({ className, children, node, ...props }) => {
         void node
+        if (isMermaidFence(className)) {
+          return <MermaidDiagram code={String(children).replace(/\n$/, "")} />
+        }
         const isBlock =
           String(children).endsWith("\n") || className?.startsWith("language-")
         return (

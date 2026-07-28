@@ -5,6 +5,10 @@ import type { PluggableList } from "unified"
 import { useSyntaxTheme } from "@/features/themes"
 import { Check, Copy } from "lucide-react"
 
+import {
+  isMermaidFence,
+  MermaidDiagram,
+} from "@/shared/components/mermaid-diagram"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { FileChip } from "./file-chip"
@@ -150,6 +154,10 @@ function CodeBlock({
   const syntax = useSyntaxTheme()
   const match = /language-(\w+)/.exec(className ?? "")
   const code = String(children).replace(/\n$/, "")
+
+  if (isMermaidFence(className)) {
+    return <MermaidDiagram code={code} />
+  }
 
   if (match) {
     return (
