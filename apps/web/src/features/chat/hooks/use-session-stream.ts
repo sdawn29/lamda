@@ -748,7 +748,13 @@ export function useSessionStream({
           enqueue({ kind: "compaction_start", reason })
         },
 
-        onCompactionEnd: ({ reason, errorMessage, aborted, willRetry }) => {
+        onCompactionEnd: ({
+          reason,
+          errorMessage,
+          aborted,
+          willRetry,
+          result,
+        }) => {
           if (doneFlag.current) return
           enqueue({
             kind: "compaction_end",
@@ -756,6 +762,7 @@ export function useSessionStream({
             errorMessage,
             aborted,
             willRetry,
+            result,
           })
         },
 

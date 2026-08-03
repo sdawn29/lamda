@@ -138,4 +138,6 @@ export type {
   ToolApprovalBridge,
   ToolApprovalRequest,
   ToolApprovalDecision,
+  CompactionResult,
+  CompactionDetails,
 } from "./types.js";

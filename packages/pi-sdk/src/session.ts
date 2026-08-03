@@ -424,7 +424,13 @@ export function readSessionHistory(sessionFilePath: string): HistoryBlock[] {
       }
       // toolResult entries are consumed via the toolResults map above — skip
     } else if (entry.type === "compaction") {
-      blocks.push({ role: "compaction", createdAt });
+      blocks.push({
+        role: "compaction",
+        createdAt,
+        summary: entry.summary,
+        tokensBefore: entry.tokensBefore,
+        details: entry.details,
+      });
     }
   }
 

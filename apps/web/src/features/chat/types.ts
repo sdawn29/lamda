@@ -3,6 +3,9 @@
  * This replaces the legacy string-based content parsing.
  */
 
+import { parseStoredCompactionMeta, type CompactionMeta } from "./lib/compaction-meta"
+export type { CompactionMeta }
+
 // ── User Messages ─────────────────────────────────────────────────────────────
 
 export interface UserMessage {
@@ -152,6 +155,10 @@ export interface CompactionMessage {
   role: "compaction"
   id: string
   reason: "manual" | "threshold" | "overflow"
+  /** Absent for rows written before compaction metadata existed, or when the
+   *  underlying `compaction_end` result wasn't available — renders as today's
+   *  plain (non-expandable) divider. */
+  meta?: CompactionMeta
   createdAt?: number
 }
 
@@ -193,6 +200,8 @@ export interface MessageBlock {
   attachments: string | null // JSON array of attachment metadata
   /** Client-generated id for a user block, carried from the optimistic row. */
   clientId: string | null
+  /** JSON CompactionMeta for a "compaction" block — see lib/compaction-meta.ts. */
+  compactionMeta: string | null
   createdAt: number
 }
 
@@ -317,7 +326,8 @@ export function blockToMessage(block: MessageBlock): Message {
         createdAt: block.createdAt,
       }
 
-    case "compaction":
+    case "compaction": {
+      const meta = parseStoredCompactionMeta(block.compactionMeta)
       return {
         role: "compaction",
         id: block.id,
@@ -325,8 +335,10 @@ export function blockToMessage(block: MessageBlock): Message {
           | "manual"
           | "threshold"
           | "overflow",
+        ...(meta ? { meta } : {}),
         createdAt: block.createdAt,
       }
+    }
 
     default:
       // Fallback for unknown roles

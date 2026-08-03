@@ -16,6 +16,19 @@ export interface AttachmentMetadata {
 }
 
 /**
+ * Persisted payload for a "compaction" block — what was summarized away and at
+ * what token cost. Stored as JSON in `message_blocks.compaction_meta`, following
+ * the existing `attachments` column's JSON-in-TEXT pattern.
+ */
+export interface CompactionMeta {
+  summary: string;
+  tokensBefore: number;
+  estimatedTokensAfter?: number;
+  readFiles: string[];
+  modifiedFiles: string[];
+}
+
+/**
  * Complete message block structure matching pi-agent's message format.
  */
 export interface MessageBlock {
@@ -40,6 +53,8 @@ export interface MessageBlock {
   attachments: string | null;
   /** Client-generated id for a user block — see schema.ts's column comment. */
   clientId: string | null;
+  /** JSON-serialized CompactionMeta — see schema.ts's column comment. */
+  compactionMeta: string | null;
   createdAt: number;
 }
 
@@ -401,6 +416,7 @@ export function listRunningToolBlocks(threadId: string): MessageBlock[] {
 export function insertCompactionBlock(
   threadId: string,
   reason: "manual" | "threshold" | "overflow",
+  meta?: CompactionMeta,
   createdAt?: number,
 ): string {
   const id = randomUUID();
@@ -412,6 +428,7 @@ export function insertCompactionBlock(
       blockIndex,
       role: "compaction",
       content: reason,
+      compactionMeta: meta ? JSON.stringify(meta) : null,
       createdAt: createdAt ?? Date.now(),
     })
     .run();

@@ -14,6 +14,7 @@ import type {
 } from "../types"
 import type { AgentEndMessage } from "../session-events"
 import type { SubagentRunDetails } from "./subagent"
+import { buildCompactionMeta } from "./compaction-meta"
 
 export interface TurnMeta {
   startTime: number
@@ -232,6 +233,14 @@ export type QueuedEvent =
       errorMessage?: string
       aborted?: boolean
       willRetry?: boolean
+      /** Present when pi's `compaction_end` event carried a result — absent on
+       *  aborted/errored compactions or against an older server build. */
+      result?: {
+        summary: string
+        tokensBefore: number
+        estimatedTokensAfter?: number
+        details?: unknown
+      }
     }
   | {
       kind: "server_error"
@@ -327,12 +336,21 @@ export function applyQueuedEvent(
 
     case "compaction_end": {
       if (!event.errorMessage && !event.aborted) {
+        const meta = event.result
+          ? buildCompactionMeta({
+              summary: event.result.summary,
+              tokensBefore: event.result.tokensBefore,
+              estimatedTokensAfter: event.result.estimatedTokensAfter,
+              details: event.result.details,
+            })
+          : undefined
         return [
           ...msgs,
           {
             role: "compaction" as const,
             id: crypto.randomUUID(),
             reason: event.reason,
+            ...(meta ? { meta } : {}),
             createdAt: Date.now(),
           },
         ]

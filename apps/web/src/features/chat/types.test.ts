@@ -24,6 +24,7 @@ function block(overrides: Partial<MessageBlock> = {}): MessageBlock {
     toolStartTime: null,
     attachments: null,
     clientId: null,
+    compactionMeta: null,
     createdAt: 1000,
     ...overrides,
   }
@@ -105,6 +106,40 @@ describe("blockToMessage / blocksToMessages", () => {
     expect(compaction.role).toBe("compaction")
     if (compaction.role === "compaction") {
       expect(compaction.reason).toBe("manual")
+      expect(compaction.meta).toBeUndefined()
+    }
+  })
+
+  it("parses compaction_meta into the compaction message's meta field", () => {
+    const withMeta = blockToMessage(
+      block({
+        role: "compaction",
+        content: "threshold",
+        compactionMeta: JSON.stringify({
+          summary: "Summarized the debugging session",
+          tokensBefore: 50000,
+          estimatedTokensAfter: 8000,
+          readFiles: ["src/a.ts"],
+          modifiedFiles: ["src/b.ts"],
+        }),
+      })
+    )
+    expect(withMeta.role).toBe("compaction")
+    if (withMeta.role === "compaction") {
+      expect(withMeta.meta).toEqual({
+        summary: "Summarized the debugging session",
+        tokensBefore: 50000,
+        estimatedTokensAfter: 8000,
+        readFiles: ["src/a.ts"],
+        modifiedFiles: ["src/b.ts"],
+      })
+    }
+
+    const malformed = blockToMessage(
+      block({ role: "compaction", content: "manual", compactionMeta: "{not json" })
+    )
+    if (malformed.role === "compaction") {
+      expect(malformed.meta).toBeUndefined()
     }
   })
 

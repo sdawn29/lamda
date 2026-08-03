@@ -37,7 +37,8 @@ import { UserMessageContent } from "./user-message"
 import { CopyButton } from "@/shared/components/copy-button"
 import { Button } from "@/shared/ui/button"
 import { getProviderMeta } from "@/shared/lib/provider-meta"
-import { formatDuration, formatTime } from "@/shared/lib/formatters"
+import { formatDuration, formatNumber, formatTime } from "@/shared/lib/formatters"
+import { FileChip } from "./file-chip"
 import type { SlashCommand } from "../api"
 import type { AgentDto } from "@/features/workspace/api"
 import {
@@ -401,15 +402,83 @@ const COMPACTION_LABEL: Record<CompactionMessage["reason"], string> = {
   overflow: "Context window freed",
 }
 
-function CompactionBlock({ message }: { message: CompactionMessage }) {
+function CompactionBlock({
+  message,
+  rootPath,
+}: {
+  message: CompactionMessage
+  rootPath?: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const meta = message.meta
+  const canExpand = !!meta
+
   return (
-    <div className="flex items-center gap-3 py-2">
-      <div className="h-px flex-1 bg-border/40" />
-      <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1 text-2xs text-muted-foreground/60">
-        <SparklesIcon className="h-3 w-3 text-primary/50" />
-        <span>{COMPACTION_LABEL[message.reason]}</span>
+    <div className="flex flex-col gap-2 py-2">
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-border/40" />
+        <button
+          type="button"
+          disabled={!canExpand}
+          onClick={() => setExpanded((v) => !v)}
+          className={cn(
+            "flex shrink-0 items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1 text-2xs text-muted-foreground/60 transition-colors",
+            canExpand && "cursor-pointer hover:text-muted-foreground"
+          )}
+        >
+          <SparklesIcon className="h-3 w-3 text-primary/50" />
+          <span>{COMPACTION_LABEL[message.reason]}</span>
+          {canExpand && (
+            <ChevronRightIcon
+              className={cn(
+                "h-3 w-3 transition-transform",
+                expanded && "rotate-90"
+              )}
+            />
+          )}
+        </button>
+        <div className="h-px flex-1 bg-border/40" />
       </div>
-      <div className="h-px flex-1 bg-border/40" />
+
+      {expanded && meta && (
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 rounded-lg border border-border/40 bg-card/50 px-4 py-3">
+          <div className={chatProseClass}>
+            <Markdown
+              remarkPlugins={remarkPlugins}
+              components={getMarkdownComponents(rootPath, false)}
+            >
+              {meta.summary}
+            </Markdown>
+          </div>
+
+          {meta.estimatedTokensAfter != null && (
+            <div className="text-2xs text-muted-foreground/70">
+              {formatNumber(meta.tokensBefore)} →{" "}
+              {formatNumber(meta.estimatedTokensAfter)} tokens
+            </div>
+          )}
+
+          {meta.modifiedFiles.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs">
+              <span className="shrink-0 text-muted-foreground/60">
+                Modified
+              </span>
+              {meta.modifiedFiles.map((path) => (
+                <FileChip key={path} path={path} rootPath={rootPath} />
+              ))}
+            </div>
+          )}
+
+          {meta.readFiles.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs">
+              <span className="shrink-0 text-muted-foreground/60">Read</span>
+              {meta.readFiles.map((path) => (
+                <FileChip key={path} path={path} rootPath={rootPath} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -456,7 +525,12 @@ export const MessageRow = memo(function MessageRow({
   }
 
   if (message.role === "compaction") {
-    return <CompactionBlock message={message as CompactionMessage} />
+    return (
+      <CompactionBlock
+        message={message as CompactionMessage}
+        rootPath={rootPath}
+      />
+    )
   }
 
   if (message.role === "user") {

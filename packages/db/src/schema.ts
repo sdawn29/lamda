@@ -114,6 +114,10 @@ export const messageBlocks = sqliteTable("message_blocks", {
   toolDuration: integer("tool_duration"),
   toolStartTime: integer("tool_start_time"),
   attachments: text("attachments"), // JSON array of attachment metadata
+  // JSON CompactionMeta (summary, token reclaim, touched files) for a
+  // "compaction" block. NULL for non-compaction blocks and for compaction
+  // blocks written before this column existed.
+  compactionMeta: text("compaction_meta"),
   // Client-generated id for a user block, carried through from the optimistic
   // row created at send time. Lets the client reconcile its optimistic message
   // with the persisted one by identity instead of by matching content, which

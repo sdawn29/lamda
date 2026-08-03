@@ -40,6 +40,7 @@ import {
 } from "../services/session-service.js";
 import { submitAnswer } from "../services/question-registry.js";
 import { submitApproval } from "../services/approval-registry.js";
+import { buildCompactionMeta } from "../services/compaction-meta.js";
 import {
   readSessionHistory,
   createModePreambleStripper,
@@ -856,7 +857,20 @@ sessions.post("/session/:id/fork", async (c) => {
           result: block.toolResult,
         });
       } else if (block.role === "compaction") {
-        insertCompactionBlock(newThreadId, "manual", block.createdAt);
+        // The JSONL compaction entry carries summary/tokensBefore/details but not
+        // estimatedTokensAfter (pi doesn't persist that field to the session file),
+        // so the rebuilt meta is missing that one figure. Entries written before
+        // compaction metadata existed have no summary at all — meta stays undefined,
+        // same "plain divider" fallback as a NULL compaction_meta row.
+        const meta =
+          block.summary !== undefined
+            ? buildCompactionMeta({
+                summary: block.summary,
+                tokensBefore: block.tokensBefore ?? 0,
+                details: block.details,
+              })
+            : undefined;
+        insertCompactionBlock(newThreadId, "manual", meta, block.createdAt);
       }
     }
   } catch (err) {

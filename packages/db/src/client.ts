@@ -74,7 +74,7 @@ export function closeDb(): void {
 // `user_version = 0` (SQLite's default), so on first run after an upgrade the
 // whole gated block below runs once and then never again — instead of on
 // every app startup, which is what it did before this version gate existed.
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 function getTableColumns(sqlite: Database.Database, table: string): string[] {
   const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as {
@@ -732,6 +732,21 @@ function createDb() {
       }
     } catch {
       // Safe to ignore — columns may already exist.
+    }
+  }
+
+  if (currentVersion < 5) {
+    // Migration: Add compaction_meta column to message_blocks. Holds the JSON
+    // CompactionMeta (summary, token reclaim, touched files) for a "compaction"
+    // block, following the existing `attachments` column's JSON-in-TEXT pattern.
+    // NULL for rows written before this column existed — the UI falls back to
+    // the plain divider it already renders for those.
+    try {
+      if (!hasColumn(sqlite, "message_blocks", "compaction_meta")) {
+        sqlite.exec(`ALTER TABLE message_blocks ADD COLUMN compaction_meta TEXT`);
+      }
+    } catch {
+      // Safe to ignore — column may already exist.
     }
   }
 

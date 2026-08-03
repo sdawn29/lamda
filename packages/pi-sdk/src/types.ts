@@ -1,9 +1,25 @@
 import type {
   AgentSessionEvent,
+  CompactionResult,
   ModelRuntime,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { Mode } from "./modes.js";
+
+// Re-exported so consumers (e.g. the server's compaction_end handler) can type
+// the event's `result` field against the SDK's actual shape instead of
+// duck-typing a narrower one by hand — the bug that dropped this data before.
+export type { CompactionResult };
+
+/**
+ * Details payload for pi's default (non-extension) compaction. `CompactionResult.details`
+ * is typed `unknown` because extensions can put arbitrary data there, so this is the shape
+ * to validate an unknown `details` against rather than trust blindly.
+ */
+export interface CompactionDetails {
+  readFiles: string[];
+  modifiedFiles: string[];
+}
 
 /** A slash command available in the current session. */
 export interface SlashCommand {
@@ -291,4 +307,13 @@ export type HistoryBlock =
       isError: boolean;
       createdAt: number;
     }
-  | { role: "compaction"; createdAt: number };
+  | {
+      role: "compaction";
+      createdAt: number;
+      /** Present when the JSONL compaction entry carried a result — absent for
+       *  entries written before compaction metadata existed. `estimatedTokensAfter`
+       *  isn't persisted to the session file, so it's not recoverable here. */
+      summary?: string;
+      tokensBefore?: number;
+      details?: unknown;
+    };

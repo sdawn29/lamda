@@ -15,8 +15,13 @@ import {
   insertAiUsage,
   getThread,
 } from "@lamda/db";
-import type { ManagedSessionHandle, SessionEvent } from "@lamda/pi-sdk";
+import type {
+  CompactionResult,
+  ManagedSessionHandle,
+  SessionEvent,
+} from "@lamda/pi-sdk";
 import { PLAN_DIR } from "@lamda/pi-sdk";
+import { buildCompactionMeta } from "./services/compaction-meta.js";
 import { gitStatus, gitStashCreate, gitWriteCheckpointRef } from "@lamda/git";
 import { threadStatusBroadcaster } from "./thread-status-broadcaster.js";
 import { scheduleReflection } from "./services/memory-reflection.js";
@@ -1227,15 +1232,62 @@ class SessionEventHub {
       return;
     }
 
-    // compaction_end - persist a marker so the divider survives page refresh
+    // compaction_end - persist a marker (+ the summarized result, when present)
+    // so the divider survives page refresh and can be expanded to show what
+    // was summarized away.
     if (event.type === "compaction_end") {
       const ce = event as {
         reason: "manual" | "threshold" | "overflow";
+        result: CompactionResult | undefined;
         aborted?: boolean;
         errorMessage?: string;
       };
       if (!ce.aborted && !ce.errorMessage) {
-        insertCompactionBlock(this.threadId, ce.reason);
+        const meta = ce.result
+          ? buildCompactionMeta({
+              summary: ce.result.summary,
+              tokensBefore: ce.result.tokensBefore,
+              estimatedTokensAfter: ce.result.estimatedTokensAfter,
+              details: ce.result.details,
+            })
+          : undefined;
+        insertCompactionBlock(this.threadId, ce.reason, meta);
+
+        // Attribute the summarizer's own token cost to ai_usage, tagged like a
+        // subagent so the dashboard's byAgent breakdown surfaces it as its own
+        // line. Mirrors message_end's usage recording: wrapped so accounting
+        // failures can never break event processing, zero-usage skipped.
+        const usage = ce.result?.usage;
+        if (
+          usage &&
+          usage.input + usage.output + usage.cacheRead + usage.cacheWrite > 0
+        ) {
+          try {
+            if (this.cachedWorkspaceId === null) {
+              this.cachedWorkspaceId =
+                getThread(this.threadId)?.workspaceId ?? "";
+            }
+            insertAiUsage({
+              threadId: this.threadId,
+              workspaceId: this.cachedWorkspaceId,
+              provider: "",
+              model: "",
+              agentId: "compaction",
+              agentLabel: "Compaction",
+              inputTokens: usage.input,
+              outputTokens: usage.output,
+              cacheReadTokens: usage.cacheRead,
+              cacheWriteTokens: usage.cacheWrite,
+              reasoningTokens: usage.reasoning ?? 0,
+              totalTokens:
+                usage.totalTokens ??
+                usage.input + usage.output + usage.cacheRead + usage.cacheWrite,
+              cost: usage.cost?.total ?? 0,
+            });
+          } catch {
+            // Usage accounting must never break event processing.
+          }
+        }
       }
       return;
     }

@@ -153,6 +153,14 @@ export interface SessionEventHandlers {
     aborted: boolean
     willRetry: boolean
     errorMessage?: string
+    /** Present when pi's event carried a result — see CompactionMeta for the
+     *  validated/persisted shape this eventually becomes. */
+    result?: {
+      summary: string
+      tokensBefore: number
+      estimatedTokensAfter?: number
+      details?: unknown
+    }
   }) => void
   onServerError: (event: SessionServerErrorEvent) => void
   onTransportError?: (event: Event) => void
@@ -276,6 +284,12 @@ export function subscribeToSessionEvents(
               aborted: boolean
               willRetry: boolean
               errorMessage?: string
+              result?: {
+                summary: string
+                tokensBefore: number
+                estimatedTokensAfter?: number
+                details?: unknown
+              }
             }
           )
           break
