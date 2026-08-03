@@ -908,7 +908,9 @@ function AgentUsageBreakdown({ byAgent }: { byAgent: AiUsageByAgent[] }) {
                 />
               }
             />
-            <TooltipContent>Subagents: {formatCost(subagentCost)}</TooltipContent>
+            <TooltipContent>
+              Subagents: {formatCost(subagentCost)}
+            </TooltipContent>
           </Tooltip>
         </div>
       )}

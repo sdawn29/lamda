@@ -102,7 +102,10 @@ function trimToolResult(result: unknown): unknown {
           return { type: "text", text: capText("", it.text) };
         }
         if (it?.type === "image") {
-          return { type: "text", text: "[image omitted from subagent transcript]" };
+          return {
+            type: "text",
+            text: "[image omitted from subagent transcript]",
+          };
         }
         return item;
       })

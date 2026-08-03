@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, statSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, statSync, rmSync } from "fs";
 import { join } from "path";
 
 /**
@@ -67,6 +67,21 @@ function load(cwd: string): ToolApprovalsFile {
   }
   cache.set(cwd, { data, mtimeMs });
   return data;
+}
+
+/**
+ * Delete a workspace's remembered decisions — both the on-disk file and the
+ * in-memory cache. Used by the "Delete all data" reset, which has to reach the
+ * app state that lives inside the user's workspaces, not just `~/.lamda`.
+ * Best-effort: a missing or unwritable file is not an error.
+ */
+export function clearToolDecisions(cwd: string): void {
+  cache.delete(cwd);
+  try {
+    rmSync(filePath(cwd), { force: true });
+  } catch {
+    /* nothing persisted, or not ours to remove */
+  }
 }
 
 /** Look up a remembered decision for a tool in this workspace, if any. */

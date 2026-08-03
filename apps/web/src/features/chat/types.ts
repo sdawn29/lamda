@@ -3,7 +3,10 @@
  * This replaces the legacy string-based content parsing.
  */
 
-import { parseStoredCompactionMeta, type CompactionMeta } from "./lib/compaction-meta"
+import {
+  parseStoredCompactionMeta,
+  type CompactionMeta,
+} from "./lib/compaction-meta"
 export type { CompactionMeta }
 
 // ── User Messages ─────────────────────────────────────────────────────────────

@@ -828,7 +828,9 @@ sessions.post("/session/:id/fork", async (c) => {
         // then the memory block.
         insertUserBlock(
           newThreadId,
-          stripCodeContextPreamble(stripMemoryPreamble(stripModePre(block.content))),
+          stripCodeContextPreamble(
+            stripMemoryPreamble(stripModePre(block.content)),
+          ),
           undefined,
           block.createdAt,
         );

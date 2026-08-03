@@ -70,7 +70,9 @@ export const DiffStat = memo(function DiffStat({
   return (
     <span className="flex shrink-0 items-baseline gap-0.5 font-mono text-3xs tabular-nums">
       {added > 0 && <span className="text-diff-add">+{displayAdded}</span>}
-      {removed > 0 && <span className="text-diff-remove">-{displayRemoved}</span>}
+      {removed > 0 && (
+        <span className="text-diff-remove">-{displayRemoved}</span>
+      )}
     </span>
   )
 })

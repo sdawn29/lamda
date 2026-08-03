@@ -1,9 +1,5 @@
 import * as React from "react"
-import {
-  ContainerIcon,
-  FileTextIcon,
-  type LucideIcon,
-} from "lucide-react"
+import { ContainerIcon, FileTextIcon, type LucideIcon } from "lucide-react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { getIconName, buildCatppuccinSvgElement } from "@/shared/ui/file-icon"
 import { cn } from "@/shared/lib/utils"

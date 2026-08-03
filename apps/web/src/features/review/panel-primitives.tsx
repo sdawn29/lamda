@@ -364,7 +364,10 @@ export function CollapsibleChecksSummary({
         aria-expanded={open}
         className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-xs transition-colors hover:bg-muted/30"
       >
-        <Chevron className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+        <Chevron
+          className="size-3 shrink-0 text-muted-foreground"
+          aria-hidden
+        />
         {overall === "fail" ? (
           <XCircle className="size-3.5 shrink-0 text-destructive" aria-hidden />
         ) : overall === "pending" ? (
@@ -449,7 +452,10 @@ function titleCase(raw: string): string {
     .join(" ")
 }
 
-export function humanizeStatus(raw: string): { label: string; tone: StatusTone } {
+export function humanizeStatus(raw: string): {
+  label: string
+  tone: StatusTone
+} {
   const known = KNOWN_STATUSES[raw.toLowerCase()]
   if (known) return known
   return { label: titleCase(raw), tone: "neutral" }
@@ -544,7 +550,11 @@ export function ReviewerAvatar({
       className="relative inline-flex"
       title={state ? `${name} · ${reviewStateLabel(state)}` : name}
     >
-      <UserAvatar src={src} name={name} className="size-5 ring-2 ring-background" />
+      <UserAvatar
+        src={src}
+        name={name}
+        className="size-5 ring-2 ring-background"
+      />
       {state ? (
         <span
           className={cn(

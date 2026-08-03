@@ -627,7 +627,10 @@ export function listArchivedThreads(): Promise<{
 }
 
 export function resetAllData(): Promise<void> {
-  return apiFetch<void>("/reset", { method: "DELETE" })
+  // Tears down every worktree, shuts MCP servers down, wipes the database and
+  // ~/.lamda — comfortably past the default 30s request timeout on a machine
+  // with many workspaces.
+  return apiFetch<void>("/reset", { method: "DELETE", timeoutMs: 180_000 })
 }
 
 export interface WorkspaceFileEntry {

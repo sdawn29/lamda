@@ -743,7 +743,9 @@ function createDb() {
     // the plain divider it already renders for those.
     try {
       if (!hasColumn(sqlite, "message_blocks", "compaction_meta")) {
-        sqlite.exec(`ALTER TABLE message_blocks ADD COLUMN compaction_meta TEXT`);
+        sqlite.exec(
+          `ALTER TABLE message_blocks ADD COLUMN compaction_meta TEXT`,
+        );
       }
     } catch {
       // Safe to ignore — column may already exist.

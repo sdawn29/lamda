@@ -239,7 +239,9 @@ localModels.post("/local-providers/refresh", async (c) => {
     return c.json(
       {
         error:
-          err instanceof Error ? err.message : "Failed to refresh model catalogs",
+          err instanceof Error
+            ? err.message
+            : "Failed to refresh model catalogs",
       },
       502,
     );

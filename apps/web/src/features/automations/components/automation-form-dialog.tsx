@@ -349,9 +349,7 @@ function AutomationFormBody({
 
             <div className="flex items-center gap-2.5 rounded-lg bg-primary/5 px-3 py-2 ring-1 ring-primary/10 ring-inset">
               <CalendarClock className="size-3.5 shrink-0 text-primary/70" />
-              <span className="text-xs font-medium">
-                {describeCron(cron)}
-              </span>
+              <span className="text-xs font-medium">{describeCron(cron)}</span>
               <span className="ml-auto shrink-0 font-mono text-3xs text-muted-foreground/50">
                 {cron}
               </span>
@@ -394,8 +392,8 @@ function AutomationFormBody({
 
             {approvalMode === "ask" && (
               <Callout>
-                No one is present during a scheduled run, so “Ask” will block
-                on the first approval. Choose an auto-approve mode.
+                No one is present during a scheduled run, so “Ask” will block on
+                the first approval. Choose an auto-approve mode.
               </Callout>
             )}
           </Card>

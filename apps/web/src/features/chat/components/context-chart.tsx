@@ -325,7 +325,9 @@ export function ContextChart({
                 <span className="flex items-center gap-1 text-3xs text-muted-foreground">
                   <BotIcon className="size-3" />
                   {subagentUsage.requests}{" "}
-                  {subagentUsage.requests === 1 ? "subagent call" : "subagent calls"}
+                  {subagentUsage.requests === 1
+                    ? "subagent call"
+                    : "subagent calls"}
                 </span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-2xs font-medium text-foreground/80 tabular-nums">

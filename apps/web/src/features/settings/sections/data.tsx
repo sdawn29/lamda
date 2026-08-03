@@ -2,35 +2,12 @@ import { useState } from "react"
 import { FolderOpen, Trash2 } from "lucide-react"
 
 import { Button } from "@/shared/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/ui/dialog"
-import { useWorkspace } from "@/features/workspace"
 
+import { ResetAllDataDialog } from "../components/reset-all-data-dialog"
 import { SettingsGroup, SettingsRow } from "../components/settings-ui"
 
 export function DataSection() {
-  const { resetAll } = useWorkspace()
   const [showConfirm, setShowConfirm] = useState(false)
-  const [resetting, setResetting] = useState(false)
-
-  async function handleReset() {
-    setResetting(true)
-    try {
-      await resetAll()
-      setShowConfirm(false)
-      await window.electronAPI?.restartServer()
-      window.location.reload()
-    } catch {
-      setResetting(false)
-    }
-  }
 
   return (
     <>
@@ -53,7 +30,7 @@ export function DataSection() {
       <SettingsGroup title="Danger zone">
         <SettingsRow
           title="Delete all data"
-          description="Permanently removes all workspaces, threads, and messages. This cannot be undone."
+          description="Resets the app to a fresh install: removes every workspace, thread, message, memory, automation, and all settings. This cannot be undone."
         >
           <Button
             variant="destructive"
@@ -66,32 +43,7 @@ export function DataSection() {
         </SettingsRow>
       </SettingsGroup>
 
-      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>Delete all data?</DialogTitle>
-            <DialogDescription>
-              This will permanently delete all workspaces, threads, and
-              messages. This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose
-              render={<Button variant="outline" />}
-              disabled={resetting}
-            >
-              Cancel
-            </DialogClose>
-            <Button
-              variant="destructive"
-              onClick={handleReset}
-              disabled={resetting}
-            >
-              {resetting ? "Deleting" : "Delete all"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ResetAllDataDialog open={showConfirm} onOpenChange={setShowConfirm} />
     </>
   )
 }

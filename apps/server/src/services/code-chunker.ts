@@ -117,7 +117,8 @@ const OVERLAP_LINES = 10;
 /** How far back (in lines) to look for a snap point before giving up. */
 const SNAP_LOOKBACK = 15;
 
-const STRUCTURAL_LINE = /^\s*(export |function |class |def |func |const |pub |fn )/;
+const STRUCTURAL_LINE =
+  /^\s*(export |function |class |def |func |const |pub |fn )/;
 
 export interface CodeChunk {
   chunkIndex: number;
@@ -138,7 +139,11 @@ export function sha256(text: string): string {
  * a line beginning a top-level declaration, so chunks tend to end on a
  * natural boundary instead of mid-block. Falls back to idealEnd untouched.
  */
-function findSnapPoint(lines: string[], start: number, idealEnd: number): number {
+function findSnapPoint(
+  lines: string[],
+  start: number,
+  idealEnd: number,
+): number {
   const floor = Math.max(start + 1, idealEnd - SNAP_LOOKBACK);
   for (let i = idealEnd - 1; i >= floor; i--) {
     const line = lines[i];
@@ -167,7 +172,9 @@ export function chunkFileContent(text: string): CodeChunk[] {
   while (start < lines.length) {
     const idealEnd = Math.min(lines.length, start + TARGET_LINES);
     let end =
-      idealEnd < lines.length ? findSnapPoint(lines, start, idealEnd) : lines.length;
+      idealEnd < lines.length
+        ? findSnapPoint(lines, start, idealEnd)
+        : lines.length;
     // Snap point degenerated to <=start (e.g. no boundary found) — take the ideal end.
     if (end <= start) end = idealEnd;
     // Enforce the hard cap regardless of where the snap landed.
@@ -213,8 +220,7 @@ export function chunkId(
   chunkIndex: number,
   contentHash: string,
 ): string {
-  return sha256(`${workspaceId}\n${filePath}\n${chunkIndex}\n${contentHash}`).slice(
-    0,
-    32,
-  );
+  return sha256(
+    `${workspaceId}\n${filePath}\n${chunkIndex}\n${contentHash}`,
+  ).slice(0, 32);
 }

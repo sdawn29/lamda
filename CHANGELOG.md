@@ -4,164 +4,164 @@
 
 ### Features
 
-* enhance pull request and merge request features
-* add Pull Request comment card and panel primitives for review functionality
+- enhance pull request and merge request features
+- add Pull Request comment card and panel primitives for review functionality
 
 ### Other Changes
 
-* Refactor mode configurations and enhance agent prompts
+- Refactor mode configurations and enhance agent prompts
 
 ## [0.55.0](../../releases/tag/v0.55.0) — 2026-07-16
 
 ### Features
 
-* **subagent:** add model override support and enhance model description in delegate tool
+- **subagent:** add model override support and enhance model description in delegate tool
 
 ### Bug Fixes
 
-* **rich-input:** adjust padding for consistent button alignment
+- **rich-input:** adjust padding for consistent button alignment
 
 ## [0.54.0](../../releases/tag/v0.54.0) — 2026-07-16
 
 ### Features
 
-* **github:** enhance pull request detail view with merge readiness and copy branch functionality
-* **gitlab:** enhance merge request detail and review view with improved status handling and UI components
-* add support for merge request reviews and comments
-* enhance pull request review functionality with comments and file diffs
-* **chat:** add addFileMention action to chat actions context
-* **chat:** improve UI for chat components and enhance message display feat(dock): add descriptions for dock panels and improve layout
+- **github:** enhance pull request detail view with merge readiness and copy branch functionality
+- **gitlab:** enhance merge request detail and review view with improved status handling and UI components
+- add support for merge request reviews and comments
+- enhance pull request review functionality with comments and file diffs
+- **chat:** add addFileMention action to chat actions context
+- **chat:** improve UI for chat components and enhance message display feat(dock): add descriptions for dock panels and improve layout
 
 ## [0.53.0](../../releases/tag/v0.53.0) — 2026-07-15
 
 ### Features
 
-* implement GitHub and GitLab merge request details and comments
-* **chat:** implement subagent panel and improve subagent card UI
-* **dock:** implement dock store with tab management and persistence
+- implement GitHub and GitLab merge request details and comments
+- **chat:** implement subagent panel and improve subagent card UI
+- **dock:** implement dock store with tab management and persistence
 
 ## [0.52.0](../../releases/tag/v0.52.0) — 2026-07-14
 
 ### Features
 
-* update web fetch tool to return Markdown and enhance related tests
+- update web fetch tool to return Markdown and enhance related tests
 
 ## [0.51.0](../../releases/tag/v0.51.0) — 2026-07-14
 
 ### Features
 
-* enhance tool activity descriptions and add tests for activity labeling
+- enhance tool activity descriptions and add tests for activity labeling
 
 ### Code Refactoring
 
-* optimize state management and effects in various components
+- optimize state management and effects in various components
 
 ## [0.50.0](../../releases/tag/v0.50.0) — 2026-07-12
 
 ### Features
 
-* enhance update handling with structured release notes and new composer settings menu
-* **electron:** add auto-update functionality
-* **chat:** enhance subagent transcript scrolling and add agent mention dropdown
+- enhance update handling with structured release notes and new composer settings menu
+- **electron:** add auto-update functionality
+- **chat:** enhance subagent transcript scrolling and add agent mention dropdown
 
 ## [0.49.0](../../releases/tag/v0.49.0) — 2026-07-10
 
 ### Features
 
-* enhance app sidebar for mobile responsiveness
+- enhance app sidebar for mobile responsiveness
 
 ## [0.48.0](../../releases/tag/v0.48.0) — 2026-07-09
 
 ### Features
 
-* **resources:** implement resource monitoring with CPU, memory, and background work metrics
-* **api:** add saveRawModeDefinition and saveRawAgentDefinition functions for raw mode and agent definitions
-* implement persistent notification system with notification bell and panel
-* **web-fetch:** add web_fetch tool for fetching and processing web content
-* add tool catalog and allowlist management
+- **resources:** implement resource monitoring with CPU, memory, and background work metrics
+- **api:** add saveRawModeDefinition and saveRawAgentDefinition functions for raw mode and agent definitions
+- implement persistent notification system with notification bell and panel
+- **web-fetch:** add web_fetch tool for fetching and processing web content
+- add tool catalog and allowlist management
 
 ### Code Refactoring
 
-* **chat:** adjust ApprovalModeCombobox placement and styling
+- **chat:** adjust ApprovalModeCombobox placement and styling
 
 ## [0.47.0](../../releases/tag/v0.47.0) — 2026-07-08
 
 ### Features
 
-* **gitlab:** add GitLab tools and integration for issue and merge request management
+- **gitlab:** add GitLab tools and integration for issue and merge request management
 
 ### Bug Fixes
 
-* **chat:** update pending approval state to use an array fix(agents): handle undefined value in workspace selection change
+- **chat:** update pending approval state to use an array fix(agents): handle undefined value in workspace selection change
 
 ## [0.46.0](../../releases/tag/v0.46.0) — 2026-07-07
 
 ### Features
 
-* add custom tools support for agents and subagents
-* add agent management functionality with tests
+- add custom tools support for agents and subagents
+- add agent management functionality with tests
 
 ## [0.45.1](../../releases/tag/v0.45.1) — 2026-07-05
 
 ### Bug Fixes
 
-* **chat:** enhance session stream handling with replay support
+- **chat:** enhance session stream handling with replay support
 
 ## [0.45.0](../../releases/tag/v0.45.0) — 2026-07-04
 
 ### Features
 
-* **menu:** implement native menu actions and expose API to renderer
+- **menu:** implement native menu actions and expose API to renderer
 
 ### Other Changes
 
-* Refactor documentation and add new features
+- Refactor documentation and add new features
 
 ## [0.44.0](../../releases/tag/v0.44.0) — 2026-07-04
 
 ### Features
 
-* **mcp:** add enabled property to server config and update related logic feat(chat): enhance chat composer with initial value and value change handling refactor(workspace): implement manual sorting for workspaces with drag-and-drop fix(chat): persist thread drafts in localStorage for chat composer
-* **chat:** improve scroll behavior on thread switch and adjust scrollIntoView behavior
-* **git:** add publish branch functionality and upstream check
+- **mcp:** add enabled property to server config and update related logic feat(chat): enhance chat composer with initial value and value change handling refactor(workspace): implement manual sorting for workspaces with drag-and-drop fix(chat): persist thread drafts in localStorage for chat composer
+- **chat:** improve scroll behavior on thread switch and adjust scrollIntoView behavior
+- **git:** add publish branch functionality and upstream check
 
 ### Bug Fixes
 
-* **build:** update electronVersion in package.json to match devDependencies
-* **deps:** update monaco-editor to version 0.55.1
+- **build:** update electronVersion in package.json to match devDependencies
+- **deps:** update monaco-editor to version 0.55.1
 
 ### Code Refactoring
 
-* remove streaming caret logic and related styles; simplify message rendering
+- remove streaming caret logic and related styles; simplify message rendering
 
 ## [0.43.0](../../releases/tag/v0.43.0) — 2026-07-03
 
 ### Features
 
-* **usage:** add reasoningTokens to AI usage metrics and update database schema feat(provider-cards): add new API key providers including NVIDIA and Moonshot AI fix(package): downgrade monaco-editor to version 0.53.0 for compatibility docs(AGENTS): update SDK references from @mariozechner to @earendil-works
+- **usage:** add reasoningTokens to AI usage metrics and update database schema feat(provider-cards): add new API key providers including NVIDIA and Moonshot AI fix(package): downgrade monaco-editor to version 0.53.0 for compatibility docs(AGENTS): update SDK references from @mariozechner to @earendil-works
 
 ## [0.42.0](../../releases/tag/v0.42.0) — 2026-07-03
 
 ### Features
 
-* **chat:** add clientId to MessageBlock structure for enhanced message tracking
+- **chat:** add clientId to MessageBlock structure for enhanced message tracking
 
 ## [0.41.0](../../releases/tag/v0.41.0) — 2026-07-03
 
 ### Features
 
-* **onboarding:** refactor provider step to use tabs and improve UI feedback feat(settings): enhance API key management with navigation cards for subscriptions feat(settings): add navigation card for subscriptions in API keys section feat(settings): add navigation card for API keys in subscriptions section
-* **chat:** enhance UI components with improved styling and badge integration
-* **workspace:** add workspace sorting functionality with persistent state
-* **chat:** implement pure state-transition logic for WebSocket event stream
+- **onboarding:** refactor provider step to use tabs and improve UI feedback feat(settings): enhance API key management with navigation cards for subscriptions feat(settings): add navigation card for subscriptions in API keys section feat(settings): add navigation card for API keys in subscriptions section
+- **chat:** enhance UI components with improved styling and badge integration
+- **workspace:** add workspace sorting functionality with persistent state
+- **chat:** implement pure state-transition logic for WebSocket event stream
 
 ### Bug Fixes
 
-* **chat:** adjust responsive breakpoints and improve layout consistency
+- **chat:** adjust responsive breakpoints and improve layout consistency
 
 ### Code Refactoring
 
-* **dropdown-menu:** replace className with variant for destructive items
+- **dropdown-menu:** replace className with variant for destructive items
 
 ## [0.40.0](../../releases/tag/v0.40.0) — 2026-07-01
 

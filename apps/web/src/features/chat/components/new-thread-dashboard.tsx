@@ -81,7 +81,15 @@ function buildWeeks(
     const row = byDay.get(key)
     const tokens = row?.totalTokens ?? 0
     const level =
-      tokens === 0 ? 0 : tokens <= q1 ? 1 : tokens <= q2 ? 2 : tokens <= q3 ? 3 : 4
+      tokens === 0
+        ? 0
+        : tokens <= q1
+          ? 1
+          : tokens <= q2
+            ? 2
+            : tokens <= q3
+              ? 3
+              : 4
     return { key, date, tokens, cost: row?.cost ?? 0, level }
   })
 
@@ -144,7 +152,10 @@ function ActivityHeatmap({ weeks }: { weeks: HeatmapDay[][] }) {
 
         <div>
           {/* Month labels */}
-          <div className="relative h-4 select-none" style={{ width: gridWidth }}>
+          <div
+            className="relative h-4 select-none"
+            style={{ width: gridWidth }}
+          >
             {labels.map((label) => (
               <span
                 key={`${label.text}-${label.index}`}
@@ -182,7 +193,10 @@ function ActivityHeatmap({ weeks }: { weeks: HeatmapDay[][] }) {
                 {/* Pad the current partial week so the column keeps its width. */}
                 {week.length < 7 &&
                   Array.from({ length: 7 - week.length }).map((_, i) => (
-                    <div key={`pad-${i}`} style={{ width: CELL, height: CELL }} />
+                    <div
+                      key={`pad-${i}`}
+                      style={{ width: CELL, height: CELL }}
+                    />
                   ))}
               </div>
             ))}

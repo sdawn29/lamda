@@ -392,7 +392,9 @@ describe("finalizeRunningTools", () => {
     const t = result[0] as ToolMessage
     expect(t.status).toBe("error")
     const details = (
-      t.result as { details: { status: string; endedAt?: number; blocks: unknown[] } }
+      t.result as {
+        details: { status: string; endedAt?: number; blocks: unknown[] }
+      }
     ).details
     expect(details.status).toBe("aborted")
     expect(details.endedAt).toBeTypeOf("number")

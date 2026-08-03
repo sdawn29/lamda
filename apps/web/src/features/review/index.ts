@@ -39,11 +39,7 @@ export {
   summarizeChecks,
   type CheckRun,
 } from "./ci-checks-badge"
-export {
-  CommitList,
-  type CommitDiffFile,
-  type ReviewCommit,
-} from "./commits"
+export { CommitList, type CommitDiffFile, type ReviewCommit } from "./commits"
 export {
   ActivityList,
   checksSummaryText,

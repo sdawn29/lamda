@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { readFile, access } from "node:fs/promises";
+import { readFile, access, rm } from "node:fs/promises";
 import { join, extname } from "node:path";
 import {
   listWorkspacesWithThreads,
@@ -10,7 +10,6 @@ import {
   listThreadsForWorkspace,
   insertWorkspace,
   deleteWorkspace,
-  deleteAllWorkspaces,
   updateWorkspaceOpenWithApp,
   updateWorkspaceEnv,
   updateWorkspaceIcon,
@@ -23,13 +22,19 @@ import {
   isVecAvailable,
   getSetting,
   upsertSetting,
+  resetDatabase,
 } from "@lamda/db";
 import {
   getWorkspaceCommands,
   embeddingsEnabled,
   embedQuery,
+  resetModelRuntime,
 } from "@lamda/pi-sdk";
-import { abortMerge, isMergeInProgress } from "@lamda/git";
+import {
+  abortMerge,
+  isMergeInProgress,
+  gitDeleteAllLamdaRefs,
+} from "@lamda/git";
 import { existsSync } from "node:fs";
 import { store } from "../store.js";
 import { sessionEvents } from "../session-events.js";
@@ -39,6 +44,11 @@ import { fileTreeService } from "../services/file-tree-service.js";
 import { lamdaConfigWatcher } from "../services/lamda-config-watcher.js";
 import { removeOwnedThreadWorktree } from "../services/worktree-service.js";
 import { clearAppDataDir } from "../lib/attachments.js";
+import { stopAutomationScheduler } from "../services/automation-scheduler.js";
+import { deleteMcpSettings } from "../services/mcp-service.js";
+import { clearToolDecisions } from "../services/tool-approval-store.js";
+import { AUTH_FILE } from "../services/auth-service.js";
+import { MODELS_FILE } from "../services/models-config-service.js";
 import { parseJsonBody } from "../lib/validate.js";
 
 const createWorkspaceSchema = z.object({
@@ -316,8 +326,20 @@ workspaces.post("/workspace", async (c) => {
   );
 });
 
+/**
+ * "Delete all data" — return the app to a first-launch state. Removes every
+ * trace it has written: managed worktrees and the private `refs/lamda/` refs it
+ * planted in the user's repos, remembered tool approvals inside each workspace,
+ * every row in the database (settings included), everything on disk under
+ * `~/.lamda` apart from the live database file itself, and the provider
+ * credentials / local-model config it wrote. Running MCP servers,
+ * watchers, and agent sessions are torn down first so nothing rewrites state
+ * behind the wipe. The client restarts the server and reloads afterwards.
+ */
 workspaces.delete("/reset", async (_c) => {
-  for (const ws of listWorkspacesWithThreads()) {
+  const allWorkspaces = listWorkspacesWithThreads();
+
+  for (const ws of allWorkspaces) {
     try {
       await teardownWorkspaceThreads(ws.id, ws.path);
     } catch (error) {
@@ -332,8 +354,47 @@ workspaces.delete("/reset", async (_c) => {
       );
     }
   }
-  deleteAllWorkspaces();
+
+  // Stop everything that could write to the database or the data dir while (or
+  // after) we clear it.
+  stopAutomationScheduler();
+  await deleteMcpSettings();
+  for (const ws of allWorkspaces) {
+    workspaceIndexer.stopIndexing(ws.id);
+    semanticIndexer.stop(ws.id);
+    fileTreeService.stopWorkspace(ws.id);
+    lamdaConfigWatcher.stopWorkspace(ws.id);
+  }
+
+  // Any session left over from a workspace row that's already gone (e.g. one
+  // deleted earlier this run) still holds a live agent — dispose those too.
+  for (const { sessionId } of store.getAll()) {
+    await sessionEvents.dispose(sessionId);
+    store.delete(sessionId);
+  }
+
+  // Per-workspace artifacts that live inside the user's own directories.
+  await Promise.all(
+    allWorkspaces.map(async (ws) => {
+      clearToolDecisions(ws.path);
+      await gitDeleteAllLamdaRefs(ws.path);
+    }),
+  );
+
+  resetDatabase();
   await clearAppDataDir();
+
+  // Provider credentials and local-model registrations live in the pi agent's
+  // config dir, not `~/.lamda` — a reset that left the user signed in wouldn't
+  // be a reset. Only the two files this app writes are removed; the rest of
+  // `~/.pi` belongs to the pi CLI and is left alone.
+  await Promise.all(
+    [AUTH_FILE, MODELS_FILE].map((file) =>
+      rm(file, { force: true }).catch(() => {}),
+    ),
+  );
+  resetModelRuntime();
+
   return new Response(null, { status: 204 });
 });
 

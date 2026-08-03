@@ -136,7 +136,11 @@ describe("blockToMessage / blocksToMessages", () => {
     }
 
     const malformed = blockToMessage(
-      block({ role: "compaction", content: "manual", compactionMeta: "{not json" })
+      block({
+        role: "compaction",
+        content: "manual",
+        compactionMeta: "{not json",
+      })
     )
     if (malformed.role === "compaction") {
       expect(malformed.meta).toBeUndefined()

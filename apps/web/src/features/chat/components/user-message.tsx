@@ -13,7 +13,11 @@ import { useFileChipRootPath } from "../file-chip-context"
 import { FileChip, resolveAbsolutePath } from "./file-chip"
 import { MessageChip } from "./message-chip"
 import { colorStyle, resolveModeIcon } from "./mode-combobox"
-import { AgentModelLine, AgentSourceBadge, AgentToolCountLine } from "./agent-info"
+import {
+  AgentModelLine,
+  AgentSourceBadge,
+  AgentToolCountLine,
+} from "./agent-info"
 import {
   FILE_CONTEXT_RE,
   parseFileCommentContext,

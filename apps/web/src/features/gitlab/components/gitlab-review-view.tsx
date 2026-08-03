@@ -145,7 +145,9 @@ export function GitlabReviewView({
         <LastUpdatedLabel updatedAt={lastUpdated} />
         <RefreshButton
           spinning={panelFetching}
-          onClick={() => void qc.invalidateQueries({ queryKey: gitlabKeys.all })}
+          onClick={() =>
+            void qc.invalidateQueries({ queryKey: gitlabKeys.all })
+          }
           label="Refresh GitLab data"
         />
         <Button

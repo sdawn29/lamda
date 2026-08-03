@@ -19,7 +19,9 @@ export interface CompactionMetaInput {
  * there. A `details` that doesn't match the default `{ readFiles, modifiedFiles }`
  * shape degrades to empty file lists instead of throwing or persisting garbage.
  */
-export function buildCompactionMeta(input: CompactionMetaInput): CompactionMeta {
+export function buildCompactionMeta(
+  input: CompactionMetaInput,
+): CompactionMeta {
   const { readFiles, modifiedFiles } = validateCompactionDetails(input.details);
   return {
     summary: input.summary,

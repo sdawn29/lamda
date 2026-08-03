@@ -184,7 +184,8 @@ function buildRuntimeHandle(
     async compact() {
       await runtime.session.compact();
     },
-    getAvailableThinkingLevels: () => runtime.session.getAvailableThinkingLevels(),
+    getAvailableThinkingLevels: () =>
+      runtime.session.getAvailableThinkingLevels(),
     getCommands() {
       return mapResourceCommands(runtime.session.resourceLoader);
     },

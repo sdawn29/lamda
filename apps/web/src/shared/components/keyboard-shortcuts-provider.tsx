@@ -139,7 +139,9 @@ export function KeyboardShortcutsProvider({
   React.useEffect(() => {
     return (
       window.electronAPI?.onNativeMenuAction?.((action) => {
-        if (Object.values(SHORTCUT_ACTIONS).includes(action as ShortcutAction)) {
+        if (
+          Object.values(SHORTCUT_ACTIONS).includes(action as ShortcutAction)
+        ) {
           runAction(action as ShortcutAction)
         }
       }) ?? (() => {})

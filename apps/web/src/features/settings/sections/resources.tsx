@@ -149,7 +149,7 @@ function StatTile({
     <div className="flex flex-col gap-0.5 rounded-lg border border-border/60 bg-card/50 p-3">
       <span className="text-xs text-muted-foreground">{label}</span>
       <div className="flex items-center justify-between gap-2">
-        <span className="whitespace-nowrap text-xl font-semibold leading-tight">
+        <span className="text-xl leading-tight font-semibold whitespace-nowrap">
           {value}
         </span>
         {points && <Sparkline points={points} />}
@@ -530,7 +530,11 @@ const storageSegments = [
   { key: "databaseBytes", label: "Database", color: "var(--chart-1)" },
   { key: "attachmentsBytes", label: "Attachments", color: "var(--chart-3)" },
   { key: "worktreesBytes", label: "Worktrees", color: "var(--chart-5)" },
-  { key: "otherBytes", label: "Everything else", color: "var(--muted-foreground)" },
+  {
+    key: "otherBytes",
+    label: "Everything else",
+    color: "var(--muted-foreground)",
+  },
 ] as const
 
 const storageDescriptions: Record<string, string> = {
@@ -833,7 +837,7 @@ export function ResourcesSection() {
           title="JS heap limit"
           description="Maximum heap V8 will allocate before the server runs out of memory."
         >
-          <span className="text-sm tabular-nums text-muted-foreground">
+          <span className="text-sm text-muted-foreground tabular-nums">
             {data ? formatBytes(data.process.heapLimit) : "—"}
           </span>
         </SettingsRow>
@@ -853,7 +857,7 @@ export function ResourcesSection() {
           title="Load average"
           description="Average runnable processes over the last 1, 5, and 15 minutes."
         >
-          <span className="text-sm tabular-nums text-muted-foreground">
+          <span className="text-sm text-muted-foreground tabular-nums">
             {data
               ? data.system.loadAverage
                   .map((value) => value.toFixed(2))

@@ -147,9 +147,7 @@ function CommitRow({
                 <button
                   type="button"
                   onClick={() =>
-                    expandable
-                      ? setExpanded((v) => !v)
-                      : void openExternal(url)
+                    expandable ? setExpanded((v) => !v) : void openExternal(url)
                   }
                   className="group w-full rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                 >
@@ -163,7 +161,9 @@ function CommitRow({
                     <span>·</span>
                     <span>{authorLabel}</span>
                     <span>·</span>
-                    <span title={new Date(commit.committedDate).toLocaleString()}>
+                    <span
+                      title={new Date(commit.committedDate).toLocaleString()}
+                    >
                       {formatRelativeDate(commit.committedDate)}
                     </span>
                   </div>

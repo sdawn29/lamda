@@ -106,7 +106,12 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 
 export async function apiFetch<T>(
   path: string,
-  init?: RequestInit
+  /**
+   * Standard fetch init, plus an optional `timeoutMs` override for the rare
+   * request that legitimately outlives the 30s default (e.g. the whole-app
+   * data reset, which tears down worktrees and vacuums the database).
+   */
+  init?: RequestInit & { timeoutMs?: number }
 ): Promise<T> {
   const base = await getServerUrl()
 
@@ -114,7 +119,7 @@ export async function apiFetch<T>(
   const controller = new AbortController()
   const timeoutId = setTimeout(
     () => controller.abort(),
-    DEFAULT_REQUEST_TIMEOUT_MS
+    init?.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
   )
 
   // Merge signals if parent signal provided

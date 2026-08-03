@@ -537,9 +537,7 @@ export async function getPullRequest(
       reviewDecision: string | null;
       mergeable: string | null;
       autoMergeRequest: { enabledAt?: string | null } | null;
-      reviewRequests:
-        | { login?: string; name?: string; slug?: string }[]
-        | null;
+      reviewRequests: { login?: string; name?: string; slug?: string }[] | null;
       latestReviews: { author: RawPrAuthor | null; state: string }[] | null;
       files: { path: string; additions: number; deletions: number }[];
       commits: {

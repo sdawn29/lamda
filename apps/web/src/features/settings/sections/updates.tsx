@@ -67,9 +67,7 @@ export function UpdatesSection() {
         >
           <Switch
             checked={autoUpdateEnabled ?? true}
-            onCheckedChange={(checked) =>
-              setAutoUpdateEnabled.mutate(checked)
-            }
+            onCheckedChange={(checked) => setAutoUpdateEnabled.mutate(checked)}
             disabled={setAutoUpdateEnabled.isPending}
             aria-label="Automatic updates"
           />

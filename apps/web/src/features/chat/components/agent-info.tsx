@@ -100,9 +100,7 @@ export function AgentModelLine({
   const parts = formatAgentModel(model)
   if (!parts) {
     return (
-      <span
-        className={cn("text-2xs text-muted-foreground italic", className)}
-      >
+      <span className={cn("text-2xs text-muted-foreground italic", className)}>
         Inherits conversation model
       </span>
     )

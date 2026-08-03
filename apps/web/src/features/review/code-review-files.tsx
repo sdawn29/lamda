@@ -438,7 +438,9 @@ function ReviewFileDiff({
                       <pre
                         className={cn(
                           "min-w-0 flex-1 px-3 font-mono",
-                          wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre"
+                          wrap
+                            ? "break-words whitespace-pre-wrap"
+                            : "whitespace-pre"
                         )}
                       >
                         {line.content || " "}
@@ -549,7 +551,11 @@ function ReviewSideBySideDiff({
     }
   }
 
-  function reportSlotHeight(rowIndex: number, side: ReviewSide, height: number) {
+  function reportSlotHeight(
+    rowIndex: number,
+    side: ReviewSide,
+    height: number
+  ) {
     const key = `${rowIndex}:${side}`
     setSlotHeights((current) =>
       current[key] === height ? current : { ...current, [key]: height }
@@ -566,7 +572,9 @@ function ReviewSideBySideDiff({
   // Threads anchored per row and side; a row can carry one on each side.
   const threadsByRow = new Map<
     number,
-    Partial<Record<ReviewSide, { label: string; comments: CodeReviewComment[] }>>
+    Partial<
+      Record<ReviewSide, { label: string; comments: CodeReviewComment[] }>
+    >
   >()
   const seenAnchors = new Set<string>()
   let widestLine = 0
@@ -980,7 +988,9 @@ function ReviewSideCell({
       <pre
         className={cn(
           "flex-1 px-2 font-mono [tab-size:4]",
-          wrap ? "min-w-0 whitespace-pre-wrap break-words" : "min-w-max whitespace-pre"
+          wrap
+            ? "min-w-0 break-words whitespace-pre-wrap"
+            : "min-w-max whitespace-pre"
         )}
       >
         {line.content || " "}
@@ -1085,9 +1095,7 @@ function ReviewComments({
     <div
       className={cn(
         "overflow-hidden rounded-lg border border-border/60 bg-background/95 font-sans shadow-md shadow-black/[0.04]",
-        contained
-          ? "w-full"
-          : "sticky left-0 mx-2 my-1 w-[calc(100cqw-1rem)]"
+        contained ? "w-full" : "sticky left-0 mx-2 my-1 w-[calc(100cqw-1rem)]"
       )}
     >
       <div className="flex h-8 items-center gap-1.5 border-b border-border/50 bg-muted/25 px-2.5">

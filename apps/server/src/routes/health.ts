@@ -183,7 +183,10 @@ function recordResourceSample(): void {
     loopDelayMs: sample.process.eventLoop.meanMs,
     loopDelayMaxMs: sample.process.eventLoop.maxMs,
     activeLanes: sample.queues.filter((queue) => queue.active).length,
-    queuedJobs: sample.queues.reduce((total, queue) => total + queue.pending, 0),
+    queuedJobs: sample.queues.reduce(
+      (total, queue) => total + queue.pending,
+      0,
+    ),
   });
   if (resourceHistory.length > HISTORY_LIMIT) {
     resourceHistory.splice(0, resourceHistory.length - HISTORY_LIMIT);

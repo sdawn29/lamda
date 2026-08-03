@@ -288,7 +288,12 @@ github.post("/github/prs/:number/merge", async (c) => {
   if (!cwd) return c.json({ error: "No repo context" }, 400);
   try {
     const method = body.method as gh.MergeMethod | undefined;
-    await gh.mergePullRequest(cwd, number, method ?? "squash", body.auto ?? false);
+    await gh.mergePullRequest(
+      cwd,
+      number,
+      method ?? "squash",
+      body.auto ?? false,
+    );
     return c.json({ ok: true });
   } catch (err) {
     return ghErrorResponse(c, err, "Failed to merge pull request");

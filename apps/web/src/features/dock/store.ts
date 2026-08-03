@@ -386,7 +386,10 @@ export const useDockStore = create<DockStoreState>()(
               ...scope,
               docks: {
                 ...scope.docks,
-                [targetDock]: { ...scope.docks[targetDock], activeTabId: tabId },
+                [targetDock]: {
+                  ...scope.docks[targetDock],
+                  activeTabId: tabId,
+                },
               },
             }))
           }
@@ -483,7 +486,10 @@ export const useDockStore = create<DockStoreState>()(
         set((s) => ({
           ...updateScope(s, (scope) => ({
             ...scope,
-            docks: { ...scope.docks, [dockId]: { ...scope.docks[dockId], size } },
+            docks: {
+              ...scope.docks,
+              [dockId]: { ...scope.docks[dockId], size },
+            },
           })),
           // Sizes are per-scope but seeded from this global default (see the
           // Sizes section of the design doc) — without also writing it here,

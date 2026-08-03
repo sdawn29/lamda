@@ -1057,7 +1057,7 @@ export function ChatView({
             ref={scrollContainerRef}
             onScroll={onScroll}
             className={cn(
-              "flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-8 [scrollbar-gutter:stable_both-edges]",
+              "flex min-h-0 w-full flex-1 [scrollbar-gutter:stable_both-edges] flex-col overflow-y-auto pb-8",
               // Reserve room for the floating mobile islands (absolutely
               // positioned above, in the relative parent) so the first message
               // doesn't render underneath them.

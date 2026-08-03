@@ -537,8 +537,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
       const rect = e.currentTarget.getBoundingClientRect()
       setWorkspaceDropTarget({
         id: targetId,
-        position:
-          e.clientY < rect.top + rect.height / 2 ? "before" : "after",
+        position: e.clientY < rect.top + rect.height / 2 ? "before" : "after",
       })
     },
     [canDropWorkspace, draggingWorkspaceId]
@@ -885,7 +884,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
               <TooltipTrigger
                 render={
                   <SidebarGroupAction
-                    className="right-9 invisible group-hover/workspaces:visible aria-expanded:visible"
+                    className="invisible right-9 group-hover/workspaces:visible aria-expanded:visible"
                     render={<DropdownMenuTrigger />}
                   >
                     <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/60 transition-colors hover:text-foreground" />

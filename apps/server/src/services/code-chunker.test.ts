@@ -53,9 +53,10 @@ describe("looksGenerated", () => {
   });
 
   it("does not flag normal code", () => {
-    const text = Array.from({ length: 20 }, (_, i) => `const a${i} = ${i};`).join(
-      "\n",
-    );
+    const text = Array.from(
+      { length: 20 },
+      (_, i) => `const a${i} = ${i};`,
+    ).join("\n");
     expect(looksGenerated(text)).toBe(false);
   });
 });

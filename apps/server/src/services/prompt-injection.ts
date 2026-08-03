@@ -48,10 +48,7 @@ function withModePreamble(entry: StoredSession, userText: string): string {
  * keeping the clean mention in the persisted user message. Unknown or
  * mode-disallowed ids remain ordinary text.
  */
-function withSubagentMentions(
-  entry: StoredSession,
-  userText: string,
-): string {
+function withSubagentMentions(entry: StoredSession, userText: string): string {
   const mode = normalizeMode(getThread(entry.threadId)?.mode);
   const modeConfig = mode ? getModeConfig(mode, entry.cwd) : null;
   if (!modeConfig?.tools.includes("delegate")) return userText;

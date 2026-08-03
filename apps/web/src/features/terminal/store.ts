@@ -19,7 +19,12 @@ function killServerTerminal(tabId: string): void {
 function revealTerminalDockTab(): void {
   useDockStore
     .getState()
-    .openTab({ type: "terminal", singleton: true, defaultDock: "bottom", title: "Terminal" })
+    .openTab({
+      type: "terminal",
+      singleton: true,
+      defaultDock: "bottom",
+      title: "Terminal",
+    })
 }
 
 export interface TerminalTab {
@@ -129,13 +134,20 @@ export const useTerminalStore = create<TerminalStore>()((set, get) => ({
     }))
     useDockStore
       .getState()
-      .toggleTab({ type: "terminal", singleton: true, defaultDock: "bottom", title: "Terminal" })
+      .toggleTab({
+        type: "terminal",
+        singleton: true,
+        defaultDock: "bottom",
+        title: "Terminal",
+      })
   },
 
   syncCwd: (workspaceId, cwd) =>
     set((s) => ({
       states: updateWorkspace(s.states, workspaceId, (current) => {
-        const activeTab = current.tabs.find((tab) => tab.id === current.activeTabId)
+        const activeTab = current.tabs.find(
+          (tab) => tab.id === current.activeTabId
+        )
         if (activeTab?.cwd === cwd) return current
         return ensureTabAtCwd(workspaceId, cwd, current)
       }),
@@ -175,7 +187,9 @@ export const useTerminalStore = create<TerminalStore>()((set, get) => ({
         const next = p.tabs.filter((t) => t.id !== tabId)
         if (next.length === 0) return { ...p, tabs: [], activeTabId: null }
         const newActive =
-          p.activeTabId === tabId ? next[idx > 0 ? idx - 1 : 0].id : p.activeTabId
+          p.activeTabId === tabId
+            ? next[idx > 0 ? idx - 1 : 0].id
+            : p.activeTabId
         return { ...p, tabs: next, activeTabId: newActive }
       }),
     })),
@@ -223,7 +237,8 @@ export function useTerminalForWorkspace(workspaceId: string, cwd: string) {
     toggle: () => store().toggle(workspaceId, cwd),
     open: () => store().open(workspaceId, cwd),
     addTab: () => store().addTab(workspaceId, cwd),
-    runCommand: (command: string) => store().runCommand(workspaceId, cwd, command),
+    runCommand: (command: string) =>
+      store().runCommand(workspaceId, cwd, command),
     closeTab: (tabId: string) => store().closeTab(workspaceId, tabId),
     setActiveTab: (tabId: string) => store().setActiveTab(workspaceId, tabId),
     renameTab: (tabId: string, title: string) =>

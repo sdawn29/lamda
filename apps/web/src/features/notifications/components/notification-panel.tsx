@@ -101,14 +101,14 @@ function NotificationRow({ item }: { item: NotificationItem }) {
         <button
           type="button"
           onClick={() => dismiss(item.id)}
-          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/30 group-hover:opacity-100"
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/30"
           aria-label="Dismiss notification"
         >
           <XIcon className="size-3" />
         </button>
       </div>
       {item.description && (
-        <p className="text-muted-foreground/80 leading-snug">
+        <p className="leading-snug text-muted-foreground/80">
           {item.description}
         </p>
       )}

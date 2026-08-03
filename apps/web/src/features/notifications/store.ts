@@ -57,7 +57,10 @@ interface NotificationStore {
   /** Insert or update a notification by id (progress items live-update in place instead of stacking). */
   upsert: (
     id: string,
-    fields: Omit<NotificationItem, "id" | "createdAt" | "updatedAt" | "read"> & {
+    fields: Omit<
+      NotificationItem,
+      "id" | "createdAt" | "updatedAt" | "read"
+    > & {
       read?: boolean
     }
   ) => void
@@ -153,8 +156,9 @@ export const useNotificationStore = create<NotificationStore>()(
         ) {
           return { items: {} }
         }
-        const items = (persisted as { items?: Record<string, NotificationItem> })
-          .items
+        const items = (
+          persisted as { items?: Record<string, NotificationItem> }
+        ).items
         return {
           items: pruneItems(
             Object.fromEntries(
@@ -175,7 +179,9 @@ export const useNotificationStore = create<NotificationStore>()(
   )
 )
 
-export function selectNotificationList(state: NotificationStore): NotificationItem[] {
+export function selectNotificationList(
+  state: NotificationStore
+): NotificationItem[] {
   return Object.values(state.items).sort(
     (a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt)
   )

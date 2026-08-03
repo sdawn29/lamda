@@ -14,7 +14,7 @@ import {
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -229,7 +229,11 @@ function installApplicationMenu() {
       label: "File",
       submenu: [
         menuAction("New Thread", "CommandOrControl+T", "new_thread"),
-        menuAction("New Workspace", "CommandOrControl+Shift+N", "new_workspace"),
+        menuAction(
+          "New Workspace",
+          "CommandOrControl+Shift+N",
+          "new_workspace",
+        ),
         separator(),
         menuAction(
           "Open in Editor",
@@ -899,7 +903,32 @@ app.whenReady().then(async () => {
     autoUpdater.quitAndInstall();
   });
 
-  ipcMain.handle("get-auto-update-enabled", () => appSettings.autoUpdateEnabled);
+  // Second half of "Delete all data": the server wipes its database and
+  // ~/.lamda, this clears everything the desktop shell owns — the main-process
+  // preferences file in userData and the renderer's web storage (localStorage,
+  // caches, IndexedDB, service workers). The renderer restarts the server and
+  // reloads itself right after.
+  ipcMain.handle("reset-app-data", async () => {
+    appSettings = { ...DEFAULT_APP_SETTINGS };
+    try {
+      rmSync(getSettingsFilePath(), { force: true });
+    } catch {
+      // Nothing persisted yet, or not removable — defaults still apply below.
+    }
+    applyAutoUpdatePolicy();
+
+    try {
+      await session.defaultSession.clearStorageData();
+      await session.defaultSession.clearCache();
+    } catch (err) {
+      console.error("Failed to clear renderer storage:", err);
+    }
+  });
+
+  ipcMain.handle(
+    "get-auto-update-enabled",
+    () => appSettings.autoUpdateEnabled,
+  );
 
   ipcMain.handle("set-auto-update-enabled", (_event, enabled: boolean) => {
     appSettings = { ...appSettings, autoUpdateEnabled: enabled };

@@ -22,26 +22,26 @@ lives, the inner splitter widths) stays a global user preference.
 
 ```ts
 interface DockScopeState {
-  docks: Record<DockId, DockZoneState> // tabIds, activeTabId, isOpen, size
-  tabs: Record<string, DockTab>
-  filePreviews: FilePreview[]
-  activeFilePreviewId: string | null
-  fileTreeOpen: boolean
-  rightDockFullscreen: boolean
+  docks: Record<DockId, DockZoneState>; // tabIds, activeTabId, isOpen, size
+  tabs: Record<string, DockTab>;
+  filePreviews: FilePreview[];
+  activeFilePreviewId: string | null;
+  fileTreeOpen: boolean;
+  rightDockFullscreen: boolean;
 }
 
 interface DockStoreState {
-  scopes: Record<string, DockScopeState>
-  activeScopeId: string
+  scopes: Record<string, DockScopeState>;
+  activeScopeId: string;
   // global
-  singletonHome: Partial<Record<string, DockId>>
-  fileTreeWidth: number
-  reviewFilesWidth: number
-  draggingTabId: string | null
-  defaultSizes: Record<DockId, number>
+  singletonHome: Partial<Record<string, DockId>>;
+  fileTreeWidth: number;
+  reviewFilesWidth: number;
+  draggingTabId: string | null;
+  defaultSizes: Record<DockId, number>;
   // …every existing action, unchanged in signature
-  setActiveScope: (id: string | null) => void
-  dropScope: (id: string) => void
+  setActiveScope: (id: string | null) => void;
+  dropScope: (id: string) => void;
 }
 ```
 

@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -848,6 +848,42 @@ export async function gitListCheckpointRefs(cwd: string): Promise<string[]> {
       .map((ref) => ref.slice(CHECKPOINT_REF_PREFIX.length));
   } catch {
     return [];
+  }
+}
+
+/**
+ * Delete every ref the app has ever written into this repo's private
+ * `refs/lamda/` namespace — both per-turn checkpoint anchors and per-thread
+ * shadow snapshot chains — so their objects become eligible for `git gc`.
+ * Used by the "Delete all data" reset, which must leave no trace inside the
+ * user's repositories. Best-effort: a missing repo or git binary is a no-op.
+ */
+export async function gitDeleteAllLamdaRefs(cwd: string): Promise<void> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["for-each-ref", "--format=%(refname)", "refs/lamda/"],
+      { cwd, timeout: 10000 },
+    );
+    const refs = stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (refs.length === 0) return;
+
+    // `update-ref --stdin` deletes the whole batch in one call — a repo with a
+    // long history can hold hundreds of these refs. NUL-delimited (-z) input
+    // keeps refs with unusual characters safe.
+    const input = refs.map((ref) => `delete ${ref}\0\0`).join("");
+    await new Promise<void>((resolve) => {
+      const child = spawn("git", ["update-ref", "-z", "--stdin"], { cwd });
+      child.on("error", () => resolve());
+      child.on("close", () => resolve());
+      child.stdin.on("error", () => resolve());
+      child.stdin.end(input);
+    });
+  } catch {
+    // ignore
   }
 }
 

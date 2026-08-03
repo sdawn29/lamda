@@ -41,6 +41,8 @@ interface ElectronAPI {
   restartServer: () => Promise<ServerStatus>
   openPath: (path: string) => Promise<void>
   openDataDir: () => Promise<void>
+  /** Clear desktop-owned state: userData preferences + renderer web storage. */
+  resetAppData: () => Promise<void>
   listOpenWithApps: () => Promise<OpenWithApp[]>
   getOpenWithAppIcon: (appId: string) => Promise<string | null>
   openWorkspaceWithApp: (workspacePath: string, appId?: string) => Promise<void>

@@ -133,7 +133,10 @@ function peekWindow(
     0,
     Math.min(centerIdx - half, all.length - PEEK_LINE_COUNT)
   )
-  return { start: startIdx + 1, rows: all.slice(startIdx, startIdx + PEEK_LINE_COUNT) }
+  return {
+    start: startIdx + 1,
+    rows: all.slice(startIdx, startIdx + PEEK_LINE_COUNT),
+  }
 }
 
 /** Line-numbered code peek. Rows inside [line, endLine] get the accent

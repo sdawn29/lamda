@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("restart-server"),
   openPath: (path: string) => ipcRenderer.invoke("open-path", path),
   openDataDir: () => ipcRenderer.invoke("open-data-dir"),
+  resetAppData: (): Promise<void> => ipcRenderer.invoke("reset-app-data"),
   listOpenWithApps: (): Promise<OpenWithApp[]> =>
     ipcRenderer.invoke("list-open-with-apps"),
   getOpenWithAppIcon: (appId: string): Promise<string | null> =>

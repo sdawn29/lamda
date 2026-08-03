@@ -12,15 +12,6 @@ import {
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/ui/dialog"
 import { Progress, ProgressLabel, ProgressValue } from "@/shared/ui/progress"
 import {
   ReleaseNotes,
@@ -31,9 +22,9 @@ import {
   type ElectronUpdateStatus,
 } from "@/features/electron"
 import { openExternal } from "@/features/electron/api"
-import { useWorkspace } from "@/features/workspace"
 import { cn } from "@/shared/lib/utils"
 
+import { ResetAllDataDialog } from "../components/reset-all-data-dialog"
 import {
   SettingsGroup,
   SettingsRow,
@@ -50,21 +41,7 @@ export function AboutSection() {
   const installUpdate = useInstallUpdate()
   const isElectron = !!window.electronAPI
 
-  const { resetAll } = useWorkspace()
   const [showConfirm, setShowConfirm] = useState(false)
-  const [resetting, setResetting] = useState(false)
-
-  async function handleReset() {
-    setResetting(true)
-    try {
-      await resetAll()
-      setShowConfirm(false)
-      await window.electronAPI?.restartServer()
-      window.location.reload()
-    } catch {
-      setResetting(false)
-    }
-  }
 
   const version = import.meta.env.DEV ? "dev build" : `v${__APP_VERSION__}`
 
@@ -179,8 +156,9 @@ export function AboutSection() {
           <div className="flex min-w-0 flex-col gap-0.5">
             <p className="text-sm leading-snug">Delete all data</p>
             <p className="text-xs/relaxed text-muted-foreground">
-              Permanently removes all workspaces, threads, and messages. This
-              cannot be undone.
+              Resets the app to a fresh install: removes every workspace,
+              thread, message, memory, automation, and all settings. This cannot
+              be undone.
             </p>
           </div>
           <Button
@@ -195,32 +173,7 @@ export function AboutSection() {
         </div>
       </section>
 
-      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>Delete all data?</DialogTitle>
-            <DialogDescription>
-              This will permanently delete all workspaces, threads, and
-              messages. This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose
-              render={<Button variant="outline" />}
-              disabled={resetting}
-            >
-              Cancel
-            </DialogClose>
-            <Button
-              variant="destructive"
-              onClick={handleReset}
-              disabled={resetting}
-            >
-              {resetting ? "Deleting" : "Delete all"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ResetAllDataDialog open={showConfirm} onOpenChange={setShowConfirm} />
     </>
   )
 }

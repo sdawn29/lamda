@@ -137,7 +137,9 @@ export function CommandPalette() {
   const codeSearchEnabled = open && debouncedSearch.trim().length >= 3
   const { data: codeSearchData, isFetching: codeSearchLoading } =
     useSemanticSearch(activeWorkspace?.id, debouncedSearch, codeSearchEnabled)
-  const codeHits = codeSearchEnabled ? (codeSearchData?.results ?? []).slice(0, 5) : []
+  const codeHits = codeSearchEnabled
+    ? (codeSearchData?.results ?? []).slice(0, 5)
+    : []
 
   const toggleSidebarBinding = useShortcutBinding(
     SHORTCUT_ACTIONS.TOGGLE_SIDEBAR
@@ -298,8 +300,12 @@ export function CommandPalette() {
                   </div>
                 ) : (
                   codeHits.map((hit) => {
-                    const name = hit.filePath.split(/[/\\]/).pop() || hit.filePath
-                    const dir = hit.filePath.split(/[/\\]/).slice(0, -1).join("/")
+                    const name =
+                      hit.filePath.split(/[/\\]/).pop() || hit.filePath
+                    const dir = hit.filePath
+                      .split(/[/\\]/)
+                      .slice(0, -1)
+                      .join("/")
                     return (
                       <CommandItem
                         // Server-ranked (semantic) results shouldn't be re-filtered
@@ -330,7 +336,7 @@ export function CommandPalette() {
                             L{hit.startLine}-{hit.endLine}
                           </CommandShortcut>
                         </div>
-                        <pre className="w-full overflow-hidden text-ellipsis whitespace-pre-wrap break-all rounded bg-muted/50 px-2 py-1 font-mono text-[0.7rem] text-muted-foreground">
+                        <pre className="w-full overflow-hidden rounded bg-muted/50 px-2 py-1 font-mono text-[0.7rem] break-all text-ellipsis whitespace-pre-wrap text-muted-foreground">
                           {hit.content.slice(0, 200)}
                         </pre>
                       </CommandItem>

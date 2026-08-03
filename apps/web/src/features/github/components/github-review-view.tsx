@@ -199,7 +199,9 @@ export function GithubReviewView({
         <LastUpdatedLabel updatedAt={lastUpdated} />
         <RefreshButton
           spinning={panelFetching}
-          onClick={() => void qc.invalidateQueries({ queryKey: githubKeys.all })}
+          onClick={() =>
+            void qc.invalidateQueries({ queryKey: githubKeys.all })
+          }
           label="Refresh GitHub data"
         />
         <Button
@@ -590,7 +592,9 @@ function GithubPullRequestDetail({
                 )}
               </PropertyRow>
               <PropertyRow
-                icon={<MessageCircle className="size-3.5 shrink-0" aria-hidden />}
+                icon={
+                  <MessageCircle className="size-3.5 shrink-0" aria-hidden />
+                }
                 label="Comments"
               >
                 {commentCount > 0

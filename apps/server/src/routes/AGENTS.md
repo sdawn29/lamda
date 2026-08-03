@@ -179,13 +179,13 @@ Sessions also support a unified WebSocket command channel at `/ws/session/:id/co
 
 ### Server → Client Messages
 
-| Message Type         | Payload                                          | Description            |
-| -------------------- | ------------------------------------------------ | ---------------------- |
-| `ack`                | `{clientId?, operation, accepted}`               | Command acknowledgment |
-| `git:result`         | `{sessionId, operation, success, error?, data?}` | Git operation result   |
-| `git:status`         | `{sessionId, status}`                            | Git status update      |
-| `git:progress`       | `{sessionId, operation, current, total}`         | Progress update        |
-| `server_error`       | `{message}`                                      | Error response         |
+| Message Type   | Payload                                          | Description            |
+| -------------- | ------------------------------------------------ | ---------------------- |
+| `ack`          | `{clientId?, operation, accepted}`               | Command acknowledgment |
+| `git:result`   | `{sessionId, operation, success, error?, data?}` | Git operation result   |
+| `git:status`   | `{sessionId, status}`                            | Git status update      |
+| `git:progress` | `{sessionId, operation, current, total}`         | Progress update        |
+| `server_error` | `{message}`                                      | Error response         |
 
 ### TypeScript Types
 

@@ -147,7 +147,7 @@ export function MobileThreadIslands({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="ml-0 max-w-0 shrink-0 translate-x-1 overflow-hidden text-muted-foreground/50 opacity-0 transition-all duration-150 group-hover/thread-title:ml-0.5 group-hover/thread-title:max-w-5 group-hover/thread-title:translate-x-0 group-hover/thread-title:opacity-100 aria-expanded:ml-0.5 aria-expanded:max-w-5 aria-expanded:translate-x-0 aria-expanded:opacity-100 focus-visible:ml-0.5 focus-visible:max-w-5 focus-visible:translate-x-0 focus-visible:opacity-100"
+                className="ml-0 max-w-0 shrink-0 translate-x-1 overflow-hidden text-muted-foreground/50 opacity-0 transition-all duration-150 group-hover/thread-title:ml-0.5 group-hover/thread-title:max-w-5 group-hover/thread-title:translate-x-0 group-hover/thread-title:opacity-100 focus-visible:ml-0.5 focus-visible:max-w-5 focus-visible:translate-x-0 focus-visible:opacity-100 aria-expanded:ml-0.5 aria-expanded:max-w-5 aria-expanded:translate-x-0 aria-expanded:opacity-100"
               />
             }
           >

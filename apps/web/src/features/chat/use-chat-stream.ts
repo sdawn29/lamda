@@ -262,11 +262,7 @@ export function useChatStream({
         resyncMessages()
       }
     }
-  }, [
-    sessionStatus,
-    threadId,
-    resyncMessages,
-  ])
+  }, [sessionStatus, threadId, resyncMessages])
 
   const {
     messages,

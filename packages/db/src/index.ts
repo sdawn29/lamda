@@ -21,3 +21,4 @@ export * from "./queries/todos.js";
 export * from "./queries/memories.js";
 export * from "./queries/code-chunks.js";
 export * from "./queries/checkpoints.js";
+export * from "./queries/reset.js";

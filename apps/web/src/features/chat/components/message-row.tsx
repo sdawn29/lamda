@@ -37,7 +37,11 @@ import { UserMessageContent } from "./user-message"
 import { CopyButton } from "@/shared/components/copy-button"
 import { Button } from "@/shared/ui/button"
 import { getProviderMeta } from "@/shared/lib/provider-meta"
-import { formatDuration, formatNumber, formatTime } from "@/shared/lib/formatters"
+import {
+  formatDuration,
+  formatNumber,
+  formatTime,
+} from "@/shared/lib/formatters"
 import { FileChip } from "./file-chip"
 import type { SlashCommand } from "../api"
 import type { AgentDto } from "@/features/workspace/api"

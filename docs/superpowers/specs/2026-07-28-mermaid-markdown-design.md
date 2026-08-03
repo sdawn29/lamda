@@ -9,12 +9,12 @@ surface in the web app, instead of showing them as plain code.
 
 ## Surfaces in scope
 
-| Surface                                                | File                                                    | Current markdown setup                     |
-| ------------------------------------------------------ | ------------------------------------------------------- | ------------------------------------------ |
-| Markdown file preview                                  | `apps/web/src/features/main-tabs/components/file-content-view.tsx` | own `components` map incl. `code`/`pre`     |
-| Chat (assistant body, thinking block, tool call cards) | `apps/web/src/features/chat/components/markdown-components.tsx`    | `CodeBlock` + Prism, compact & rich maps    |
+| Surface                                                | File                                                               | Current markdown setup                       |
+| ------------------------------------------------------ | ------------------------------------------------------------------ | -------------------------------------------- |
+| Markdown file preview                                  | `apps/web/src/features/main-tabs/components/file-content-view.tsx` | own `components` map incl. `code`/`pre`      |
+| Chat (assistant body, thinking block, tool call cards) | `apps/web/src/features/chat/components/markdown-components.tsx`    | `CodeBlock` + Prism, compact & rich maps     |
 | Skill detail page                                      | `apps/web/src/features/skills/components/skill-detail-page.tsx`    | `ReactMarkdown` with **no** `components` map |
-| Remote markdown (release notes, update dialog)         | `apps/web/src/shared/components/remote-markdown.tsx`               | `components` map with only `a`              |
+| Remote markdown (release notes, update dialog)         | `apps/web/src/shared/components/remote-markdown.tsx`               | `components` map with only `a`               |
 
 The four maps stay separate. They differ meaningfully (compact chat vs. full
 prose vs. file-link resolution), and unifying them is a larger refactor than
@@ -30,7 +30,7 @@ four call sites.
 - Caches a single `import("mermaid")` promise so the dependency is code-split
   out of the main chunk and fetched only when a diagram first appears.
 - Calls `mermaid.initialize({ startOnLoad: false, securityLevel: "strict",
-  theme: "base", themeVariables })` once per theme.
+theme: "base", themeVariables })` once per theme.
 - `themeVariables` is derived at call time from the live CSS custom properties
   on `document.documentElement` (`--background`, `--foreground`, `--primary`,
   `--border`, `--muted`, `--muted-foreground`). Diagrams therefore inherit the

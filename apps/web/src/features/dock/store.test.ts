@@ -227,9 +227,9 @@ describe("mergeDockPersisted", () => {
     expect(mergeDockPersisted(null, current).defaultSizes).toEqual(
       current.defaultSizes
     )
-    expect(
-      mergeDockPersisted({ garbage: true }, current).defaultSizes
-    ).toEqual(current.defaultSizes)
+    expect(mergeDockPersisted({ garbage: true }, current).defaultSizes).toEqual(
+      current.defaultSizes
+    )
     expect(
       mergeDockPersisted("not even an object", current).defaultSizes
     ).toEqual(current.defaultSizes)

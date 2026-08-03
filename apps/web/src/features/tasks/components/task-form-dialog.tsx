@@ -146,11 +146,7 @@ function TaskFormBody({
       </div>
 
       <div className="flex items-center justify-between border-t bg-muted/20 px-4 py-2.5">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onOpenChange(false)}
-        >
+        <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
         <div className="flex items-center gap-2.5">

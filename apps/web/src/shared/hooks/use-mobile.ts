@@ -9,11 +9,11 @@ export function useIsMobile(breakpoint: number = MOBILE_BREAKPOINT) {
       mql.addEventListener("change", onChange)
       return () => mql.removeEventListener("change", onChange)
     },
-    [breakpoint],
+    [breakpoint]
   )
   const getSnapshot = React.useCallback(
     () => window.innerWidth < breakpoint,
-    [breakpoint],
+    [breakpoint]
   )
 
   return React.useSyncExternalStore(subscribe, getSnapshot)

@@ -62,11 +62,16 @@ export function buildCompactionMeta(input: {
  * a NULL/malformed column (rows written before this column existed, or a
  * corrupt value) rather than re-validating file-list shapes.
  */
-export function parseStoredCompactionMeta(raw: string | null): CompactionMeta | null {
+export function parseStoredCompactionMeta(
+  raw: string | null
+): CompactionMeta | null {
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as Partial<CompactionMeta>
-    if (typeof parsed.summary !== "string" || typeof parsed.tokensBefore !== "number") {
+    if (
+      typeof parsed.summary !== "string" ||
+      typeof parsed.tokensBefore !== "number"
+    ) {
       return null
     }
     return {
@@ -76,7 +81,9 @@ export function parseStoredCompactionMeta(raw: string | null): CompactionMeta | 
         ? { estimatedTokensAfter: parsed.estimatedTokensAfter }
         : {}),
       readFiles: isStringArray(parsed.readFiles) ? parsed.readFiles : [],
-      modifiedFiles: isStringArray(parsed.modifiedFiles) ? parsed.modifiedFiles : [],
+      modifiedFiles: isStringArray(parsed.modifiedFiles)
+        ? parsed.modifiedFiles
+        : [],
     }
   } catch {
     return null

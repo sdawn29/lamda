@@ -46,7 +46,11 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 import { CommentCard } from "./comment-card"
 import type { summarizeChecks } from "./ci-checks-badge"
-import { PropertyRow, UserAvatar, type MergeButtonState } from "./panel-primitives"
+import {
+  PropertyRow,
+  UserAvatar,
+  type MergeButtonState,
+} from "./panel-primitives"
 
 /**
  * Provider-neutral scaffolding for the GitHub/GitLab panel pages: the detail
@@ -195,13 +199,16 @@ export function DetailHeader({
         {title}
       </h1>
       <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <UserAvatar src={avatarSrc} name={author} className="size-4.5 shrink-0" />
-        <span className="truncate font-medium">{author ?? "Unknown author"}</span>
+        <UserAvatar
+          src={avatarSrc}
+          name={author}
+          className="size-4.5 shrink-0"
+        />
+        <span className="truncate font-medium">
+          {author ?? "Unknown author"}
+        </span>
         <span className="text-muted-foreground/40">·</span>
-        <span
-          className="shrink-0"
-          title={new Date(createdAt).toLocaleString()}
-        >
+        <span className="shrink-0" title={new Date(createdAt).toLocaleString()}>
           {formatRelativeDate(createdAt)}
         </span>
         <span className="text-muted-foreground/40">·</span>
@@ -373,7 +380,12 @@ export function DetailActionsFooter({
 }) {
   return (
     <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/45 pt-2.5">
-      <Button variant="outline" size="sm" disabled={pending} onClick={onCheckout}>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={pending}
+        onClick={onCheckout}
+      >
         <GitBranch data-icon="inline-start" />
         Checkout
       </Button>
@@ -422,9 +434,7 @@ export function MergeDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {auto
-              ? `Enable auto-merge for ${subject}?`
-              : `Merge ${subject}?`}
+            {auto ? `Enable auto-merge for ${subject}?` : `Merge ${subject}?`}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {auto
@@ -470,10 +480,8 @@ export function RepoPanelHeader({
   return (
     <div className="shrink-0 p-2 pb-0">
       <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/90 p-2.5 shadow-sm shadow-black/[0.03] backdrop-blur @sm/panel:flex-row @sm/panel:items-center @sm/panel:justify-between dark:shadow-black/20">
-        <button
-          type="button"
-          className="flex min-w-0 items-center gap-2 text-left text-xs font-medium hover:underline"
-          onClick={() => void openExternal(url)}
+        <div
+          className="flex min-w-0 items-center gap-2 text-left text-xs font-medium"
           title={name}
         >
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
@@ -485,7 +493,17 @@ export function RepoPanelHeader({
               {subtitle}
             </span>
           </span>
-        </button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0 text-muted-foreground/60 hover:text-foreground"
+            onClick={() => void openExternal(url)}
+            aria-label={`Open ${name}`}
+            title={`Open ${name}`}
+          >
+            <ExternalLink data-icon="inline-start" />
+          </Button>
+        </div>
         <div className="flex items-center justify-between gap-2 @sm/panel:justify-end">
           {children}
         </div>
@@ -626,4 +644,3 @@ export function SectionHeading({
     </div>
   )
 }
-

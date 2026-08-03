@@ -65,11 +65,16 @@ const useScrollMetaStore = create<ScrollMetaState>()(
 
       setScroll: (threadId, meta) =>
         set((s) => {
-          const scroll = { ...s.scroll, [threadId]: { ...meta, savedAt: Date.now() } }
+          const scroll = {
+            ...s.scroll,
+            [threadId]: { ...meta, savedAt: Date.now() },
+          }
           const ids = Object.keys(scroll)
           if (ids.length > MAX_ENTRIES) {
             ids
-              .sort((a, b) => (scroll[a].savedAt ?? 0) - (scroll[b].savedAt ?? 0))
+              .sort(
+                (a, b) => (scroll[a].savedAt ?? 0) - (scroll[b].savedAt ?? 0)
+              )
               .slice(0, ids.length - MAX_ENTRIES)
               .forEach((id) => delete scroll[id])
           }

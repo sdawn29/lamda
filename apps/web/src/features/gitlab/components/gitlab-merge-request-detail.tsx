@@ -449,7 +449,9 @@ export function GitlabMergeRequestDetail({
               onSuccess: () => {
                 setMergeOpen(false)
                 toast.success(
-                  mergeState.auto ? "Auto-merge enabled" : "Merge request merged"
+                  mergeState.auto
+                    ? "Auto-merge enabled"
+                    : "Merge request merged"
                 )
               },
               onError: (mergeError) =>

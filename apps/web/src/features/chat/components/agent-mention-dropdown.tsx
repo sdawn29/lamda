@@ -10,7 +10,11 @@ import {
 import { cn } from "@/shared/lib/utils"
 import type { AgentDto } from "@/features/workspace/api"
 import { colorStyle, resolveModeIcon } from "./mode-combobox"
-import { AgentModelLine, AgentSourceBadge, AgentToolsSummary } from "./agent-info"
+import {
+  AgentModelLine,
+  AgentSourceBadge,
+  AgentToolsSummary,
+} from "./agent-info"
 
 /**
  * Detail pane for the currently highlighted agent — mirrors the facts shown
@@ -78,7 +82,8 @@ export function AgentMentionDropdown({
   // in response to a prop change) rather than in an effect, so there's no
   // extra render cascade or one-frame flash of the stale hover target.
   const [hoveredId, setHoveredId] = React.useState<string | null>(null)
-  const [prevSelectedIndex, setPrevSelectedIndex] = React.useState(selectedIndex)
+  const [prevSelectedIndex, setPrevSelectedIndex] =
+    React.useState(selectedIndex)
   if (selectedIndex !== prevSelectedIndex) {
     setPrevSelectedIndex(selectedIndex)
     setHoveredId(null)

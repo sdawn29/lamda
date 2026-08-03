@@ -58,7 +58,9 @@ export function DockZone({ dockId, ctx }: DockZoneProps) {
   const setFileTreeWidth = useDockStore((s) => s.setFileTreeWidth)
   const reviewFilesWidth = useDockStore((s) => s.reviewFilesWidth)
   const setReviewFilesWidth = useDockStore((s) => s.setReviewFilesWidth)
-  const rightDockFullscreen = useDockStore((s) => activeScope(s).rightDockFullscreen)
+  const rightDockFullscreen = useDockStore(
+    (s) => activeScope(s).rightDockFullscreen
+  )
   const toggleRightDockFullscreen = useDockStore(
     (s) => s.toggleRightDockFullscreen
   )
@@ -240,7 +242,7 @@ export function DockZone({ dockId, ctx }: DockZoneProps) {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-border bg-background shadow-md">
       <div
-        className="flex h-11 shrink-0 items-center gap-1 overflow-hidden px-2 py-0"
+        className="flex h-9 shrink-0 items-center gap-1 overflow-hidden px-1.5 py-0"
         onDragOver={handleHeaderDragOver}
         onDragLeave={() => setHeaderDropActive(false)}
         onDrop={handleHeaderDrop}
@@ -313,10 +315,10 @@ export function DockZone({ dockId, ctx }: DockZoneProps) {
                   setDropTarget(null)
                 }}
                 className={cn(
-                  "group flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md pr-1.5 pl-2.5 text-xs font-medium transition-all duration-150 select-none",
+                  "group flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-md pr-1 pl-1.5 text-xs font-semibold transition-all duration-150 select-none",
                   isActive
-                    ? "bg-accent text-accent-foreground shadow-sm ring-1 ring-border/60"
-                    : "text-muted-foreground/70 hover:bg-accent/60 hover:text-foreground",
+                    ? "bg-secondary/80 text-foreground ring-1 ring-border/50"
+                    : "text-muted-foreground/70 hover:bg-secondary/50 hover:text-foreground",
                   isDragging && "opacity-40",
                   dropBefore && "border-l-2 border-primary",
                   dropAfter && "border-r-2 border-primary"
