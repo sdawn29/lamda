@@ -20,7 +20,7 @@ import { ShortcutKbd } from "@/shared/ui/kbd"
 import { useTerminalStore } from "@/features/terminal/store"
 import { useBranch } from "@/features/git/queries"
 import { GitlabLogo } from "@/features/gitlab/components/gitlab-logo"
-import { useDockStore, openFileTab } from "./store"
+import { useDockStore, activeScope, openFileTab } from "./store"
 import type { DockId, DockPanelContext, DockPanelDefinition } from "./types"
 
 const ReviewPanel = lazy(() =>
@@ -68,7 +68,7 @@ function GitlabDockPanel({ sessionId }: { sessionId: string }) {
 }
 // Review and Files both host the file-tree overlay drawer in dock-zone.tsx.
 function FileTreeToggleAction({ label }: { label: string }) {
-  const fileTreeOpen = useDockStore((s) => s.fileTreeOpen)
+  const fileTreeOpen = useDockStore((s) => activeScope(s).fileTreeOpen)
   const toggleFileTree = useDockStore((s) => s.toggleFileTree)
   const fileTreeBinding = useShortcutBinding(SHORTCUT_ACTIONS.TOGGLE_FILE_TREE)
   return (
@@ -98,8 +98,10 @@ function FileTreeToggleAction({ label }: { label: string }) {
 // The Files panel owns navigation and its internal file tabs. Files never
 // become standalone dock tabs.
 function FilesPanel({ ctx }: { ctx: DockPanelContext }) {
-  const filePreviews = useDockStore((s) => s.filePreviews)
-  const activeFilePreviewId = useDockStore((s) => s.activeFilePreviewId)
+  const filePreviews = useDockStore((s) => activeScope(s).filePreviews)
+  const activeFilePreviewId = useDockStore(
+    (s) => activeScope(s).activeFilePreviewId
+  )
   const closeFilePreview = useDockStore((s) => s.closeFilePreview)
   const setActiveFilePreview = useDockStore((s) => s.setActiveFilePreview)
   const reorderFilePreview = useDockStore((s) => s.reorderFilePreview)
@@ -406,7 +408,9 @@ export function openPanelInDock(
   const def = PANELS[type]
   if (!def) return
   const store = useDockStore.getState()
-  const existing = Object.values(store.tabs).find((t) => t.type === type)
+  const existing = Object.values(activeScope(store).tabs).find(
+    (t) => t.type === type
+  )
   if (existing) return
   store.openTab({
     type,

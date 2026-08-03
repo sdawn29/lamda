@@ -21,7 +21,7 @@ import {
   type ChangedFile,
 } from "@/features/git"
 import { PANELS, openPanelInDock } from "../panels"
-import { useDockStore } from "../store"
+import { useDockStore, activeScope } from "../store"
 import type { DockId, DockPanelContext, DockTab } from "../types"
 
 const FileTree = lazy(() =>
@@ -46,19 +46,19 @@ interface DockZoneProps {
 }
 
 export function DockZone({ dockId, ctx }: DockZoneProps) {
-  const dock = useDockStore((s) => s.docks[dockId])
-  const tabs = useDockStore((s) => s.tabs)
+  const dock = useDockStore((s) => activeScope(s).docks[dockId])
+  const tabs = useDockStore((s) => activeScope(s).tabs)
   const setActiveTab = useDockStore((s) => s.setActiveTab)
   const closeTab = useDockStore((s) => s.closeTab)
   const moveTab = useDockStore((s) => s.moveTab)
   const reorderTab = useDockStore((s) => s.reorderTab)
-  const fileTreeOpen = useDockStore((s) => s.fileTreeOpen)
+  const fileTreeOpen = useDockStore((s) => activeScope(s).fileTreeOpen)
   const toggleFileTree = useDockStore((s) => s.toggleFileTree)
   const fileTreeWidth = useDockStore((s) => s.fileTreeWidth)
   const setFileTreeWidth = useDockStore((s) => s.setFileTreeWidth)
   const reviewFilesWidth = useDockStore((s) => s.reviewFilesWidth)
   const setReviewFilesWidth = useDockStore((s) => s.setReviewFilesWidth)
-  const rightDockFullscreen = useDockStore((s) => s.rightDockFullscreen)
+  const rightDockFullscreen = useDockStore((s) => activeScope(s).rightDockFullscreen)
   const toggleRightDockFullscreen = useDockStore(
     (s) => s.toggleRightDockFullscreen
   )
@@ -490,6 +490,6 @@ export function DockZone({ dockId, ctx }: DockZoneProps) {
 
 export function useIsForeignDockDrag(dockId: DockId): boolean {
   const draggingTabId = useDockStore((s) => s.draggingTabId)
-  const tabIds = useDockStore((s) => s.docks[dockId].tabIds)
+  const tabIds = useDockStore((s) => activeScope(s).docks[dockId].tabIds)
   return draggingTabId !== null && !tabIds.includes(draggingTabId)
 }

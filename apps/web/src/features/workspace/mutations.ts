@@ -272,7 +272,12 @@ export function useDeleteWorkspace() {
       useMainTabsStore
         .getState()
         .closeWorkspaceTabs(workspace.threads.map((t) => t.id))
-      useDockStore.getState().closeWorkspaceFileTabs(workspace.path)
+      const dockStore = useDockStore.getState()
+      dockStore.closeWorkspaceFileTabs(workspace.path)
+      // Every thread of the deleted workspace loses its dock scope too —
+      // closeWorkspaceFileTabs only sweeps file previews, not the rest of
+      // the per-thread layout (open panels, tabs, sizes).
+      for (const thread of workspace.threads) dockStore.dropScope(thread.id)
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
   })
@@ -332,6 +337,9 @@ export function useDeleteThread() {
       )
 
       removeSessionQueries(queryClient, [deletedThread?.sessionId])
+      // Drop the thread's dock layout — otherwise the scopes map grows for
+      // the rest of the session with no way to reclaim it.
+      useDockStore.getState().dropScope(threadId)
       queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
   })

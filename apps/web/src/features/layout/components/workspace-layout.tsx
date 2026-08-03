@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import {
   Outlet,
   useParams,
@@ -15,6 +22,7 @@ import { TooltipProvider } from "@/shared/ui/tooltip"
 import { useTerminal } from "@/features/terminal"
 import {
   useDockStore,
+  activeScope,
   isTabVisible,
   DockZone,
   useIsForeignDockDrag,
@@ -57,20 +65,39 @@ export function WorkspaceLayout() {
   const isOnboardRoute = useRouterState({
     select: (s) => s.matches.some((m) => m.routeId === "/onboard"),
   })
+  // Global (non-workspace) pages. The title bar hides its workspace/thread-
+  // scoped islands here — including the dock toggles — so the docks themselves
+  // stay collapsed too, otherwise a panel would sit on screen with no control
+  // to close it. Their tabs stay mounted (just zero-sized / display:none) so
+  // keep-alive panels like the terminal survive the round trip.
+  const isGlobalRoute = useRouterState({
+    select: (s) =>
+      s.matches.some(
+        (m) => m.routeId === "/automations" || m.routeId.startsWith("/skills")
+      ),
+  })
   const { isLoading, workspaces } = useWorkspace()
   const { threadId: activeThreadId } = useParams({ strict: false }) as {
     threadId?: string
   }
+  // Leaf routeId of the committed match — used only to detect a /new origin
+  // for the dock scope handoff below (see the effect a few lines down).
+  const activeRouteId = useRouterState({
+    select: (s) => s.matches.at(-1)?.routeId,
+  })
   const { states: terminalStates, syncCwd: syncTerminalCwd } = useTerminal()
-  const rightDock = useDockStore((s) => s.docks.right)
-  const bottomDock = useDockStore((s) => s.docks.bottom)
-  const rightDockFullscreen = useDockStore((s) => s.rightDockFullscreen)
+  const rightDock = useDockStore((s) => activeScope(s).docks.right)
+  const bottomDock = useDockStore((s) => activeScope(s).docks.bottom)
+  const rightDockFullscreen = useDockStore(
+    (s) => activeScope(s).rightDockFullscreen
+  )
   const toggleRightDockFullscreen = useDockStore(
     (s) => s.toggleRightDockFullscreen
   )
   const closeDock = useDockStore((s) => s.closeDock)
   const setDockSize = useDockStore((s) => s.setDockSize)
   const toggleFileTree = useDockStore((s) => s.toggleFileTree)
+  const setActiveScope = useDockStore((s) => s.setActiveScope)
   const terminalTabVisible = useDockStore((s) => isTabVisible(s, "terminal"))
   // Mounts an otherwise-empty dock as a drop target while a tab from the
   // other dock is being dragged over it (see dock-zone.tsx).
@@ -80,6 +107,10 @@ export function WorkspaceLayout() {
   const setLeftSidebarOpen = useLeftSidebarStore((s) => s.setOpen)
 
   const isMobile = useIsMobile(900)
+  // Previous committed routeId, for the dock-scope handoff effect below.
+  // undefined until the first navigation completes, which is fine — a
+  // handoff on cold load has no scratch scope to inherit from anyway.
+  const previousRouteIdRef = useRef<string | undefined>(undefined)
   const leftSidebarRef = useRef<HTMLDivElement>(null)
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(256)
   const isLeftSidebarDragging = useRef(false)
@@ -297,6 +328,25 @@ export function WorkspaceLayout() {
     syncTerminalCwd,
   ])
 
+  // Drives the dock store's per-thread scope (see features/dock/store.ts).
+  // `handoff` is true only when the previous committed route was /new — the
+  // one case where a thread-less scope's layout (panels opened while
+  // composing) should carry onto the thread just created from it, rather
+  // than the new thread starting at closed defaults. previousRouteIdRef is
+  // read *before* being updated to the current route below, so it always
+  // reflects the route this navigation came from.
+  //
+  // Layout effect, not a passive one: a passive effect lands after paint, so
+  // every thread switch would flash one frame of the *previous* thread's dock
+  // — its width, its open panels — before the new scope takes over. Same
+  // class of flash the committed-matches reads at the top of this component
+  // exist to avoid.
+  useLayoutEffect(() => {
+    const cameFromNewRoute = previousRouteIdRef.current === "/new"
+    setActiveScope(activeThreadId ?? null, { handoff: cameFromNewRoute })
+    previousRouteIdRef.current = activeRouteId
+  }, [activeThreadId, activeRouteId, setActiveScope])
+
   const rsSessionId =
     activeThread?.sessionId ??
     rsWorkspace?.threads.find((t) => t.sessionId)?.sessionId ??
@@ -373,15 +423,18 @@ export function WorkspaceLayout() {
     ]
   )
 
+  // Both are no-ops on the global pages, where the docks are hidden.
   useShortcutHandler(
     SHORTCUT_ACTIONS.TOGGLE_FILE_TREE,
-    rsWorkspacePath ? toggleFileTree : null
+    rsWorkspacePath && !isGlobalRoute ? toggleFileTree : null
   )
   // Disabled while the right dock has no tabs — fullscreen would collapse the
   // chat column with nothing to show in its place.
   useShortcutHandler(
     SHORTCUT_ACTIONS.TOGGLE_FULLSCREEN_DIFF,
-    rightDock.tabIds.length > 0 ? toggleRightDockFullscreen : null
+    rightDock.tabIds.length > 0 && !isGlobalRoute
+      ? toggleRightDockFullscreen
+      : null
   )
 
   if (isSettingsRoute) {
@@ -418,7 +471,14 @@ export function WorkspaceLayout() {
   // A foreign drag forces the dock visible even while closed/empty — otherwise
   // its "Drop here" strip (or header) would be display:none and undroppable.
   const bottomDockVisible =
-    (bottomDock.isOpen || bottomDropTarget) && !rightDockFullscreen
+    (bottomDock.isOpen || bottomDropTarget) &&
+    !rightDockFullscreen &&
+    !isGlobalRoute
+  const rightDockVisible =
+    (rightDock.isOpen || rightDropTarget) && !isGlobalRoute
+  // Fullscreen collapses the main column — never do that on a global page,
+  // where the dock it would expand into is hidden.
+  const rightDockFullscreenActive = rightDockFullscreen && !isGlobalRoute
 
   return (
     <TooltipProvider>
@@ -455,10 +515,10 @@ export function WorkspaceLayout() {
           <div
             className="flex h-full flex-1 flex-col overflow-hidden transition-[flex-grow,opacity] duration-200 ease-linear"
             style={{
-              flexGrow: rightDockFullscreen ? 0 : 1,
-              minWidth: rightDockFullscreen ? 0 : MIN_CHAT_PANEL_WIDTH,
-              opacity: rightDockFullscreen ? 0 : 1,
-              pointerEvents: rightDockFullscreen ? "none" : undefined,
+              flexGrow: rightDockFullscreenActive ? 0 : 1,
+              minWidth: rightDockFullscreenActive ? 0 : MIN_CHAT_PANEL_WIDTH,
+              opacity: rightDockFullscreenActive ? 0 : 1,
+              pointerEvents: rightDockFullscreenActive ? "none" : undefined,
             }}
           >
             <SidebarInset className="min-h-0 w-full flex-1 overflow-hidden rounded-lg border border-border shadow-md">
@@ -500,9 +560,9 @@ export function WorkspaceLayout() {
           {isMobile
             ? (rightDock.tabIds.length > 0 || rightDock.isOpen) && (
                 <Sheet
-                  open={rightDock.isOpen}
+                  open={rightDockVisible}
                   onOpenChange={(open) => {
-                    if (!open) closeDock("right")
+                    if (!open && !isGlobalRoute) closeDock("right")
                   }}
                 >
                   <SheetContent
@@ -519,7 +579,7 @@ export function WorkspaceLayout() {
                 rightDropTarget ||
                 rightDock.isOpen) && (
                 <>
-                  {rightDock.isOpen && !rightDockFullscreen && (
+                  {rightDockVisible && !rightDockFullscreenActive && (
                     <div
                       onMouseDown={handleResizeStart}
                       className="group relative z-30 w-2 shrink-0 cursor-col-resize"
@@ -537,15 +597,15 @@ export function WorkspaceLayout() {
                         // flex-grow toggles here, so fullscreen grows smoothly
                         // from whatever width is currently on screen instead of
                         // snapping to a recalculated basis.
-                        flexGrow: rightDockFullscreen ? 1 : 0,
+                        flexGrow: rightDockFullscreenActive ? 1 : 0,
                       } as React.CSSProperties
                     }
                     className={cn(
                       "h-full min-h-0 overflow-hidden transition-[width,flex-grow] duration-200 ease-linear",
                       // A foreign drag forces the dock visible even while closed —
                       // a w-0 dock can't receive the drop.
-                      rightDock.isOpen || rightDropTarget
-                        ? rightDockFullscreen
+                      rightDockVisible
+                        ? rightDockFullscreenActive
                           ? "w-(--sidebar-width) flex-none"
                           : // Cap at the available space so the dock never
                             // overflows the right padding as the window shrinks —

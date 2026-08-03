@@ -59,7 +59,7 @@ import type { AgentDto } from "@/features/workspace/api"
 import { useEnvDialog, useWorkspace } from "@/features/workspace"
 import { useGitStatus, statusLabel } from "@/features/git"
 import { buildChangedFileMap } from "../file-chip-context"
-import { useDockStore } from "@/features/dock"
+import { useDockStore, activeScope } from "@/features/dock"
 import { getModeOption, modeOptionFromDto, ModeCombobox } from "./mode-combobox"
 import { ApprovalModeCombobox } from "./approval-mode-combobox"
 import { ModelCombobox } from "./model-combobox"
@@ -459,7 +459,7 @@ export const ChatComposer = memo(
       () => buildChangedFileMap(gitStatusData?.raw ?? ""),
       [gitStatusData?.raw]
     )
-    const filePreviews = useDockStore((s) => s.filePreviews)
+    const filePreviews = useDockStore((s) => activeScope(s).filePreviews)
     // Workspace-relative paths of files open in the Files panel.
     const openFilePaths = React.useMemo(() => {
       const paths = new Set<string>()

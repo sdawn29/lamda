@@ -55,7 +55,7 @@ import {
 } from "@/shared/ui/alert-dialog"
 import { useSkillsSearchStore, useSkillDetails } from "@/features/skills"
 import { useAutomationsUiStore } from "@/features/automations"
-import { useDockStore, toggleReviewPanel } from "@/features/dock"
+import { useDockStore, activeScope, toggleReviewPanel } from "@/features/dock"
 import {
   useElectronFullscreen,
   useElectronPlatform,
@@ -190,9 +190,11 @@ export function TitleBar() {
   // sheet, surface the new-thread + search shortcuts here.
   const isMobile = useIsMobile(900)
   const openPalette = useCommandPalette((state) => state.openPalette)
-  const bottomDockOpen = useDockStore((s) => s.docks.bottom.isOpen)
-  const rightDockOpen = useDockStore((s) => s.docks.right.isOpen)
-  const rightDockFullscreen = useDockStore((s) => s.rightDockFullscreen)
+  const bottomDockOpen = useDockStore((s) => activeScope(s).docks.bottom.isOpen)
+  const rightDockOpen = useDockStore((s) => activeScope(s).docks.right.isOpen)
+  const rightDockFullscreen = useDockStore(
+    (s) => activeScope(s).rightDockFullscreen
+  )
   const toggleRightDockFullscreen = useDockStore(
     (s) => s.toggleRightDockFullscreen
   )

@@ -46,7 +46,13 @@ import { useWorkspace, useEnvDialog } from "@/features/workspace"
 import { useWorkspaceIndex } from "@/features/workspace/queries"
 import { useSemanticSearch } from "@/features/semantic-search"
 import { useTerminalForWorkspace } from "@/features/terminal"
-import { useDockStore, isTabVisible, openFileTab, toggleReviewPanel } from "@/features/dock"
+import {
+  useDockStore,
+  activeScope,
+  isTabVisible,
+  openFileTab,
+  toggleReviewPanel,
+} from "@/features/dock"
 import { useSidebar } from "@/shared/ui/sidebar"
 import { DEFAULT_SETTINGS_SECTION } from "@/features/settings"
 import { useTheme } from "@/shared/components/theme-provider"
@@ -74,7 +80,7 @@ export function CommandPalette() {
   }
   const { workspaces } = useWorkspace()
   const reviewOpen = useDockStore((s) => isTabVisible(s, "review"))
-  const fileTreeOpen = useDockStore((s) => s.fileTreeOpen)
+  const fileTreeOpen = useDockStore((s) => activeScope(s).fileTreeOpen)
   const toggleFileTree = useDockStore((s) => s.toggleFileTree)
   const { toggleSidebar } = useSidebar()
   const openSettings = useCallback(() => {

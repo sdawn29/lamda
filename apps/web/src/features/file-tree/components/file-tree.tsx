@@ -36,7 +36,7 @@ import {
   ContextMenuTrigger,
 } from "@/shared/ui/context-menu"
 import { getFileIcon } from "@/shared/ui/file-icon"
-import { openFileTab, useDockStore } from "@/features/dock"
+import { openFileTab, useDockStore, activeScope } from "@/features/dock"
 import { useOpenPath } from "@/features/electron"
 // Deep import (not the chat barrel) to avoid a feature-cycle through chat.
 import { useChatActions } from "@/features/chat/contexts/chat-actions-context"
@@ -280,12 +280,14 @@ export function FileTree({
 
   // The file shown in the dock's active file tab, if it lives under this
   // tree's root. Chat attachments (sourceUrl) live outside any workspace.
-  const activeFilePath = useDockStore(
-    (s) =>
-      s.filePreviews.find(
-        (file) => file.id === s.activeFilePreviewId && !file.sourceUrl
+  const activeFilePath = useDockStore((s) => {
+    const scope = activeScope(s)
+    return (
+      scope.filePreviews.find(
+        (file) => file.id === scope.activeFilePreviewId && !file.sourceUrl
       )?.filePath ?? null
-  )
+    )
+  })
   const activeRelativePath = useMemo(
     () =>
       activeFilePath?.startsWith(`${workspacePath}/`)

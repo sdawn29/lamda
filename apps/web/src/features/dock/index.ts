@@ -1,5 +1,6 @@
 export {
   useDockStore,
+  activeScope,
   isTabVisible,
   openFileTab,
   openReviewPanel,
