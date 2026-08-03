@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.57.0](../../releases/tag/v0.57.0) — 2026-08-03
+
+### Features
+
+* **dock:** implement thread-scoped dock state management
+* implement compaction metadata handling and UI integration
+* add freshness labels and polling for GitHub and GitLab panels
+* add support for rendering Mermaid diagrams in markdown
+* refactor model handling and authentication in pi-sdk
+
+### Code Refactoring
+
+* update component border radius styles from xl to lg
+
+### Other Changes
+
+* Refactor and enhance reset functionality across settings and workspace
+* update component styles to use rounded-xl instead of rounded-2xl
+
 ## [0.56.0](../../releases/tag/v0.56.0) — 2026-07-17
 
 ### Features
