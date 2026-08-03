@@ -158,7 +158,7 @@ export function CommentCard({
       className={cn(
         "overflow-hidden",
         !embedded &&
-          "rounded-xl border border-border/60 bg-card/70 shadow-sm shadow-black/[0.025]"
+          "rounded-lg border border-border/60 bg-card/70 shadow-sm shadow-black/[0.025]"
       )}
     >
       <div className="flex items-center gap-2 border-b border-border/40 bg-muted/20 px-3 py-2">

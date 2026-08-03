@@ -272,7 +272,7 @@ function ModeListPage() {
             <DefinitionRowSkeleton />
           </DefinitionList>
         ) : visibleModes.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border/70 px-6 py-8 text-center">
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border/70 px-6 py-8 text-center">
             <SparklesIcon className="size-5 text-muted-foreground" />
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium">

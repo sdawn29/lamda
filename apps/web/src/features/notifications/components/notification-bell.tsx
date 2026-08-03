@@ -26,14 +26,14 @@ export function NotificationBell() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative size-7 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  className="relative text-muted-foreground/70 hover:text-foreground"
                   aria-label={
                     unreadCount > 0
                       ? `Notifications, ${unreadCount} unread`
                       : "Notifications"
                   }
                 >
-                  <BellIcon className="size-4" />
+                  <BellIcon />
                   {unreadCount > 0 && (
                     <>
                       <span className="absolute top-1 right-1 flex size-1.5 rounded-full bg-primary" />

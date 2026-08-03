@@ -81,7 +81,7 @@ export function TasksDropdown({
               <Button
                 variant="ghost"
                 className={cn(
-                  "h-7 rounded-md text-muted-foreground hover:text-foreground",
+                  "h-7 rounded-md text-muted-foreground/70 hover:text-foreground",
                   isMobile ? "w-7 px-0" : "gap-1.5 px-2"
                 )}
                 disabled={!lastUsedTask}
@@ -101,7 +101,7 @@ export function TasksDropdown({
                   </>
                 ) : (
                   <>
-                    <Play className="size-4" />
+                    <Play />
                     {!isMobile && (
                       <span className="text-xs font-medium whitespace-nowrap">
                         Tasks

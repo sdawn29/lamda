@@ -30,7 +30,7 @@ function ChatViewSkeleton() {
         </div>
       </div>
       <div className="mx-auto w-full max-w-3xl shrink-0 px-6 py-2">
-        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-20 w-full rounded-lg" />
       </div>
     </div>
   )

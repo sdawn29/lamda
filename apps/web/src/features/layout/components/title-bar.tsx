@@ -28,7 +28,6 @@ import {
 } from "@tanstack/react-router"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
-import { ButtonGroup } from "@/shared/ui/button-group"
 import { useSidebar, SidebarTrigger } from "@/shared/ui/sidebar"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 import {
@@ -388,14 +387,23 @@ export function TitleBar() {
     SHORTCUT_ACTIONS.OPEN_COMMAND_PALETTE
   )
 
-  // Each control group is its own floating "island": a rounded, bordered pill
-  // that opts out of the window drag region so its controls receive clicks in
-  // Electron. The transparent strip between islands stays draggable so the
-  // frameless window can still be moved by the title bar.
+  // The title bar is a single flat strip — control groups are plain, chrome-less
+  // clusters rather than bordered pills. Each group opts out of the window drag
+  // region so its controls receive clicks in Electron; the gaps between groups
+  // stay draggable so the frameless window can still be moved by the title bar.
+  //
+  // Its h-11 spans the whole strip above the islands (which start at 44px, see
+  // workspace-layout), so items-center centres the controls on the space the bar
+  // actually owns rather than on a shorter box floating at the top of it.
   const drag = { WebkitAppRegion: "drag" } as React.CSSProperties
   const noDrag = { WebkitAppRegion: "no-drag" } as React.CSSProperties
-  const island =
-    "flex h-full shrink-0 items-center rounded-xl border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-lg"
+  const island = "flex h-full shrink-0 items-center"
+  // One look for every icon control in the bar: a 28px ghost box (size="icon")
+  // with a muted glyph that resolves to full contrast on hover, and the same
+  // muted fill for the three "engaged" states — hovered, toggled on
+  // (aria-pressed) and menu-open (aria-expanded, set by the Button variant).
+  const barButton =
+    "text-muted-foreground/70 hover:text-foreground disabled:opacity-30 aria-pressed:bg-muted aria-pressed:text-foreground"
 
   return (
     <>
@@ -417,21 +425,30 @@ export function TitleBar() {
       </AlertDialog>
 
       <div
-        className="fixed inset-x-2 top-2 z-50 flex h-8 items-center gap-2"
+        className="fixed inset-x-0 top-0 z-50 flex h-11 items-center gap-1 px-2"
         style={drag}
       >
-        {/* ── Traffic lights island (native macOS controls sit on top) ─────── */}
+        {/* ── Traffic lights spacer (native macOS controls sit on top) ──────
+            Electron places the lights at x:16, y:16 (main.ts): 12px dots on a
+            20px pitch, so they occupy 16…68px and centre on y=22 — the centre
+            of this h-11 bar.
+
+            The spacer is sized against the *glyphs*, not the button boxes. Each
+            control is a 14px icon centred in a 28px box, so 7px either side is
+            invisible padding and two neighbouring glyphs sit 18px apart
+            (gap-1 + 7 + 7). Ending the spacer flush with the last light would
+            leave only 11px to the first glyph, reading as crowded. Running it
+            7px past the lights (8px px-2 + 68px = 76) restores the 18px
+            rhythm. */}
         {isMac && !isFullscreen && (
-          <div className={cn(island, "w-[4.75rem]")} aria-hidden />
+          <div className={cn(island, "w-17")} aria-hidden />
         )}
 
         {/* ── Left sidebar toggle ──────────────────────────────────────────── */}
         <div className={island} style={noDrag}>
           <Tooltip>
             <TooltipTrigger
-              render={
-                <SidebarTrigger className="size-7 text-muted-foreground/70 hover:text-foreground" />
-              }
+              render={<SidebarTrigger size="icon" className={barButton} />}
             />
             <TooltipContent>
               Toggle sidebar{" "}
@@ -447,12 +464,12 @@ export function TitleBar() {
               render={
                 <Button
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon"
                   onClick={() => router.history.back()}
                   disabled={!canGoBack}
-                  className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
+                  className={barButton}
                 >
-                  <ChevronLeft className="size-4" />
+                  <ChevronLeft />
                   <span className="sr-only">Go back</span>
                 </Button>
               }
@@ -466,12 +483,12 @@ export function TitleBar() {
               render={
                 <Button
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon"
                   onClick={() => router.history.forward()}
                   disabled={!canGoForward}
-                  className="size-7 text-muted-foreground/60 hover:text-foreground disabled:opacity-25"
+                  className={barButton}
                 >
-                  <ChevronRight className="size-4" />
+                  <ChevronRight />
                   <span className="sr-only">Go forward</span>
                 </Button>
               }
@@ -497,11 +514,11 @@ export function TitleBar() {
                 render={
                   <Button
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon"
                     onClick={handleNewThread}
-                    className="size-7 text-muted-foreground/70 hover:text-foreground"
+                    className={barButton}
                   >
-                    <MessageSquarePlus className="size-4" />
+                    <MessageSquarePlus />
                     <span className="sr-only">New thread</span>
                   </Button>
                 }
@@ -516,11 +533,11 @@ export function TitleBar() {
                 render={
                   <Button
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon"
                     onClick={openPalette}
-                    className="size-7 text-muted-foreground/70 hover:text-foreground"
+                    className={barButton}
                   >
-                    <Search className="size-4" />
+                    <Search />
                     <span className="sr-only">Search</span>
                   </Button>
                 }
@@ -533,20 +550,19 @@ export function TitleBar() {
           </div>
         )}
 
-        {/* ── Automations page island: heading + new-automation action ──────── */}
+        {/* ── Automations page group: heading + new-automation action ──────── */}
         {isAutomations && (
-          <div className={cn(island, "shrink-0 gap-1.5 px-2.5")} style={noDrag}>
+          <div className={cn(island, "shrink-0 gap-1.5 px-1.5")} style={noDrag}>
             <Clock className="size-3.5 text-muted-foreground/70" />
             <span className="text-sm font-semibold text-foreground">
               Automations
             </span>
             <Button
-              size="sm"
-              className="ml-1 h-6 gap-1 px-2 text-xs"
+              className="ml-1"
               onClick={openNewAutomation}
               disabled={workspaces.length === 0}
             >
-              <Plus className="size-3.5" />
+              <Plus data-icon="inline-start" />
               New
             </Button>
           </div>
@@ -556,7 +572,7 @@ export function TitleBar() {
         {isSkills && (
           <>
             <div
-              className={cn(island, "shrink-0 gap-1.5 px-2.5")}
+              className={cn(island, "shrink-0 gap-1.5 px-1.5")}
               style={noDrag}
             >
               <Container className="size-3.5 text-muted-foreground/70" />
@@ -565,7 +581,10 @@ export function TitleBar() {
               </span>
             </div>
             <div
-              className={cn(island, "w-64 shrink-0 gap-1.5 px-2.5")}
+              className={cn(
+                island,
+                "h-7 w-64 shrink-0 gap-1.5 rounded-md border border-border bg-muted/40 px-2"
+              )}
               style={noDrag}
             >
               <Search className="size-3.5 shrink-0 text-muted-foreground/60" />
@@ -584,7 +603,7 @@ export function TitleBar() {
           navigation island) ────────────────────────────────────────────── */}
         {isSkillDetail && (
           <div
-            className={cn(island, "min-w-0 shrink gap-1.5 px-2.5")}
+            className={cn(island, "min-w-0 shrink gap-1.5 px-1.5")}
             style={noDrag}
           >
             <Container className="size-3.5 shrink-0 text-muted-foreground/70" />
@@ -786,9 +805,14 @@ export function TitleBar() {
               />
             </div>
 
-            {/* ── Sidebar controls ────────────────────────────────────────────── */}
-            <ButtonGroup
-              className={island}
+            {/* ── Sidebar controls ──────────────────────────────────────────────
+                A plain row, not a ButtonGroup: the group variant squares off
+                adjacent corners for segmented, bordered controls, which would
+                leave these two ghost buttons with mismatched hover fills next
+                to every other pair in the bar. */}
+            <div
+              role="group"
+              className={cn(island, "gap-0.5")}
               style={noDrag}
               aria-label="Sidebar controls"
             >
@@ -797,12 +821,12 @@ export function TitleBar() {
                   render={
                     <Button
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon"
                       onClick={() => toggleRightDock("bottom")}
                       aria-pressed={bottomDockOpen}
-                      className="size-7 text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+                      className={barButton}
                     >
-                      <PanelBottom data-icon="inline-start" />
+                      <PanelBottom />
                       <span className="sr-only">Toggle bottom sidebar</span>
                     </Button>
                   }
@@ -815,12 +839,12 @@ export function TitleBar() {
                   render={
                     <Button
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon"
                       onClick={handleToggleRightSidebar}
                       aria-pressed={rightDockOpen || rightDockFullscreen}
-                      className="size-7 text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+                      className={barButton}
                     >
-                      <PanelRight data-icon="inline-start" />
+                      <PanelRight />
                       <span className="sr-only">Toggle right sidebar</span>
                     </Button>
                   }
@@ -830,7 +854,7 @@ export function TitleBar() {
                   <ShortcutKbd binding={rightSidebarBinding} className="ml-1" />
                 </TooltipContent>
               </Tooltip>
-            </ButtonGroup>
+            </div>
           </>
         )}
       </div>

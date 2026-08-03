@@ -99,7 +99,7 @@ export function ChatErrorAlert({ error, onAction }: ChatErrorAlertProps) {
         "animate-in duration-200 fade-in-0 slide-in-from-bottom-2"
       )}
     >
-      <div className="overflow-hidden rounded-xl border border-destructive/20 bg-destructive/5">
+      <div className="overflow-hidden rounded-lg border border-destructive/20 bg-destructive/5">
         {/* Header row */}
         <div className="flex items-center gap-2.5 px-3 py-2">
           <Icon className="h-3.5 w-3.5 shrink-0 text-destructive/70" />

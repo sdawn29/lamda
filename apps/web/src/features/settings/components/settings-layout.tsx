@@ -15,7 +15,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
       style={{ "--sidebar-width": "15rem" } as CSSProperties}
       className="h-svh bg-sidebar"
     >
-      {/* Draggable window strip behind the titlebar island (frameless window /
+      {/* Draggable window strip behind the title bar (frameless window /
           macOS traffic lights). */}
       <div
         className="fixed inset-x-0 top-0 z-0 h-11"
@@ -23,8 +23,8 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
       />
       <SettingsTitleBar />
       <SettingsSidebar />
-      <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-12 pr-2 pb-2 peer-data-[state=collapsed]:pl-2 max-md:pl-2">
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background shadow-md">
+      <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-11 pr-2 pb-2 peer-data-[state=collapsed]:pl-2 max-md:pl-2">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-md">
           <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         </main>
       </div>

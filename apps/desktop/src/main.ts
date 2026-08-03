@@ -700,7 +700,10 @@ async function createWindow(splash?: BrowserWindow) {
     show: false,
     backgroundColor: "#09090b",
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 17 },
+    // Centres the 12px lights on the renderer's 44px (h-11) title bar: y = 22 - 6.
+    // Only read at window construction, so changing it needs an app restart, not
+    // a reload. Kept in sync with apps/web/.../layout/components/title-bar.tsx.
+    trafficLightPosition: { x: 16, y: 16 },
     webPreferences: {
       contextIsolation: true,
       devTools: !app.isPackaged,

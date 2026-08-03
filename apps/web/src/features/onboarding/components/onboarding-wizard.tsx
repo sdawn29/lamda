@@ -164,7 +164,7 @@ export function OnboardingWizard() {
           </div>
 
           {/* Step body */}
-          <div className="rounded-xl border bg-card/70 p-5 shadow-sm">
+          <div className="rounded-lg border bg-card/70 p-5 shadow-sm">
             {step === "about" && (
               <AboutStep
                 name={name}
@@ -275,7 +275,7 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
           {WELCOME_FEATURES.map(({ icon: Icon, label, description }) => (
             <div
               key={label}
-              className="flex flex-col gap-2 rounded-xl border bg-card/50 p-3 text-left"
+              className="flex flex-col gap-2 rounded-lg border bg-card/50 p-3 text-left"
             >
               <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
                 <Icon className="size-3.5 text-primary/80" />

@@ -123,7 +123,7 @@ export function WorkspaceEmptyState() {
           </div>
 
           {/* Setup checklist */}
-          <div className="divide-y rounded-xl border bg-card/70 px-5 shadow-sm">
+          <div className="divide-y rounded-lg border bg-card/70 px-5 shadow-sm">
             <StepRow
               number={1}
               title="Connect an AI provider"
@@ -153,7 +153,7 @@ export function WorkspaceEmptyState() {
             {FEATURES.map(({ icon: Icon, label, description }) => (
               <div
                 key={label}
-                className="flex flex-col gap-2 rounded-xl border bg-card/50 p-3 transition-colors hover:bg-card/80"
+                className="flex flex-col gap-2 rounded-lg border bg-card/50 p-3 transition-colors hover:bg-card/80"
               >
                 <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
                   <Icon className="size-3.5 text-primary/80" />

@@ -354,7 +354,7 @@ export function GitlabMergeRequestDetail({
               />
             </section>
 
-            <section className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
+            <section className="rounded-lg border border-border/60 bg-card/70 p-3 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
               <div className="flex flex-wrap items-center gap-1.5">
                 <MergeReadinessBanner
                   kind={readiness}

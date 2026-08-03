@@ -167,7 +167,7 @@ function OverviewPage({ workspaces }: { workspaces: WorkspaceDto[] }) {
       </div>
 
       {workspaces.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border/70 px-6 py-8 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border/70 px-6 py-8 text-center">
           <SearchIcon className="size-5 text-muted-foreground" />
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium">No workspaces yet</p>
@@ -177,7 +177,7 @@ function OverviewPage({ workspaces }: { workspaces: WorkspaceDto[] }) {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col divide-y divide-border/50 overflow-hidden rounded-xl border border-border/60 bg-card/50">
+        <div className="flex flex-col divide-y divide-border/50 overflow-hidden rounded-lg border border-border/60 bg-card/50">
           {workspaces.map((workspace) => (
             <WorkspaceIndexRow
               key={workspace.id}
@@ -222,7 +222,7 @@ function SearchPlayground({
     data && data.mode !== "none" ? searchModeLabel(data.mode) : null
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-border/60 bg-card/50 p-3.5">
+    <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/50 p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
           <h3 className="text-sm font-medium">Search this index</h3>
@@ -353,7 +353,7 @@ function WorkspaceDetailPage({ workspace }: { workspace: WorkspaceDto }) {
         <span className="text-xs font-medium">Workspaces</span>
       </Button>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-3.5 shadow-sm">
+      <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card p-3.5 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background text-muted-foreground">

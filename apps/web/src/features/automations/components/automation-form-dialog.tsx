@@ -208,7 +208,7 @@ function AutomationFormBody({
     <>
       {/* Header */}
       <DialogHeader className="flex-row items-center gap-3 space-y-0 border-b border-border/70 px-6 py-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15 ring-inset">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary ring-1 ring-primary/15 ring-inset">
           <CalendarClock className="size-4" />
         </div>
         <div className="flex flex-col gap-0.5">
@@ -437,7 +437,7 @@ function Card({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/15 p-3.5">
+    <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/15 p-3.5">
       <SectionLabel>{title}</SectionLabel>
       {children}
     </div>

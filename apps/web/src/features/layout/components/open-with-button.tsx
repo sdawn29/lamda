@@ -143,7 +143,7 @@ export function OpenWithButton({
     >
       <Button
         className={cn(
-          "h-7 rounded-md text-muted-foreground hover:text-foreground",
+          "h-7 rounded-md text-muted-foreground/70 hover:text-foreground",
           isMobile ? "w-7 px-0" : "gap-1.5 px-2"
         )}
         disabled={disabled}

@@ -350,7 +350,7 @@ export function RawEditorToggle({
   onChange: (value: "form" | "raw") => void
 }) {
   return (
-    <div className="inline-flex rounded-xl border border-border/70 bg-muted/40 p-0.5">
+    <div className="inline-flex rounded-lg border border-border/70 bg-muted/40 p-0.5">
       {(["form", "raw"] as const).map((mode) => (
         <button
           key={mode}
@@ -447,7 +447,7 @@ export function RawDefinitionEditor({
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/60 shadow-sm">
+    <section className="overflow-hidden rounded-lg border border-border/70 bg-card/60 shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3.5 py-2.5">
         <div className="flex flex-col gap-0.5">
           <h3 className="text-xs font-medium">Raw definition</h3>

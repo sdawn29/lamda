@@ -77,7 +77,7 @@ export function DetailTopBar({
 }) {
   return (
     <div className="shrink-0 p-2 pb-0">
-      <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border/60 bg-background/85 px-2 py-1.5 shadow-sm shadow-black/[0.03] backdrop-blur dark:shadow-black/20">
+      <div className="flex min-h-11 items-center gap-2 rounded-lg border border-border/60 bg-background/85 px-2 py-1.5 shadow-sm shadow-black/[0.03] backdrop-blur dark:shadow-black/20">
         <Button
           variant="ghost"
           size="icon-sm"
@@ -224,7 +224,7 @@ export function EmptyPlaceholder({
   hint?: string
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-border/70 bg-card/45 px-4 py-8 text-center">
+    <div className="rounded-lg border border-dashed border-border/70 bg-card/45 px-4 py-8 text-center">
       <MessageSquare className="mx-auto mb-2 size-5 text-muted-foreground/40" />
       <p className="text-xs font-medium">{title}</p>
       {hint ? (
@@ -264,7 +264,7 @@ export function ActivityList<T extends ActivityItem>({
 }) {
   if (loading && items.length === 0) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
         <Loader2 className="size-3 animate-spin" aria-hidden />
         Loading comments
       </div>
@@ -319,7 +319,7 @@ export function CommentComposer({
   onSubmit: () => void
 }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card/75 p-2.5 shadow-sm shadow-black/[0.025]">
+    <div className="rounded-lg border border-border/60 bg-card/75 p-2.5 shadow-sm shadow-black/[0.025]">
       <Textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -447,7 +447,7 @@ export function MergeDialog({
 /** Card container for the panel-root list sections (PRs, MRs, issues). */
 export function ListCard({ children }: { children: ReactNode }) {
   return (
-    <div className="divide-y divide-border/40 overflow-hidden rounded-xl border border-border/60 bg-card/65 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
+    <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60 bg-card/65 shadow-sm shadow-black/[0.025] dark:shadow-black/20">
       {children}
     </div>
   )
@@ -469,7 +469,7 @@ export function RepoPanelHeader({
 }) {
   return (
     <div className="shrink-0 p-2 pb-0">
-      <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-background/90 p-2.5 shadow-sm shadow-black/[0.03] backdrop-blur @sm/panel:flex-row @sm/panel:items-center @sm/panel:justify-between dark:shadow-black/20">
+      <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/90 p-2.5 shadow-sm shadow-black/[0.03] backdrop-blur @sm/panel:flex-row @sm/panel:items-center @sm/panel:justify-between dark:shadow-black/20">
         <button
           type="button"
           className="flex min-w-0 items-center gap-2 text-left text-xs font-medium hover:underline"

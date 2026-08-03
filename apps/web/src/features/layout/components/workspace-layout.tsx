@@ -433,19 +433,25 @@ export function WorkspaceLayout() {
         }
         className="h-svh bg-sidebar"
       >
-        {/* Draggable window strip behind the titlebar island (frameless
-            window). The island's controls opt out with no-drag. */}
+        {/* Draggable window strip behind the title bar (frameless window).
+            The bar's controls opt out with no-drag. */}
         <div
-          className="fixed inset-x-0 top-0 z-0 h-13"
+          className="fixed inset-x-0 top-0 z-0 h-11"
           style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
         />
         <TitleBar />
         <AppSidebar onResizeStart={handleLeftSidebarResizeStart} />
 
-        <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-12 pr-2 pb-2 peer-data-[state=collapsed]:pl-2 max-md:pl-2">
+        {/* Island grid: every island (sidebar, editor, docks) sits in a uniform
+            8px gutter below the title bar, whose h-11 spans that whole strip —
+            so the top offset is pt-11 (44px), the bar's own height. AppSidebar
+            positions itself independently (top-9! + the floating variant's own
+            p-2, which supplies that same 8px); if this offset changes, its
+            class has to change with it or the two islands stop lining up. */}
+        <div className="relative z-20 flex min-w-0 flex-1 overflow-hidden pt-11 pr-2 pb-2 peer-data-[state=collapsed]:pl-2 max-md:pl-2">
           {/* Editor column: the editor island and (when open) a separate
               bottom dock stacked below it, with a resize gutter as the gap.
-              Chrome lives in the unified titlebar island above. */}
+              Chrome lives in the flat title bar above. */}
           <div
             className="flex h-full flex-1 flex-col overflow-hidden transition-[flex-grow,opacity] duration-200 ease-linear"
             style={{
@@ -455,7 +461,7 @@ export function WorkspaceLayout() {
               pointerEvents: rightDockFullscreen ? "none" : undefined,
             }}
           >
-            <SidebarInset className="min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-border shadow-md">
+            <SidebarInset className="min-h-0 w-full flex-1 overflow-hidden rounded-lg border border-border shadow-md">
               <div className="min-h-0 flex-1 overflow-hidden">
                 <MainContentArea />
               </div>

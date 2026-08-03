@@ -144,7 +144,7 @@ export function AppearancePicker({
             type="button"
             title="Change color and icon"
             className={cn(
-              "group relative flex size-12 shrink-0 items-center justify-center rounded-xl transition-shadow outline-none hover:ring-2 hover:ring-ring/50 focus-visible:ring-2 focus-visible:ring-ring",
+              "group relative flex size-12 shrink-0 items-center justify-center rounded-md transition-shadow outline-none hover:ring-2 hover:ring-ring/50 focus-visible:ring-2 focus-visible:ring-ring",
               style.softBg,
               style.iconAccent
             )}
@@ -325,7 +325,7 @@ export function DefinitionRow({
  *  hairline-divided rows, matching the app's floating-island surfaces. */
 export function DefinitionList({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col divide-y divide-border/50 overflow-hidden rounded-xl border border-border/60 bg-card/50">
+    <div className="flex flex-col divide-y divide-border/50 overflow-hidden rounded-lg border border-border/60 bg-card/50">
       {children}
     </div>
   )
@@ -474,7 +474,7 @@ export function DefinitionEditorHeader({
 }) {
   const dir = identity.scope === "local" ? dirLocal : dirGlobal
   return (
-    <header className="flex items-start gap-3.5 rounded-xl border border-border/60 bg-card p-3.5 shadow-sm">
+    <header className="flex items-start gap-3.5 rounded-lg border border-border/60 bg-card p-3.5 shadow-sm">
       <AppearancePicker
         color={identity.color}
         icon={identity.icon}
@@ -585,7 +585,7 @@ export function DefinitionEditorFooter({
   onSubmit: () => void
 }) {
   return (
-    <footer className="sticky bottom-3 z-10 mt-5 flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/90 px-3.5 py-2.5 shadow-md backdrop-blur">
+    <footer className="sticky bottom-3 z-10 mt-5 flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-background/90 px-3.5 py-2.5 shadow-md backdrop-blur">
       <p className="text-3xs text-muted-foreground">{hint}</p>
       <div className="flex shrink-0 items-center gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel}>

@@ -37,7 +37,7 @@ export function TabsEmptyState() {
         </div>
       </div>
 
-      <div className="w-80 overflow-hidden rounded-xl border bg-card/60">
+      <div className="w-80 overflow-hidden rounded-lg border bg-card/60">
         {HINTS.map(({ action, icon: Icon, description }, i) => (
           <div
             key={action}

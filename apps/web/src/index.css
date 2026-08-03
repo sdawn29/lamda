@@ -68,13 +68,27 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* ── Radius scale — one tier per structural level ──────────────────────
+     Every tier derives from the theme's `--radius` (10px by default), so a
+     theme retunes the whole app by moving one number. Which tier to reach
+     for is a function of what the element *is*, not how big it looks:
+
+       sm   4px  xs controls, badges, kbd, checkbox glyphs, swatches
+       md   6px  default controls: buttons, inputs, tabs, menu/list rows
+       lg   8px  surfaces: islands, cards, popovers, menus, panels
+       xl  10px  top-level overlays only: dialogs, command palette
+       2xl 12px  the brand mark / app icon — deliberately outside the UI tiers
+
+     Nothing should be rounder than the surface it sits in, which is why the
+     tiers stay tight: the 1.4×/1.8× steps this replaced made inner cards read
+     rounder than the islands containing them. ── */
+  --radius-sm: calc(var(--radius) * 0.4);
+  --radius-md: calc(var(--radius) * 0.6);
+  --radius-lg: calc(var(--radius) * 0.8);
+  --radius-xl: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.2);
+  --radius-3xl: calc(var(--radius) * 1.4);
+  --radius-4xl: calc(var(--radius) * 1.6);
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -155,7 +169,8 @@
   --chart-4: #a84a5f;
   --chart-5: #7a5aa0;
 
-  /* ── Radius (10px controls) ── */
+  /* ── Radius anchor: the top tier (dialogs). Controls land at 0.6× of it,
+       surfaces at 0.8× — see the radius scale in `@theme inline`. ── */
   --radius: 0.625rem;
 
   /* ── Island base: the recessed backdrop the floating islands (sidebars +
@@ -433,7 +448,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: var(--secondary);
     color: var(--secondary-foreground);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
@@ -610,7 +625,7 @@
       var(--lamda-diff-added) var(--lamda-diff-border-alpha),
       transparent
     ) !important;
-    border-radius: 3px !important;
+    border-radius: var(--radius-sm) !important;
   }
   /* Removed rows: same treatment in the destructive hue. */
   .lamda-monaco-diff-viewer .monaco-editor .line-delete,
@@ -644,7 +659,7 @@
       var(--lamda-diff-removed) var(--lamda-diff-border-alpha),
       transparent
     ) !important;
-    border-radius: 3px !important;
+    border-radius: var(--radius-sm) !important;
   }
   /* Empty filler rows (the blank space opposite an add/remove in split view)
      get a faint hatch-free muted wash instead of Monaco's stock grey block. */
@@ -674,7 +689,7 @@
   .monaco-editor .quick-input-widget,
   .context-view .monaco-menu .monaco-action-bar.vertical,
   .monaco-menu-container {
-    border-radius: var(--radius) !important;
+    border-radius: var(--radius-lg) !important;
     box-shadow: 0 4px 16px -2px rgb(0 0 0 / 0.18) !important;
   }
 
@@ -695,7 +710,7 @@
      cleanly. The inner `.monaco-hover` must then drop its own (larger) radius —
      otherwise its background pulls inward from the corners and leaves gaps. */
   .monaco-editor .monaco-resizable-hover {
-    border-radius: var(--radius) !important;
+    border-radius: var(--radius-lg) !important;
     overflow: hidden !important;
     background: var(--popover) !important;
     box-shadow: 0 4px 16px -2px rgb(0 0 0 / 0.18) !important;
@@ -732,7 +747,7 @@
     height: auto !important;
     min-height: 36px !important;
     overflow: visible !important;
-    border-radius: var(--radius) !important;
+    border-radius: var(--radius-lg) !important;
     border: 1px solid color-mix(in srgb, var(--border) 85%, transparent) !important;
     background: color-mix(in srgb, var(--popover) 96%, transparent) !important;
     color: var(--popover-foreground) !important;
@@ -781,7 +796,7 @@
     padding: 0 !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
-    border-radius: calc(var(--radius) * 0.5) !important;
+    border-radius: var(--radius-sm) !important;
     background: transparent !important;
     background-position: center !important;
     line-height: 1 !important;
@@ -794,7 +809,7 @@
      space on the right so the overlaid toggles never sit on top of the text. */
   .monaco-editor .find-widget .monaco-inputbox {
     min-height: 28px !important;
-    border-radius: calc(var(--radius) * 0.7) !important;
+    border-radius: var(--radius-md) !important;
     border: 1px solid var(--input) !important;
     background: color-mix(in srgb, var(--input) 24%, transparent) !important;
     color: var(--foreground) !important;
@@ -841,7 +856,7 @@
     float: none !important;
     color: var(--muted-foreground) !important;
     border: 1px solid transparent !important;
-    border-radius: calc(var(--radius) * 0.5) !important;
+    border-radius: var(--radius-sm) !important;
     transition:
       background-color 150ms ease,
       border-color 150ms ease,
@@ -901,7 +916,7 @@
     padding: 0 !important;
     color: var(--muted-foreground) !important;
     border: 1px solid transparent !important;
-    border-radius: calc(var(--radius) * 0.5) !important;
+    border-radius: var(--radius-sm) !important;
     transition:
       background-color 150ms ease,
       border-color 150ms ease,
@@ -944,10 +959,10 @@
 
   /* Rounded selection rows inside menus and the suggest list. */
   .context-view .monaco-menu .monaco-action-bar .action-item .action-label {
-    border-radius: calc(var(--radius) * 0.6) !important;
+    border-radius: var(--radius-md) !important;
   }
   .monaco-editor .suggest-widget .monaco-list .monaco-list-row {
-    border-radius: calc(var(--radius) * 0.5) !important;
+    border-radius: var(--radius-md) !important;
   }
 
   /* Find-widget button tooltips use Monaco's compact workbench hover. Keep
@@ -972,7 +987,7 @@
   /* Themed inputs inside the find/rename widgets. */
   .monaco-editor .find-widget .monaco-inputbox,
   .monaco-editor .rename-box .rename-input {
-    border-radius: calc(var(--radius) * 0.6) !important;
+    border-radius: var(--radius-md) !important;
   }
 
   /* Round Monaco's own (non-native) scrollbar slider like the app scrollbars. */
@@ -994,7 +1009,7 @@
     border: 1px solid var(--border) !important;
     color: var(--popover-foreground) !important;
     font-family: var(--font-sans) !important;
-    border-radius: var(--radius) !important;
+    border-radius: var(--radius-lg) !important;
   }
   .sonner-toast[data-type="error"] {
     border-color: color-mix(
@@ -1026,7 +1041,7 @@
   .sonner-toast-action {
     background: var(--destructive) !important;
     color: var(--primary-foreground) !important;
-    border-radius: calc(var(--radius) * 0.8) !important;
+    border-radius: var(--radius-md) !important;
     font-size: 0.75rem !important;
     font-weight: 500 !important;
     padding: 0.375rem 0.75rem !important;
@@ -1044,7 +1059,7 @@
   .sonner-toast-cancel {
     background: var(--secondary) !important;
     color: var(--secondary-foreground) !important;
-    border-radius: calc(var(--radius) * 0.8) !important;
+    border-radius: var(--radius-md) !important;
     font-size: 0.75rem !important;
     font-weight: 500 !important;
     padding: 0.375rem 0.75rem !important;
@@ -1061,7 +1076,7 @@
 
   .sonner-toast-close {
     color: var(--muted-foreground) !important;
-    border-radius: calc(var(--radius) * 0.6) !important;
+    border-radius: var(--radius-sm) !important;
     transition: all 0.15s ease !important;
   }
 
@@ -1163,7 +1178,10 @@
   }
 
   [data-slot="sidebar-container"] {
-    top: 2.75rem; /* h-11 — matches title bar height exactly */
+    /* Fallback for sidebars that don't set their own offset; AppSidebar and
+       SettingsSidebar override this with top-9! plus their p-2 gutter, landing
+       the island at 44px — the bottom edge of the h-11 title bar. */
+    top: 2.25rem;
   }
 
   /* ── Global scrollbars — thin, themed, subtle ────────────────────────── */

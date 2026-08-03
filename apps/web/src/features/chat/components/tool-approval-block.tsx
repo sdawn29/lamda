@@ -153,7 +153,7 @@ export function ToolApprovalBlock({
   return (
     <div
       className={cn(
-        "flex w-full flex-col gap-3 rounded-2xl border border-border/70 bg-card p-3 shadow-sm",
+        "flex w-full flex-col gap-3 rounded-lg border border-border/70 bg-card p-3 shadow-sm",
         "animate-in duration-300 fade-in-0 slide-in-from-bottom-2"
       )}
     >

@@ -16,7 +16,7 @@ import { findSettingsSection } from "../sections"
 import { useAppSettings } from "../queries"
 
 /**
- * Island titlebar for the settings page — mirrors the workspace titlebar so the
+ * Flat titlebar for the settings page — mirrors the workspace titlebar so the
  * window chrome reads consistently. Holds the "back to threads" control and the
  * page title; the rest of the bar is the draggable window strip.
  */
@@ -59,22 +59,23 @@ export function SettingsTitleBar() {
   const drag = { WebkitAppRegion: "drag" } as CSSProperties
   const noDrag = { WebkitAppRegion: "no-drag" } as CSSProperties
 
-  // Each control group is its own floating "island": a rounded, bordered pill
-  // that opts out of the window drag region so its controls receive clicks in
-  // Electron. The transparent strips between islands stay draggable so the
-  // frameless window can still be moved by the title bar. Mirrors the workspace
-  // titlebar.
-  const island =
-    "flex h-full shrink-0 items-center rounded-xl border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-lg"
+  // Flat title bar: control groups are plain, chrome-less clusters that opt out
+  // of the window drag region so their controls receive clicks in Electron. The
+  // gaps between groups stay draggable so the frameless window can still be
+  // moved by the title bar. Mirrors the workspace titlebar.
+  const island = "flex h-full shrink-0 items-center"
+  // Same control look as the workspace titlebar — see the note there.
+  const barButton =
+    "text-muted-foreground/70 hover:text-foreground disabled:opacity-30 aria-pressed:bg-muted aria-pressed:text-foreground"
 
   return (
     <div
-      className="fixed inset-x-2 top-2 z-50 flex h-8 items-center gap-2"
+      className="fixed inset-x-0 top-0 z-50 flex h-11 items-center gap-1 px-2"
       style={drag}
     >
-      {/* ── Traffic lights island (native macOS controls sit on top) ─────── */}
+      {/* ── Traffic lights spacer — geometry mirrors the workspace bar ───── */}
       {isMac && !isFullscreen && (
-        <div className={cn(island, "w-[4.75rem]")} aria-hidden />
+        <div className={cn(island, "w-17")} aria-hidden />
       )}
 
       {/* ── Settings sidebar toggle ────────────────────────────────────── */}
@@ -83,12 +84,13 @@ export function SettingsTitleBar() {
           <TooltipTrigger
             render={
               <SidebarTrigger
+                size="icon"
                 aria-label={
                   isSidebarOpen
                     ? "Close settings sidebar"
                     : "Open settings sidebar"
                 }
-                className="size-7 text-muted-foreground/70 hover:text-foreground"
+                className={barButton}
               />
             }
           />
@@ -105,13 +107,12 @@ export function SettingsTitleBar() {
             render={
               <Button
                 variant="ghost"
-                size="sm"
                 onClick={handleClose}
                 aria-label="Go back"
-                className="h-7 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                className={barButton}
               >
-                <ArrowLeft className="size-3.5" />
-                <span className="text-xs font-medium">Back</span>
+                <ArrowLeft data-icon="inline-start" />
+                Back
               </Button>
             }
           />
@@ -125,7 +126,7 @@ export function SettingsTitleBar() {
       </div>
 
       {/* ── Page title (Settings › section) ──────────────────────────────── */}
-      <div className={cn(island, "min-w-0 shrink gap-1 px-2.5")} style={noDrag}>
+      <div className={cn(island, "min-w-0 shrink gap-1 px-1.5")} style={noDrag}>
         <span className="shrink-0 text-sm font-semibold text-foreground">
           Settings
         </span>

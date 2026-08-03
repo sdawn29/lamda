@@ -321,7 +321,7 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-12 text-center">
-      <div className="flex size-10 items-center justify-center rounded-xl border border-border/50 bg-muted/50">
+      <div className="flex size-10 items-center justify-center rounded-md border border-border/50 bg-muted/50">
         <Clock className="size-4 text-muted-foreground/60" />
       </div>
       <div className="flex flex-col gap-1">

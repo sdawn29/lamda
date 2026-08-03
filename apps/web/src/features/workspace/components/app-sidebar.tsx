@@ -793,8 +793,8 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
     <Sidebar
       variant="floating"
       collapsible="offcanvas"
-      className="top-10! h-[calc(100svh-2.5rem)]"
-      mobileClassName="inset-y-12! left-4! h-auto! w-72! max-w-[calc(100%-2rem)]! overflow-hidden rounded-xl border border-border bg-background shadow-xl"
+      className="top-9! h-[calc(100svh-2.25rem)]"
+      mobileClassName="inset-y-11! left-4! h-auto! w-72! max-w-[calc(100%-2rem)]! overflow-hidden rounded-lg border border-border bg-background shadow-xl"
     >
       <SidebarHeader className={cn("shrink-0 p-0", isMobile ? "h-9" : "h-2")} />
       <SidebarContent className="overflow-hidden">
@@ -941,7 +941,7 @@ export function AppSidebar({ onResizeStart }: AppSidebarProps) {
             <SidebarMenu>
               {workspaces.length === 0 ? (
                 <div className="my-3 flex flex-col items-center gap-2.5 px-2 text-center">
-                  <div className="flex size-9 items-center justify-center rounded-xl border border-border/50 bg-muted/50">
+                  <div className="flex size-9 items-center justify-center rounded-md border border-border/50 bg-muted/50">
                     <FolderOpen className="size-4 text-muted-foreground/60" />
                   </div>
                   <p className="text-xs text-muted-foreground/70">

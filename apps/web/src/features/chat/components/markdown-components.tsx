@@ -125,7 +125,7 @@ function TaskCheckbox({ checked }: { checked?: boolean }) {
   return (
     <span
       className={cn(
-        "mt-[0.2em] inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+        "mt-[0.2em] inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors",
         checked
           ? "border-primary bg-primary text-primary-foreground"
           : "border-muted-foreground/40 bg-transparent"

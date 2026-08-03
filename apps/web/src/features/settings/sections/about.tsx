@@ -71,7 +71,7 @@ export function AboutSection() {
   return (
     <>
       {/* App identity */}
-      <section className="flex flex-col items-center gap-4 rounded-2xl border border-border/60 px-6 py-9 text-center">
+      <section className="flex flex-col items-center gap-4 rounded-lg border border-border/60 px-6 py-9 text-center">
         <LamdaMark className="size-16 rounded-2xl text-4xl shadow-sm ring-1 ring-border/50" />
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-2.5">
@@ -168,7 +168,7 @@ export function AboutSection() {
       </SettingsGroup>
 
       {/* Danger zone */}
-      <section className="overflow-hidden rounded-xl border border-destructive/30 bg-destructive/5">
+      <section className="overflow-hidden rounded-lg border border-destructive/30 bg-destructive/5">
         <header className="flex items-center gap-2 border-b border-destructive/20 px-4 py-2.5">
           <AlertTriangle className="size-3.5 text-destructive" />
           <h2 className="text-sm font-medium tracking-tight text-destructive">

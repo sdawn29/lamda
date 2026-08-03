@@ -86,7 +86,7 @@ function OptionRow({
       <span
         className={cn(
           "mt-0.5 flex size-3.5 shrink-0 items-center justify-center border transition-all duration-150",
-          multi ? "rounded-[4px]" : "rounded-full",
+          multi ? "rounded-sm" : "rounded-full",
           selected
             ? "border-primary bg-primary text-primary-foreground"
             : "border-muted-foreground/35 bg-transparent group-hover/opt:border-primary/50"
@@ -339,7 +339,7 @@ export function QuestionView({ sessionId, question }: QuestionViewProps) {
   return (
     <div
       className={cn(
-        "flex w-full flex-col rounded-2xl border border-input bg-card shadow-sm",
+        "flex w-full flex-col rounded-lg border border-input bg-card shadow-sm",
         "animate-in duration-300 fade-in-0 slide-in-from-bottom-2"
       )}
     >

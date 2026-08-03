@@ -117,7 +117,7 @@ function FilesPanel({ ctx }: { ctx: DockPanelContext }) {
   if (!filePreview) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+        <div className="flex size-10 items-center justify-center rounded-md bg-muted text-muted-foreground">
           <FolderTree className="size-5" aria-hidden />
         </div>
         <div className="flex flex-col gap-1">
