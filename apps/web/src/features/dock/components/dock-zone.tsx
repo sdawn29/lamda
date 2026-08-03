@@ -180,7 +180,7 @@ export function DockZone({ dockId, ctx }: DockZoneProps) {
         onDragLeave={() => setHeaderDropActive(false)}
         onDrop={handleHeaderDrop}
         className={cn(
-          "flex h-full w-full flex-col overflow-y-auto rounded-2xl border bg-background shadow-md transition-colors",
+          "flex h-full w-full flex-col overflow-y-auto rounded-xl border bg-background shadow-md transition-colors",
           headerDropActive ? "border-primary/60 bg-primary/5" : "border-border"
         )}
       >
@@ -238,7 +238,7 @@ export function DockZone({ dockId, ctx }: DockZoneProps) {
   }
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-md">
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border bg-background shadow-md">
       <div
         className="flex h-11 shrink-0 items-center gap-1 overflow-hidden px-2 py-0"
         onDragOver={handleHeaderDragOver}
@@ -453,7 +453,7 @@ export function DockZone({ dockId, ctx }: DockZoneProps) {
                 ref={fileTreeDrawerRef}
                 style={{ width: drawerWidth }}
                 className={cn(
-                  "absolute inset-y-2 right-2 z-20 flex max-w-[85%] flex-col overflow-hidden rounded-2xl border border-border bg-background p-1 shadow-md transition-transform duration-200 ease-out",
+                  "absolute inset-y-2 right-2 z-20 flex max-w-[85%] flex-col overflow-hidden rounded-xl border border-border bg-background p-1 shadow-md transition-transform duration-200 ease-out",
                   showFileTree && "translate-x-0",
                   !showFileTree &&
                     "pointer-events-none translate-x-[calc(100%+0.5rem)]"

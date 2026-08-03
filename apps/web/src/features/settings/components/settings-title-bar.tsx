@@ -65,7 +65,7 @@ export function SettingsTitleBar() {
   // frameless window can still be moved by the title bar. Mirrors the workspace
   // titlebar.
   const island =
-    "flex h-full shrink-0 items-center rounded-2xl border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-xl"
+    "flex h-full shrink-0 items-center rounded-xl border border-border bg-background px-0.5 shadow-sm [&_button]:rounded-lg"
 
   return (
     <div

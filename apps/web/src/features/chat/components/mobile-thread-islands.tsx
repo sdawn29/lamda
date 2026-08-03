@@ -105,7 +105,7 @@ export function MobileThreadIslands({
 
   return (
     <div className="absolute inset-x-0 top-2 z-30 flex flex-wrap justify-start gap-1.5 px-2">
-      <div className="group/thread-title flex max-w-full min-w-0 shrink items-center gap-1 overflow-hidden rounded-2xl border border-border bg-background/70 px-2 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-xl">
+      <div className="group/thread-title flex max-w-full min-w-0 shrink items-center gap-1 overflow-hidden rounded-xl border border-border bg-background/70 px-2 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-lg">
         {activeWorkspace && (
           <Badge
             variant="secondary"
@@ -191,7 +191,7 @@ export function MobileThreadIslands({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="flex shrink-0 items-center rounded-2xl border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-xl">
+      <div className="flex shrink-0 items-center rounded-xl border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-lg">
         <BranchSelector
           branch={branch}
           branches={branches}
@@ -203,7 +203,7 @@ export function MobileThreadIslands({
         />
       </div>
       {(branch !== null || branches.length > 0) && (
-        <div className="flex shrink-0 items-center rounded-2xl border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-xl">
+        <div className="flex shrink-0 items-center rounded-xl border border-border bg-background/70 px-0.5 py-1 shadow-sm backdrop-blur-md [&_button]:rounded-lg">
           <WorktreeSelector
             threadId={threadId}
             sessionId={sessionId}

@@ -77,7 +77,7 @@ export function SettingsSidebar() {
       variant="floating"
       collapsible="offcanvas"
       className="top-10! h-[calc(100svh-2.5rem)]"
-      mobileClassName="inset-y-12! left-4! h-auto! w-72! max-w-[calc(100%-2rem)]! overflow-hidden rounded-2xl border border-border bg-background shadow-xl"
+      mobileClassName="inset-y-12! left-4! h-auto! w-72! max-w-[calc(100%-2rem)]! overflow-hidden rounded-xl border border-border bg-background shadow-xl"
     >
       {/* Search */}
       <SidebarHeader className="px-3 pt-3 pb-3">

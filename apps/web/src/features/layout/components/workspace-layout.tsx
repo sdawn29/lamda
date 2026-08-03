@@ -455,7 +455,7 @@ export function WorkspaceLayout() {
               pointerEvents: rightDockFullscreen ? "none" : undefined,
             }}
           >
-            <SidebarInset className="min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-border shadow-md">
+            <SidebarInset className="min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-border shadow-md">
               <div className="min-h-0 flex-1 overflow-hidden">
                 <MainContentArea />
               </div>
