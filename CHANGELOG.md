@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.58.0](../../releases/tag/v0.58.0) — 2026-08-11
+
+### Features
+
+* **auth:** add isFreshOAuthCredential function and tests for OAuth credential validation refactor(build): enhance package resolution and OAuth flow registration chore: update dependencies to version 0.83.0
+
 ## [0.57.0](../../releases/tag/v0.57.0) — 2026-08-03
 
 ### Features
