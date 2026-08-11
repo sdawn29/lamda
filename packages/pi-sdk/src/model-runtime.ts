@@ -3,8 +3,26 @@ import type {
   CredentialInfo,
   CredentialStore,
 } from "@earendil-works/pi-ai";
+import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import type { SdkConfig } from "./types.js";
+
+/**
+ * pi-ai loads each provider's OAuth flow through a *variable* dynamic import
+ * (`import("./anthropic.js")`) specifically so bundlers cannot follow it into
+ * Node-only code. That leaves the specifier in the esbuild output, where it
+ * resolves relative to `server.cjs` instead of node_modules — so in the
+ * packaged desktop app every subscription login failed with
+ * ERR_MODULE_NOT_FOUND while dev (unbundled) worked fine.
+ *
+ * `registerBunOAuthFlows` is pi-ai's supported escape hatch: it statically
+ * imports every flow and registers them, so the dynamic import is never
+ * reached. Despite the name it is not Bun-specific — it applies to any bundled
+ * host. The build aliases this specifier to the same pi-ai copy
+ * pi-coding-agent resolves, because the registry lives in module state and a
+ * second copy would register on the wrong instance.
+ */
+registerBunOAuthFlows();
 
 /**
  * Process-local credential store. Used when an API key is supplied explicitly

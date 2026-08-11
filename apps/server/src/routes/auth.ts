@@ -7,6 +7,7 @@ import {
   readAuthJson,
   writeAuthJson,
   activeLogins,
+  isFreshOAuthCredential,
   type OAuthSseEvent,
   type ActiveLogin,
 } from "../services/auth-service.js";
@@ -44,6 +45,7 @@ auth.get("/auth/oauth/providers", async (c) => {
 auth.post("/auth/oauth/:providerId/login", async (c) => {
   const providerId = c.req.param("providerId");
   const loginId = randomUUID();
+  const credentialBefore = (await readAuthJson())[providerId];
 
   const login: ActiveLogin = {
     sseQueue: [],
@@ -154,8 +156,19 @@ auth.post("/auth/oauth/:providerId/login", async (c) => {
       emit({ type: "done" });
       activeLogins.delete(loginId);
     })
-    .catch((err: unknown) => {
-      if (!login.abortController.signal.aborted) {
+    .catch(async (err: unknown) => {
+      if (login.abortController.signal.aborted) {
+        activeLogins.delete(loginId);
+        return;
+      }
+      // The credential may already be on disk even though login() rejected —
+      // see isFreshOAuthCredential. Report that as the successful sign-in it
+      // is; the catalogs the failed refresh wanted are reloaded by the reset.
+      const credentialAfter = (await readAuthJson())[providerId];
+      if (isFreshOAuthCredential(credentialBefore, credentialAfter)) {
+        resetModelRuntime();
+        emit({ type: "done" });
+      } else {
         emit({
           type: "error",
           message: err instanceof Error ? err.message : String(err),

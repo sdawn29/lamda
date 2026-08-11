@@ -5,6 +5,7 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   rmSync,
   statSync,
 } from "node:fs";
@@ -18,19 +19,35 @@ function resolvePackageDir(packageName) {
   return dirname(require.resolve(`${packageName}/package.json`));
 }
 
-function findPackageRoot(packageName) {
-  let dir = __dirname;
+function findPackageRoot(packageName, startDir = __dirname) {
+  let dir = startDir;
   while (dir !== dirname(dir)) {
     const candidate = resolve(dir, "node_modules", packageName);
     if (existsSync(resolve(candidate, "package.json"))) return candidate;
     dir = dirname(dir);
   }
-  throw new Error(`Could not locate ${packageName} in any node_modules above ${__dirname}`);
+  throw new Error(`Could not locate ${packageName} in any node_modules above ${startDir}`);
 }
 
 // Wipe dist/ up front so stale layouts from previous builds (e.g. pre-refactor
 // dist/node_modules/) cannot linger and mislead electron-builder.
 rmSync(resolve("dist"), { recursive: true, force: true });
+
+// The package's `exports` field forbids both `./package.json` and the CJS
+// `require` condition, so require.resolve cannot see it — walk node_modules.
+const piPackageDir = findPackageRoot("@earendil-works/pi-coding-agent");
+
+// pi-ai's OAuth flows are loaded through a variable dynamic import so bundlers
+// cannot follow them (see the registerBunOAuthFlows() call in @lamda/pi-sdk).
+// That import survives bundling and then resolves next to server.cjs, so the
+// packaged app cannot load any flow. pi-sdk defeats it by registering the
+// statically imported flows from "@earendil-works/pi-ai/bun-oauth" — but the
+// registry is module state, so it must land on the very pi-ai copy that
+// pi-coding-agent itself resolves (npm may nest a second copy under it).
+// Aliasing the exact subpath to that copy's file keeps one instance in the
+// bundle; a bare package alias would bypass the exports map and fail to
+// resolve the extensionless subpath.
+const piAiDir = findPackageRoot("@earendil-works/pi-ai", piPackageDir);
 
 await build({
   entryPoints: ["src/index.ts"],
@@ -41,6 +58,9 @@ await build({
   outfile: "dist/server.cjs",
   // Cannot bundle native .node addons — externalize and copy alongside bundle
   external: ["@silvia-odwyer/photon-node", "better-sqlite3", "node-pty"],
+  alias: {
+    "@earendil-works/pi-ai/bun-oauth": resolve(piAiDir, "dist/bun-oauth.js"),
+  },
   minify: false,
   sourcemap: true,
   // ESM packages that use import.meta.url (e.g. @earendil-works/pi-coding-agent)
@@ -84,10 +104,6 @@ cpSync(nodePtySrc, resolve("dist/addons/node-pty"), { recursive: true });
 // in dev, Resources/server/ in prod) looking for the first package.json. Drop
 // the SDK's package.json next to server.cjs so that walk succeeds and the
 // SDK reads the right metadata (name "pi", configDir ".pi", real version).
-// Note: the package's `exports` field forbids both `./package.json` and the
-// CJS `require` condition, so neither require.resolve form works — fall back
-// to walking the node_modules chain directly.
-const piPackageDir = findPackageRoot("@earendil-works/pi-coding-agent");
 copyFileSync(resolve(piPackageDir, "package.json"), resolve("dist/package.json"));
 
 // @silvia-odwyer/photon-node is a dependency of @earendil-works/pi-coding-agent and
@@ -130,5 +146,45 @@ function assertAddonsPresent() {
 }
 
 assertAddonsPresent();
+
+// Every provider's OAuth flow must be inside the bundle, registered on the one
+// pi-ai instance the runtime uses. Otherwise pi-ai falls back to its variable
+// dynamic import, which resolves next to server.cjs and fails — subscription
+// sign-in then breaks in the packaged app only, where nobody sees a stack
+// trace. Cheap to check here, so check it here.
+function assertOAuthFlowsBundled() {
+  const bundle = readFileSync(resolve("dist/server.cjs"), "utf-8");
+
+  const flowPaths = [
+    ...bundle.matchAll(
+      /([\w@.\-/]*node_modules\/@earendil-works\/pi-ai)\/dist\/auth\/oauth\/(\w[\w-]*)\.js/g,
+    ),
+  ];
+  const copies = new Set(flowPaths.map((m) => m[1]));
+  const flows = new Set(flowPaths.map((m) => m[2]));
+
+  if (!bundle.includes("registerBundledOAuthFlowLoaders")) {
+    throw new Error(
+      "[server build] pi-ai's bundled OAuth loaders are not registered. " +
+        "Check the registerBunOAuthFlows() call in @lamda/pi-sdk.",
+    );
+  }
+  for (const flow of ["anthropic", "openai-codex", "github-copilot"]) {
+    if (!flows.has(flow)) {
+      throw new Error(
+        `[server build] OAuth flow "${flow}" was not bundled — sign-in would fail at runtime.`,
+      );
+    }
+  }
+  if (copies.size !== 1) {
+    throw new Error(
+      `[server build] ${copies.size} copies of @earendil-works/pi-ai in the bundle ` +
+        `(${[...copies].join(", ")}). The flow registry is module state, so the ` +
+        `bun-oauth alias in this file must point at the copy pi-coding-agent resolves.`,
+    );
+  }
+}
+
+assertOAuthFlowsBundled();
 
 console.log("Build complete → dist/server.cjs");

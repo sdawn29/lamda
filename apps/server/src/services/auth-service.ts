@@ -22,6 +22,24 @@ export async function writeAuthJson(data: AuthJson): Promise<void> {
   await writeFile(AUTH_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
 }
 
+/**
+ * Did a provider gain a *fresh* OAuth credential while a login ran?
+ *
+ * `ModelRuntime.login()` persists the credential first and only then refreshes
+ * the model catalogs over the network, so a refresh failure rejects a login
+ * that has already succeeded. Comparing the stored credential from before and
+ * after the flow tells the two apart: a leftover credential from an earlier
+ * session is unchanged, and so still counts as a failure.
+ */
+export function isFreshOAuthCredential(
+  before: AuthEntry | undefined,
+  after: AuthEntry | undefined,
+): boolean {
+  if (after?.type !== "oauth") return false;
+  if (before?.type !== "oauth") return true;
+  return before.access !== after.access || before.expires !== after.expires;
+}
+
 export type OAuthSseEvent =
   | { type: "auth_url"; url: string; instructions?: string }
   | {
